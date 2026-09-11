@@ -31,6 +31,11 @@ interface HospitalTopbarProps {
   role: HospitalRole;
   onRoleChange: (role: HospitalRole | '__logout') => void;
   onNavigate: (view: HospitalNavView) => void;
+  /**
+   * Opens the off-canvas sidebar. Rendered as a hamburger below `lg` only, so
+   * the desktop topbar is unchanged (audit 3.4.1).
+   */
+  onMenu?: () => void;
 }
 
 /** Hospital shell topbar with notification bell + role-switch menu (design `Topbar`). */
@@ -41,6 +46,7 @@ export function HospitalTopbar({
   role,
   onRoleChange,
   onNavigate,
+  onMenu,
 }: HospitalTopbarProps) {
   const [menu, setMenu] = useState(false);
   const [notif, setNotif] = useState(false);
@@ -114,19 +120,32 @@ export function HospitalTopbar({
         ];
   const unread = notifs.filter((n) => n.unread).length;
   return (
-    <header className="h-topbar border-border relative z-20 flex flex-none items-center justify-between border-b bg-white px-7">
-      <div className="flex items-center gap-3.5">
+    <header className="min-h-topbar border-border relative z-20 flex flex-none flex-wrap items-center justify-between gap-y-2 border-b bg-white px-4 py-2 lg:px-7 lg:py-0">
+      <div className="flex min-w-0 items-center gap-3.5">
+        {onMenu && (
+          <button
+            type="button"
+            onClick={onMenu}
+            aria-label="Open navigation"
+            title="Open navigation"
+            className="text-text-strong flex cursor-pointer lg:hidden"
+          >
+            <Icon name="layout-grid" size={24} />
+          </button>
+        )}
         {onBack && (
           <button type="button" onClick={onBack} className="text-text-strong flex cursor-pointer">
             <Icon name="arrow-left" size={24} />
           </button>
         )}
-        <div>
-          <h1 className="text-h1 text-text-strong m-0">{title}</h1>
-          {subtitle && <div className="text-caption text-text-muted mt-0.25">{subtitle}</div>}
+        <div className="min-w-0">
+          <h1 className="text-h1 text-text-strong m-0 truncate">{title}</h1>
+          {subtitle && (
+            <div className="text-caption text-text-muted mt-0.25 truncate">{subtitle}</div>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
           onClick={() => {
@@ -148,7 +167,7 @@ export function HospitalTopbar({
         {notif && (
           <>
             <div onClick={() => setNotif(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-18.5 z-40 w-83 overflow-hidden rounded-lg border bg-white">
+            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-83 max-w-full overflow-hidden rounded-lg border bg-white lg:right-18.5">
               <div className="border-border-soft flex items-center justify-between border-b px-4 py-3.5">
                 <span className="text-text-strong text-[15px] font-semibold">Notifications</span>
                 {unread > 0 && (
@@ -211,7 +230,7 @@ export function HospitalTopbar({
           className="flex cursor-pointer items-center gap-2.5"
         >
           <Avatar name={u.name} size={38} />
-          <div className="flex flex-col items-start">
+          <div className="hidden flex-col items-start sm:flex">
             <span className="text-body text-text-strong font-medium">{u.name}</span>
             <span className="text-caption text-text-muted">{u.role}</span>
           </div>
@@ -220,7 +239,7 @@ export function HospitalTopbar({
         {menu && (
           <>
             <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-7 z-40 w-58 overflow-hidden rounded-lg border bg-white p-2">
+            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-58 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
               <div className="text-tiny text-text-faint px-2.5 pt-2 pb-1.5 font-semibold tracking-[.06em] uppercase">
                 Switch Role
               </div>

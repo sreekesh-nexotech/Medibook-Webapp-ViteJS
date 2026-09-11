@@ -176,7 +176,33 @@
   --color-border-soft: #e5e7eb;
   --color-border-input: #eaeaea;
 
-  /* Text */
+  /* ---- Text ----
+   *
+   * WHICH GREY IS SAFE FOR TEXT (measured, WCAG 2.1 non-bold body text needs
+   * 4.5:1; non-text UI furniture needs 3:1):
+   *
+   *   token              hex      on white  on #f7f8fa  on bg-app #f3f3f3
+   *   --text-strong      #111827   17.74      16.69        15.99   text-safe
+   *   --text-navy        #0e2a4a   14.50      13.64        13.06   text-safe
+   *   --text-body        #1f2737   14.96      14.08        13.48   text-safe
+   *   --text-muted       #6b7280    4.83       4.55         4.36   text-safe on
+   *                                                               white/grey-200
+   *                                                               only (see below)
+   *   --text-faint       #9ca3af    2.54       2.39         2.29   DECORATIVE ONLY
+   *   --color-grey-900   #4b5363    7.73       7.27         6.97   text-safe
+   *
+   * RULE FOR SCREENS:
+   *   * Readable copy a user must be able to act on — captions, sub-lines,
+   *     helper text, "last updated", table secondary values, empty-state
+   *     sentences — uses `text-text-muted`.
+   *   * `text-text-faint` is for decoration that carries no information:
+   *     placeholder glyphs, disabled-state hints duplicated elsewhere,
+   *     watermark text, inactive sort chevrons, separators. Never use it for
+   *     a sentence the user is meant to read.
+   *   * `text-text-muted` measures 4.36:1 directly on the app background
+   *     (#f3f3f3) — just under the bar. Captions that sit on the page
+   *     background rather than on a white Card should use `text-grey-900`
+   *     (6.97:1) or `text-text-body`. Inside a Card (white) muted is fine. */
   --color-text-strong: #111827;
   --color-text-body: #1f2737;
   --color-text-muted: #6b7280;
@@ -184,17 +210,31 @@
   --color-text-on-dark: #ffffff;
   --color-text-navy: #0e2a4a;
 
-  /* Status badge soft backgrounds */
+  /* Status badge soft backgrounds + WCAG-AA foregrounds.
+   *
+   * Every `*-fg` below is measured against its paired `*-bg` (the scheduled
+   * background is `rgba(37,99,235,.14)` over white = #e0e9fc). The original
+   * design-file foregrounds all failed the 4.5:1 minimum for the 12.5px badge
+   * text, so each was darkened one ramp step to the nearest passing token:
+   *
+   *   scheduled  #2563eb 4.24:1  ->  #1d4ed8 5.50:1
+   *   completed  #16a34a 3.00:1  ->  #15803d 4.57:1
+   *   queue      #d98512 2.58:1  ->  #8a5208 5.73:1   (= --color-y-800)
+   *   cancelled  #e74c3c 3.13:1  ->  #a82d20 5.62:1   (= --color-d-700)
+   *   noshow     #ea7c2b 2.47:1  ->  #9c4410 5.64:1
+   *
+   * The soft backgrounds are unchanged, so pill geometry and tint are
+   * identical — only the glyph colour moved. */
   --color-badge-scheduled-bg: rgba(37, 99, 235, 0.14);
-  --color-badge-scheduled-fg: #2563eb;
+  --color-badge-scheduled-fg: #1d4ed8;
   --color-badge-completed-bg: #dcfce7;
-  --color-badge-completed-fg: #16a34a;
+  --color-badge-completed-fg: #15803d;
   --color-badge-queue-bg: #fef3c7;
-  --color-badge-queue-fg: #d98512;
+  --color-badge-queue-fg: #8a5208;
   --color-badge-cancelled-bg: #fee2e2;
-  --color-badge-cancelled-fg: #e74c3c;
+  --color-badge-cancelled-fg: #a82d20;
   --color-badge-noshow-bg: #ffedd5;
-  --color-badge-noshow-fg: #ea7c2b;
+  --color-badge-noshow-fg: #9c4410;
 
   /* ---- Type ---- */
   --font-sans: 'Poppins', 'Open Sans', 'Segoe UI', system-ui, sans-serif;
@@ -240,6 +280,8 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-input: 10px;
+  /* Shimmer-block corner used by every Skeleton primitive. */
+  --radius-skeleton: 6px;
 
   /* ---- Shadows ---- */
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
@@ -249,6 +291,9 @@
   --spacing-sidebar: 254px;
   --spacing-sidebar-compact: 76px;
   --spacing-topbar: 87px;
+  /* Below `lg`, a multi-column table stops crushing and scrolls sideways
+   * inside its own scroller instead (see shared/ui/TableShell). */
+  --spacing-table-min: 860px;
 
   /* ---- Motion ---- */
   --animate-fade-in: fade-in 0.15s ease-out;
@@ -336,12 +381,29 @@
     background: transparent;
   }
 
-  /* Design-file focus treatment for form controls */
+  /* Design-file focus treatment for form controls (inset ring, unchanged). */
   select:focus,
   input:focus,
-  textarea:focus {
+  textarea:focus,
+  select:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
     outline: 2px solid var(--color-blue);
     outline-offset: -1px;
+  }
+
+  /* Keyboard focus ring for everything else — audit 3.3.4 ("buttons and links
+   * never show a focus outline"). `:focus-visible` only, so a pointer click
+   * still paints nothing and no control's resting visual changes.
+   * `[tabindex="-1"]` is excluded so programmatically focusing a dialog panel
+   * or a skip target never draws a ring around the panel. */
+  button:focus-visible,
+  a:focus-visible,
+  summary:focus-visible,
+  [role='button']:focus-visible,
+  [tabindex]:not([tabindex='-1']):focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 2px;
   }
 
   /* Approved "Comfy" table density: every table cell gets 22px vertical

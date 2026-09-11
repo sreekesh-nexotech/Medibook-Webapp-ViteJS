@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+
+import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
 
 import {
   AUTH_LOGIN_PATH,
@@ -13,10 +16,19 @@ import { useAuthStore } from '@/features/auth/application/store/auth.store';
 import { useSettingsStore } from '@/features/settings/application/store/settings.store';
 
 import { ErrorBoundary } from './ErrorBoundary';
-import { NAV_PARENT, subFor, titleFor, viewAllowed, type HospitalNavView } from './hospital-nav';
+import {
+  documentTitleFor,
+  NAV_PARENT,
+  subFor,
+  titleFor,
+  viewAllowed,
+  type HospitalNavView,
+} from './hospital-nav';
 import { HospitalSidebar } from './HospitalSidebar';
 import { HospitalTopbar } from './HospitalTopbar';
 import { ScreenError } from './ScreenError';
+import { SidebarDrawer } from './SidebarDrawer';
+import { useSidebarMode } from './useSidebarMode';
 import { createViewHistory } from './view-history';
 
 /**
@@ -40,6 +52,13 @@ export function HospitalShell({ role }: HospitalShellProps) {
   const view = hospitalViewFromPath(location.pathname);
   const navActive = NAV_PARENT[view] ?? view;
 
+  // Responsive sidebar: `full` at >= lg (unchanged), a 76px icon rail at
+  // md-lg, an off-canvas drawer below md (audit 3.4.1).
+  const sidebarMode = useSidebarMode();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useDocumentTitle(documentTitleFor(role, view));
+
   // History-aware back — recorded synchronously in render so availability is
   // correct immediately (exactly like the prototype).
   history.record(view, location.pathname);
@@ -53,7 +72,10 @@ export function HospitalShell({ role }: HospitalShellProps) {
         }
       : null;
 
-  const handleNavigate = (target: HospitalNavView) => navigate(hospitalPath(role, target));
+  const handleNavigate = (target: HospitalNavView) => {
+    setNavOpen(false);
+    navigate(hospitalPath(role, target));
+  };
 
   const handleRoleChange = (next: HospitalRole | '__logout') => {
     if (next === '__logout') {
@@ -71,14 +93,19 @@ export function HospitalShell({ role }: HospitalShellProps) {
     }
   };
 
+  const sidebar = (mode: 'full' | 'rail') => (
+    <HospitalSidebar
+      active={navActive}
+      onNavigate={handleNavigate}
+      role={role}
+      hospitalName={hospitalName}
+      mode={mode}
+    />
+  );
+
   return (
     <div className="bg-bg-app flex h-full overflow-hidden">
-      <HospitalSidebar
-        active={navActive}
-        onNavigate={handleNavigate}
-        role={role}
-        hospitalName={hospitalName}
-      />
+      {sidebarMode !== 'drawer' && sidebar(sidebarMode)}
       <div className="flex min-w-0 flex-1 flex-col">
         <HospitalTopbar
           title={titleFor(role, view)}
@@ -87,8 +114,9 @@ export function HospitalShell({ role }: HospitalShellProps) {
           role={role}
           onRoleChange={handleRoleChange}
           onNavigate={handleNavigate}
+          onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary
             key={view}
             fallback={(_err, reset) => (
@@ -99,6 +127,13 @@ export function HospitalShell({ role }: HospitalShellProps) {
           </ErrorBoundary>
         </div>
       </div>
+      <SidebarDrawer
+        open={navOpen && sidebarMode !== 'full'}
+        onClose={() => setNavOpen(false)}
+        label="Hospital navigation"
+      >
+        {sidebar('full')}
+      </SidebarDrawer>
     </div>
   );
 }

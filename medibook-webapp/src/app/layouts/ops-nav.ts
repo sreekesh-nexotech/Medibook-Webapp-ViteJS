@@ -23,6 +23,8 @@ export const OPS_NAV: readonly OpsNavSection[] = [
     section: 'Network',
     items: [
       { id: 'hospitals', label: 'Hospitals', icon: 'building-2' },
+      { id: 'onboarding', label: 'Onboarding', icon: 'rocket' },
+      { id: 'compliance', label: 'Compliance', icon: 'shield-check' },
       { id: 'plans', label: 'Subscription Plans', icon: 'layers' },
     ],
   },
@@ -90,7 +92,19 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Home-screen banners and push notifications in the Medibook patient app',
   ],
   settings: ['Platform Settings', 'Platform-wide preferences and defaults'],
+  onboarding: [
+    'Hospital Onboarding',
+    'Applications, KYC verification and go-live across the onboarding pipeline',
+  ],
+  compliance: ['Compliance', 'Registration, licence and document compliance per hospital instance'],
 };
+
+/** Browser-tab title per ops view — audit 3.9.2 (the console ran under the
+ * hospital app's title). */
+export function opsDocumentTitleFor(view: OpsView): string {
+  const meta = OPS_META[view];
+  return `${meta ? meta[0] : 'Operations'} · Medibook Operations`;
+}
 
 /** The signed-in ops identity (design `OPS_USER`). */
 export const OPS_USER = {

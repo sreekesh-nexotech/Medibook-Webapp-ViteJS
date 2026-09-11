@@ -20,6 +20,8 @@ export function HospitalNavItem({ item, active, onClick, collapsed }: HospitalNa
       type="button"
       onClick={() => onClick(item.id)}
       title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
+      aria-current={isActive ? 'page' : undefined}
       className={cn(
         'text-body mx-2.5 flex cursor-pointer items-center gap-3.5 rounded-md transition-colors duration-150',
         collapsed ? 'justify-center py-2.75' : 'justify-start px-4 py-2.5',

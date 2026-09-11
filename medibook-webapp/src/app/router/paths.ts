@@ -28,7 +28,14 @@ export const OPS_BASE_PATH = '/ops';
 
 /* ------------------------------------------------------- hospital views */
 
-/** Hospital view ids, exactly as the design prototype named them. */
+/**
+ * Hospital view ids, exactly as the design prototype named them, plus the
+ * screens the current build round adds (`slots` … `billing`). A view id lives
+ * here before its screen exists so nav entries, links and `hospitalPath()`
+ * calls compile while the screen is being built; until the route is wired the
+ * URL falls through to `NotFoundScreen`, which says so rather than silently
+ * bouncing to the dashboard.
+ */
 export type HospitalView =
   | 'dashboard'
   | 'appointments'
@@ -43,7 +50,20 @@ export type HospitalView =
   | 'users'
   | 'reports'
   | 'settings'
-  | 'help';
+  | 'help'
+  // ---- added this round (screens owned by the feature agents) ----
+  /** Doctor slot templates + exceptions. Admin-only. */
+  | 'slots'
+  /** Hospital profile: branches, holidays, banners. Admin-only. */
+  | 'profile'
+  /** Services & pricing, taxes, coupons. Admin-only. */
+  | 'services'
+  /** Patient messaging templates + announcements. Admin-only. */
+  | 'messaging'
+  /** Hospital-side audit trail. Admin-only. */
+  | 'audit'
+  /** Plan & billing (today a tab inside `settlements`). Admin-only. */
+  | 'billing';
 
 /** Detail views whose URL carries a param (`OpsSel`/`Store` selection → URL). */
 export type HospitalDetailView = 'patient-detail' | 'doctor-detail';
@@ -67,7 +87,32 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   reports: 'reports',
   settings: 'settings',
   help: 'help',
+  slots: 'slots',
+  profile: 'profile',
+  services: 'services',
+  messaging: 'messaging',
+  audit: 'audit',
+  billing: 'billing',
 };
+
+/**
+ * Hospital views that must sit behind `RequireAdmin` in the route tree — a
+ * receptionist reaching one gets `ForbiddenScreen`, not a silent redirect.
+ */
+export const ADMIN_ONLY_HOSPITAL_VIEWS: readonly HospitalView[] = [
+  'settlements',
+  'doctors',
+  'doctor-detail',
+  'users',
+  'reports',
+  'settings',
+  'slots',
+  'profile',
+  'services',
+  'messaging',
+  'audit',
+  'billing',
+];
 
 /** Absolute path for a param-free hospital view. */
 export function hospitalPath(role: HospitalRole, view: HospitalStaticView): string {
@@ -76,6 +121,33 @@ export function hospitalPath(role: HospitalRole, view: HospitalStaticView): stri
 
 export function hospitalDashboardPath(role: HospitalRole): string {
   return hospitalPath(role, 'dashboard');
+}
+
+/* Named helpers for the views added this round, so feature screens link by
+ * function rather than by assembling a path string. */
+
+export function hospitalSlotsPath(role: HospitalRole): string {
+  return hospitalPath(role, 'slots');
+}
+
+export function hospitalProfilePath(role: HospitalRole): string {
+  return hospitalPath(role, 'profile');
+}
+
+export function hospitalServicesPath(role: HospitalRole): string {
+  return hospitalPath(role, 'services');
+}
+
+export function hospitalMessagingPath(role: HospitalRole): string {
+  return hospitalPath(role, 'messaging');
+}
+
+export function hospitalAuditPath(role: HospitalRole): string {
+  return hospitalPath(role, 'audit');
+}
+
+export function hospitalBillingPath(role: HospitalRole): string {
+  return hospitalPath(role, 'billing');
 }
 
 /** List views resolvable 1:1 from their first URL segment. */
@@ -91,6 +163,12 @@ const HOSPITAL_SEGMENT_VIEWS: readonly HospitalView[] = [
   'reports',
   'settings',
   'help',
+  'slots',
+  'profile',
+  'services',
+  'messaging',
+  'audit',
+  'billing',
 ];
 
 /** Current hospital view id from a `/:role/...` pathname (design `parseHash`). */
@@ -123,7 +201,12 @@ export type OpsView =
   | 'platform-users'
   | 'platform-user-detail'
   | 'notifications'
-  | 'settings';
+  | 'settings'
+  // ---- added this round (screens owned by the feature agents) ----
+  /** Hospital onboarding pipeline (applications, KYC, go-live). */
+  | 'onboarding'
+  /** Document/regulatory compliance per hospital. */
+  | 'compliance';
 
 /** Ops detail views whose URL carries a param (`OpsSel` selection → URL). */
 export type OpsDetailView =
@@ -150,6 +233,8 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   'platform-user-detail': 'platform-users/:id',
   notifications: 'notifications',
   settings: 'settings',
+  onboarding: 'onboarding',
+  compliance: 'compliance',
 };
 
 /** Absolute path for a param-free ops view. */
@@ -160,6 +245,16 @@ export function opsPath(view: OpsStaticView): string {
 /** Absolute path for one hospital's ops profile (bell/alert `hospital:<id>` targets). */
 export function opsHospitalDetailPath(id: number): string {
   return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.hospitals}/${id}`;
+}
+
+/* Named helpers for the ops views added this round. */
+
+export function opsOnboardingPath(): string {
+  return opsPath('onboarding');
+}
+
+export function opsCompliancePath(): string {
+  return opsPath('compliance');
 }
 
 /** Ops list views resolvable 1:1 from their first URL segment. */
@@ -176,6 +271,8 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'platform-users',
   'notifications',
   'settings',
+  'onboarding',
+  'compliance',
 ];
 
 /** Current ops view id from an `/ops/...` pathname. */

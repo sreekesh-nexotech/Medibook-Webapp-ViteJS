@@ -1,17 +1,15 @@
-import { Navigate, Outlet, useParams } from 'react-router-dom';
-
-import { hospitalDashboardPath, isHospitalRole } from '@/app/router/paths';
+import { RequirePermission } from '@/app/router/RequirePermission';
 
 /**
  * Wrapper for admin-only hospital views (`settlements`, `doctors`, `users`,
- * `reports`, `settings`): a receptionist is bounced to their dashboard
- * (spec §6 role gates).
+ * `reports`, `settings`, plus the new `slots` / `profile` / `services` /
+ * `messaging` / `audit` / `billing`).
+ *
+ * Kept under the original export name so the route tree and anything else
+ * importing it are unaffected — it is now a thin call into the
+ * permission-aware `RequirePermission`, which renders `ForbiddenScreen`
+ * instead of silently bouncing a receptionist to their dashboard (audit 3.7).
  */
 export function RequireAdmin() {
-  const { role: roleParam } = useParams();
-  if (roleParam !== 'admin') {
-    const role = isHospitalRole(roleParam) ? roleParam : 'receptionist';
-    return <Navigate to={hospitalDashboardPath(role)} replace />;
-  }
-  return <Outlet />;
+  return <RequirePermission requireAdminRole roleLabel="Administrator" />;
 }

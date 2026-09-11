@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
+import { NotFoundScreen } from '@/app/layouts/NotFoundScreen';
 import { DashboardSwitch } from '@/app/router/DashboardSwitch';
 import { HospitalGuard } from '@/app/router/HospitalGuard';
 import { OpsGuard } from '@/app/router/OpsGuard';
@@ -49,6 +50,59 @@ import { UsersRolesScreen } from '@/features/users-roles/presentation/screens/Us
 /** React Router catch-all segment. */
 const CATCH_ALL = '*';
 
+/* ============================================================================
+ * ORCHESTRATOR: screens to wire once the feature agents land
+ * ============================================================================
+ * The view ids, URL segments, `*Path()` helpers and sidebar nav entries for
+ * every screen below already exist (`app/router/paths.ts`,
+ * `app/layouts/hospital-nav.ts`, `app/layouts/ops-nav.ts`), so links and
+ * `hospitalPath()` / `opsPath()` calls compile today. Only the route rows are
+ * missing — deliberately, because importing a screen that does not exist yet
+ * would break the build. Until each row lands the URL falls through to
+ * `NotFoundScreen`, which explains itself instead of silently redirecting.
+ *
+ * HOSPITAL — every one of these is ADMIN-ONLY: add the row inside the existing
+ * `{ element: <RequireAdmin />, children: [...] }` block, not beside it.
+ *
+ *   // ORCHESTRATOR: wire SlotsScreen here
+ *   { path: HOSPITAL_VIEW_SEGMENT.slots, element: <SlotsScreen /> }
+ *       url: /:role/slots        (admin only)
+ *
+ *   // ORCHESTRATOR: wire HospitalProfileScreen here
+ *   { path: HOSPITAL_VIEW_SEGMENT.profile, element: <HospitalProfileScreen /> }
+ *       url: /:role/profile      (admin only) — branches, holidays, banners
+ *
+ *   // ORCHESTRATOR: wire ServicesPricingScreen here
+ *   { path: HOSPITAL_VIEW_SEGMENT.services, element: <ServicesPricingScreen /> }
+ *       url: /:role/services     (admin only) — services & pricing, taxes, coupons
+ *
+ *   // ORCHESTRATOR: wire MessagingScreen here
+ *   { path: HOSPITAL_VIEW_SEGMENT.messaging, element: <MessagingScreen /> }
+ *       url: /:role/messaging    (admin only) — templates + announcements
+ *
+ *   // ORCHESTRATOR: wire AuditTrailScreen here
+ *   { path: HOSPITAL_VIEW_SEGMENT.audit, element: <AuditTrailScreen /> }
+ *       url: /:role/audit        (admin only)
+ *
+ *   // ORCHESTRATOR: wire PlanBillingScreen here — OPTIONAL
+ *   { path: HOSPITAL_VIEW_SEGMENT.billing, element: <PlanBillingScreen /> }
+ *       url: /:role/billing      (admin only)
+ *       NOTE: plan & billing is ALREADY reachable — `PlanBilling` renders as a
+ *       tab inside `SettlementsScreen`. The view id + segment + helper exist so
+ *       it *can* be split out, but no sidebar entry was added and this row is
+ *       only needed if the owning agent promotes it to its own screen.
+ *
+ * OPS — no role gate; the whole console is already behind `OpsGuard`.
+ *
+ *   // ORCHESTRATOR: wire OpsOnboardingScreen here
+ *   { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> }
+ *       url: /ops/onboarding
+ *
+ *   // ORCHESTRATOR: wire OpsComplianceScreen here
+ *   { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> }
+ *       url: /ops/compliance
+ * ========================================================================== */
+
 /** The full route tree (spec §6). Guards live beside it in `app/router/`. */
 export const router = createBrowserRouter([
   { path: ROOT_PATH, element: <RootRedirect /> },
@@ -78,7 +132,9 @@ export const router = createBrowserRouter([
           { path: HOSPITAL_VIEW_SEGMENT.settings, element: <HospitalSettingsScreen /> },
         ],
       },
-      { path: CATCH_ALL, element: <Navigate to={ROOT_PATH} replace /> },
+      // Audit 3.2.4/3.7 — an unknown hospital URL explains itself instead of
+      // silently redirecting to the dashboard.
+      { path: CATCH_ALL, element: <NotFoundScreen /> },
     ],
   },
   {
@@ -105,8 +161,8 @@ export const router = createBrowserRouter([
       },
       { path: OPS_VIEW_SEGMENT.notifications, element: <OpsNotificationsScreen /> },
       { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
-      { path: CATCH_ALL, element: <Navigate to={ROOT_PATH} replace /> },
+      { path: CATCH_ALL, element: <NotFoundScreen /> },
     ],
   },
-  { path: CATCH_ALL, element: <Navigate to={ROOT_PATH} replace /> },
+  { path: CATCH_ALL, element: <NotFoundScreen /> },
 ]);

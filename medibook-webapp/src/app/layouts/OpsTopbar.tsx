@@ -37,10 +37,22 @@ interface OpsTopbarProps {
   onOpenHospital: (id: number) => void;
   onLogout: () => void;
   onBack: (() => void) | null;
+  /**
+   * Opens the off-canvas sidebar. Rendered as a hamburger below `lg` only, so
+   * the desktop topbar is unchanged (audit 3.4.1).
+   */
+  onMenu?: () => void;
 }
 
 /** Ops console topbar with notification bell + account menu (design `OpsTopbar`). */
-export function OpsTopbar({ view, onNavigate, onOpenHospital, onLogout, onBack }: OpsTopbarProps) {
+export function OpsTopbar({
+  view,
+  onNavigate,
+  onOpenHospital,
+  onLogout,
+  onBack,
+  onMenu,
+}: OpsTopbarProps) {
   const [menu, setMenu] = useState(false);
   const [notif, setNotif] = useState(false);
   const requests = useInboxStore((s) => s.requests);
@@ -85,19 +97,30 @@ export function OpsTopbar({ view, onNavigate, onOpenHospital, onLogout, onBack }
     else onNavigate(go);
   };
   return (
-    <header className="h-topbar border-border relative z-20 flex flex-none items-center justify-between border-b bg-white px-7">
-      <div className="flex items-center gap-3.5">
+    <header className="min-h-topbar border-border relative z-20 flex flex-none flex-wrap items-center justify-between gap-y-2 border-b bg-white px-4 py-2 lg:px-7 lg:py-0">
+      <div className="flex min-w-0 items-center gap-3.5">
+        {onMenu && (
+          <button
+            type="button"
+            onClick={onMenu}
+            aria-label="Open navigation"
+            title="Open navigation"
+            className="text-text-strong flex cursor-pointer lg:hidden"
+          >
+            <Icon name="layout-grid" size={24} />
+          </button>
+        )}
         {onBack && (
           <button type="button" onClick={onBack} className="text-text-strong flex cursor-pointer">
             <Icon name="arrow-left" size={24} />
           </button>
         )}
-        <div>
-          <h1 className="text-h1 text-text-strong m-0">{m[0]}</h1>
-          {m[1] && <div className="text-caption text-text-muted mt-0.25">{m[1]}</div>}
+        <div className="min-w-0">
+          <h1 className="text-h1 text-text-strong m-0 truncate">{m[0]}</h1>
+          {m[1] && <div className="text-caption text-text-muted mt-0.25 truncate">{m[1]}</div>}
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
           onClick={() => {
@@ -119,7 +142,7 @@ export function OpsTopbar({ view, onNavigate, onOpenHospital, onLogout, onBack }
         {notif && (
           <>
             <div onClick={() => setNotif(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-18.5 z-40 w-85 overflow-hidden rounded-lg border bg-white">
+            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-85 max-w-full overflow-hidden rounded-lg border bg-white lg:right-18.5">
               <div className="border-border-soft text-text-strong border-b px-4 py-3.5 text-[15px] font-semibold">
                 Notifications
               </div>
@@ -165,7 +188,7 @@ export function OpsTopbar({ view, onNavigate, onOpenHospital, onLogout, onBack }
           className="flex cursor-pointer items-center gap-2.5"
         >
           <Avatar name={OPS_USER.name} src={OPS_USER.av} size={38} />
-          <div className="flex flex-col items-start">
+          <div className="hidden flex-col items-start sm:flex">
             <span className="text-body text-text-strong font-medium">{OPS_USER.name}</span>
             <span className="text-caption text-text-muted">{OPS_USER.role}</span>
           </div>
@@ -174,7 +197,7 @@ export function OpsTopbar({ view, onNavigate, onOpenHospital, onLogout, onBack }
         {menu && (
           <>
             <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-7 z-40 w-60 overflow-hidden rounded-lg border bg-white p-2">
+            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-60 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
               <div className="flex items-center gap-2.5 px-2.5 py-2.25">
                 <Avatar name={OPS_USER.name} src={OPS_USER.av} size={32} />
                 <div className="min-w-0">

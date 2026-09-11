@@ -2,6 +2,7 @@ import type { CSSProperties, MouseEventHandler, ReactNode } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 import { Icon } from '@/shared/ui/Icon';
+import { Spinner } from '@/shared/ui/Spinner';
 import type { IconName } from '@/shared/ui/icon-registry';
 
 type ButtonVariant = 'primary' | 'secondary' | 'info' | 'ghost' | 'danger' | 'success';
@@ -18,6 +19,23 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
   size?: ButtonSize;
   className?: string;
+  /**
+   * Action in flight — audit 3.5.6 ("primary buttons are never disabled while
+   * working"). Swaps the leading glyph for a `Spinner`, sets `aria-busy`,
+   * disables the button and blocks `onClick`, so one slow save cannot be
+   * submitted three times. Default `false`.
+   */
+  busy?: boolean;
+  /** Unavailable action: dimmed, `cursor-not-allowed`, no `onClick`. Default `false`. */
+  disabled?: boolean;
+  /**
+   * Native `form` attribute — lets a submit button live outside its `<form>`
+   * (how `FormModal` puts Save in the modal footer). Only meaningful with
+   * `type="submit"`.
+   */
+  form?: string;
+  /** Accessible name when the button has no text (icon-only usage). */
+  ariaLabel?: string;
 }
 
 /** Variant fills + the prototype's JS-hover background map as `hover:` classes. */
@@ -40,25 +58,35 @@ export function Button({
   type = 'button',
   size = 'md',
   className,
+  busy = false,
+  disabled = false,
+  form,
+  ariaLabel,
 }: ButtonProps) {
   const iconSize = size === 'sm' ? 16 : 18;
+  const isBlocked = busy || disabled;
   return (
     <button
       type={type}
-      onClick={onClick}
+      form={form}
+      aria-label={ariaLabel}
+      aria-busy={busy || undefined}
+      disabled={isBlocked}
+      onClick={isBlocked ? undefined : onClick}
       className={cn(
-        'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg whitespace-nowrap transition-colors duration-150',
+        'inline-flex items-center justify-center gap-2 rounded-lg whitespace-nowrap transition-colors duration-150',
         size === 'sm'
           ? 'text-body px-3.5 py-2 leading-none font-medium'
           : 'text-button px-5 py-2.75',
         VARIANT_CLASSES[variant],
+        isBlocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className,
       )}
       style={style}
     >
-      {icon && <Icon name={icon} size={iconSize} />}
+      {busy ? <Spinner size={iconSize} decorative /> : icon && <Icon name={icon} size={iconSize} />}
       {children}
-      {iconRight && <Icon name={iconRight} size={iconSize} />}
+      {iconRight && !busy && <Icon name={iconRight} size={iconSize} />}
     </button>
   );
 }
