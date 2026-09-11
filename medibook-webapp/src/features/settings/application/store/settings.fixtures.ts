@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: HospitalSettings = {
   rules: {
     duration: '15 mins',
     onlineBooking: true,
+    horizon: '30 days',
     maxPerSlot: '15 slots',
     buffer: '15 mins',
     allowCancel: true,

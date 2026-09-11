@@ -7,6 +7,7 @@ import { recordAudit } from '@/features/audit/application/store/audit.store';
 import { DEFAULT_SETTINGS } from './settings.fixtures';
 import {
   CANONICAL_TOKEN_SCHEME,
+  openDaysInHorizon,
   parseCount,
   parseDurationMinutes,
   slotsPerDay,
@@ -35,7 +36,9 @@ import type {
  * ```
  *
  * `selectSlotLengthMinutes` and `selectSlotBufferMinutes` are the two the slot
- * generator needs; `selectCancellationCutoffHours` + `selectCancellationAllowed`
+ * generator needs, together with `selectSchedulingHorizonDays` (how far ahead
+ * it may generate at all) and `selectMaxPerSlot` (how many patients one slot
+ * time holds); `selectCancellationCutoffHours` + `selectCancellationAllowed`
  * are the cancellation policy; `selectHoldTimeoutMinutes`,
  * `selectAutoNoShowMinutes`, `selectGraceMinutes` and `selectAfterGraceAction`
  * drive the queue. These names are stable — treat them as the contract.
@@ -77,6 +80,7 @@ function loadSettings(): HospitalSettings {
 const RULE_LABEL: Readonly<Record<keyof HospitalRules, string>> = {
   duration: 'Default consultation duration',
   onlineBooking: 'Online appointment booking',
+  horizon: 'Scheduling horizon',
   maxPerSlot: 'Max appointments per slot',
   buffer: 'Buffer between appointments',
   allowCancel: 'Patient cancellation',
@@ -223,9 +227,21 @@ export function selectSlotBufferMinutes(s: SettingsSnapshot): number {
   return parseDurationMinutes(s.settings.rules.buffer, 0);
 }
 
-/** How many patients may share one slot ("15 slots" -> 15). */
+/**
+ * Concurrent capacity of one slot time ("15 slots" -> 15) — how many patients
+ * may hold the same 9:30 am before it reads Full. Not a daily cap.
+ */
 export function selectMaxPerSlot(s: SettingsSnapshot): number {
   return parseCount(s.settings.rules.maxPerSlot, 1);
+}
+
+/**
+ * How many calendar days ahead the booking calendar is open ("30 days" -> 30).
+ * The slot generator must not emit a slot beyond `todayISO() + this`, and the
+ * patient app must not offer one.
+ */
+export function selectSchedulingHorizonDays(s: SettingsSnapshot): number {
+  return parseCount(s.settings.rules.horizon, 30);
 }
 
 /** Whether patients may book from the Medibook app at all. */
@@ -260,6 +276,14 @@ export function selectSlotsPerDoctorPerDay(s: SettingsSnapshot): number {
     slotMinutes: selectSlotLengthMinutes(s),
     bufferMinutes: selectSlotBufferMinutes(s),
   });
+}
+
+/**
+ * Days inside the scheduling horizon the hospital is actually open, counting
+ * `startIso` as day 1 — the bookable-day count the horizon really buys.
+ */
+export function selectOpenDaysInHorizon(s: SettingsSnapshot, startIso: string): number {
+  return openDaysInHorizon(startIso, selectSchedulingHorizonDays(s), s.settings.hoursDays);
 }
 
 /* ---- cancellation / no-show policy ---- */

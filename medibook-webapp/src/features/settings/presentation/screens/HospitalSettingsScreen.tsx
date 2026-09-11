@@ -6,7 +6,7 @@ import { type HospitalStaticView, hospitalPath, isHospitalRole } from '@/app/rou
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { cn } from '@/shared/lib/cn';
-import { money } from '@/shared/lib/format';
+import { addDaysISO, fmtDate, money, todayISO } from '@/shared/lib/format';
 import { email as validateEmail, positiveAmount, required } from '@/shared/lib/validate';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
@@ -32,12 +32,14 @@ import {
   HOLD_TIMEOUT_OPTIONS,
   MAX_PER_SLOT_OPTIONS,
   OPEN_TIME_OPTIONS,
+  SCHEDULING_HORIZON_OPTIONS,
   SLOT_BUFFER_OPTIONS,
   SLOT_LENGTH_OPTIONS,
   TOKEN_GEN_OPTIONS,
   TOKEN_SCHEME_OPTIONS,
   cancellationDeadline,
   durationCopy,
+  openDaysInHorizon,
   parseCount,
   parseDurationMinutes,
   shiftTimeLabel,
@@ -279,6 +281,10 @@ export function HospitalSettingsScreen() {
     bufferMinutes,
   });
   const maxPerSlot = parseCount(draft.rules.maxPerSlot, 1);
+  const horizonDays = parseCount(draft.rules.horizon, 30);
+  const horizonStart = todayISO();
+  const horizonEnd = addDaysISO(horizonStart, horizonDays - 1);
+  const horizonOpenDays = openDaysInHorizon(horizonStart, horizonDays, draft.hoursDays);
   const cancelHours = parseDurationMinutes(draft.rules.cancelBefore, 120) / 60;
   const cancelDeadline = cancellationDeadline(EXAMPLE_APPOINTMENT_TIME, cancelHours);
   const autoNoShowMinutes = parseDurationMinutes(draft.rules.autoNoShow, 60);
@@ -749,8 +755,19 @@ export function HospitalSettingsScreen() {
                   />
                 </RuleRow>
                 <RuleRow
+                  label="Scheduling horizon"
+                  hint={`Booking is open to ${fmtDate(horizonEnd)} — ${horizonOpenDays} open ${horizonOpenDays === 1 ? 'day' : 'days'}, ≈ ${horizonOpenDays * perDoctorSlots} slots per doctor. Nothing past it is generated or offered.`}
+                >
+                  {sel(
+                    draft.rules.horizon,
+                    SCHEDULING_HORIZON_OPTIONS,
+                    (v) => setRule('horizon', v),
+                    'Scheduling horizon',
+                  )}
+                </RuleRow>
+                <RuleRow
                   label="Max appointments per slot"
-                  hint={`Up to ${perDoctorSlots * maxPerSlot} appointments a day per doctor at this slot length`}
+                  hint={`Concurrent capacity of one slot time: ${maxPerSlot} ${maxPerSlot === 1 ? 'patient' : 'patients'} may hold the same ${EXAMPLE_SLOT_TIME} before it reads Full. Not a daily cap — the day holds ${perDoctorSlots} × ${maxPerSlot} = ${perDoctorSlots * maxPerSlot} appointments per doctor.`}
                 >
                   {sel(
                     draft.rules.maxPerSlot,
@@ -763,8 +780,9 @@ export function HospitalSettingsScreen() {
                   label="Buffer time between appointments"
                   hint={
                     bufferMinutes === 0
-                      ? 'Appointments run back to back'
-                      : `Each appointment consumes ${durationCopy(slotMinutes + bufferMinutes)} of the doctor's day`
+                      ? 'No buffer — appointments run back to back, so a slot every ' +
+                        durationCopy(slotMinutes)
+                      : `The buffer sits after the consultation, not inside it: the patient still gets ${durationCopy(slotMinutes)}, and the next slot starts ${durationCopy(slotMinutes + bufferMinutes)} later.`
                   }
                   last
                 >
@@ -1000,10 +1018,16 @@ export function HospitalSettingsScreen() {
               <span className="text-body text-text-body">
                 With these rules a doctor working {draft.hoursOpen}–{draft.hoursClose} has{' '}
                 <span className="font-semibold">{perDoctorSlots} slots</span> of{' '}
-                {durationCopy(slotMinutes)} (plus {durationCopy(bufferMinutes)} buffer), up to{' '}
+                {durationCopy(slotMinutes)}, each followed by {durationCopy(bufferMinutes)} of
+                buffer, and each holding up to {maxPerSlot} patients — up to{' '}
                 <span className="font-semibold">{perDoctorSlots * maxPerSlot} appointments</span> a
-                day. Slots & Availability generates exactly this, minus anything on the holiday
-                calendar.
+                day, and{' '}
+                <span className="font-semibold">
+                  {horizonOpenDays * perDoctorSlots * maxPerSlot} across the {horizonDays}-day
+                  horizon
+                </span>{' '}
+                (to {fmtDate(horizonEnd)}). Slots & Availability generates exactly this, minus
+                anything on the holiday calendar.
               </span>
             </Card>
           </>

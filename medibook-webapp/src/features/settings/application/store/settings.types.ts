@@ -22,8 +22,24 @@ export interface HospitalRules {
   /** Default consultation length, e.g. "15 mins" (`selectSlotLengthMinutes`). */
   readonly duration: string;
   readonly onlineBooking: boolean;
+  /**
+   * How far ahead the booking calendar is open, e.g. "30 days"
+   * (`selectSchedulingHorizonDays`). Beyond it no slot is offered, in the
+   * patient app or at the desk.
+   */
+  readonly horizon: string;
+  /**
+   * Concurrent capacity of ONE slot time — how many patients may hold the
+   * same 9:30 am slot before it reads Full, e.g. "15 slots"
+   * (`selectMaxPerSlot`). It is not a daily cap.
+   */
   readonly maxPerSlot: string;
-  /** Gap between consecutive appointments, e.g. "15 mins" (`selectSlotBufferMinutes`). */
+  /**
+   * Gap that follows each consultation, e.g. "15 mins"
+   * (`selectSlotBufferMinutes`). The buffer sits **after** the consultation,
+   * never inside it: a 15-minute consultation with a 15-minute buffer gives
+   * the patient 15 minutes and consumes 30 minutes of the doctor's day.
+   */
   readonly buffer: string;
   readonly allowCancel: boolean;
   readonly cancelBefore: string;

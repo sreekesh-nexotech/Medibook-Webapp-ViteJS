@@ -21,10 +21,30 @@
 /** Consultation slot length options, in the order the select offers them. */
 export const SLOT_LENGTH_OPTIONS = ['10 mins', '15 mins', '20 mins', '30 mins'] as const;
 
-/** Gap between consecutive appointments. `0 mins` means back-to-back. */
+/**
+ * Gap that follows each consultation. `0 mins` means back-to-back. The buffer
+ * is **after** the consultation, never inside it — see `slotsPerDay`.
+ */
 export const SLOT_BUFFER_OPTIONS = ['0 mins', '5 mins', '10 mins', '15 mins'] as const;
 
-/** How many patients may be booked into one slot. */
+/**
+ * Scheduling horizon: how far ahead the booking calendar is open. The slot
+ * generator must not produce a slot beyond it, and the patient app must not
+ * offer one.
+ */
+export const SCHEDULING_HORIZON_OPTIONS = [
+  '7 days',
+  '14 days',
+  '30 days',
+  '60 days',
+  '90 days',
+] as const;
+
+/**
+ * Concurrent capacity of ONE slot time — how many patients may hold the same
+ * 9:30 am slot before it reads Full. Not a daily cap: the daily cap is this
+ * number times the slots the day holds.
+ */
 export const MAX_PER_SLOT_OPTIONS = ['5 slots', '10 slots', '15 slots', '20 slots'] as const;
 
 /** How long before the appointment a patient may still cancel. */
@@ -143,9 +163,12 @@ export interface SlotCapacityInput {
 
 /**
  * How many consultation slots one doctor's day holds, which is the whole
- * point of the slot-length and buffer rules: each appointment consumes
- * `slotMinutes + bufferMinutes`, and the last slot must still finish before
- * closing time.
+ * point of the slot-length and buffer rules.
+ *
+ * **The buffer sits after the consultation, not inside it.** So each slot
+ * starts `slotMinutes + bufferMinutes` after the previous one, the patient
+ * still gets the full `slotMinutes`, and only the *last* slot needs no buffer
+ * — which is why the span is credited one buffer back before dividing.
  */
 export function slotsPerDay({
   openLabel,
@@ -160,6 +183,32 @@ export function slotsPerDay({
   if (span <= 0 || slotMinutes <= 0 || step <= 0) return 0;
   // The final slot needs `slotMinutes` of room; the buffer after it is free.
   return Math.max(0, Math.floor((span + bufferMinutes) / step));
+}
+
+/** Weekday index of an ISO date on the local calendar, 0 = Monday .. 6 = Sunday. */
+export function isoWeekdayIndex(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  // Noon avoids any DST edge; the parts are read back locally, never via UTC.
+  return (new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12).getDay() + 6) % 7;
+}
+
+/**
+ * Open days inside the scheduling horizon: the horizon counts calendar days,
+ * but only the days the hospital is open can carry a slot. Day 1 of the
+ * horizon is `startIso` itself.
+ */
+export function openDaysInHorizon(
+  startIso: string,
+  horizonDays: number,
+  openFlags: readonly boolean[],
+): number {
+  if (horizonDays <= 0 || openFlags.length === 0) return 0;
+  const first = isoWeekdayIndex(startIso);
+  let open = 0;
+  for (let i = 0; i < horizonDays; i += 1) {
+    if (openFlags[(first + i) % openFlags.length] === true) open += 1;
+  }
+  return open;
 }
 
 /** The clock time after which a cancellation forfeits the fee. */
