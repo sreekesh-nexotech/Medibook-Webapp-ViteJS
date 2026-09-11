@@ -39,6 +39,14 @@ import type {
 /** Compliance-log module name for compliance actions. */
 const COMPLIANCE_LOG_MODULE = 'Compliance';
 
+/**
+ * The signed-in operator's work email. `OPS_USER` (the ops identity in the
+ * shell) carries a display name and role but no email, and every compliance
+ * record is keyed by email — so the one the console signs its own records
+ * with lives here, next to the records, until a real session provides it.
+ */
+export const OPS_ACTING_USER_EMAIL = 'riya.sharma@medibook.in';
+
 /** Width of the export-request sequence, e.g. `DSR-2026-0004`. */
 const EXPORT_SEQ_WIDTH = 4;
 

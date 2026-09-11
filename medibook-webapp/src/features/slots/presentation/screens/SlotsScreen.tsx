@@ -176,9 +176,7 @@ export function SlotsScreen() {
 
       {!settings.rules.onlineBooking && (
         <Card pad={14} className="flex flex-wrap items-center gap-2">
-          <span className="text-y-700 flex items-center gap-2">
-            <Icon name="triangle-alert" size={16} />
-          </span>
+          <Icon name="triangle-alert" size={16} className="text-y-700" />
           <span className="text-body text-text-body">
             Online booking is switched off in Hospital Settings, so patients cannot book any of
             these slots from the app.
@@ -195,9 +193,7 @@ export function SlotsScreen() {
         </Card>
       )}
 
-      {isPending ? (
-        <SkeletonTable rows={7} cols={8} />
-      ) : !result ? (
+      {isPending || !result ? (
         <SkeletonTable rows={7} cols={8} />
       ) : !result.ok ? (
         <ErrorState

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsPath } from '@/app/router/paths';
+import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsOnboardingPath, opsPath } from '@/app/router/paths';
 import { SETTLE_COMMISSION } from '@/core/config/demo';
 import { useSort } from '@/shared/hooks/useSort';
 import { useOpsAct } from '@/shared/hooks/useOpsAct';
@@ -12,7 +12,9 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { InfoGrid, type InfoGridItem } from '@/shared/ui/InfoGrid';
@@ -42,9 +44,27 @@ import {
 } from '@/features/ops-hospitals/application/store/hospitals.store';
 import { KYC_DOCS } from '@/features/ops-hospitals/application/store/hospitals.fixtures';
 import type { OpsDoctor } from '@/features/ops-hospitals/application/store/hospitals.types';
+import {
+  docProgress,
+  goLiveBlockers,
+  stageOf,
+} from '@/features/ops-hospitals/application/store/onboarding.derive';
+import { ONBOARDING_DOC_LABEL } from '@/features/ops-hospitals/application/store/onboarding.fixtures';
+import { useOnboardingStore } from '@/features/ops-hospitals/application/store/onboarding.store';
+import { longDateFromIso } from '@/features/ops-hospitals/application/store/opsDates';
+import {
+  DOC_BADGE,
+  STAGE_BADGE,
+} from '@/features/ops-hospitals/presentation/components/onboarding.view';
+import {
+  graceFor,
+  graceDaysFor,
+  isUnpaid,
+} from '@/features/ops-billing/application/store/billing.derive';
+import { billingTodayIso } from '@/features/ops-billing/application/store/billing.store';
 
 /** Which lifecycle dialog is open. */
-type DetailModal = 'approve' | 'reject' | 'suspend' | null;
+type DetailModal = 'approve' | 'reject' | 'suspend' | 'unsuspend' | null;
 
 /** Detail-page path builder for a billing sub-record (reuses the route table). */
 const billingDetailPath = (view: 'invoice-detail' | 'payment-detail', id: number): string =>
@@ -57,7 +77,10 @@ export function OpsHospitalDetailScreen() {
   const hospitals = useHospitalsStore((s) => s.hospitals);
   const approve = useHospitalsStore((s) => s.approve);
   const reject = useHospitalsStore((s) => s.reject);
-  const toggleSuspend = useHospitalsStore((s) => s.toggleSuspend);
+  const suspendHospital = useHospitalsStore((s) => s.suspend);
+  const unsuspendHospital = useHospitalsStore((s) => s.unsuspend);
+  const onboardingCases = useOnboardingStore((s) => s.cases);
+  const goLive = useOnboardingStore((s) => s.goLive);
   const plans = usePlansStore((s) => s.plans);
   const invoices = useBillingStore((s) => s.invoices);
   const payments = useBillingStore((s) => s.payments);
@@ -90,11 +113,18 @@ export function OpsHospitalDetailScreen() {
 
   const limit = opsPlanQuota(h.plan);
   const bank = bankOf(h.id);
+  /* The onboarding case is authoritative for KYC once one exists: it holds the
+   * per-document decisions the pipeline records (SA-01). Hospitals seeded
+   * before a case existed still fall back to the registry's KYC record. */
+  const onboarding = onboardingCases.find((c) => c.hid === h.id) ?? null;
+  const onboardingDocs = onboarding && onboarding.docs.length > 0 ? onboarding.docs : null;
+  const blockers = onboarding ? goLiveBlockers(onboarding) : [];
+  const progress = onboarding ? docProgress(onboarding) : { approved: 0, total: 0 };
   const quota = Math.min(100, Math.round((h.bookings / limit) * 100));
   const suspended = h.status === 'Suspended';
   const kyc = kycOf(h);
   const kycMissing = KYC_DOCS.filter(([k]) => kyc[k] === 'Missing').map(([, l]) => l);
-  const kycReady = kycMissing.length === 0;
+  const kycReady = onboardingDocs ? blockers.length === 0 : kycMissing.length === 0;
   const gstin = gstinOf(h);
   const depts = opsDeptsFor(h);
   const invs = invoices.filter((v) => v.hid === h.id);
@@ -111,6 +141,12 @@ export function OpsHospitalDetailScreen() {
       net: 'net' in r && typeof r.net === 'number' ? r.net : Math.round(r.gross * (1 - comm)),
     }));
   const acts = logs.filter((l) => l.hid === h.id || String(l.action).includes(h.name)).slice(0, 8);
+  /* Oldest unpaid invoice drives the grace countdown and the suspension path. */
+  const oldestUnpaid = [...invs]
+    .filter(isUnpaid)
+    .sort((a, b) => (Date.parse(a.due) || 0) - (Date.parse(b.due) || 0))[0];
+  const grace = oldestUnpaid ? graceFor(oldestUnpaid, h, billingTodayIso()) : null;
+  const graceDays = oldestUnpaid ? graceDaysFor(oldestUnpaid, h) : h.graceDays;
   const allDocs = opsDocsFor(h);
   const docs = dSorted(docDeptF === 'All' ? allDocs : allDocs.filter((d) => d.dept === docDeptF), {
     name: (d) => d.name,
@@ -177,14 +213,32 @@ export function OpsHospitalDetailScreen() {
     },
     { k: 'IFSC', v: bank ? bank.ifsc : '—', num: Boolean(bank) },
     { k: 'Settlement UPI', v: bank && bank.upi ? bank.upi : '—' },
+    {
+      k: 'Payment Grace',
+      v:
+        graceDays === undefined
+          ? 'Platform default'
+          : `${graceDays} day${graceDays === 1 ? '' : 's'}${h.graceDays !== undefined ? ' (set on this hospital)' : ''}`,
+    },
     ...(h.status === 'Rejected' && h.rejectReason
       ? [{ k: 'Rejection Reason', v: h.rejectReason }]
+      : []),
+    ...(h.suspension
+      ? [
+          { k: 'Suspended Since', v: longDateFromIso(h.suspension.since) },
+          { k: 'Suspension Reason', v: h.suspension.reason },
+        ]
       : []),
   ];
 
   const attemptApprove = () => {
     if (!kycReady) {
-      toast(`Cannot approve — ${kycMissing.join(', ')} not received.`, 'error');
+      toast(
+        onboardingDocs
+          ? `Cannot approve — ${blockers[0]}`
+          : `Cannot approve — ${kycMissing.join(', ')} not received.`,
+        'error',
+      );
       return;
     }
     setModal('approve');
@@ -238,7 +292,10 @@ export function OpsHospitalDetailScreen() {
               </Button>
             ) : (
               <>
-                <Button variant="secondary" onClick={() => setModal('suspend')}>
+                <Button
+                  variant={suspended ? 'secondary' : 'danger'}
+                  onClick={() => setModal(suspended ? 'unsuspend' : 'suspend')}
+                >
                   {suspended ? 'Reactivate Instance' : 'Suspend Instance'}
                 </Button>
                 <Button onClick={() => navigate(opsPath('plans'))}>Manage Plan</Button>
@@ -247,6 +304,66 @@ export function OpsHospitalDetailScreen() {
           </div>
         </div>
       </Card>
+
+      {h.suspension && (
+        <Card pad={16} className="border-d-500">
+          <div className="flex flex-wrap items-start gap-3.5">
+            <div className="bg-d-100 text-d-500 flex size-10 flex-none items-center justify-center rounded-md">
+              <Icon name="ban" size={19} />
+            </div>
+            <div className="min-w-50 flex-1">
+              <div className="text-body text-text-strong font-medium">
+                Suspended — {h.suspension.reason.toLowerCase()}
+              </div>
+              <div className="text-caption text-text-muted">
+                Since {longDateFromIso(h.suspension.since)} by {h.suspension.by}
+                {h.suspension.invoiceNo ? ` · ${h.suspension.invoiceNo}` : ''}
+                {h.suspension.note ? ` · ${h.suspension.note}` : ''}
+              </div>
+              <div className="text-caption text-text-muted mt-1">
+                Staff cannot sign in and patients cannot book while this is in force.
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
+              Lift Suspension
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {!suspended && grace && oldestUnpaid && (
+        <Card pad={16}>
+          <div className="flex flex-wrap items-center gap-3.5">
+            <div
+              className={cn(
+                'flex size-10 flex-none items-center justify-center rounded-md',
+                grace.expired ? 'bg-d-100 text-d-500' : 'bg-y-100 text-y-600',
+              )}
+            >
+              <Icon name={grace.expired ? 'triangle-alert' : 'hourglass'} size={19} />
+            </div>
+            <div className="min-w-50 flex-1">
+              <div className="text-body text-text-strong font-medium">
+                {oldestUnpaid.no} is unpaid ·{' '}
+                {grace.expired
+                  ? `grace closed ${-grace.daysLeft} day${grace.daysLeft === -1 ? '' : 's'} ago`
+                  : `grace ends in ${grace.daysLeft} day${grace.daysLeft === 1 ? '' : 's'}`}
+              </div>
+              <div className="text-caption text-text-muted">
+                {money(oldestUnpaid.amount)} due {oldestUnpaid.due} · {grace.days}-day grace window
+                ends {longDateFromIso(grace.endsIso)}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigate(billingDetailPath('invoice-detail', oldestUnpaid.id))}
+            >
+              Open Invoice
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card pad={14}>
         <Tabs

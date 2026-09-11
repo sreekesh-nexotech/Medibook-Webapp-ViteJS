@@ -249,6 +249,8 @@ export function OpsAnalyticsScreen() {
 
   const data = deriveAnalytics(period);
   const apiRows = data.errors.filter((r) => r.scope === 'API');
+  const errorTrend = aggregateErrorTrend(data.errors, data.buckets);
+  const errorPeakPct = errorTrend.reduce((worst, p) => Math.max(worst, p.value), 0);
 
   const exportRows =
     tab === 'Bookings'
@@ -341,14 +343,7 @@ export function OpsAnalyticsScreen() {
       {tab === 'Error Rates' && (
         <>
           <div className="grid items-stretch gap-5 lg:grid-cols-2">
-            <ErrorTrendCard
-              trend={aggregateErrorTrend(data.errors, data.buckets)}
-              period={period}
-              peakPct={aggregateErrorTrend(data.errors, data.buckets).reduce(
-                (worst, p) => Math.max(worst, p.value),
-                0,
-              )}
-            />
+            <ErrorTrendCard trend={errorTrend} period={period} peakPct={errorPeakPct} />
             <ErrorsBySurfaceCard rows={apiRows} title="Errors by API Surface" period={period} />
           </div>
           <ErrorRatesCard rows={data.errors} period={period} scope={scope} onScope={setScope} />
