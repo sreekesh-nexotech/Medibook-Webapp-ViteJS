@@ -104,7 +104,7 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
             </span>
           </>
         ) : (
-          <span className="text-body text-text-faint">
+          <span className="text-body text-text-muted">
             {onBreak ? 'On a break' : queue.length ? 'Ready to call next' : 'No patients waiting'}
           </span>
         )}
@@ -114,7 +114,7 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
         <span className="text-caption text-text-muted flex-none">Up next</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {upNext.length === 0 ? (
-            <span className="text-caption text-text-faint">—</span>
+            <span className="text-caption text-text-muted">nobody yet</span>
           ) : (
             upNext.map((a) => (
               <span
@@ -155,33 +155,31 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
             <Button
               size="sm"
               variant="secondary"
-              className={cn('flex-1', queue.length ? undefined : 'pointer-events-none opacity-50')}
+              className="flex-1"
+              disabled={queue.length === 0}
               onClick={() => callNext(doctor)}
             >
               Call Next
             </Button>
             <IconBtn
               name="skip-forward"
+              label="Skip — move to end of queue"
               box={34}
               size={15}
-              title="Skip — move to end of queue"
               onClick={() => skip(doctor)}
             />
           </>
         ) : (
-          <Button
-            size="sm"
-            className={cn('flex-1', canCall ? undefined : 'pointer-events-none opacity-50')}
-            onClick={() => callNext(doctor)}
-          >
+          <Button size="sm" className="flex-1" disabled={!canCall} onClick={() => callNext(doctor)}>
             Call Next
           </Button>
         )}
         <IconBtn
           name={onBreak ? 'play' : 'pause'}
+          label="Pause or resume doctor"
+          title={onBreak ? 'Resume' : 'Take a break'}
           box={34}
           size={15}
-          title={onBreak ? 'Resume' : 'Take a break'}
           color={onBreak ? 'var(--color-g-600)' : undefined}
           onClick={() => setDocStatus(doctor, onBreak ? 'Available' : 'On Break')}
         />

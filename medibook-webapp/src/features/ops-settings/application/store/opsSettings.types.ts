@@ -7,7 +7,16 @@
 /** Payout run cadence (the Payout Schedule select's options). */
 export type PayoutSchedule = 'Weekly' | 'Fortnightly' | 'Monthly';
 
-/** Admin session timeout (the Session Timeout select's options). */
+/**
+ * Admin session timeout (the Session Timeout select's options).
+ *
+ * **Contract (audit 3.7.5):** the shared `useIdleTimeout` in `OpsShell` reads
+ * `settings.sessTimeout` and takes the idle minutes from it with
+ * `Number.parseInt(value, 10)`. Every member must therefore start with the
+ * number of minutes — `"45 min"` is fine, `"1 hour"` would silently become
+ * one minute. Keep `SESSION_TIMEOUT_OPTIONS` (fixtures) as the single list
+ * the UI offers.
+ */
 export type SessionTimeout = '15 min' | '30 min' | '60 min';
 
 /** Platform-wide preferences and defaults. */

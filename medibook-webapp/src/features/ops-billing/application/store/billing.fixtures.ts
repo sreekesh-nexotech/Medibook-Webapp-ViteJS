@@ -5,6 +5,44 @@
  */
 import type { Invoice, Payment } from '@/features/ops-billing/application/store/billing.types';
 
+/** Demo operations actor the seeded reminder requests are attributed to. */
+const OPS_ACTOR = 'riya.sharma@medibook.in';
+
+/**
+ * Reminder history seeded on the two invoices that ran past their due date —
+ * every entry is `Queued`, because recording the request is all the console
+ * actually does.
+ */
+const KAVERI_REMINDERS: Invoice['reminders'] = [
+  {
+    id: 2,
+    at: 'June 08, 2026 · 10:12',
+    channel: 'SMS',
+    to: '+91 97390 18452',
+    status: 'Queued',
+    by: OPS_ACTOR,
+  },
+  {
+    id: 1,
+    at: 'May 20, 2026 · 09:40',
+    channel: 'Email',
+    to: 'contact@kaverigen.in',
+    status: 'Queued',
+    by: OPS_ACTOR,
+  },
+];
+
+const GIRNAR_REMINDERS: Invoice['reminders'] = [
+  {
+    id: 1,
+    at: 'May 22, 2026 · 11:05',
+    channel: 'Email',
+    to: 'admin@girnarmsp.in',
+    status: 'Queued',
+    by: OPS_ACTOR,
+  },
+];
+
 export const OPS_INVOICES: readonly Invoice[] = [
   {
     id: 1,
@@ -15,6 +53,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 01, 2026',
     due: 'June 15, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 2,
@@ -25,6 +64,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 01, 2026',
     due: 'June 15, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 3,
@@ -35,6 +75,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 01, 2026',
     due: 'June 15, 2026',
     status: 'Pending',
+    reminders: [],
   },
   {
     id: 4,
@@ -45,6 +86,8 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'May 01, 2026',
     due: 'May 15, 2026',
     status: 'Overdue',
+    reminders: KAVERI_REMINDERS,
+    graceDays: 14,
   },
   {
     id: 5,
@@ -55,6 +98,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 01, 2026',
     due: 'June 15, 2026',
     status: 'Payment failed',
+    reminders: [],
   },
   {
     id: 6,
@@ -65,6 +109,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 02, 2026',
     due: 'June 16, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 7,
@@ -75,6 +120,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 02, 2026',
     due: 'June 16, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 8,
@@ -85,6 +131,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 03, 2026',
     due: 'June 17, 2026',
     status: 'Pending',
+    reminders: [],
   },
   {
     id: 9,
@@ -95,6 +142,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'May 03, 2026',
     due: 'May 17, 2026',
     status: 'Overdue',
+    reminders: GIRNAR_REMINDERS,
   },
   {
     id: 10,
@@ -105,6 +153,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 04, 2026',
     due: 'June 18, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 11,
@@ -115,6 +164,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 04, 2026',
     due: 'June 18, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 12,
@@ -125,6 +175,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 05, 2026',
     due: 'June 19, 2026',
     status: 'Pending',
+    reminders: [],
   },
   {
     id: 13,
@@ -135,6 +186,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'April 01, 2026',
     due: 'April 15, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 14,
@@ -145,6 +197,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'May 01, 2026',
     due: 'May 15, 2026',
     status: 'Completed',
+    reminders: [],
   },
   {
     id: 15,
@@ -155,6 +208,7 @@ export const OPS_INVOICES: readonly Invoice[] = [
     issued: 'June 01, 2026',
     due: 'June 15, 2026',
     status: 'Completed',
+    reminders: [],
   },
 ];
 
@@ -169,6 +223,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 49999,
     date: 'June 09, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 2,
@@ -180,6 +235,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 24999,
     date: 'June 08, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 3,
@@ -191,6 +247,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 59999,
     date: 'June 07, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 4,
@@ -202,6 +259,8 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 24999,
     date: 'June 06, 2026',
     status: 'Payment failed',
+    attempts: 2,
+    lastAttemptAt: 'June 07, 2026 · 09:15',
   },
   {
     id: 5,
@@ -213,6 +272,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 24999,
     date: 'June 06, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 6,
@@ -224,6 +284,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 9999,
     date: 'June 05, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 7,
@@ -235,6 +296,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 49999,
     date: 'June 05, 2026',
     status: 'Pending',
+    attempts: 1,
   },
   {
     id: 8,
@@ -246,6 +308,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 24999,
     date: 'June 04, 2026',
     status: 'Success',
+    attempts: 1,
   },
   {
     id: 9,
@@ -257,6 +320,8 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 9999,
     date: 'June 03, 2026',
     status: 'Payment failed',
+    attempts: 3,
+    lastAttemptAt: 'June 04, 2026 · 16:48',
   },
   {
     id: 10,
@@ -268,6 +333,7 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 49999,
     date: 'June 02, 2026',
     status: 'Pending',
+    attempts: 1,
   },
   {
     id: 11,
@@ -279,5 +345,6 @@ export const OPS_PAYMENTS: readonly Payment[] = [
     amount: 24999,
     date: 'June 09, 2026',
     status: 'Success',
+    attempts: 1,
   },
 ];

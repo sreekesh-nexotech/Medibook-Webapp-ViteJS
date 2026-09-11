@@ -19,14 +19,21 @@ export interface HospitalBank {
 }
 
 export interface HospitalRules {
+  /** Default consultation length, e.g. "15 mins" (`selectSlotLengthMinutes`). */
   readonly duration: string;
   readonly onlineBooking: boolean;
   readonly maxPerSlot: string;
+  /** Gap between consecutive appointments, e.g. "15 mins" (`selectSlotBufferMinutes`). */
   readonly buffer: string;
   readonly allowCancel: boolean;
   readonly cancelBefore: string;
   readonly autoNoShow: string;
   readonly tokenGen: string;
+  /**
+   * Token numbering scheme — one of `TOKEN_SCHEME_OPTIONS`. Defaults to the
+   * canonical hospital-wide `T-001` series (CANONICAL_MASTER_DATA §5).
+   */
+  readonly tokenScheme: string;
   readonly showToken: boolean;
   readonly allowHold: boolean;
   readonly holdTimeout: string;

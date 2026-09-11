@@ -8,7 +8,8 @@ import { useLogsStore } from '@/features/ops-logs/application/store/logs.store';
 import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
 
 import { OPS_PLANS, OPS_PLAN_CHANGES } from './plans.fixtures';
-import type { Plan, PlanChange } from './plans.types';
+import { bookingQuotaMirror } from './plans.limits';
+import type { Plan, PlanChange, PlanLimits } from './plans.types';
 
 /**
  * Subscription-plan catalog + plan-change queue (design `OpsDB.plans` /
@@ -21,13 +22,18 @@ import type { Plan, PlanChange } from './plans.types';
 /** Compliance-log module name for every plan mutation. */
 const PLANS_LOG_MODULE = 'Subscription Plans';
 
-/** Save payload — a missing id means "create". Money fields arrive parsed. */
+/**
+ * Save payload — a missing id means "create". Money fields and ceilings arrive
+ * parsed; `quota` is not accepted because it is derived from `limits.bookings`
+ * (one source of truth for what a plan allows — audit SA-02).
+ */
 export interface PlanSaveInput {
   readonly id?: number;
   readonly name: string;
   readonly price: number;
-  readonly quota: number;
-  readonly staff: string;
+  /** `null` = monthly billing only. */
+  readonly yearlyPrice: number | null;
+  readonly limits: PlanLimits;
   readonly support: string;
   readonly extra: string;
   readonly popular: boolean;
@@ -72,8 +78,9 @@ export const usePlansStore = create<PlansState & PlansActions>()((set, get) => (
       const record: Omit<Plan, 'id'> = {
         name,
         price: input.price,
-        quota: input.quota,
-        staff: input.staff,
+        yearlyPrice: input.yearlyPrice,
+        limits: input.limits,
+        quota: bookingQuotaMirror(input.limits),
         support: input.support,
         extra: input.extra.trim(),
         popular: input.popular,

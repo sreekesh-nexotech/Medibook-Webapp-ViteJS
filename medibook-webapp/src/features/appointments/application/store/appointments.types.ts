@@ -71,11 +71,20 @@ export const TOKEN_PREFIX: Readonly<Record<Department, string>> = {
 /** "Online" = pre-booked + pre-paid via the Medibook app; "Walk-in" = booked at the desk. */
 export type AppointmentSource = 'Online' | 'Walk-in';
 
-export type PaymentState = 'Paid' | 'Pending' | 'Refunded';
+/**
+ * `Waived` is the audited fee-waiver state (HA-09): the consultation happened,
+ * no money was taken, and the reason is recorded on the appointment. It is
+ * deliberately not `Paid` — nothing was collected — and not `Pending` either,
+ * because there is nothing left to collect.
+ */
+export type PaymentState = 'Paid' | 'Pending' | 'Refunded' | 'Waived';
 
 export type AppointmentStatus = 'Scheduled' | 'In Queue' | 'Completed' | 'Cancelled' | 'No-show';
 
 export type Gender = 'Male' | 'Female' | 'Other';
+
+/** Where a refund was pushed back out. */
+export type RefundChannel = 'Desk' | 'Medibook';
 
 /** Desk payment modes offered by the Mark Payment flow. */
 export type PaymentMode = 'Cash' | 'UPI' | 'Card';
@@ -110,5 +119,28 @@ export interface Appointment {
   /** Queue re-order stamp set when a patient is skipped to the back. */
   readonly qorder?: number;
   readonly cancelReason?: string;
-  readonly refundVia?: 'Desk';
+  /** Who pushed the refund out: the desk (cash back) or Medibook (online). */
+  readonly refundVia?: RefundChannel;
+  /** Amount actually refunded — may be less than the gross paid (partial refund). */
+  readonly refundAmount?: number;
+  readonly refundReason?: string;
+  /** Epoch ms the refund was recorded. */
+  readonly refundedAt?: number;
+  /**
+   * Desk confirmation still owed (HA-05). Online bookings that arrive
+   * unconfirmed sit here until someone with `Appointments.edit` approves them;
+   * until then they cannot be checked in, paid for or given a token.
+   */
+  readonly needsApproval?: boolean;
+  /** Epoch ms the desk approved the booking. */
+  readonly approvedAt?: number;
+  /** Waived fee (HA-09) — the amount forgone and why. A waiver needs a reason. */
+  readonly waivedAmount?: number;
+  readonly waiveReason?: string;
+  readonly waivedAt?: number;
+  /**
+   * Receipt-series number, `MB/R/2026-27/000123`, minted once per payment and
+   * then stable: re-opening a receipt must never renumber it.
+   */
+  readonly receiptNo?: string;
 }

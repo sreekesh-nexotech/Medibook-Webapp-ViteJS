@@ -5,7 +5,8 @@
  * actions are demoable.
  */
 
-import type { Appointment, DoctorStatus } from './appointments.types';
+import { formatReceiptNo } from './appointments.logic';
+import type { Appointment, DoctorStatus, PaymentState } from './appointments.types';
 
 export const SEED_APPOINTMENTS: readonly Appointment[] = [
   {
@@ -115,6 +116,7 @@ export const SEED_APPOINTMENTS: readonly Appointment[] = [
     token: 'T-004',
     status: 'Scheduled',
     remark: '',
+    needsApproval: true,
   },
   {
     id: 'AP1006',
@@ -187,6 +189,7 @@ export const SEED_APPOINTMENTS: readonly Appointment[] = [
     token: 'T-007',
     status: 'Scheduled',
     remark: '',
+    needsApproval: true,
   },
   {
     id: 'AP1010',
@@ -246,6 +249,18 @@ export const INITIAL_DOC_STATUS: Readonly<Record<string, DoctorStatus>> = {
 /** Hospital-wide token sequence already consumed by the seed (next issue = T-008). */
 export const INITIAL_TOKEN_SEQ = 7;
 
+/** Payment states that mean money changed hands, so a receipt exists. */
+const RECEIPTED_STATES: readonly PaymentState[] = ['Paid', 'Refunded'];
+
+/**
+ * Receipt numbers already issued by the seed — so the financial-year series
+ * (`MB/R/2026-27/000123`) starts from a realistic figure rather than 1, and the
+ * store's next mint continues it.
+ */
+export const INITIAL_RECEIPT_SEQ = SEED_APPOINTMENTS.filter((a) =>
+  RECEIPTED_STATES.includes(a.payment),
+).length;
+
 const MINUTE_MS = 60_000;
 
 /**
@@ -262,8 +277,15 @@ export const CALLED_AT_OFFSETS_MS: Readonly<Record<string, number>> = {
  * `initStore()` does at startup. The store calls this once at init.
  */
 export function seedAppointments(now: number = Date.now()): readonly Appointment[] {
+  let receiptSeq = 0;
   return SEED_APPOINTMENTS.map((a) => {
     const offset = a.token == null ? undefined : CALLED_AT_OFFSETS_MS[a.token];
-    return offset == null ? a : { ...a, calledAt: now - offset };
+    const calledAt = offset == null ? {} : { calledAt: now - offset };
+    // Already-paid seed rows carry a receipt number, in seed order, so the
+    // series is continuous and re-opening a receipt never renumbers it.
+    const receipt = RECEIPTED_STATES.includes(a.payment)
+      ? { receiptNo: formatReceiptNo((receiptSeq += 1)) }
+      : {};
+    return { ...a, ...calledAt, ...receipt };
   });
 }

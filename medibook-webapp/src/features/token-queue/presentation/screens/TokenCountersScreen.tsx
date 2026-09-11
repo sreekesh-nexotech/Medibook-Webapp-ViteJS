@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useNow } from '@/shared/hooks/useNow';
 import { cn } from '@/shared/lib/cn';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
 
+import {
+  formatUpdatedAt,
+  useListRefresh,
+} from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import {
   DEPARTMENTS,
@@ -14,10 +21,13 @@ import {
 } from '@/features/appointments/application/store/appointments.types';
 import { DoctorQueueCard } from '@/features/token-queue/presentation/components/DoctorQueueCard';
 
+/** Doctor cards per row of the grid — also the shimmer count while refreshing. */
+const CARD_COLUMNS = 2;
+
 /**
  * Live token queue (design `Screens.jsx` `TokenCounters`): a doctor-centric
- * department front desk — search + department/doctor filters + refresh, a
- * Serving / Waiting / On break / Longest stat strip (Longest turns danger red
+ * department front desk — search + department/doctor filters + a wired refresh,
+ * a Serving / Waiting / On break / Longest stat strip (Longest turns danger red
  * past 20 min), and a two-column grid of `DoctorQueueCard`s. A 30-second tick
  * keeps every card's elapsed timer live.
  */
@@ -33,6 +43,19 @@ export function TokenCountersScreen() {
   const [docF, setDocF] = useState('All Doctors');
   // Re-render every 30s so the elapsed timers stay live (design behaviour).
   const now = useNow(30000);
+
+  /**
+   * Audit 3.1.1 — Refresh re-reads the live queue out of the store and every
+   * card re-derives from it, with the shared loading state while it runs. On a
+   * queue screen this is the control the desk reaches for most.
+   */
+  const reload = useCallback((): void => {
+    const state = useAppointmentsStore.getState();
+    if (!Array.isArray(state.appts) || state.serving == null) {
+      throw new Error('The live queue is unavailable.');
+    }
+  }, []);
+  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
 
   const dept = activeDept || 'All Departments';
   const inDept = Object.keys(DOCTOR_META).filter(
@@ -65,6 +88,13 @@ export function TokenCountersScreen() {
     },
   ];
 
+  const filtersActive = q !== '' || docF !== 'All Doctors' || dept !== 'All Departments';
+  const clearAll = (): void => {
+    setQ('');
+    setDocF('All Doctors');
+    setDept('All Departments');
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Card pad={14} className="flex flex-wrap items-center gap-3.5">
@@ -74,6 +104,7 @@ export function TokenCountersScreen() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by doctor"
+            aria-label="Search by doctor"
             className="text-body text-text-strong flex-1 border-none bg-transparent outline-none"
           />
         </div>
@@ -84,9 +115,15 @@ export function TokenCountersScreen() {
             setDept(v);
             setDocF('All Doctors');
           }}
+          aria-label="Filter by department"
         />
-        <FilterSelect value={docF} options={['All Doctors', ...inDept]} onChange={setDocF} />
-        <RefreshBtn />
+        <FilterSelect
+          value={docF}
+          options={['All Doctors', ...inDept]}
+          onChange={setDocF}
+          aria-label="Filter by doctor"
+        />
+        <RefreshBtn onRefresh={refresh} title="Refresh the live queue" />
         <div className="bg-border h-8.5 w-px" />
         <div className="flex items-center gap-5 pr-1">
           {stats.map((st) => (
@@ -96,18 +133,38 @@ export function TokenCountersScreen() {
             </div>
           ))}
         </div>
+        <span className="text-caption text-text-muted whitespace-nowrap">
+          Updated {formatUpdatedAt(updatedAt)}
+        </span>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3.5">
-        {doctors.map((d) => (
-          <DoctorQueueCard key={d} doctor={d} />
-        ))}
-      </div>
-
-      {doctors.length === 0 && (
-        <Card pad={40} className="text-body-lg text-text-faint text-center">
-          No doctors match your search.
+      {loading ? (
+        <SkeletonCards count={CARD_COLUMNS} lines={4} pad={16} />
+      ) : error ? (
+        <Card pad={24}>
+          <ErrorState
+            inline
+            title="The live queue didn't reload"
+            message={error}
+            onRetry={() => void refresh()}
+          />
         </Card>
+      ) : doctors.length === 0 ? (
+        <Card pad={24}>
+          <EmptyState
+            icon="stethoscope"
+            title="No doctors match your search."
+            message="No doctor in this department matches the current filters."
+            actionLabel={filtersActive ? 'Clear filters' : undefined}
+            onAction={filtersActive ? clearAll : undefined}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-2 gap-3.5">
+          {doctors.map((d) => (
+            <DoctorQueueCard key={d} doctor={d} />
+          ))}
+        </div>
       )}
     </div>
   );

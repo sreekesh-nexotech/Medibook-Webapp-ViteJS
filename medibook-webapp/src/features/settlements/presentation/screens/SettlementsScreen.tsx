@@ -1,24 +1,31 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { SETTLE_COMMISSION } from '@/core/config/demo';
 import type { SortAccessors } from '@/shared/hooks/useSort';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
+import { downloadCsv } from '@/shared/lib/download';
 import { fmtDate, money, moneyShort } from '@/shared/lib/format';
+import { dateRange } from '@/shared/lib/validate';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { ClearChip } from '@/shared/ui/ClearChip';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { Modal } from '@/shared/ui/Modal';
 import { Pager } from '@/shared/ui/Pager';
+import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SegTabs } from '@/shared/ui/SegTabs';
+import { SkeletonKpiStrip } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
 import type { Settlement } from '@/features/settlements/application/store/settlements.types';
 import { PlanBilling } from '@/features/settlements/presentation/components/PlanBilling';
@@ -27,6 +34,9 @@ import { PlanBilling } from '@/features/settlements/presentation/components/Plan
 const SETTLE_PCT = `${Math.round(SETTLE_COMMISSION * 100)}%`;
 
 const PAGE = 7;
+
+/** Appointment states whose fee will never be settled. */
+const DEAD_STATUSES: readonly string[] = ['Cancelled', 'No-show'];
 
 /** Which action a confirm dialog is driving. */
 type ConfirmAction = 'received' | 'raise' | 'request';
@@ -46,6 +56,16 @@ const ACC: SortAccessors<Settlement> = {
   status: (r) => r.status,
 };
 
+const SETTLEMENT_COLUMNS = [
+  'Settlement Period',
+  'Gross Amount',
+  'Commission',
+  'Net Payable',
+  'Expected Date',
+  'Status',
+  'Action',
+] as const;
+
 const SORT_KEYS: Readonly<Record<string, string>> = {
   'Settlement Period': 'period',
   'Gross Amount': 'gross',
@@ -60,6 +80,7 @@ export function SettlementsScreen() {
   const settlements = useSettlementsStore((s) => s.settlements);
   const settleMarkReceived = useSettlementsStore((s) => s.settleMarkReceived);
   const settleRequest = useSettlementsStore((s) => s.settleRequest);
+  const appts = useAppointmentsStore((s) => s.appts);
 
   const [tab, setTab] = useState('Settlements');
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
@@ -67,7 +88,22 @@ export function SettlementsScreen() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(false);
   const { sort, onSort, sorted } = useSort<Settlement>();
+
+  /**
+   * Re-derive the ledger from the store. There is no settlements API yet, so
+   * the refresh re-emits the live store state — every row and KPI is rebuilt
+   * from it — and this is where the refetch goes when that API lands.
+   */
+  const refresh = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    useSettlementsStore.setState((s) => ({ settlements: [...s.settlements] }));
+    setLoading(false);
+  }, []);
+
+  const rangeError = from !== '' && to !== '' ? dateRange(from, to) : undefined;
 
   const filtered = settlements.filter((r) => {
     if (q && !(r.id + r.period + r.status).toLowerCase().includes(q.toLowerCase())) return false;
@@ -79,6 +115,22 @@ export function SettlementsScreen() {
   const total = sum(settlements);
   const received = sum(settlements.filter((r) => r.status === 'Received'));
   const overdue = settlements.filter((r) => r.status === 'Overdue');
+
+  // Fees Medibook has collected for appointments that have not completed yet:
+  // prepaid online bookings still in the queue. Derived from the appointments
+  // store rather than printed as a fixed figure, so the tile cannot claim a
+  // number the app cannot back up.
+  const heldGross = appts
+    .filter(
+      (a) =>
+        a.source === 'Online' &&
+        a.payment === 'Paid' &&
+        !DEAD_STATUSES.includes(a.status) &&
+        a.status !== 'Completed',
+    )
+    .reduce((s, a) => s + a.amount, 0);
+  const heldNet = heldGross - Math.round(heldGross * SETTLE_COMMISSION);
+
   const KPIS: readonly StatCardData[] = [
     {
       icon: 'wallet',
@@ -107,8 +159,8 @@ export function SettlementsScreen() {
     {
       icon: 'clock',
       label: 'Held by Medibook (Upcoming)',
-      value: money(37800),
-      sub: 'payable after appointments complete',
+      value: money(heldNet),
+      sub: 'prepaid online bookings still to complete',
       iconClass: 'bg-y-100 text-y-600',
       valueClass: 'text-y-600',
     },
@@ -124,37 +176,56 @@ export function SettlementsScreen() {
       fn(v);
       setPage(0);
     };
+  const filtersActive = q !== '' || from !== '' || to !== '';
+  const clearFilters = (): void => {
+    setQ('');
+    setFrom('');
+    setTo('');
+    setPage(0);
+  };
 
+  let tableState: TableStateSpec | undefined;
+  if (loading) tableState = { kind: 'loading', rows: 5 };
+  else if (rows.length === 0)
+    tableState = {
+      kind: 'empty',
+      icon: 'scale',
+      title: filtersActive ? 'No settlements match your filters.' : 'No settlements yet.',
+      message: filtersActive
+        ? 'Widen the expected-date range or clear the search.'
+        : 'Weekly statements appear here once Medibook has collected online booking fees.',
+      actionLabel: filtersActive ? 'Clear filters' : undefined,
+      onAction: filtersActive ? clearFilters : undefined,
+    };
+
+  /** Real CSV file — RFC-4180 escaping and a UTF-8 BOM so Excel renders ₹. */
   const exportCsv = (): void => {
-    const head = [
-      'Statement',
-      'Period',
-      'Gross',
-      'Commission %',
-      'Commission',
-      'Net Payable',
-      'Expected',
-      'Status',
-      'Transfer Ref',
-      'Received On',
-    ];
-    const lines = filtered.map((r) => [
-      r.id,
-      r.period,
-      r.gross,
-      SETTLE_PCT,
-      r.commission,
-      r.net,
-      fmtDate(r.expected),
-      r.status,
-      r.utr || '—',
-      fmtDate(r.receivedOn),
+    downloadCsv('medibook-settlements.csv', [
+      [
+        'Statement',
+        'Period',
+        'Gross',
+        'Commission %',
+        'Commission',
+        'Net Payable',
+        'Expected',
+        'Status',
+        'Transfer Ref',
+        'Received On',
+      ],
+      ...filtered.map((r) => [
+        r.id,
+        r.period,
+        r.gross,
+        SETTLE_PCT,
+        r.commission,
+        r.net,
+        fmtDate(r.expected),
+        r.status,
+        r.utr ?? '—',
+        fmtDate(r.receivedOn),
+      ]),
     ]);
-    const csv = [head, ...lines].map((row) => row.map((c) => `"${c}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'medibook-settlements.csv';
-    a.click();
     toast('Exported medibook-settlements.csv', 'success');
   };
 
@@ -170,9 +241,17 @@ export function SettlementsScreen() {
       <Card pad={16} className="flex flex-wrap items-center justify-between gap-3">
         <SegTabs tabs={['Settlements', 'Plan & Billing']} value={tab} onChange={setTab} />
         {tab === 'Settlements' && (
-          <Button variant="secondary" icon="download" onClick={exportCsv}>
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-2.5">
+            <RefreshBtn onRefresh={refresh} title="Refresh settlements" />
+            <Button
+              variant="secondary"
+              icon="download"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+            >
+              Export CSV
+            </Button>
+          </div>
         )}
       </Card>
 
@@ -180,12 +259,14 @@ export function SettlementsScreen() {
         <PlanBilling />
       ) : (
         <>
-          <KpiStrip items={KPIS} />
+          {loading ? <SkeletonKpiStrip count={KPIS.length} /> : <KpiStrip items={KPIS} />}
           <Card pad={16} className="flex flex-wrap items-center gap-3.5">
             <span className="text-body text-text-muted">Expected between</span>
             <input
               type="date"
               value={from}
+              aria-label="Expected on or after"
+              aria-invalid={rangeError ? true : undefined}
               onChange={(e) => onFilter(setFrom)(e.target.value)}
               className="border-border text-body text-text-body h-11 rounded-md border px-3.5"
             />
@@ -193,19 +274,24 @@ export function SettlementsScreen() {
             <input
               type="date"
               value={to}
+              aria-label="Expected on or before"
+              aria-invalid={rangeError ? true : undefined}
               onChange={(e) => onFilter(setTo)(e.target.value)}
               className="border-border text-body text-text-body h-11 rounded-md border px-3.5"
             />
             {(from || to) && (
-              <span
+              <ClearChip
+                label="Clear dates"
                 onClick={() => {
                   setFrom('');
                   setTo('');
                   setPage(0);
                 }}
-                className="text-body text-blue cursor-pointer"
-              >
-                Clear
+              />
+            )}
+            {rangeError && (
+              <span className="text-caption text-d-700 inline-flex items-center gap-1.5">
+                <Icon name="triangle-alert" size={13} /> {rangeError}
               </span>
             )}
             <span className="flex-1" />
@@ -224,25 +310,20 @@ export function SettlementsScreen() {
                 <input
                   value={q}
                   onChange={(e) => onFilter(setQ)(e.target.value)}
+                  aria-label="Search settlements by statement, date or status"
                   placeholder="Search by statement, date or status"
                   className="text-body text-text-strong flex-1 border-none bg-transparent outline-none"
                 />
               </div>
             </div>
             <TableShell
-              columns={[
-                'Settlement Period',
-                'Gross Amount',
-                'Commission',
-                'Net Payable',
-                'Expected Date',
-                'Status',
-                'Action',
-              ]}
+              columns={SETTLEMENT_COLUMNS}
               rightCols={['Gross Amount', 'Commission', 'Net Payable']}
               sortKeys={SORT_KEYS}
               sort={sort}
               onSort={onSort}
+              state={tableState}
+              scrollLabel="Settlement records"
             >
               {rows.map((r) => (
                 <tr key={r.id} className="hover:bg-grey-200 transition-colors duration-150">
@@ -304,12 +385,14 @@ export function SettlementsScreen() {
                           Follow-up raised · awaiting Medibook
                         </span>
                       ) : (
-                        <span
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon="triangle-alert"
                           onClick={() => setConfirm({ row: r, action: 'raise' })}
-                          className="text-body text-y-700 cursor-pointer font-medium"
                         >
                           Raise a request
-                        </span>
+                        </Button>
                       )
                     ) : r.requested ? (
                       <span className="text-caption text-blue">Requested · awaiting Medibook</span>
@@ -326,11 +409,6 @@ export function SettlementsScreen() {
                 </tr>
               ))}
             </TableShell>
-            {filtered.length === 0 && (
-              <div className="text-text-faint text-body-lg py-9 text-center">
-                No settlements match your filters.
-              </div>
-            )}
             <Pager
               total={filtered.length}
               page={pg}

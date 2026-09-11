@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
-
-import { isoToRel, money, relToISO } from '@/shared/lib/format';
-import { Button } from '@/shared/ui/Button';
+import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { money } from '@/shared/lib/format';
 import { Field } from '@/shared/ui/Field';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { Select } from '@/shared/ui/Select';
-import { toast } from '@/shared/ui/toast/toast.store';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
+import {
+  isoToRelLocal,
+  isPastISO,
+  relToISOLocal,
+  todayISO,
+} from '@/features/appointments/application/store/appointments.logic';
 import {
   DEPARTMENTS,
   DOCTORS,
@@ -37,6 +40,8 @@ const TIME_SLOTS = [
 const dateInputClass =
   'rounded-input border-border text-body text-text-strong h-13.5 w-full border bg-white px-4';
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 interface EditForm {
   dept: Department;
   doctor: string;
@@ -45,96 +50,120 @@ interface EditForm {
   remark: string;
 }
 
+/** Inline field errors instead of the old "Select department and doctor" toast. */
+const VALIDATORS: FormValidators<EditForm> = {
+  dept: (value) => (DEPARTMENTS.includes(value) ? undefined : 'Choose a department.'),
+  doctor: (value, values) => {
+    if (value.trim() === '') return 'Choose a doctor.';
+    const doctors: readonly string[] = DOCTORS[values.dept] ?? [];
+    return doctors.includes(value) ? undefined : 'That doctor does not work in this department.';
+  },
+  iso: (value) => {
+    const raw = value.trim();
+    if (raw === '') return 'Pick a date.';
+    if (!ISO_DATE_PATTERN.test(raw)) return 'Enter a valid date.';
+    if (Number.isNaN(new Date(`${raw}T00:00:00`).getTime())) return 'Enter a valid date.';
+    if (isPastISO(raw)) return 'The date cannot be in the past.';
+    return undefined;
+  },
+  time: (value) =>
+    TIME_SLOTS.includes(value) ? undefined : 'Pick an appointment time from the list.',
+};
+
 interface EditApptModalProps {
   appt: Appointment | null;
   onClose: () => void;
 }
 
 /** Full edit: dept/doctor/date/time/note (design `Flows.jsx` `EditApptModal`). */
-export function EditApptModal({ appt, onClose }: EditApptModalProps) {
+function EditApptForm({ appt, onClose }: { appt: Appointment; onClose: () => void }) {
   const editAppt = useAppointmentsStore((s) => s.editAppt);
-  const [f, setF] = useState<EditForm | null>(null);
-  useEffect(() => {
-    if (appt) {
-      setF({
-        dept: appt.dept,
-        doctor: appt.doctor,
-        iso: relToISO(appt.date),
-        time: appt.time,
-        remark: appt.remark || '',
+  const form = useForm<EditForm>({
+    initial: {
+      dept: appt.dept,
+      doctor: appt.doctor,
+      iso: relToISOLocal(appt.date),
+      time: appt.time,
+      remark: appt.remark || '',
+    },
+    validate: VALIDATORS,
+    onSubmit: (v) => {
+      editAppt(appt.id, {
+        dept: v.dept,
+        doctor: v.doctor,
+        date: isoToRelLocal(v.iso),
+        time: v.time,
+        remark: v.remark,
       });
-    }
-  }, [appt?.id]);
-  if (!appt || !f) return null;
-  const onDept = (v: string) => {
+      onClose();
+    },
+  });
+
+  const onDept = (v: string): void => {
     const dept = DEPARTMENTS.find((d) => d === v);
     if (!dept) return;
-    setF((x) => (x ? { ...x, dept, doctor: '' } : x));
+    // Clearing the doctor keeps the pair valid; its error appears on submit.
+    form.setValues({ dept, doctor: '' });
   };
-  const setField = (patch: Partial<EditForm>) => setF((x) => (x ? { ...x, ...patch } : x));
-  const fee = FEES[f.dept] || appt.amount;
-  const save = () => {
-    if (!f.dept || !f.doctor) {
-      toast('Select department and doctor', 'error');
-      return;
-    }
-    editAppt(appt.id, {
-      dept: f.dept,
-      doctor: f.doctor,
-      date: isoToRel(f.iso),
-      time: f.time,
-      remark: f.remark,
-    });
-    onClose();
-  };
+
+  const fee = FEES[form.values.dept] || appt.amount;
+
   return (
-    <Modal
-      open={!!appt}
+    <FormModal
+      open
       onClose={onClose}
       title="Edit Appointment"
       width={560}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button icon="check" onClick={save}>
-            Save Changes
-          </Button>
-        </>
-      }
+      onSubmit={form.handleSubmit}
+      submitLabel="Save Changes"
+      busy={form.submitting}
     >
       <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
-        <Field label="Department" required>
-          <Select value={f.dept} options={DEPARTMENTS} onChange={onDept} />
+        <Field label="Department" required error={form.errorFor('dept')}>
+          <Select value={form.values.dept} options={DEPARTMENTS} onChange={onDept} />
         </Field>
-        <Field label="Doctor" required>
+        <Field label="Doctor" required error={form.errorFor('doctor')}>
           <Select
-            value={f.doctor}
-            placeholder={f.dept ? 'Select Doctor' : 'Select department first'}
-            options={DOCTORS[f.dept]}
-            onChange={(v) => setField({ doctor: v })}
+            value={form.values.doctor}
+            placeholder={form.values.dept ? 'Select Doctor' : 'Select department first'}
+            options={DOCTORS[form.values.dept]}
+            onChange={(v) => form.setField('doctor', v)}
+            onBlur={() => form.blurField('doctor')}
           />
         </Field>
-        <Field label="Date">
-          <input
-            type="date"
-            value={f.iso}
-            min={relToISO('Today')}
-            onChange={(e) => setField({ iso: e.target.value })}
-            className={dateInputClass}
-          />
+        <Field label="Date" required error={form.errorFor('iso')}>
+          {(field) => (
+            <input
+              type="date"
+              id={field.id}
+              value={form.values.iso}
+              min={todayISO()}
+              aria-describedby={field.describedById}
+              aria-invalid={field.invalid || undefined}
+              onChange={(e) => form.setField('iso', e.target.value)}
+              onBlur={() => form.blurField('iso')}
+              className={dateInputClass}
+            />
+          )}
         </Field>
-        <Field label="Time">
-          <Select value={f.time} options={TIME_SLOTS} onChange={(v) => setField({ time: v })} />
+        <Field label="Time" required error={form.errorFor('time')}>
+          <Select
+            value={form.values.time}
+            options={TIME_SLOTS}
+            onChange={(v) => form.setField('time', v)}
+            onBlur={() => form.blurField('time')}
+          />
         </Field>
         <Field label="Note" className="col-span-full">
-          <textarea
-            value={f.remark}
-            onChange={(e) => setField({ remark: e.target.value })}
-            placeholder="Add any relevant notes..."
-            className="rounded-input border-border text-body-lg text-text-strong h-20 w-full resize-none border p-3"
-          ></textarea>
+          {(field) => (
+            <textarea
+              id={field.id}
+              value={form.values.remark}
+              onChange={(e) => form.setField('remark', e.target.value)}
+              placeholder="Add any relevant notes..."
+              className="rounded-input border-border text-body-lg text-text-strong h-20 w-full resize-none border p-3"
+            ></textarea>
+          )}
         </Field>
       </div>
       <div className="text-body text-text-body mt-4 flex items-center gap-2">
@@ -149,6 +178,12 @@ export function EditApptModal({ appt, onClose }: EditApptModalProps) {
           Fee changed after payment — settle the difference at the desk.
         </div>
       )}
-    </Modal>
+    </FormModal>
   );
+}
+
+/** Keyed wrapper: a new appointment gets a fresh form, with no prop-to-state effect. */
+export function EditApptModal({ appt, onClose }: EditApptModalProps) {
+  if (!appt) return null;
+  return <EditApptForm key={appt.id} appt={appt} onClose={onClose} />;
 }

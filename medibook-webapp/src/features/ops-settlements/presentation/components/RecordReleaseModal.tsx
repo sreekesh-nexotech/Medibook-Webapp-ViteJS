@@ -2,9 +2,8 @@ import { hospName } from '@/features/ops-hospitals/application/store/hospitals.s
 import type { Bank } from '@/features/ops-hospitals/application/store/hospitals.types';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
-import { Button } from '@/shared/ui/Button';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { OpsField } from '@/shared/ui/OpsField';
 import { TextInput } from '@/shared/ui/TextInput';
 
@@ -25,7 +24,10 @@ interface RecordReleaseModalProps {
   onRecord: () => void;
 }
 
-/** Record Settlement Release modal (design single-statement release form). */
+/**
+ * Record Settlement Release modal (design single-statement release form),
+ * on `FormModal` so Enter records the release (audit 3.4.5).
+ */
 export function RecordReleaseModal({
   rel,
   relBank,
@@ -54,21 +56,14 @@ export function RecordReleaseModal({
       ]
     : [];
   return (
-    <Modal
+    <FormModal
       open={!!rel}
       onClose={onClose}
       title="Record Settlement Release"
       width={500}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={busy ? undefined : onRecord} className={cn(busy && 'opacity-50')}>
-            {busy ? 'Recording…' : 'Record Release'}
-          </Button>
-        </>
-      }
+      onSubmit={onRecord}
+      submitLabel={busy ? 'Recording…' : 'Record Release'}
+      busy={busy}
     >
       {rel && (
         <div className="flex flex-col gap-4">
@@ -91,22 +86,31 @@ export function RecordReleaseModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <OpsField label="Amount Released (₹)" required error={err.amt}>
-              <TextInput value={amt} onChange={onAmtChange} height={48} />
+              <TextInput
+                value={amt}
+                name="releasedAmount"
+                inputMode="numeric"
+                onChange={onAmtChange}
+                height={48}
+              />
             </OpsField>
             <OpsField label="Transfer Reference (UTR)" required error={err.ref}>
-              <TextInput value={utrRef} onChange={onRefChange} height={48} />
+              <TextInput value={utrRef} name="utr" onChange={onRefChange} height={48} />
             </OpsField>
           </div>
           <OpsField label="Remark (visible to the hospital)">
-            <textarea
-              value={remark}
-              onChange={(e) => onRemarkChange(e.target.value)}
-              placeholder="e.g. Part release — balance follows after dispute review"
-              className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
-            ></textarea>
+            {(field) => (
+              <textarea
+                id={field.id}
+                value={remark}
+                onChange={(e) => onRemarkChange(e.target.value)}
+                placeholder="e.g. Part release — balance follows after dispute review"
+                className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
+              ></textarea>
+            )}
           </OpsField>
         </div>
       )}
-    </Modal>
+    </FormModal>
   );
 }

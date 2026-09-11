@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useSort, type SortAccessors } from '@/shared/hooks/useSort';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
+import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -11,9 +13,14 @@ import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import { HOSPITAL_VIEW_SEGMENT, hospitalPath, isHospitalRole } from '@/app/router/paths';
 
+import {
+  formatUpdatedAt,
+  useListRefresh,
+} from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import {
   DEPARTMENTS,
@@ -21,6 +28,7 @@ import {
 } from '@/features/appointments/application/store/appointments.types';
 import { usePatientsStore } from '@/features/patients/application/store/patients.store';
 import type { Patient } from '@/features/patients/application/store/patients.types';
+import { PatientModal } from '@/features/patients/presentation/components/PatientModal';
 
 /**
  * Patients list. Patients are real records in the store (identity + contact
@@ -51,6 +59,17 @@ interface PatientRow extends Patient {
 
 const PAT_PAGE = 8;
 
+const COLUMNS = [
+  'MR Number',
+  'Patient Name',
+  'Age',
+  'Gender',
+  'Phone',
+  'Visits',
+  'Status',
+  'Action',
+];
+
 export function PatientsScreen() {
   const navigate = useNavigate();
   const { role } = useParams();
@@ -65,7 +84,22 @@ export function PatientsScreen() {
   const [statusF, setStatusF] = useState('All Status');
   const [sortF, setSortF] = useState('Sort: Recent');
   const [page, setPage] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
   const { sort, onSort, sorted } = useSort<PatientRow>();
+
+  /**
+   * Audit 3.1.1 — Refresh re-reads both stores this list is derived from
+   * (patient records + their visit history) and the table re-derives from
+   * them, with the shared loading state while it runs. No toast.
+   */
+  const reload = useCallback((): void => {
+    const freshPatients = usePatientsStore.getState().patients;
+    const freshAppts = useAppointmentsStore.getState().appts;
+    if (!Array.isArray(freshPatients) || !Array.isArray(freshAppts)) {
+      throw new Error('The patient list is unavailable.');
+    }
+  }, []);
+  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
 
   const open = (mrn: string) =>
     navigate(`/${hospitalRole}/${HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(':mrn', mrn)}`);
@@ -126,63 +160,93 @@ export function PatientsScreen() {
     setPage(0);
   };
 
+  const filtersActive =
+    q !== '' || deptF !== 'All Departments' || statusF !== 'All Status' || sortF !== 'Sort: Recent';
+  const clearAll = () => {
+    setQ('');
+    setDeptF('All Departments');
+    setStatusF('All Status');
+    setSortF('Sort: Recent');
+    setPage(0);
+  };
+
+  /** Loading / empty / error live inside the table body so the header stays put. */
+  const tableState: TableStateSpec | undefined = loading
+    ? { kind: 'loading', rows: PAT_PAGE }
+    : error
+      ? { kind: 'error', message: error, onRetry: () => void refresh() }
+      : rows.length === 0
+        ? filtersActive
+          ? {
+              kind: 'empty',
+              title: 'No patients match your filters.',
+              message: 'No record matches this search, department or status.',
+              actionLabel: 'Clear filters',
+              onAction: clearAll,
+            }
+          : {
+              kind: 'empty',
+              icon: 'user-plus',
+              title: 'No patients yet.',
+              message: 'Add the first record — identity and contact only, no clinical data.',
+              actionLabel: 'Add patient',
+              onAction: () => setAddOpen(true),
+            }
+        : undefined;
+
   return (
     <div className="flex flex-col gap-5">
       <Card pad={20}>
-        <div className="mb-4">
-          <SearchField
-            value={q}
-            onChange={reset(setQ)}
-            placeholder="Search by patient name, MR number or phone"
-          />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="min-w-60 flex-1">
+            <SearchField
+              value={q}
+              onChange={reset(setQ)}
+              placeholder="Search by patient name, MR number or phone"
+            />
+          </div>
+          <Can perm="Patients.add">
+            <Button icon="user-plus" onClick={() => setAddOpen(true)}>
+              Add Patient
+            </Button>
+          </Can>
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <RefreshBtn />
+          <RefreshBtn onRefresh={refresh} title="Refresh patients" />
           <FilterSelect
             value={deptF}
             options={['All Departments', ...DEPARTMENTS]}
             onChange={reset(setDeptF)}
+            aria-label="Filter by department"
           />
           <FilterSelect
             value={statusF}
             options={['All Status', 'Active', 'Inactive']}
             onChange={reset(setStatusF)}
+            aria-label="Filter by status"
           />
           <FilterSelect
             value={sortF}
             options={['Sort: Recent', 'Sort: Name']}
             onChange={reset(setSortF)}
+            aria-label="Sort patients"
           />
-          {(q ||
-            deptF !== 'All Departments' ||
-            statusF !== 'All Status' ||
-            sortF !== 'Sort: Recent') && (
+          {filtersActive && (
             <button
               type="button"
-              onClick={() => {
-                setQ('');
-                setDeptF('All Departments');
-                setStatusF('All Status');
-                setSortF('Sort: Recent');
-                setPage(0);
-              }}
+              onClick={clearAll}
               className="text-body text-blue cursor-pointer whitespace-nowrap"
             >
               Clear all
             </button>
           )}
+          <span className="flex-1"></span>
+          <span className="text-caption text-text-muted whitespace-nowrap">
+            Updated {formatUpdatedAt(updatedAt)}
+          </span>
         </div>
         <TableShell
-          columns={[
-            'MR Number',
-            'Patient Name',
-            'Age',
-            'Gender',
-            'Phone',
-            'Visits',
-            'Status',
-            'Action',
-          ]}
+          columns={COLUMNS}
           sortKeys={{
             'MR Number': 'mrn',
             'Patient Name': 'name',
@@ -194,6 +258,8 @@ export function PatientsScreen() {
           }}
           sort={sort}
           onSort={onSort}
+          state={tableState}
+          scrollLabel="Patients"
         >
           {rows.map((p) => (
             <tr
@@ -217,26 +283,35 @@ export function PatientsScreen() {
               </td>
               <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                 <div className="flex gap-2">
-                  <IconBtn name="eye" box={36} size={16} onClick={() => open(p.mrn)} title="View" />
+                  <IconBtn
+                    name="eye"
+                    label="View patient"
+                    box={36}
+                    size={16}
+                    onClick={() => open(p.mrn)}
+                  />
                   <IconBtn
                     name="calendar-plus"
+                    label="Book appointment"
                     box={36}
                     size={16}
                     onClick={() => book(p.mrn)}
-                    title="Book appointment"
                   />
                 </div>
               </td>
             </tr>
           ))}
         </TableShell>
-        {list.length === 0 && (
-          <div className="text-text-faint text-body-lg py-9 text-center">
-            No patients match your filters.
-          </div>
-        )}
         <Pager total={list.length} page={pg} pageSize={PAT_PAGE} onPage={setPage} noun="patients" />
       </Card>
+      <PatientModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSaved={(mrn) => {
+          setAddOpen(false);
+          open(mrn);
+        }}
+      />
     </div>
   );
 }

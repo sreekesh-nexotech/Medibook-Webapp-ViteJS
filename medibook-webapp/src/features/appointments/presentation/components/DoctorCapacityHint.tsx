@@ -1,9 +1,8 @@
-import { useMemo } from 'react';
-
 import { cn } from '@/shared/lib/cn';
 import { Icon } from '@/shared/ui/Icon';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
+import { doctorLoad } from '@/features/appointments/application/store/appointments.logic';
 
 interface DoctorCapacityHintProps {
   doctor: string;
@@ -15,14 +14,12 @@ interface DoctorCapacityHintProps {
  * The design's unused `source` prop is dropped (it had no effect).
  */
 export function DoctorCapacityHint({ doctor }: DoctorCapacityHintProps) {
-  const doctorLoadToday = useAppointmentsStore((s) => s.doctorLoadToday);
-  // Re-compute the load as bookings / doctor status change.
+  // Derived from the two slices this component subscribes to, through the pure
+  // `doctorLoad` rule — so the load recomputes whenever bookings or the
+  // doctor's status change, with no memo to keep in step.
   const appts = useAppointmentsStore((s) => s.appts);
   const docStatus = useAppointmentsStore((s) => s.docStatus);
-  const { booked, cap, status, off, full } = useMemo(
-    () => doctorLoadToday(doctor),
-    [doctorLoadToday, doctor, appts, docStatus],
-  );
+  const { booked, cap, status, off, full } = doctorLoad(appts, docStatus, doctor);
   const pct = Math.min(100, Math.round((booked / cap) * 100));
   const warn = off || full;
   const barColorClass = off || full ? 'bg-d-500' : pct > 75 ? 'bg-y-600' : 'bg-g-600';

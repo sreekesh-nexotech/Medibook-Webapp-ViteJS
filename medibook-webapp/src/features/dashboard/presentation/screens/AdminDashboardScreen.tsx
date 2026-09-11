@@ -1,53 +1,74 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
 import { cn } from '@/shared/lib/cn';
 import { money, moneyShort } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
-import { BarChart } from '@/shared/ui/BarChart';
+import { BarChart, type BarChartDatum } from '@/shared/ui/BarChart';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { LineChart } from '@/shared/ui/LineChart';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { SkeletonKpiStrip, SkeletonTable } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
+import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import { DOCTOR_META } from '@/features/appointments/application/store/appointments.types';
+import { DEPARTMENTS } from '@/features/appointments/application/store/appointments.types';
+import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
+import { usePatientsStore } from '@/features/patients/application/store/patients.store';
 import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
 
 import { OverviewHeader } from '@/features/dashboard/presentation/components/OverviewHeader';
 import type { Period } from '@/features/dashboard/presentation/components/period';
 
-/** Appointments-by-department bars (design `AD_DEPT`), per-bar colours from data. */
-const AD_DEPT: readonly { l: string; v: number; color: string }[] = [
-  { l: 'Cardio', v: 62, color: 'var(--color-blue)' },
-  { l: 'Ortho', v: 48, color: 'var(--color-p-400)' },
-  { l: 'Pedia', v: 55, color: 'var(--color-g-500)' },
-  { l: 'Neuro', v: 31, color: 'var(--color-y-500)' },
-  { l: 'ENT', v: 27, color: 'var(--color-blue-strong)' },
-  { l: 'Derma', v: 38, color: 'var(--color-p-300)' },
+/** Bar colours cycled across the department chart (design `AD_DEPT` palette). */
+const DEPT_BAR_COLORS: readonly string[] = [
+  'var(--color-blue)',
+  'var(--color-p-400)',
+  'var(--color-g-500)',
+  'var(--color-y-500)',
+  'var(--color-blue-strong)',
+  'var(--color-p-300)',
 ];
 
-const AD_RATINGS: Record<string, string> = {
-  'Dr. Thomas K.': '4.9',
-  'Dr. Anil R.': '4.6',
-  'Dr. Geetha R.': '4.7',
-  'Dr. Kumar V.': '4.8',
-  'Dr. Maya S.': '4.5',
-  'Dr. Arun B.': '4.4',
-  'Dr. Leela P.': '4.6',
+/** Short chart labels for the seeded departments; anything else keeps its name. */
+const DEPT_SHORT: Readonly<Record<string, string>> = {
+  'General Medicine': 'Gen Med',
+  Cardiology: 'Cardio',
+  Orthopedics: 'Ortho',
+  Pediatrics: 'Pedia',
+  Neurology: 'Neuro',
+  ENT: 'ENT',
+  Dermatology: 'Derma',
 };
 
-// period scaling for the believable cumulative figures (Today is real where possible)
+/** Appointment states that never count towards activity. */
+const DEAD_STATUSES: readonly string[] = ['Cancelled', 'No-show'];
+
+/** The five doctors the performance table shows. */
+const PERF_ROWS = 5;
+
+const PERF_COLUMNS = ['Doctor', 'Department', 'Appointments', 'Rating', 'Status'] as const;
+
+/**
+ * Period scaling for the historical figures. Only `Today` is derived from the
+ * live stores; the other three periods are illustrative until the reporting
+ * API lands, and every figure that uses this factor says so on screen.
+ */
 const AD_FACT: Record<Period, number> = {
   Today: 1,
   Yesterday: 0.94,
   'This Week': 6.2,
   'This Month': 26.5,
 };
+
 const AD_FOOT: Record<Period, readonly { l: string; v: number }[]> = {
   Today: [
     { l: '8a', v: 22 },
@@ -82,6 +103,20 @@ const AD_FOOT: Record<Period, readonly { l: string; v: number }[]> = {
   ],
 };
 
+/** Illustrative totals for the periods the stores cannot answer. */
+const AD_SAMPLE_APPTS: Readonly<Record<Period, number>> = {
+  Today: 0,
+  Yesterday: 96,
+  'This Week': 1996,
+  'This Month': 6200,
+};
+const AD_SAMPLE_REVENUE: Readonly<Record<Period, number>> = {
+  Today: 0,
+  Yesterday: 132400,
+  'This Week': 884000,
+  'This Month': 3762000,
+};
+
 /** A "Requires Attention" row (design's `ALERTS` items). */
 interface Alert {
   readonly icon: IconName;
@@ -91,7 +126,16 @@ interface Alert {
   readonly go: HospitalStaticView;
 }
 
-/** Admin (hospital) dashboard — design `Dashboard.jsx` `AdminDashboard`. */
+/**
+ * Admin (hospital) dashboard — design `Dashboard.jsx` `AdminDashboard`.
+ *
+ * Audit follow-ups applied here: the doctor-performance table runs on
+ * `TableShell` (so it scrolls instead of crushing, and has loading/empty
+ * states), the KPI strip shimmers while the screen re-derives, and every
+ * figure either comes from a store or is labelled as a sample — the "Total
+ * Patients" tile now counts the patient register instead of printing a number
+ * nothing in the app can back up.
+ */
 export function AdminDashboardScreen() {
   const navigate = useNavigate();
   const { role } = useParams();
@@ -102,59 +146,89 @@ export function AdminDashboardScreen() {
 
   const appts = useAppointmentsStore((s) => s.appts);
   const docStatus = useAppointmentsStore((s) => s.docStatus);
+  const docs = useCatalogStore((s) => s.docs);
+  const patients = usePatientsStore((s) => s.patients);
   const settlements = useSettlementsStore((s) => s.settlements);
   const [period, setPeriod] = useState<Period>('Today');
+  const [loading, setLoading] = useState(false);
 
+  /**
+   * Re-derive the dashboard from the stores it reads. No API yet, so the
+   * refresh re-emits the appointments ledger — every KPI, chart and row is
+   * rebuilt from it — and this is where the refetch goes when one lands.
+   */
+  const refresh = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    useAppointmentsStore.setState((s) => ({ appts: [...s.appts] }));
+    setLoading(false);
+  }, []);
+
+  const isToday = period === 'Today';
   const factor = AD_FACT[period] || 1;
-  const periodWord =
-    period === 'Today' ? 'today' : period === 'Yesterday' ? 'yesterday' : period.toLowerCase();
+  const periodWord = isToday
+    ? 'today'
+    : period === 'Yesterday'
+      ? 'yesterday'
+      : period.toLowerCase();
   const footData = AD_FOOT[period] || AD_FOOT['Today'];
-  const deptData = AD_DEPT.map((d) => ({ ...d, v: Math.max(1, Math.round(d.v * factor)) }));
-  const docNames = Object.keys(DOCTOR_META);
-  const activeDocs = docNames.filter((d) => {
-    const st: string = docStatus[d];
-    return st !== 'On Break' && st !== 'Inactive';
+
+  const live = appts.filter((a) => a.date === 'Today' && !DEAD_STATUSES.includes(a.status));
+
+  // Department bars: real counts for Today, the same counts scaled for the
+  // sample periods (the caption under the chart says which is which).
+  const deptData: readonly BarChartDatum[] = DEPARTMENTS.map((d, i) => {
+    const count = live.filter((a) => a.dept === d).length;
+    return {
+      l: DEPT_SHORT[d] ?? d,
+      v: isToday ? count : Math.max(1, Math.round(count * factor)),
+      color: DEPT_BAR_COLORS[i % DEPT_BAR_COLORS.length],
+    };
+  });
+
+  const activeDocs = docs.filter((d) => {
+    if (d.status !== 'Active') return false;
+    return docStatus[d.name] !== 'On Break';
   }).length;
-  const docAppt = (name: string): number =>
-    appts.filter(
-      (a) =>
-        a.doctor === name && a.date === 'Today' && !['Cancelled', 'No-show'].includes(a.status),
-    ).length;
-  const perfDocs = docNames
-    .map((name) => ({
-      name,
-      dept: DOCTOR_META[name].dept,
-      appts: period === 'Today' ? docAppt(name) : Math.round((docAppt(name) + 3) * factor),
-      rating: AD_RATINGS[name] || '4.5',
-      status: docStatus[name] === 'On Break' ? 'On Leave' : 'Active',
-    }))
+
+  // The table covers every doctor the catalog knows **and** every doctor named
+  // by today's appointments: the two stores can disagree (audit 2.6.2), and a
+  // name-only match would silently report those consultations as zero.
+  const docByName = new Map(docs.map((d) => [d.name, d] as const));
+  const perfNames = [...new Set([...docs.map((d) => d.name), ...live.map((a) => a.doctor)])];
+  const unlistedDoctors = perfNames.filter((name) => !docByName.has(name));
+  const perfDocs = perfNames
+    .map((name) => {
+      const doc = docByName.get(name);
+      const own = live.filter((a) => a.doctor === name);
+      return {
+        key: doc ? doc.id : `appt-${name}`,
+        name,
+        dept: doc?.depts[0] ?? own[0]?.dept ?? '—',
+        appts: isToday ? own.length : Math.round((own.length + 3) * factor),
+        rating: doc ? doc.rating.toFixed(1) : null,
+        status: doc ? (docStatus[name] === 'On Break' ? 'On Leave' : doc.status) : null,
+      };
+    })
     .sort((a, b) => b.appts - a.appts)
-    .slice(0, 5);
+    .slice(0, PERF_ROWS);
+
   const overdue = settlements.filter((r) => r.status === 'Overdue');
   const pendingSettle = settlements.filter((r) => r.status !== 'Received');
   const pendingPay = appts.filter((a) => a.payment === 'Pending').length;
   const realToday = appts.filter((a) => a.date === 'Today').length;
-  const realRev =
-    appts.filter((a) => a.payment === 'Paid').reduce((s, a) => s + a.amount, 0) + 112000;
-  const apptTotals: Record<Period, number> = {
-    Today: realToday,
-    Yesterday: 96,
-    'This Week': 1996,
-    'This Month': 6200,
-  };
-  const revTotals: Record<Period, number> = {
-    Today: realRev,
-    Yesterday: 132400,
-    'This Week': 884000,
-    'This Month': 3762000,
-  };
+  const realRev = appts.filter((a) => a.payment === 'Paid').reduce((s, a) => s + a.amount, 0);
+
+  const apptTotal = isToday ? realToday : AD_SAMPLE_APPTS[period];
+  const revTotal = isToday ? realRev : AD_SAMPLE_REVENUE[period];
+  const sampleSub = `Sample figure for ${periodWord}`;
 
   const KPIS: readonly StatCardData[] = [
     {
       icon: 'calendar-check',
-      label: period === 'Today' ? 'Appointments Today' : 'Appointments',
-      value: apptTotals[period],
-      sub: period === 'Today' ? 'Online + walk-in' : `Booked ${periodWord}`,
+      label: isToday ? 'Appointments Today' : 'Appointments',
+      value: apptTotal,
+      sub: isToday ? 'Online + walk-in' : sampleSub,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
     },
@@ -162,23 +236,23 @@ export function AdminDashboardScreen() {
       icon: 'stethoscope',
       label: 'Active Doctors',
       value: String(activeDocs),
-      sub: `of ${docNames.length} on roster`,
+      sub: `of ${docs.length} on roster`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
     },
     {
       icon: 'users',
       label: 'Total Patients',
-      value: '12,480',
-      sub: 'All-time registered',
+      value: patients.length.toLocaleString('en-IN'),
+      sub: 'Registered patient records',
       iconClass: 'bg-p-100 text-p-500',
       valueClass: 'text-p-500',
     },
     {
       icon: 'indian-rupee',
-      label: period === 'Today' ? 'Revenue Today' : 'Revenue',
-      value: moneyShort(revTotals[period]),
-      sub: period === 'Today' ? 'Desk + online prepaid' : `Earned ${periodWord}`,
+      label: isToday ? 'Revenue Today' : 'Revenue',
+      value: moneyShort(revTotal),
+      sub: isToday ? 'Desk + online prepaid, collected' : sampleSub,
       iconClass: 'bg-y-100 text-y-600',
       valueClass: 'text-y-600',
     },
@@ -203,53 +277,101 @@ export function AdminDashboardScreen() {
       go: 'settlements',
     });
   }
-  ALERTS.push({
-    icon: 'scale',
-    iconClass: 'bg-blue-soft-bg text-blue',
-    t: `${pendingSettle.length} settlements awaiting transfer`,
-    s: `${money(pendingSettle.reduce((s, r) => s + r.net, 0))} expected from Medibook`,
-    go: 'settlements',
-  });
+  if (pendingSettle.length) {
+    ALERTS.push({
+      icon: 'scale',
+      iconClass: 'bg-blue-soft-bg text-blue',
+      t: `${pendingSettle.length} settlements awaiting transfer`,
+      s: `${money(pendingSettle.reduce((s, r) => s + r.net, 0))} expected from Medibook`,
+      go: 'settlements',
+    });
+  }
+
+  let perfState: TableStateSpec | undefined;
+  if (loading) perfState = { kind: 'loading', rows: PERF_ROWS };
+  else if (perfDocs.length === 0)
+    perfState = {
+      kind: 'empty',
+      icon: 'stethoscope',
+      title: 'No doctors on the roster yet.',
+      message: 'Add a doctor to see consultations, ratings and availability here.',
+      actionLabel: 'Manage staff',
+      onAction: () => go('doctors'),
+    };
+
+  // Nothing in any of the three stores the dashboard reads: that is a failed
+  // load, not an empty hospital, so say so and offer a retry rather than
+  // rendering a wall of zeros.
+  if (!loading && appts.length === 0 && docs.length === 0 && patients.length === 0) {
+    return (
+      <ErrorState
+        title="The dashboard could not load"
+        message="No appointments, doctors or patients came back. Retrying usually fixes it — nothing has been lost."
+        onRetry={refresh}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
-      <OverviewHeader title="Hospital Overview" period={period} setPeriod={setPeriod} />
-      <KpiStrip items={KPIS} />
+      <OverviewHeader
+        title="Hospital Overview"
+        period={period}
+        setPeriod={setPeriod}
+        onRefresh={refresh}
+      />
+      {loading ? <SkeletonKpiStrip count={KPIS.length} /> : <KpiStrip items={KPIS} />}
       <div className="flex gap-5">
         <Card className="flex-[3]">
           <SectionTitle size={16} className="mb-4.5">
             Appointments by Department — {period}
           </SectionTitle>
           <BarChart data={deptData} height={210} />
+          <div className="text-caption text-text-muted mt-3">
+            {isToday
+              ? "Live count of today's appointments per department, cancellations and no-shows excluded."
+              : `Today's live counts scaled for ${periodWord} — illustrative until the reporting API lands.`}
+          </div>
         </Card>
         <Card className="flex-[2]">
           <SectionTitle size={16} className="mb-4">
             Requires Attention
           </SectionTitle>
-          <div className="flex flex-col gap-3">
-            {ALERTS.map((a, i) => (
-              <button
-                type="button"
-                key={i}
-                onClick={() => go(a.go)}
-                className="border-border-soft hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 rounded-md border p-3 text-left transition-colors duration-150"
-              >
-                <div
-                  className={cn(
-                    'flex size-9.5 flex-none items-center justify-center rounded-md',
-                    a.iconClass,
-                  )}
+          {ALERTS.length === 0 ? (
+            <EmptyState
+              compact
+              icon="circle-check"
+              title="Nothing needs attention."
+              message="No pending desk payments and no settlement is waiting on Medibook."
+              actionLabel="Open appointments"
+              onAction={() => go('appointments')}
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {ALERTS.map((a) => (
+                <button
+                  type="button"
+                  key={a.t}
+                  onClick={() => go(a.go)}
+                  className="border-border-soft hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 rounded-md border p-3 text-left transition-colors duration-150"
                 >
-                  <Icon name={a.icon} size={19} />
-                </div>
-                <div className="flex-1">
-                  <div className="text-body text-text-strong font-medium">{a.t}</div>
-                  <div className="text-caption text-text-muted">{a.s}</div>
-                </div>
-                <Icon name="chevron-right" size={18} className="text-text-faint" />
-              </button>
-            ))}
-          </div>
+                  <div
+                    className={cn(
+                      'flex size-9.5 flex-none items-center justify-center rounded-md',
+                      a.iconClass,
+                    )}
+                  >
+                    <Icon name={a.icon} size={19} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-body text-text-strong font-medium">{a.t}</div>
+                    <div className="text-caption text-text-muted">{a.s}</div>
+                  </div>
+                  <Icon name="chevron-right" size={18} className="text-text-faint" />
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
       <div className="flex gap-5">
@@ -264,47 +386,56 @@ export function AdminDashboardScreen() {
               Manage Staff
             </button>
           </div>
-          <div className="border-border-soft overflow-hidden rounded-md border">
-            <table className="text-body w-full border-collapse">
-              <thead>
-                <tr>
-                  {['Doctor', 'Department', 'Appointments', 'Rating', 'Status'].map((h) => (
-                    <th
-                      key={h}
-                      className="bg-bg-tint text-text-navy border-border-soft border-b px-3.5 text-left font-semibold"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {perfDocs.map((r, i) => (
-                  <tr key={i}>
-                    <td className="border-border-soft text-text-strong border-b px-3.5 font-medium">
-                      {r.name}
-                    </td>
-                    <td className="border-border-soft border-b px-3.5">{r.dept}</td>
-                    <td className="border-border-soft border-b px-3.5">{r.appts}</td>
-                    <td className="border-border-soft border-b px-3.5">
-                      <span className="inline-flex items-center gap-1">
-                        <Icon name="star" size={14} color="var(--color-y-500)" /> {r.rating}
-                      </span>
-                    </td>
-                    <td className="border-border-soft border-b px-3.5">
-                      <Badge status={r.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <TableShell
+            columns={PERF_COLUMNS}
+            rightCols={['Appointments']}
+            state={perfState}
+            scrollLabel="Doctor performance"
+          >
+            {perfDocs.map((r) => (
+              <tr key={r.key}>
+                <td className={cn(tdClass, 'text-text-strong font-medium')}>{r.name}</td>
+                <td className={tdClass}>{r.dept}</td>
+                <td className={cn(tdClass, 'text-right tabular-nums')}>{r.appts}</td>
+                <td className={tdClass}>
+                  {r.rating === null ? (
+                    <span className="text-text-muted">—</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name="star" size={14} color="var(--color-y-500)" /> {r.rating}
+                    </span>
+                  )}
+                </td>
+                <td className={tdClass}>
+                  {r.status === null ? (
+                    <span className="text-text-muted">Not in catalog</span>
+                  ) : (
+                    <Badge status={r.status} />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </TableShell>
+          <div className="text-caption text-text-muted mt-3">
+            {isToday
+              ? 'Consultations counted from today’s appointments; ratings and availability from the doctor catalog.'
+              : `Consultations scaled for ${periodWord}; ratings and availability from the doctor catalog.`}
+            {unlistedDoctors.length > 0 &&
+              ` ${unlistedDoctors.length} doctor${unlistedDoctors.length === 1 ? '' : 's'} in today’s appointments ${unlistedDoctors.length === 1 ? 'is' : 'are'} not in the catalog, so no rating or availability is shown for ${unlistedDoctors.length === 1 ? 'it' : 'them'}.`}
           </div>
         </Card>
         <Card className="flex-1">
           <SectionTitle size={16} className="mb-4">
             Patient Footfall — {period}
           </SectionTitle>
-          <LineChart data={footData} color="var(--color-g-600)" height={200} />
+          {loading ? (
+            <SkeletonTable rows={3} cols={3} card={false} />
+          ) : (
+            <LineChart data={footData} color="var(--color-g-600)" height={200} />
+          )}
+          <div className="text-caption text-text-muted mt-3">
+            Footfall by hour is a sample series until the reporting API lands.
+          </div>
         </Card>
       </div>
     </div>

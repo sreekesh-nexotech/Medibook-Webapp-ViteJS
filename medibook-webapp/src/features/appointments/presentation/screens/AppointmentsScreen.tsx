@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useSort } from '@/shared/hooks/useSort';
-import { isoToRel, money, timeToMinutes } from '@/shared/lib/format';
+import { money, timeToMinutes } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -13,6 +13,7 @@ import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { tdClass, TableShell } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 import { Tabs } from '@/shared/ui/Tabs';
 
 import {
@@ -22,16 +23,27 @@ import {
   type HospitalRole,
 } from '@/app/router/paths';
 
+import {
+  formatUpdatedAt,
+  useListRefresh,
+} from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import { primaryAction } from '@/features/appointments/application/store/appointments.logic';
+import {
+  isoToRelLocal,
+  primaryAction,
+  todayISO,
+} from '@/features/appointments/application/store/appointments.logic';
 import { DEPARTMENTS, DOCTORS } from '@/features/appointments/application/store/appointments.types';
 import type { Appointment } from '@/features/appointments/application/store/appointments.types';
 import { AppointmentDrawer } from '@/features/appointments/presentation/components/AppointmentDrawer';
 import { MarkPaymentModal } from '@/features/appointments/presentation/components/MarkPaymentModal';
 import { ReceiptModal } from '@/features/appointments/presentation/components/ReceiptModal';
 
-const APPT_TABS = ['All', 'Online', 'Walk-in', 'Pending Payment', 'In Queue'];
+const APPT_TABS = ['All', 'Online', 'Walk-in', 'Pending Payment', 'In Queue', 'Needs Approval'];
 const APPT_PAGE = 8;
+
+/** Grey pill for the `Waived` payment state, which the shared status map predates. */
+const WAIVED_PILL_CLASS = 'bg-grey-300 text-text-muted';
 
 const SORT_KEYS: Readonly<Record<string, string | undefined>> = {
   'MR Number': 'mrn',
@@ -62,6 +74,8 @@ export function AppointmentsScreen() {
 
   const appts = useAppointmentsStore((s) => s.appts);
   const checkIn = useAppointmentsStore((s) => s.checkIn);
+  const approve = useAppointmentsStore((s) => s.approve);
+  const ensureReceiptNo = useAppointmentsStore((s) => s.ensureReceiptNo);
 
   const [tab, setTab] = useState('All');
   const [q, setQ] = useState('');
@@ -76,11 +90,23 @@ export function AppointmentsScreen() {
   const [pay, setPay] = useState<Appointment | null>(null);
   const [receipt, setReceipt] = useState<Appointment | null>(null);
 
+  /**
+   * Audit 3.1.1 — Refresh re-reads the appointment list out of the store and
+   * the table below re-derives from it, with the shared loading state while it
+   * runs. No toast: the refreshed list is the acknowledgement.
+   */
+  const reload = useCallback((): void => {
+    const fresh = useAppointmentsStore.getState().appts;
+    if (!Array.isArray(fresh)) throw new Error('The appointment list is unavailable.');
+  }, []);
+  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
+
   const byTab = (a: Appointment) => {
     if (tab === 'Online') return a.source === 'Online';
     if (tab === 'Walk-in') return a.source === 'Walk-in';
     if (tab === 'Pending Payment') return a.payment === 'Pending';
     if (tab === 'In Queue') return a.status === 'In Queue';
+    if (tab === 'Needs Approval') return a.needsApproval === true;
     return true;
   };
   const counts: Record<string, number> = {
@@ -88,6 +114,7 @@ export function AppointmentsScreen() {
     'Walk-in': appts.filter((a) => a.source === 'Walk-in').length,
     'Pending Payment': appts.filter((a) => a.payment === 'Pending').length,
     'In Queue': appts.filter((a) => a.status === 'In Queue').length,
+    'Needs Approval': appts.filter((a) => a.needsApproval === true).length,
   };
   const ql = q.trim().toLowerCase();
   const filtered = appts.filter((a) => {
@@ -95,7 +122,7 @@ export function AppointmentsScreen() {
     if (ql && !(a.name + ' ' + a.mrn + ' ' + (a.token || '')).toLowerCase().includes(ql))
       return false;
     if (exact) {
-      if (a.date !== isoToRel(exact)) return false;
+      if (a.date !== isoToRelLocal(exact)) return false;
     } else if (dateF !== 'This Week' && a.date !== dateF) return false;
     if (deptF !== 'All Departments' && a.dept !== deptF) return false;
     if (docF !== 'All Doctors' && a.doctor !== docF) return false;
@@ -141,14 +168,46 @@ export function AppointmentsScreen() {
     setStatusF('All Status');
     setPage(0);
   };
+
+  /** Minting on the way in keeps the receipt number out of render and stable. */
+  const openReceipt = (a: Appointment): void => {
+    ensureReceiptNo(a.id);
+    setReceipt(useAppointmentsStore.getState().appts.find((x) => x.id === a.id) ?? a);
+  };
+
   const doPrimary = (a: Appointment) => {
     const p = primaryAction(a);
     if (!p) return;
-    if (p.key === 'pay') setPay(a);
+    if (p.key === 'approve') approve(a.id);
+    else if (p.key === 'pay') setPay(a);
     else if (p.key === 'checkin') checkIn(a.id);
-    else if (p.key === 'receipt') setReceipt(a);
+    else if (p.key === 'receipt') openReceipt(a);
     else if (p.key === 'queue') navigate(hospitalPath(role, 'token'));
   };
+
+  /** Loading / empty / error live inside the table body so the header stays put. */
+  const tableState: TableStateSpec | undefined = loading
+    ? { kind: 'loading', rows: APPT_PAGE }
+    : error
+      ? { kind: 'error', message: error, onRetry: () => void refresh() }
+      : rows.length === 0
+        ? filtersActive
+          ? {
+              kind: 'empty',
+              title: 'No appointments match your filters.',
+              message: 'Nothing is booked for this combination of date, doctor and status.',
+              actionLabel: 'Clear filters',
+              onAction: clearAll,
+            }
+          : {
+              kind: 'empty',
+              icon: 'calendar-plus',
+              title: 'No appointments yet.',
+              message: 'Book the first one and it will appear here with its token.',
+              actionLabel: 'Create appointment',
+              onAction: () => navigate(hospitalPath(role, 'create')),
+            }
+        : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -171,41 +230,58 @@ export function AppointmentsScreen() {
           />
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <RefreshBtn />
+          <RefreshBtn onRefresh={refresh} title="Refresh appointments" />
           <FilterSelect
             value={dateF}
             options={['Today', 'Tomorrow', 'This Week']}
             onChange={reset(setDateF)}
+            aria-label="Filter by date"
           />
           <input
             type="date"
             value={exact}
+            min={todayISO()}
             onChange={(e) => reset(setExact)(e.target.value)}
             title="Pick a specific date"
+            aria-label="Filter by a specific date"
             className="rounded-input border-border text-body text-text-body h-11 border bg-white px-3"
           />
           <FilterSelect
             value={deptF}
             options={['All Departments', ...DEPARTMENTS]}
             onChange={reset(setDeptF)}
+            aria-label="Filter by department"
           />
           <FilterSelect
             value={docF}
             options={['All Doctors', ...Object.values(DOCTORS).flat()]}
             onChange={reset(setDocF)}
+            aria-label="Filter by doctor"
           />
           <FilterSelect
             value={statusF}
             options={['All Status', 'Scheduled', 'In Queue', 'Completed', 'Cancelled', 'No-show']}
             onChange={reset(setStatusF)}
+            aria-label="Filter by status"
           />
           {filtersActive && (
             <button type="button" onClick={clearAll} className="text-body text-blue cursor-pointer">
               Clear all
             </button>
           )}
+          <span className="flex-1"></span>
+          <span className="text-caption text-text-muted whitespace-nowrap">
+            Updated {formatUpdatedAt(updatedAt)}
+          </span>
         </div>
-        <TableShell columns={COLUMNS} sortKeys={SORT_KEYS} sort={sort} onSort={onSort}>
+        <TableShell
+          columns={COLUMNS}
+          sortKeys={SORT_KEYS}
+          sort={sort}
+          onSort={onSort}
+          state={tableState}
+          scrollLabel="Appointments"
+        >
           {rows.map((a) => {
             const p = primaryAction(a);
             return (
@@ -234,21 +310,26 @@ export function AppointmentsScreen() {
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-0.75">
-                    <Badge status={a.payment} />
+                    <Badge
+                      status={a.payment}
+                      className={a.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
+                    />
                     <span className="text-caption text-text-muted tabular-nums">
                       {money(a.amount)}
                     </span>
                   </div>
                 </td>
                 <td className={tdClass}>
-                  {a.token ? (
-                    <div className="flex flex-col items-start gap-0.75">
-                      <Badge status={a.status} />
-                      <span className="text-caption text-blue font-semibold">{a.token}</span>
-                    </div>
-                  ) : (
+                  <div className="flex flex-col items-start gap-0.75">
                     <Badge status={a.status} />
-                  )}
+                    {a.needsApproval ? (
+                      <span className="text-caption text-y-700 font-semibold">Needs approval</span>
+                    ) : (
+                      a.token && (
+                        <span className="text-caption text-blue font-semibold">{a.token}</span>
+                      )
+                    )}
+                  </div>
                 </td>
                 <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
@@ -266,10 +347,10 @@ export function AppointmentsScreen() {
                     )}
                     <IconBtn
                       name="eye"
+                      label="Details"
                       box={36}
                       size={16}
                       onClick={() => setDrawer(a.id)}
-                      title="Details"
                     />
                   </div>
                 </td>
@@ -277,11 +358,6 @@ export function AppointmentsScreen() {
             );
           })}
         </TableShell>
-        {filtered.length === 0 && (
-          <div className="text-text-faint text-body-lg py-9 text-center">
-            No appointments match your filters.
-          </div>
-        )}
         <Pager
           total={filtered.length}
           page={pg}

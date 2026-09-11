@@ -3,6 +3,7 @@
  * prototype (`data.jsx` `DEFAULT_SETTINGS`).
  */
 
+import { CANONICAL_TOKEN_SCHEME } from './settings.rules';
 import type { HospitalSettings } from './settings.types';
 
 export const DEFAULT_SETTINGS: HospitalSettings = {
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: HospitalSettings = {
     cancelBefore: '2 hours',
     autoNoShow: '1 hour',
     tokenGen: 'Auto',
+    tokenScheme: CANONICAL_TOKEN_SCHEME,
     showToken: true,
     allowHold: true,
     holdTimeout: '30 mins',

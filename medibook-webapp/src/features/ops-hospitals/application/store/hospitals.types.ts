@@ -16,6 +16,26 @@ export type KycDocKey = 'reg' | 'gst' | 'licence' | 'bankproof';
 /** Per-document KYC states for one hospital. */
 export type KycRecord = Readonly<Record<KycDocKey, KycState>>;
 
+/** Why the platform paused a hospital. */
+export type SuspensionReason = 'Non-payment' | 'Compliance' | 'Manual review';
+
+/**
+ * An in-force suspension (audit SA-03: "no suspension-for-non-payment
+ * state"). Present only while `status === 'Suspended'`, and kept as a record
+ * rather than a flag so the console can say *why*, *since when* and *which
+ * invoice* — and so an unsuspend clears the whole story at once.
+ */
+export interface HospitalSuspension {
+  readonly reason: SuspensionReason;
+  /** Local-calendar ISO date the suspension took effect. */
+  readonly since: string;
+  /** The unpaid invoice that triggered it, for `Non-payment`. */
+  readonly invoiceNo?: string;
+  /** Operations user who applied it. */
+  readonly by: string;
+  readonly note?: string;
+}
+
 /** Payout bank account on file for a hospital. */
 export interface Bank {
   readonly bank: string;
@@ -40,6 +60,14 @@ export interface OpsHospital {
   readonly kyc?: KycRecord;
   readonly bank?: Bank;
   readonly rejectReason?: string;
+  /** Set while the instance is suspended; cleared when it is reactivated. */
+  readonly suspension?: HospitalSuspension;
+  /**
+   * Per-hospital payment grace window in days, overriding the platform
+   * default. `0` is a real value — no grace at all — so it must stay
+   * distinguishable from "not configured" (`undefined`).
+   */
+  readonly graceDays?: number;
 }
 
 /** Department row in the ops hospital hub's read-only roster. */

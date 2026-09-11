@@ -1,16 +1,19 @@
 import { create } from 'zustand';
 
-import { formatToken } from '@/shared/lib/format';
+import { formatToken, money } from '@/shared/lib/format';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { usePatientsStore, mintMrn } from '@/features/patients/application/store/patients.store';
 
 import {
   INITIAL_DOC_STATUS,
+  INITIAL_RECEIPT_SEQ,
   INITIAL_SERVING,
   INITIAL_TOKEN_SEQ,
   seedAppointments,
 } from './appointments.fixtures';
+import { doctorLoad, formatReceiptNo, grossAmount } from './appointments.logic';
+import type { DoctorLoad } from './appointments.logic';
 import { FEES } from './appointments.types';
 import type {
   Appointment,
@@ -20,6 +23,7 @@ import type {
   DoctorStatus,
   Gender,
   PaymentMode,
+  RefundChannel,
 } from './appointments.types';
 
 /**
@@ -28,12 +32,6 @@ import type {
  * Cross-store: walk-in/online creation inserts brand-new MRNs into the
  * patients store (the future shared query cache link).
  */
-
-/** Soft daily cap per doctor (illustrative; backend-driven later). */
-const DOCTOR_DAILY_CAP = 16;
-
-/** Doctor statuses that make the doctor unavailable for new walk-ins. */
-const DOCTOR_OFF_STATUSES: readonly string[] = ['On Break', 'On Leave', 'Inactive'];
 
 /**
  * Appointment id counter — replaces the prototype's
@@ -51,6 +49,15 @@ function mintApptId(): string {
 export interface PaymentDetails {
   readonly mode?: PaymentMode;
   readonly ref?: string;
+}
+
+/** A refund the desk or Medibook has pushed back to the patient (HA-09). */
+export interface RefundDetails {
+  /** Rupees actually returned — may be a part of the gross paid. */
+  readonly amount: number;
+  /** Why the money went back. Required for the audit trail. */
+  readonly reason: string;
+  readonly via: RefundChannel;
 }
 
 /** Reschedule payload (design `Actions.reschedule`). */
@@ -77,14 +84,8 @@ export interface CreateAppointmentData {
   readonly address?: string;
 }
 
-/** Front-desk capacity signal for one doctor (design `doctorLoadToday`). */
-export interface DoctorLoad {
-  readonly booked: number;
-  readonly status: DoctorStatus;
-  readonly cap: number;
-  readonly full: boolean;
-  readonly off: boolean;
-}
+/** Re-exported so existing call sites keep importing it from the store. */
+export type { DoctorLoad };
 
 interface AppointmentsState {
   appts: readonly Appointment[];
@@ -92,6 +93,8 @@ interface AppointmentsState {
   serving: Readonly<Record<string, string | null>>;
   docStatus: Readonly<Record<string, DoctorStatus>>;
   tokenSeq: number;
+  /** Receipt-series counter behind `MB/R/<FY>/<seq>` — monotonic, never reused. */
+  receiptSeq: number;
   activeDept: string;
   lastReceipt: Appointment | null;
   /** MRN handed to the Create Appointment screen by "Book Appointment". */
@@ -105,7 +108,18 @@ interface AppointmentsActions {
   checkIn: (id: string) => string;
   markPaid: (id: string, details?: PaymentDetails) => string;
   issueToken: (id: string) => string;
-  cancel: (id: string, reason?: string, refundDesk?: boolean) => void;
+  cancel: (id: string, reason?: string, refund?: RefundDetails | null) => void;
+  /** Refund without cancelling — reachable for online bookings too (HA-09). */
+  refund: (id: string, details: RefundDetails) => void;
+  /** Write off the consultation fee, with the reason that makes it auditable. */
+  waiveFee: (id: string, reason: string) => void;
+  /** Desk confirmation for a booking that arrived unconfirmed (HA-05). */
+  approve: (id: string) => void;
+  /**
+   * The appointment's receipt number, minting one from the series if this is
+   * the first time a receipt is opened for it. Stable from then on.
+   */
+  ensureReceiptNo: (id: string) => string;
   noShow: (id: string) => void;
   reschedule: (id: string, payload: ReschedulePayload) => void;
   editAppt: (id: string, patch: Partial<Appointment>) => void;
@@ -140,6 +154,7 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
     serving: INITIAL_SERVING,
     docStatus: INITIAL_DOC_STATUS,
     tokenSeq: INITIAL_TOKEN_SEQ,
+    receiptSeq: INITIAL_RECEIPT_SEQ,
     activeDept: 'All Departments',
     lastReceipt: null,
     bookMrn: null,
@@ -151,6 +166,17 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
       const seq = get().tokenSeq + 1;
       set({ tokenSeq: seq });
       return formatToken(seq);
+    },
+
+    ensureReceiptNo: (id) => {
+      const a = get().appts.find((x) => x.id === id);
+      if (!a) return '';
+      if (a.receiptNo) return a.receiptNo;
+      const seq = get().receiptSeq + 1;
+      const receiptNo = formatReceiptNo(seq);
+      set({ receiptSeq: seq });
+      get().patch(id, { receiptNo });
+      return receiptNo;
     },
 
     checkIn: (id) => {
@@ -166,15 +192,26 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
       const a = get().appts.find((x) => x.id === id);
       if (!a) return '';
       const token = a.token ?? get().nextToken(a.dept);
+      const receiptSeq = get().receiptSeq + 1;
+      const receiptNo = a.receiptNo ?? formatReceiptNo(receiptSeq);
+      if (!a.receiptNo) set({ receiptSeq });
       get().patch(id, {
         payment: 'Paid',
         token,
         status: 'In Queue',
         payMode: details.mode,
         payRef: details.ref,
+        receiptNo,
       });
       set({
-        lastReceipt: { ...a, payment: 'Paid', token, payMode: details.mode, payRef: details.ref },
+        lastReceipt: {
+          ...a,
+          payment: 'Paid',
+          token,
+          payMode: details.mode,
+          payRef: details.ref,
+          receiptNo,
+        },
       });
       toast(`Payment recorded · Token ${token} issued`, 'success');
       return token;
@@ -189,16 +226,77 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
       return token;
     },
 
-    cancel: (id, reason, refundDesk) => {
+    cancel: (id, reason, refundDetails) => {
+      const refunded = refundDetails && refundDetails.amount > 0;
       get().patch(id, {
         status: 'Cancelled',
         cancelReason: reason ?? '',
-        ...(refundDesk ? { payment: 'Refunded' as const, refundVia: 'Desk' as const } : {}),
+        ...(refunded
+          ? {
+              payment: 'Refunded' as const,
+              refundVia: refundDetails.via,
+              refundAmount: refundDetails.amount,
+              refundReason: refundDetails.reason,
+              refundedAt: Date.now(),
+            }
+          : {}),
       });
       toast(
-        refundDesk ? 'Appointment cancelled · desk refund recorded' : 'Appointment cancelled',
+        refunded
+          ? `Appointment cancelled · ${refundDetails.via === 'Desk' ? 'desk' : 'Medibook'} refund of ${money(refundDetails.amount)} recorded`
+          : 'Appointment cancelled',
         'info',
       );
+    },
+
+    refund: (id, { amount, reason, via }) => {
+      const a = get().appts.find((x) => x.id === id);
+      if (!a) return;
+      const paid = grossAmount(a);
+      // Never hand back more than was taken — the modal validates too, but the
+      // store is the last line of defence for a refund figure.
+      const safe = Math.min(Math.max(0, amount), paid);
+      if (safe <= 0) {
+        toast('Enter a refund amount greater than zero', 'error');
+        return;
+      }
+      get().patch(id, {
+        payment: 'Refunded',
+        refundVia: via,
+        refundAmount: safe,
+        refundReason: reason,
+        refundedAt: Date.now(),
+      });
+      toast(
+        safe < paid
+          ? `Partial refund of ${money(safe)} recorded · ${money(paid - safe)} retained`
+          : `Full refund of ${money(safe)} recorded`,
+        'success',
+      );
+    },
+
+    waiveFee: (id, reason) => {
+      const a = get().appts.find((x) => x.id === id);
+      if (!a) return;
+      if (!reason.trim()) {
+        toast('A fee waiver needs a reason', 'error');
+        return;
+      }
+      get().patch(id, {
+        payment: 'Waived',
+        waivedAmount: grossAmount(a),
+        waiveReason: reason.trim(),
+        waivedAt: Date.now(),
+      });
+      toast(`Fee of ${money(grossAmount(a))} waived for ${a.name}`, 'success');
+    },
+
+    approve: (id) => {
+      const a = get().appts.find((x) => x.id === id);
+      if (!a) return;
+      if (!a.needsApproval) return;
+      get().patch(id, { needsApproval: false, approvedAt: Date.now() });
+      toast(`${a.name}'s booking approved`, 'success');
     },
 
     noShow: (id) => {
@@ -241,6 +339,11 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
 
     markPaidMany: (ids, details = {}) => {
       const updated: Appointment[] = [];
+      // One payment, one receipt number — every consultation on the combined
+      // receipt shares it, which is what makes the series reconcilable.
+      const receiptSeq = get().receiptSeq + 1;
+      const receiptNo = formatReceiptNo(receiptSeq);
+      set({ receiptSeq });
       ids.forEach((id) => {
         const a = get().appts.find((x) => x.id === id);
         if (!a) return;
@@ -251,6 +354,7 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
           status: 'In Queue',
           payMode: details.mode,
           payRef: details.ref,
+          receiptNo,
         });
         const fresh = get().appts.find((x) => x.id === id);
         if (fresh) updated.push(fresh);
@@ -382,19 +486,7 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
 
     doctorLoadToday: (doctor) => {
       const s = get();
-      const booked = s.appts.filter(
-        (a) =>
-          a.doctor === doctor && a.date === 'Today' && !['Cancelled', 'No-show'].includes(a.status),
-      ).length;
-      const status = s.docStatus[doctor] ?? 'Available';
-      const cap = DOCTOR_DAILY_CAP;
-      return {
-        booked,
-        status,
-        cap,
-        full: booked >= cap,
-        off: DOCTOR_OFF_STATUSES.includes(status),
-      };
+      return doctorLoad(s.appts, s.docStatus, doctor);
     },
   }),
 );

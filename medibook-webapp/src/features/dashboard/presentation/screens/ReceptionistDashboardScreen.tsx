@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
@@ -6,9 +7,12 @@ import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
+import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { SkeletonKpiStrip } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
@@ -37,6 +41,20 @@ export function ReceptionistDashboardScreen() {
   const appts = useAppointmentsStore((s) => s.appts);
   const serving = useAppointmentsStore((s) => s.serving);
   const setDept = useAppointmentsStore((s) => s.setDept);
+  const [loading, setLoading] = useState(false);
+
+  /**
+   * Re-derive the desk view from the appointments ledger. No API yet, so the
+   * refresh re-emits the store — queue counts, collection totals and the
+   * appointment list are all rebuilt from it — and this is where the refetch
+   * goes when one lands.
+   */
+  const refresh = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    useAppointmentsStore.setState((s) => ({ appts: [...s.appts] }));
+    setLoading(false);
+  }, []);
 
   const today = appts.filter((a) => a.date === 'Today');
   const inQueue = appts.filter((a) => a.status === 'In Queue');
@@ -105,10 +123,17 @@ export function ReceptionistDashboardScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiStrip items={KPIS} onItem={(k) => go(k.go)} />
+      {loading ? (
+        <SkeletonKpiStrip count={KPIS.length} />
+      ) : (
+        <KpiStrip items={KPIS} onItem={(k) => go(k.go)} />
+      )}
 
       <div>
-        <SectionTitle className="mb-3.5">Quick Actions</SectionTitle>
+        <div className="mb-3.5 flex items-center justify-between gap-3">
+          <SectionTitle>Quick Actions</SectionTitle>
+          <RefreshBtn onRefresh={refresh} title="Refresh the front desk view" />
+        </div>
         <div className="flex gap-4">
           <Button icon="plus" className="flex-1 !p-4.5" onClick={() => go('create')}>
             New Appointment
@@ -179,7 +204,7 @@ export function ReceptionistDashboardScreen() {
                       serving <b className="text-blue">{servTok}</b>
                     </span>
                   ) : (
-                    <span className="text-caption text-text-faint">idle</span>
+                    <span className="text-caption text-text-muted">idle</span>
                   )}
                   <span
                     className={cn(
@@ -203,26 +228,39 @@ export function ReceptionistDashboardScreen() {
               View All
             </button>
           </div>
-          <div className="flex flex-col gap-2.5">
-            {today.slice(0, 5).map((a) => (
-              <button
-                type="button"
-                key={a.id}
-                onClick={() => go('appointments')}
-                className="bg-blue-soft-bg flex w-full cursor-pointer items-center gap-3.5 rounded-md px-4 py-2.75 text-left"
-              >
-                <div className="text-caption text-text-body w-14">{a.time}</div>
-                <div className="flex-1">
-                  <div className="text-body text-text-strong font-medium">{a.name}</div>
-                  <div className="text-caption text-text-muted">
-                    {a.doctor} · {a.dept}
+          {today.length === 0 ? (
+            <EmptyState
+              compact
+              icon="calendar-days"
+              title="Nothing booked for today yet."
+              message="Book a walk-in or register an online arrival to start the queue."
+              actionLabel="New Appointment"
+              actionIcon="plus"
+              actionVariant="button"
+              onAction={() => go('create')}
+            />
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {today.slice(0, 5).map((a) => (
+                <button
+                  type="button"
+                  key={a.id}
+                  onClick={() => go('appointments')}
+                  className="bg-blue-soft-bg flex w-full cursor-pointer items-center gap-3.5 rounded-md px-4 py-2.75 text-left"
+                >
+                  <div className="text-caption text-text-body w-14">{a.time}</div>
+                  <div className="flex-1">
+                    <div className="text-body text-text-strong font-medium">{a.name}</div>
+                    <div className="text-caption text-text-muted">
+                      {a.doctor} · {a.dept}
+                    </div>
                   </div>
-                </div>
-                <Badge status={a.source} />
-                <Badge status={a.status} />
-              </button>
-            ))}
-          </div>
+                  <Badge status={a.source} />
+                  <Badge status={a.status} />
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 

@@ -6,6 +6,7 @@ import { fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { InfoDot } from '@/shared/ui/InfoDot';
@@ -26,7 +27,6 @@ import { useNotificationsStore } from '@/features/ops-notifications/application/
 import type {
   Banner,
   PushAudience,
-  PushNotification,
 } from '@/features/ops-notifications/application/store/notifications.types';
 import { BannerModal } from '@/features/ops-notifications/presentation/components/BannerModal';
 import { BannerThumb } from '@/features/ops-notifications/presentation/components/BannerThumb';
@@ -80,6 +80,16 @@ const EMPTY_COMPOSER: PushComposer = {
 const dateInputClass =
   'text-body text-text-body rounded-input border-border h-12 w-full border bg-white px-3';
 
+const PUSH_COLUMNS = [
+  'Notification',
+  'Audience',
+  'When',
+  'Delivered',
+  'Open Rate',
+  'Status',
+  '',
+] as const;
+
 /** Patient-app notifications — home-screen banners + push composer (design OpsNotifications). */
 export function OpsNotificationsScreen() {
   const banners = useNotificationsStore((s) => s.banners);
@@ -100,6 +110,7 @@ export function OpsNotificationsScreen() {
   const [p, setP] = useState<PushComposer>(EMPTY_COMPOSER);
   const [pErr, setPErr] = useState<PushErrors>({});
   const [confirmSend, setConfirmSend] = useState(false);
+  const [cancelId, setCancelId] = useState<number | null>(null);
 
   const liveNow = [...banners]
     .filter((b) => bannerState(b) === 'Live')
@@ -141,9 +152,32 @@ export function OpsNotificationsScreen() {
     });
   };
 
-  const onCancelPush = (n: PushNotification) => cancelPush(n.id);
+  const cancelTarget = pushes.find((n) => n.id === cancelId) ?? null;
+
+  /**
+   * Audit 3.6.2 — cancelling a scheduled push used to fire on the first
+   * click, on the very screen whose send dialog warns that pushes cannot be
+   * recalled. It is now confirmed, and the dialog names the consequence.
+   */
+  const doCancelPush = (): void => {
+    if (cancelId == null) return;
+    const id = cancelId;
+    run('cancelpush', null, () => {
+      cancelPush(id);
+      setCancelId(null);
+    });
+  };
 
   const liveCount = banners.filter((b) => bannerState(b) === 'Live').length;
+
+  /** The banner the editor is opened on — also its remount key (no sync effect). */
+  const editKey = editFallback
+    ? 'fallback'
+    : editBanner
+      ? `banner-${editBanner.id}`
+      : edit
+        ? 'new'
+        : 'closed';
 
   return (
     <div className="flex flex-col gap-5">
@@ -205,11 +239,22 @@ export function OpsNotificationsScreen() {
               <SectionTitle>Campaign Banners</SectionTitle>
               <InfoDot text="Order sets rotation priority in the app — use the arrows. Pause takes a banner out of rotation without losing its schedule. Expired banners stay here for reference until deleted." />
               <div className="flex-1"></div>
-              <span className="text-caption text-text-faint">
+              <span className="text-caption text-text-muted">
                 {liveCount} live · {banners.length} total
               </span>
             </div>
             <div className="flex flex-col">
+              {banners.length === 0 && (
+                <EmptyState
+                  icon="image"
+                  title="No campaign banners yet."
+                  message="Until one is live the app shows the default banner above."
+                  actionLabel="Add Banner"
+                  actionIcon="plus"
+                  actionVariant="button"
+                  onAction={() => setEdit({ new: true })}
+                />
+              )}
               {banners.map((b, i) => {
                 const st = bannerState(b);
                 return (
@@ -225,18 +270,22 @@ export function OpsNotificationsScreen() {
                         name="chevron-up"
                         box={26}
                         size={15}
-                        title="Move up"
+                        label="Move up"
+                        title={`Move “${b.title}” up the rotation`}
+                        disabled={i === 0}
                         onClick={() => move(i, -1)}
                       />
                       <IconBtn
                         name="chevron-down"
                         box={26}
                         size={15}
-                        title="Move down"
+                        label="Move down"
+                        title={`Move “${b.title}” down the rotation`}
+                        disabled={i === banners.length - 1}
                         onClick={() => move(i, 1)}
                       />
                     </div>
-                    <span className="text-body text-text-faint w-4.5 flex-none text-center font-medium tabular-nums">
+                    <span className="text-body text-text-muted w-4.5 flex-none text-center font-medium tabular-nums">
                       {i + 1}
                     </span>
                     <BannerThumb img={b.img} title={b.title} />
@@ -258,7 +307,8 @@ export function OpsNotificationsScreen() {
                       name="pencil"
                       box={36}
                       size={15}
-                      title="Edit banner"
+                      label="Edit banner"
+                      title={`Edit “${b.title}”`}
                       onClick={() => setEdit({ banner: b })}
                     />
                     <IconBtn
@@ -266,7 +316,8 @@ export function OpsNotificationsScreen() {
                       box={36}
                       size={15}
                       color="var(--color-d-500)"
-                      title="Delete banner"
+                      label="Delete banner"
+                      title={`Delete “${b.title}”`}
                       onClick={() => setDelId(b.id)}
                     />
                   </div>
@@ -296,7 +347,7 @@ export function OpsNotificationsScreen() {
                     placeholder="e.g. 20% off health checkups"
                     height={48}
                   />
-                  <span className="text-caption text-text-faint mt-1 block text-right">
+                  <span className="text-caption text-text-muted mt-1 block text-right">
                     {p.title.length}/40
                   </span>
                 </OpsField>
@@ -312,7 +363,7 @@ export function OpsNotificationsScreen() {
                     placeholder="Short, actionable — one line is best."
                     className="text-body-lg text-text-strong rounded-input border-border h-18.5 w-full resize-none border p-3"
                   ></textarea>
-                  <span className="text-caption text-text-faint mt-1 block text-right">
+                  <span className="text-caption text-text-muted mt-1 block text-right">
                     {p.body.length}/120
                   </span>
                 </OpsField>
@@ -338,15 +389,20 @@ export function OpsNotificationsScreen() {
                 </OpsField>
                 {p.timing === 'Schedule' && (
                   <OpsField label="Send On" required error={pErr.date}>
-                    <input
-                      type="date"
-                      value={p.date}
-                      onChange={(e) => {
-                        setP({ ...p, date: e.target.value });
-                        setPErr({ ...pErr, date: null });
-                      }}
-                      className={dateInputClass}
-                    />
+                    {(field) => (
+                      <input
+                        type="date"
+                        id={field.id}
+                        aria-invalid={field.invalid || undefined}
+                        aria-describedby={field.describedById}
+                        value={p.date}
+                        onChange={(e) => {
+                          setP({ ...p, date: e.target.value });
+                          setPErr({ ...pErr, date: null });
+                        }}
+                        className={dateInputClass}
+                      />
+                    )}
                   </OpsField>
                 )}
                 <div className="mt-auto flex justify-end">
@@ -361,8 +417,20 @@ export function OpsNotificationsScreen() {
           <Card>
             <SectionTitle className="mb-4">Sent &amp; Scheduled</SectionTitle>
             <TableShell
-              columns={['Notification', 'Audience', 'When', 'Delivered', 'Open Rate', 'Status', '']}
+              columns={PUSH_COLUMNS}
+              scrollLabel="Sent and scheduled notifications"
               rightCols={['Delivered', 'Open Rate']}
+              state={
+                pushes.length === 0
+                  ? {
+                      kind: 'empty',
+                      icon: 'bell-ring',
+                      title: 'No notifications sent yet.',
+                      message:
+                        'Offers and announcements you send or schedule above are listed here with their delivery and open rates.',
+                    }
+                  : undefined
+              }
             >
               {pushes.map((n) => (
                 <tr key={n.id}>
@@ -387,7 +455,7 @@ export function OpsNotificationsScreen() {
                         size="sm"
                         variant="ghost"
                         style={{ color: 'var(--color-d-500)' }}
-                        onClick={() => onCancelPush(n)}
+                        onClick={() => setCancelId(n.id)}
                       >
                         Cancel
                       </Button>
@@ -401,6 +469,7 @@ export function OpsNotificationsScreen() {
       )}
 
       <BannerModal
+        key={editKey}
         open={edit != null}
         banner={editBanner}
         fallback={editFallback}
@@ -450,6 +519,31 @@ export function OpsNotificationsScreen() {
         confirmVariant="primary"
         busy={busy.push}
         onConfirm={doSend}
+      />
+      <OpsConfirm
+        open={cancelTarget != null}
+        onClose={() => setCancelId(null)}
+        icon="bell-ring"
+        tone="danger"
+        title="Cancel this scheduled notification?"
+        summary={
+          cancelTarget
+            ? [
+                { k: 'Notification', v: `“${cancelTarget.title}”` },
+                { k: 'Audience', v: cancelTarget.audience },
+                { k: 'Scheduled for', v: cancelTarget.when },
+              ]
+            : undefined
+        }
+        body={
+          cancelTarget
+            ? `It will not be sent, and the ~${AUDIENCES[cancelTarget.audience]} users in this audience will never receive it. Cancelling is only possible before delivery — once a push is out it cannot be recalled — and the cancellation itself cannot be undone: you would have to compose and schedule the notification again.`
+            : ''
+        }
+        confirmLabel={busy.cancelpush ? 'Cancelling…' : 'Cancel Notification'}
+        confirmVariant="danger"
+        busy={busy.cancelpush}
+        onConfirm={doCancelPush}
       />
     </div>
   );

@@ -8,6 +8,13 @@ import type { LogEntry, LogSeverity } from './logs.types';
  * append to (design `OpsDB.logs`). New entries are prepended with the
  * prototype's fixed demo actor/IP and a "Just now" timestamp; ids come from
  * a max+1 counter instead of the prototype's `Date.now()`.
+ *
+ * `logs` is **derived**, not authored: `appended` holds the entries written
+ * this session and `deriveLogs` joins them onto the seeded trail, newest
+ * first. That is what makes `refresh()` real work rather than a toast (audit
+ * 3.1.1) — it re-runs the same derivation the screen reads and re-stamps
+ * `refreshedAt`, so a Refresh picks up everything written since the screen
+ * was opened instead of pretending to.
  */
 
 /** The demo operations actor every prototype log write used. */
@@ -27,17 +34,32 @@ export interface LogEntryDraft {
   readonly time?: string;
 }
 
+/** The audit trail as every screen reads it: this session's writes, then the seed. */
+function deriveLogs(appended: readonly LogEntry[]): readonly LogEntry[] {
+  return [...appended, ...OPS_LOGS];
+}
+
 interface LogsState {
+  /** Entries written this session, newest first — the delta over the seed. */
+  appended: readonly LogEntry[];
+  /** Derived view: `appended` followed by the seeded trail. */
   logs: readonly LogEntry[];
+  /** Epoch ms of the last derive, so screens can show a real "updated" stamp. */
+  refreshedAt: number;
 }
 
 interface LogsActions {
   /** Prepend an audit entry (id minted, time "Just now" unless given). */
   addLog: (entry: LogEntryDraft) => void;
+  /** Re-derive `logs` from the seed + this session's writes, and re-stamp. */
+  refresh: () => void;
 }
 
 export const useLogsStore = create<LogsState & LogsActions>()((set) => ({
-  logs: OPS_LOGS,
+  appended: [],
+  logs: deriveLogs([]),
+  refreshedAt: Date.now(),
+
   addLog: (entry) =>
     set((s) => {
       const id = Math.max(0, ...s.logs.map((l) => l.id)) + 1;
@@ -51,6 +73,9 @@ export const useLogsStore = create<LogsState & LogsActions>()((set) => ({
         time: entry.time ?? 'Just now',
         sev: entry.sev,
       };
-      return { logs: [record, ...s.logs] };
+      const appended = [record, ...s.appended];
+      return { appended, logs: deriveLogs(appended) };
     }),
+
+  refresh: () => set((s) => ({ logs: deriveLogs(s.appended), refreshedAt: Date.now() })),
 }));

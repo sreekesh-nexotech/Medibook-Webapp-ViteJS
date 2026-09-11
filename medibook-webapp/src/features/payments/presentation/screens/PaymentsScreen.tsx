@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { useSort, type SortAccessors } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
+import { downloadCsv, type CsvCell } from '@/shared/lib/download';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { InfoDot } from '@/shared/ui/InfoDot';
@@ -15,10 +17,21 @@ import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import type { StatCardData } from '@/shared/ui/StatCard';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 import { Tabs } from '@/shared/ui/Tabs';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import {
+  formatUpdatedAt,
+  useListRefresh,
+} from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
+import {
+  GST_LABEL,
+  HOSPITAL_GSTIN,
+  grossAmount,
+  taxBreakdown,
+} from '@/features/appointments/application/store/appointments.logic';
 import {
   DEPARTMENTS,
   DOCTORS,
@@ -26,21 +39,33 @@ import {
 } from '@/features/appointments/application/store/appointments.types';
 import { MarkPaymentModal } from '@/features/appointments/presentation/components/MarkPaymentModal';
 import { ReceiptModal } from '@/features/appointments/presentation/components/ReceiptModal';
+import { RefundModal } from '@/features/appointments/presentation/components/RefundModal';
 
-/** Payment tabs (design `["All", "Paid", "Pending", "Refunded"]`). */
-type PayTab = 'All' | 'Paid' | 'Pending' | 'Refunded';
+/** Payment tabs (design `["All", "Paid", "Pending", "Refunded"]` + the waiver state). */
+type PayTab = 'All' | 'Paid' | 'Pending' | 'Refunded' | 'Waived';
+
+const PAY_TABS: readonly PayTab[] = ['All', 'Paid', 'Pending', 'Refunded', 'Waived'];
 
 /** Records shown per page (design `PAY_PAGE`). */
 const PAY_PAGE = 9;
 
+/** Grey pill for the `Waived` payment state, which the shared status map predates. */
+const WAIVED_PILL_CLASS = 'bg-grey-300 text-text-muted';
+
+const COLUMNS = ['Patient', 'Doctor / Dept', 'Source', 'Mode', 'Amount', 'Status', 'Action'];
+
 /**
  * Payments — record external walk-in payments + view prepaid online bookings
  * (design `Payments`, `Billing.jsx`). Ported 1:1 onto the appointments store,
- * reusing the appointments feature's Mark Payment + Receipt modals.
+ * reusing the appointments feature's Mark Payment + Receipt + Refund modals.
+ *
+ * Every rupee figure on this screen is GST-inclusive, so the KPIs, the table
+ * and the printed receipts agree (HA-10).
  */
 export function PaymentsScreen() {
   const { role } = useParams();
   const appts = useAppointmentsStore((s) => s.appts);
+  const ensureReceiptNo = useAppointmentsStore((s) => s.ensureReceiptNo);
   const [tab, setTab] = useState<PayTab>('All');
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState('All Sources');
@@ -52,22 +77,34 @@ export function PaymentsScreen() {
   const { sort, onSort, sorted } = useSort<Appointment>();
   const [pay, setPay] = useState<Appointment | null>(null);
   const [receipt, setReceipt] = useState<Appointment | null>(null);
+  const [refund, setRefund] = useState<Appointment | null>(null);
+
+  /**
+   * Audit 3.1.1 — Refresh re-reads the payment records out of the store and
+   * the table re-derives from them, with the shared loading state while it
+   * runs. No toast: the refreshed figures are the acknowledgement.
+   */
+  const reload = useCallback((): void => {
+    const fresh = useAppointmentsStore.getState().appts;
+    if (!Array.isArray(fresh)) throw new Error('The payment records are unavailable.');
+  }, []);
+  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
 
   const paid = appts.filter((a) => a.payment === 'Paid');
   const deskPaid = paid.filter((a) => a.source === 'Walk-in' && a.date === 'Today'); // collected at the hospital desk today
   const onlinePaid = paid.filter((a) => a.source === 'Online' && a.date === 'Today'); // prepaid via Medibook (settled to hospital later)
-  const deskTotal = deskPaid.reduce((s, a) => s + a.amount, 0);
+  const deskTotal = deskPaid.reduce((s, a) => s + grossAmount(a), 0);
   const cash = deskPaid
     .filter((a) => (a.payMode ?? 'Cash') === 'Cash')
-    .reduce((s, a) => s + a.amount, 0);
-  const onlineTotal = onlinePaid.reduce((s, a) => s + a.amount, 0);
+    .reduce((s, a) => s + grossAmount(a), 0);
+  const onlineTotal = onlinePaid.reduce((s, a) => s + grossAmount(a), 0);
   const pendingCount = appts.filter((a) => a.payment === 'Pending').length;
   const KPIS: readonly StatCardData[] = [
     {
       icon: 'indian-rupee',
       label: 'Collected at Desk',
       value: money(deskTotal),
-      sub: `${deskPaid.length} walk-in payment${deskPaid.length === 1 ? '' : 's'}`,
+      sub: `${deskPaid.length} walk-in payment${deskPaid.length === 1 ? '' : 's'} · incl. GST`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
     },
@@ -100,13 +137,12 @@ export function PaymentsScreen() {
     Paid: paid.length,
     Pending: pendingCount,
     Refunded: appts.filter((a) => a.payment === 'Refunded').length,
+    Waived: appts.filter((a) => a.payment === 'Waived').length,
   };
   const ql = q.trim().toLowerCase();
   const filtered = appts.filter((a) => {
-    if (tab === 'Paid' && a.payment !== 'Paid') return false;
-    if (tab === 'Pending' && a.payment !== 'Pending') return false;
-    if (tab === 'Refunded' && a.payment !== 'Refunded') return false;
-    if (tab === 'All' && a.payment === 'Refunded') return false;
+    if (tab !== 'All' && a.payment !== tab) return false;
+    if (tab === 'All' && (a.payment === 'Refunded' || a.payment === 'Waived')) return false;
     if (sourceF !== 'All Sources' && a.source !== sourceF) return false;
     if (
       modeF !== 'All Modes' &&
@@ -124,7 +160,7 @@ export function PaymentsScreen() {
     doctor: (a) => a.doctor,
     source: (a) => a.source,
     mode: (a) => a.payMode ?? '',
-    amount: (a) => a.amount,
+    amount: (a) => grossAmount(a),
     status: (a) => a.payment,
   };
   const ordered = sorted(filtered, ACC);
@@ -142,6 +178,13 @@ export function PaymentsScreen() {
     setTab(v.split(' (')[0] as PayTab);
     setPage(0);
   };
+  const filtersActive =
+    ql !== '' ||
+    dateF !== 'Today' ||
+    sourceF !== 'All Sources' ||
+    deptF !== 'All Departments' ||
+    docF !== 'All Doctors' ||
+    modeF !== 'All Modes';
   const clearAll = (): void => {
     setQ('');
     setDateF('Today');
@@ -151,50 +194,115 @@ export function PaymentsScreen() {
     setModeF('All Modes');
     setPage(0);
   };
+
+  /** Minting on the way in keeps the receipt number out of render and stable. */
+  const openReceipt = (a: Appointment): void => {
+    ensureReceiptNo(a.id);
+    setReceipt(useAppointmentsStore.getState().appts.find((x) => x.id === a.id) ?? a);
+  };
+
+  /**
+   * A genuine file, through the shared `downloadCsv` — RFC-4180 escaping and a
+   * UTF-8 BOM, so Excel renders the rupee sign. The tax columns make the export
+   * reconcilable against the printed receipts.
+   */
   const exportCsv = (): void => {
-    const head = [
-      'Patient',
-      'MR Number',
-      'Doctor',
-      'Department',
-      'Source',
-      'Mode',
-      'Amount',
-      'Status',
-    ];
-    const lines: (string | number)[][] = filtered.map((a) => [
-      a.name,
-      a.mrn,
-      a.doctor,
-      a.dept,
-      a.source,
+    const filename = 'medibook-payments.csv';
+    const modeOf = (a: Appointment): string =>
       a.payment === 'Paid'
         ? a.source === 'Online'
           ? 'Prepaid (Online)'
           : (a.payMode ?? 'Cash')
-        : '—',
-      a.amount,
-      a.payment,
-    ]);
-    const csv = [head, ...lines].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
-    const el = document.createElement('a');
-    el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    el.download = 'medibook-payments.csv';
-    el.click();
-    toast('Exported medibook-payments.csv', 'success');
+        : '—';
+    const rows: CsvCell[][] = [
+      [
+        'Receipt No.',
+        'Patient',
+        'MR Number',
+        'Doctor',
+        'Department',
+        'Date',
+        'Source',
+        'Mode',
+        'Reference',
+        'Consultation',
+        GST_LABEL,
+        'Total',
+        'Refunded',
+        'Waived',
+        'Status',
+        'Hospital GSTIN',
+      ],
+      ...filtered.map((a): CsvCell[] => {
+        const tax = taxBreakdown(a.amount);
+        return [
+          a.receiptNo ?? '',
+          a.name,
+          a.mrn,
+          a.doctor,
+          a.dept,
+          a.date,
+          a.source,
+          modeOf(a),
+          a.payRef ?? '',
+          tax.subtotal,
+          tax.gst,
+          tax.total,
+          a.refundAmount ?? 0,
+          a.waivedAmount ?? 0,
+          a.payment,
+          HOSPITAL_GSTIN,
+        ];
+      }),
+    ];
+    downloadCsv(filename, rows);
+    toast(`Exported ${filename}`, 'success');
   };
+
+  /** Loading / empty / error live inside the table body so the header stays put. */
+  const tableState: TableStateSpec | undefined = loading
+    ? { kind: 'loading', rows: PAY_PAGE }
+    : error
+      ? { kind: 'error', message: error, onRetry: () => void refresh() }
+      : rows.length === 0
+        ? filtersActive
+          ? {
+              kind: 'empty',
+              title: 'No payments match your filters.',
+              message: 'Nothing was collected for this combination of date, source and mode.',
+              actionLabel: 'Clear filters',
+              onAction: clearAll,
+            }
+          : {
+              kind: 'empty',
+              icon: 'indian-rupee',
+              title: 'No payments recorded yet.',
+              message:
+                'Walk-in payments appear here as the desk records them, prepaid online bookings as they arrive.',
+            }
+        : undefined;
+
   return (
     <div className="flex flex-col gap-5" data-role={role}>
       <KpiStrip items={KPIS} />
       <Card pad={14} className="flex flex-wrap items-center justify-between gap-4">
-        <Tabs
-          tabs={(['All', 'Paid', 'Pending', 'Refunded'] as const).map(tabLabel)}
-          value={tabLabel(tab)}
-          onChange={onTab}
-        />
-        <Button variant="secondary" icon="download" onClick={exportCsv}>
-          Export
-        </Button>
+        <Tabs tabs={PAY_TABS.map(tabLabel)} value={tabLabel(tab)} onChange={onTab} />
+        <span
+          title={
+            filtered.length === 0
+              ? 'Nothing to export for these filters'
+              : `Export ${filtered.length} record${filtered.length === 1 ? '' : 's'} as CSV`
+          }
+        >
+          <Button
+            variant="secondary"
+            icon="download"
+            onClick={exportCsv}
+            disabled={filtered.length === 0}
+          >
+            Export CSV
+          </Button>
+        </span>
       </Card>
       <Card pad={20}>
         <div className="mb-4">
@@ -205,49 +313,50 @@ export function PaymentsScreen() {
           />
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <RefreshBtn />
+          <RefreshBtn onRefresh={refresh} title="Refresh payments" />
           <FilterSelect
             value={dateF}
             options={['Today', 'This Week', 'This Month']}
             onChange={reset(setDateF)}
+            aria-label="Filter by date"
           />
           <FilterSelect
             value={sourceF}
             options={['All Sources', 'Walk-in', 'Online']}
             onChange={reset(setSourceF)}
+            aria-label="Filter by booking source"
           />
           <FilterSelect
             value={deptF}
             options={['All Departments', ...DEPARTMENTS]}
             onChange={reset(setDeptF)}
+            aria-label="Filter by department"
           />
           <FilterSelect
             value={docF}
             options={['All Doctors', ...Object.values(DOCTORS).flat()]}
             onChange={reset(setDocF)}
+            aria-label="Filter by doctor"
           />
           <FilterSelect
             value={modeF}
             options={['All Modes', 'Cash', 'UPI', 'Card']}
             onChange={reset(setModeF)}
+            aria-label="Filter by payment mode"
           />
-          {(ql ||
-            dateF !== 'Today' ||
-            sourceF !== 'All Sources' ||
-            deptF !== 'All Departments' ||
-            docF !== 'All Doctors' ||
-            modeF !== 'All Modes') && (
+          {filtersActive && (
             <button type="button" onClick={clearAll} className="text-body text-blue cursor-pointer">
               Clear all
             </button>
           )}
-          <div className="text-caption text-text-muted flex items-center gap-1.75">
-            <InfoDot text="Walk-in payments are collected at the hospital desk (cash / UPI / card). Online bookings are prepaid through the Medibook app — Medibook collects them and settles the net to the hospital later, so they are shown as 'Prepaid'." />
-          </div>
+          <InfoDot text="Walk-in payments are collected at the hospital desk (cash / UPI / card). Online bookings are prepaid through the Medibook app — Medibook collects them and settles the net to the hospital later, so they are shown as 'Prepaid'. Every amount shown includes 18% GST." />
           <span className="flex-1"></span>
+          <span className="text-caption text-text-muted whitespace-nowrap">
+            Updated {formatUpdatedAt(updatedAt)}
+          </span>
         </div>
         <TableShell
-          columns={['Patient', 'Doctor / Dept', 'Source', 'Mode', 'Amount', 'Status', 'Action']}
+          columns={COLUMNS}
           rightCols={['Amount']}
           sortKeys={{
             Patient: 'name',
@@ -259,6 +368,8 @@ export function PaymentsScreen() {
           }}
           sort={sort}
           onSort={onSort}
+          state={tableState}
+          scrollLabel="Payments"
         >
           {rows.map((a) => (
             <tr key={a.id} className="hover:bg-grey-200 transition-colors duration-150">
@@ -284,40 +395,66 @@ export function PaymentsScreen() {
                   '—'
                 )}
               </td>
-              <td className={cn(tdClass, 'text-text-strong text-right font-semibold tabular-nums')}>
-                {money(a.amount)}
+              <td className={cn(tdClass, 'text-right')}>
+                <div className="text-text-strong font-semibold tabular-nums">
+                  {money(grossAmount(a))}
+                </div>
+                <div className="text-caption text-text-muted tabular-nums">
+                  incl. {money(taxBreakdown(a.amount).gst)} GST
+                </div>
               </td>
               <td className={tdClass}>
-                <Badge status={a.payment} />
+                <div className="flex flex-col items-start gap-0.75">
+                  <Badge
+                    status={a.payment}
+                    className={a.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
+                  />
+                  {a.payment === 'Refunded' && a.refundAmount != null && (
+                    <span className="text-caption text-text-muted tabular-nums">
+                      −{money(a.refundAmount)}{' '}
+                      {a.refundVia === 'Medibook' ? 'via Medibook' : 'at desk'}
+                    </span>
+                  )}
+                </div>
               </td>
               <td className={tdClass}>
-                {a.payment === 'Pending' ? (
-                  <Button size="sm" icon="indian-rupee" onClick={() => setPay(a)}>
-                    Record
-                  </Button>
-                ) : a.payment === 'Paid' ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon="receipt"
-                    onClick={() => setReceipt(a)}
-                  >
-                    Receipt
-                  </Button>
-                ) : (
-                  <span className="text-text-faint text-caption">
-                    {a.source === 'Online' ? 'Refunded by Medibook' : 'Refunded at desk'}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {a.payment === 'Pending' && (
+                    <Can perm="Payments.add">
+                      <Button size="sm" icon="indian-rupee" onClick={() => setPay(a)}>
+                        Record
+                      </Button>
+                    </Can>
+                  )}
+                  {(a.payment === 'Paid' || a.payment === 'Refunded') && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon="receipt"
+                      onClick={() => openReceipt(a)}
+                    >
+                      Receipt
+                    </Button>
+                  )}
+                  {/* HA-09: the refund control is reachable for prepaid online
+                      bookings too, not only for paid walk-ins. */}
+                  {a.payment === 'Paid' && (
+                    <Can perm={['Payments.del', 'Appointments.del']}>
+                      <Button size="sm" variant="ghost" icon="undo-2" onClick={() => setRefund(a)}>
+                        Refund
+                      </Button>
+                    </Can>
+                  )}
+                  {a.payment === 'Waived' && (
+                    <span className="text-caption text-text-muted">
+                      {a.waiveReason || 'Fee waived'}
+                    </span>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </TableShell>
-        {filtered.length === 0 && (
-          <div className="text-text-faint text-body-lg py-9 text-center">
-            No payments match your filters.
-          </div>
-        )}
         <Pager
           total={filtered.length}
           page={pg}
@@ -344,6 +481,7 @@ export function PaymentsScreen() {
         }}
       />
       <ReceiptModal appt={receipt} onClose={() => setReceipt(null)} />
+      <RefundModal appt={refund} onClose={() => setRefund(null)} />
     </div>
   );
 }

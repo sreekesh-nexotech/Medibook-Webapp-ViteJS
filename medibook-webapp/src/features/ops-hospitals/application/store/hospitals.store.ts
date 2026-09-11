@@ -11,12 +11,14 @@ import { opsBookingsForSeed, opsDeptsForSeed, opsDocsForSeed } from './hospitals
 import { OPS_HOSPITALS } from './hospitals.fixtures';
 import type {
   Bank,
+  HospitalSuspension,
   KycRecord,
   OpsBooking,
   OpsDept,
   OpsDoctor,
   OpsHospital,
 } from './hospitals.types';
+import { opsStampNow, opsTodayIso } from './opsDates';
 
 /**
  * Ops hospital-registry store (design `OpsDB.hospitals` + the Ops.jsx
@@ -50,26 +52,55 @@ export interface OnboardHospitalForm {
   readonly plan: string;
 }
 
+/** Suspension details a caller supplies; `since` and `by` are stamped here. */
+export type SuspendInput = Omit<HospitalSuspension, 'since' | 'by'>;
+
 interface HospitalsState {
   hospitals: readonly OpsHospital[];
+  /**
+   * When the registry snapshot the screens render was last taken — shown next
+   * to the Refresh button so that control has a visible effect (audit 3.1.1).
+   */
+  syncedAt: string;
 }
 
 interface HospitalsActions {
+  /**
+   * Re-read the registry and re-stamp the sync clock. Resolves after the
+   * snapshot is in place, so a screen can hold its loading state for the real
+   * duration of the work instead of faking one. There is no server yet, so
+   * this re-derives the list from the store it already owns; when the API
+   * lands it becomes the query invalidation and nothing above it changes.
+   */
+  resync: () => Promise<void>;
   /** Onboard a new instance in Pending verification with all-Missing KYC. */
-  onboardHospital: (f: OnboardHospitalForm) => void;
+  onboardHospital: (f: OnboardHospitalForm) => number;
   /** Approve & go live — KYC becomes all-Verified, any rejection is cleared. */
   approve: (id: number) => void;
   reject: (id: number, reason: string) => void;
-  /** Suspend an active instance, or reactivate a suspended one. */
-  toggleSuspend: (id: number) => void;
+  /** Suspend an instance, recording why, since when and by whom. */
+  suspend: (id: number, input: SuspendInput) => void;
+  /** Lift a suspension — access returns immediately and the record is cleared. */
+  unsuspend: (id: number) => void;
+  /** Per-hospital payment grace override; `undefined` falls back to the platform default. */
+  setGraceDays: (id: number, days: number | undefined) => void;
   /** Cross-store setter used by the plans feature when a change is applied. */
   setPlan: (id: number, plan: string) => void;
   /** Cross-store cascade used by the plans feature on a plan rename. */
   cascadePlanRename: (from: string, to: string) => void;
 }
 
+/** Demo operations actor every registry mutation is attributed to. */
+const OPS_ACTOR = 'riya.sharma@medibook.in';
+
 export const useHospitalsStore = create<HospitalsState & HospitalsActions>()((set, get) => ({
   hospitals: OPS_HOSPITALS,
+  syncedAt: opsStampNow(),
+
+  resync: async () => {
+    const snapshot = [...get().hospitals];
+    set({ hospitals: snapshot, syncedAt: opsStampNow() });
+  },
 
   onboardHospital: (f) => {
     const id = Math.max(...get().hospitals.map((h) => h.id)) + 1;
@@ -93,6 +124,7 @@ export const useHospitalsStore = create<HospitalsState & HospitalsActions>()((se
       module: 'Hospitals',
       sev: 'Info',
     });
+    return id;
   },
 
   approve: (id) => {
@@ -101,7 +133,13 @@ export const useHospitalsStore = create<HospitalsState & HospitalsActions>()((se
     set((s) => ({
       hospitals: s.hospitals.map((x) =>
         x.id === id
-          ? { ...x, status: 'Active', kyc: KYC_ALL_VERIFIED, rejectReason: undefined }
+          ? {
+              ...x,
+              status: 'Active',
+              kyc: KYC_ALL_VERIFIED,
+              rejectReason: undefined,
+              suspension: undefined,
+            }
           : x,
       ),
     }));
@@ -129,20 +167,57 @@ export const useHospitalsStore = create<HospitalsState & HospitalsActions>()((se
     });
   },
 
-  toggleSuspend: (id) => {
+  suspend: (id, input) => {
     const h = get().hospitals.find((x) => x.id === id);
     if (!h) return;
-    const was = h.status === 'Suspended';
+    const suspension: HospitalSuspension = {
+      ...input,
+      since: opsTodayIso(),
+      by: OPS_ACTOR,
+    };
     set((s) => ({
       hospitals: s.hospitals.map((x) =>
-        x.id === id ? { ...x, status: was ? 'Active' : 'Suspended' } : x,
+        x.id === id ? { ...x, status: 'Suspended', suspension } : x,
       ),
     }));
     useLogsStore.getState().addLog({
       hid: id,
-      action: `Hospital ${was ? 'reactivated' : 'suspended'} — ${h.name}`,
+      action: `Hospital suspended (${input.reason.toLowerCase()}) — ${h.name}`,
       module: 'Hospitals',
       sev: 'Critical',
+    });
+  },
+
+  unsuspend: (id) => {
+    const h = get().hospitals.find((x) => x.id === id);
+    if (!h) return;
+    set((s) => ({
+      hospitals: s.hospitals.map((x) =>
+        x.id === id ? { ...x, status: 'Active', suspension: undefined } : x,
+      ),
+    }));
+    useLogsStore.getState().addLog({
+      hid: id,
+      action: `Hospital reactivated — ${h.name}`,
+      module: 'Hospitals',
+      sev: 'Critical',
+    });
+  },
+
+  setGraceDays: (id, days) => {
+    const h = get().hospitals.find((x) => x.id === id);
+    if (!h) return;
+    set((s) => ({
+      hospitals: s.hospitals.map((x) => (x.id === id ? { ...x, graceDays: days } : x)),
+    }));
+    useLogsStore.getState().addLog({
+      hid: id,
+      action:
+        days === undefined
+          ? `Payment grace window reset to the platform default — ${h.name}`
+          : `Payment grace window set to ${days} day${days === 1 ? '' : 's'} — ${h.name}`,
+      module: 'Billing',
+      sev: 'Info',
     });
   },
 

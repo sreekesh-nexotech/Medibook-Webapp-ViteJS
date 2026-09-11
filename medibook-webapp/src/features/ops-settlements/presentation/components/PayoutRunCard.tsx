@@ -65,6 +65,7 @@ export function PayoutRunCard({
       </div>
       <TableShell
         columns={['Statement', 'Gross', commCol, 'Net Payable', 'Status', 'Action']}
+        scrollLabel="Statements in this payout run"
         rightCols={['Gross', commCol, 'Net Payable']}
       >
         {run.rows.map((s) => (

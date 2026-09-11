@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-
-import { Button } from '@/shared/ui/Button';
+import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { email as emailRule, phoneIN, positiveAmount, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
@@ -55,119 +54,142 @@ const BLANK: PatientForm = {
   status: 'Active',
 };
 
+/** Oldest age the desk can type before it is obviously a typo. */
+const MAX_AGE = 120;
+
+/**
+ * Inline field errors instead of the old "Name and phone are required" toast
+ * (audit 3.5.1/3.5.4) — and the phone is now checked against `phoneIN`, so a
+ * 7-digit number no longer reaches the record.
+ */
+const VALIDATORS: FormValidators<PatientForm> = {
+  name: (value) => required(value, 'Patient name'),
+  phone: (value) => phoneIN(value),
+  age: (value) => {
+    if (value.trim() === '') return undefined;
+    const invalid = positiveAmount(value, 'Age');
+    if (invalid) return invalid;
+    return Number(value) <= MAX_AGE ? undefined : `Age must be ${MAX_AGE} or less.`;
+  },
+  email: (value) => (value.trim() === '' ? undefined : emailRule(value)),
+};
+
 /**
  * Add / Edit patient modal — identity + contact only (Medibook stores no
- * clinical data). Ported 1:1 from the design prototype's `PatientModal`.
+ * clinical data). Ported 1:1 from the design prototype's `PatientModal`, on
+ * `FormModal` so Enter submits.
  */
-export function PatientModal({ open, patient, onClose, onSaved }: PatientModalProps) {
+function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps, 'open'>) {
   const isNew = !patient;
   const patAdd = usePatientsStore((s) => s.patAdd);
   const patUpdate = usePatientsStore((s) => s.patUpdate);
-  const [f, setF] = useState<PatientForm>(BLANK);
 
-  useEffect(() => {
-    if (open) {
-      setF(
-        patient
-          ? {
-              name: patient.name || '',
-              phone: patient.phone || '',
-              age: patient.age ? String(patient.age) : '',
-              gender: patient.gender || 'Male',
-              email: patient.email || '',
-              address: patient.address || '',
-              status: patient.status === 'Inactive' ? 'Inactive' : 'Active',
-            }
-          : BLANK,
-      );
-    }
-  }, [open, patient]);
-
-  const set = <K extends keyof PatientForm>(k: K, v: PatientForm[K]) =>
-    setF((x) => ({ ...x, [k]: v }));
-
-  const save = () => {
-    if (!f.name || !f.phone) {
-      toast('Name and phone are required', 'error');
-      return;
-    }
-    const payload = {
-      name: f.name,
-      phone: f.phone,
-      age: Number(f.age) || 0,
-      gender: f.gender,
-      email: f.email,
-      address: f.address,
-      status: f.status,
-    };
-    if (!patient) {
-      const mrn = patAdd(payload);
-      toast('Patient added', 'success');
-      onSaved?.(mrn);
-    } else {
-      patUpdate(patient.mrn, payload);
-      toast('Patient details updated', 'success');
-      onSaved?.(patient.mrn);
-    }
-    onClose();
-  };
+  const form = useForm<PatientForm>({
+    initial: patient
+      ? {
+          name: patient.name || '',
+          phone: patient.phone || '',
+          age: patient.age ? String(patient.age) : '',
+          gender: patient.gender || 'Male',
+          email: patient.email || '',
+          address: patient.address || '',
+          status: patient.status === 'Inactive' ? 'Inactive' : 'Active',
+        }
+      : BLANK,
+    validate: VALIDATORS,
+    onSubmit: (v) => {
+      const payload = {
+        name: v.name.trim(),
+        phone: v.phone.trim(),
+        age: Number(v.age) || 0,
+        gender: v.gender,
+        email: v.email.trim(),
+        address: v.address.trim(),
+        status: v.status,
+      };
+      if (!patient) {
+        const mrn = patAdd(payload);
+        toast('Patient added', 'success');
+        onSaved?.(mrn);
+      } else {
+        patUpdate(patient.mrn, payload);
+        toast('Patient details updated', 'success');
+        onSaved?.(patient.mrn);
+      }
+      onClose();
+    },
+  });
 
   return (
-    <Modal
-      open={open}
+    <FormModal
+      open
       onClose={onClose}
       title={isNew ? 'Add Patient' : 'Edit Patient'}
       width={560}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button icon="check" onClick={save}>
-            {isNew ? 'Add Patient' : 'Save Changes'}
-          </Button>
-        </>
-      }
+      onSubmit={form.handleSubmit}
+      submitLabel={isNew ? 'Add Patient' : 'Save Changes'}
+      busy={form.submitting}
     >
       <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
-        <Field label="Full Name" required>
-          <TextInput value={f.name} onChange={(v) => set('name', v)} placeholder="Patient name" />
-        </Field>
-        <Field label="Phone Number" required>
+        <Field label="Full Name" required error={form.errorFor('name')}>
           <TextInput
-            value={f.phone}
-            onChange={(v) => set('phone', v)}
+            value={form.values.name}
+            onChange={(v) => form.setField('name', v)}
+            onBlur={() => form.blurField('name')}
+            autoComplete="name"
+            placeholder="Patient name"
+          />
+        </Field>
+        <Field label="Phone Number" required error={form.errorFor('phone')}>
+          <TextInput
+            value={form.values.phone}
+            onChange={(v) => form.setField('phone', v)}
+            onBlur={() => form.blurField('phone')}
+            inputMode="tel"
+            autoComplete="tel"
+            maxLength={10}
             placeholder="10-digit mobile"
           />
         </Field>
-        <Field label="Age">
-          <TextInput value={f.age} onChange={(v) => set('age', v)} placeholder="Age" />
+        <Field label="Age" error={form.errorFor('age')}>
+          <TextInput
+            value={form.values.age}
+            onChange={(v) => form.setField('age', v)}
+            onBlur={() => form.blurField('age')}
+            inputMode="numeric"
+            placeholder="Age"
+          />
         </Field>
         <Field label="Gender">
           <Select
-            value={f.gender}
+            value={form.values.gender}
             options={['Male', 'Female', 'Other']}
-            onChange={(v) => set('gender', v as Gender)}
+            onChange={(v) => form.setField('gender', v as Gender)}
           />
         </Field>
-        <Field label="Email">
+        <Field label="Email" error={form.errorFor('email')}>
           <TextInput
-            value={f.email}
-            onChange={(v) => set('email', v)}
+            value={form.values.email}
+            onChange={(v) => form.setField('email', v)}
+            onBlur={() => form.blurField('email')}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
             placeholder="name@mail.com"
           />
         </Field>
         <Field label="Status">
           <Select
-            value={f.status}
+            value={form.values.status}
             options={['Active', 'Inactive']}
-            onChange={(v) => set('status', v as PatientStatus)}
+            onChange={(v) => form.setField('status', v as PatientStatus)}
           />
         </Field>
         <Field label="Address" className="col-span-full">
           <TextInput
-            value={f.address}
-            onChange={(v) => set('address', v)}
+            value={form.values.address}
+            onChange={(v) => form.setField('address', v)}
+            autoComplete="street-address"
             placeholder="Area, City"
           />
         </Field>
@@ -178,6 +200,19 @@ export function PatientModal({ open, patient, onClose, onSaved }: PatientModalPr
           automatically. Medibook stores identity &amp; contact only — no clinical data.
         </div>
       )}
-    </Modal>
+    </FormModal>
+  );
+}
+
+/** Keyed wrapper: a new record gets a fresh form, with no prop-to-state effect. */
+export function PatientModal({ open, patient, onClose, onSaved }: PatientModalProps) {
+  if (!open) return null;
+  return (
+    <PatientRecordForm
+      key={patient?.mrn ?? 'new'}
+      patient={patient}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
   );
 }

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-
+import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
-import { Button } from '@/shared/ui/Button';
+import { email, minLen, phoneIN, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
-import { Modal } from '@/shared/ui/Modal';
+import { FormModal } from '@/shared/ui/FormModal';
+import { PasswordInput } from '@/shared/ui/PasswordInput';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
@@ -40,11 +40,24 @@ const INVITES: readonly (readonly [InviteMethod, string])[] = [
   ['manual', 'Set password now'],
 ];
 
+/** Shortest acceptable staff name / password. */
+const NAME_MIN = 3;
+const PASSWORD_MIN = 8;
+
+/** Module-level so `useForm`'s error memo stays stable across renders. */
+const ADD_USER_VALIDATORS: FormValidators<AddUserForm> = {
+  name: (v) => minLen(v, NAME_MIN, 'Full name'),
+  email: (v) => email(v),
+  roleId: (v) => required(v, 'Role'),
+  // Optional field: only validated once something has been typed.
+  phone: (v) => (v.trim() === '' ? undefined : phoneIN(v)),
+  password: (v, all) => (all.invite === 'manual' ? minLen(v, PASSWORD_MIN, 'Password') : undefined),
+};
+
 /** Monotonic counter for new user ids (replaces the prototype's `Date.now()`). */
 let userIdSeq = 0;
 
 interface AddUserModalProps {
-  open: boolean;
   roles: readonly Role[];
   onClose: () => void;
 }
@@ -53,103 +66,117 @@ interface AddUserModalProps {
  * Add-user modal (design `Rbac.jsx` `AddUserModal`): the details grid, a live
  * role annotation card, and the invite-method picker. The role Select stores
  * the roleId but displays the role name — ported exactly.
+ *
+ * Now a `FormModal`, so Enter submits (audit 3.5.6), and every field is
+ * validated inline through `useForm` instead of by one toast listing three
+ * fields at once (audit 3.5.1/3.5.4). The modal is mounted only while open, so
+ * it always opens blank without syncing props into state in an effect.
  */
-export function AddUserModal({ open, roles, onClose }: AddUserModalProps) {
+export function AddUserModal({ roles, onClose }: AddUserModalProps) {
   const rbacAddUser = useRbacStore((s) => s.rbacAddUser);
-  const [f, setF] = useState<AddUserForm>(BLANK_FORM);
-  const set = <K extends keyof AddUserForm>(k: K, v: AddUserForm[K]) =>
-    setF((x) => ({ ...x, [k]: v }));
-  useEffect(() => {
-    if (open) setF(BLANK_FORM);
-  }, [open]);
-  const submit = () => {
-    if (!f.name || !f.email || !f.roleId) {
-      toast('Name, email and role are required', 'error');
-      return;
-    }
-    userIdSeq += 1;
-    rbacAddUser({
-      id: `u-${userIdSeq}`,
-      name: f.name,
-      email: f.email,
-      phone: f.phone,
-      username: f.username || f.email.split('@')[0],
-      roleId: f.roleId,
-      status: 'Active',
-      last: 'Never',
-      invite: f.invite === 'manual' ? 'Accepted' : 'Pending',
-    });
-    toast(
-      f.invite === 'email'
-        ? 'Email invite sent'
-        : f.invite === 'otp'
-          ? 'OTP sent for confirmation'
-          : 'User created with password',
-      'success',
-    );
-    onClose();
-  };
-  const picked = roles.find((r) => r.id === f.roleId);
+
+  const form = useForm<AddUserForm>({
+    initial: BLANK_FORM,
+    validate: ADD_USER_VALIDATORS,
+    onSubmit: (f) => {
+      userIdSeq += 1;
+      rbacAddUser({
+        id: `u-${userIdSeq}`,
+        name: f.name.trim(),
+        email: f.email.trim(),
+        phone: f.phone.trim(),
+        username: f.username.trim() || f.email.trim().split('@')[0],
+        roleId: f.roleId,
+        status: 'Active',
+        last: 'Never',
+        invite: f.invite === 'manual' ? 'Accepted' : 'Pending',
+      });
+      toast(
+        f.invite === 'manual'
+          ? 'User created with a password — share it securely'
+          : `User created · access pending ${f.invite === 'otp' ? 'mobile OTP' : 'email invite'}`,
+        'success',
+      );
+      onClose();
+    },
+  });
+
+  const picked = roles.find((r) => r.id === form.values.roleId);
+  const isManual = form.values.invite === 'manual';
+
   return (
-    <Modal
-      open={open}
+    <FormModal
+      open
       onClose={onClose}
       title="Add User"
       width={560}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button icon="user-plus" onClick={submit}>
-            Add User
-          </Button>
-        </>
-      }
+      submitLabel="Add User"
+      busy={form.submitting}
+      onSubmit={form.handleSubmit}
     >
       <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
-        <Field label="Full Name" required>
+        <Field label="Full Name" required error={form.errorFor('name')}>
           <TextInput
-            value={f.name}
-            onChange={(v) => set('name', v)}
+            value={form.values.name}
+            onChange={(v) => form.setField('name', v)}
+            onBlur={() => form.blurField('name')}
             placeholder="e.g. Asha Verma"
+            autoComplete="name"
           />
         </Field>
-        <Field label="Role" required>
+        <Field label="Role" required error={form.errorFor('roleId')}>
           <Select
-            value={roles.find((r) => r.id === f.roleId)?.name ?? ''}
+            value={picked?.name ?? ''}
             placeholder="Select role"
             options={roles.map((r) => r.name)}
-            onChange={(name) => set('roleId', roles.find((r) => r.name === name)?.id ?? '')}
+            onChange={(name) =>
+              form.setField('roleId', roles.find((r) => r.name === name)?.id ?? '')
+            }
+            onBlur={() => form.blurField('roleId')}
           />
         </Field>
-        <Field label="Email" required>
+        <Field label="Email" required error={form.errorFor('email')}>
           <TextInput
-            value={f.email}
-            onChange={(v) => set('email', v)}
+            value={form.values.email}
+            onChange={(v) => form.setField('email', v)}
+            onBlur={() => form.blurField('email')}
             placeholder="name@hospital.med"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
           />
         </Field>
-        <Field label="Phone">
+        <Field label="Phone" error={form.errorFor('phone')} hint="10-digit mobile, optional">
           <TextInput
-            value={f.phone}
-            onChange={(v) => set('phone', v)}
+            value={form.values.phone}
+            onChange={(v) => form.setField('phone', v)}
+            onBlur={() => form.blurField('phone')}
             placeholder="Mobile number"
+            inputMode="tel"
+            autoComplete="tel"
           />
         </Field>
-        <Field label="Username">
+        <Field label="Username" hint="Taken from the email if left blank">
           <TextInput
-            value={f.username}
-            onChange={(v) => set('username', v)}
+            value={form.values.username}
+            onChange={(v) => form.setField('username', v)}
             placeholder="Auto from email if blank"
+            autoComplete="username"
           />
         </Field>
-        <Field label={f.invite === 'manual' ? 'Password' : 'Password (set later)'}>
-          <TextInput
-            value={f.password}
-            onChange={(v) => set('password', v)}
-            placeholder={f.invite === 'manual' ? 'Set a password' : 'Sent via invite'}
-            type="password"
+        <Field
+          label={isManual ? 'Password' : 'Password (set later)'}
+          required={isManual}
+          error={form.errorFor('password')}
+          hint={isManual ? `At least ${PASSWORD_MIN} characters` : undefined}
+        >
+          <PasswordInput
+            value={form.values.password}
+            onChange={(v) => form.setField('password', v)}
+            onBlur={() => form.blurField('password')}
+            placeholder={isManual ? 'Set a password' : 'Sent via invite'}
+            autoComplete="new-password"
+            disabled={!isManual}
           />
         </Field>
       </div>
@@ -163,25 +190,27 @@ export function AddUserModal({ open, roles, onClose }: AddUserModalProps) {
           <AccessSummary perms={picked.perms} />
         </div>
       )}
-      <div className="mt-4.5">
-        <div className="text-body text-text-strong mb-2">How should they get access?</div>
+      <fieldset className="mt-4.5 border-0 p-0">
+        <legend className="text-body text-text-strong mb-2 p-0">How should they get access?</legend>
         <div className="flex gap-2.5">
           {INVITES.map(([k, l]) => (
-            <div
+            <button
+              type="button"
               key={k}
-              onClick={() => set('invite', k)}
+              aria-pressed={form.values.invite === k}
+              onClick={() => form.setField('invite', k)}
               className={cn(
                 'text-body flex-1 cursor-pointer rounded-md py-3 text-center font-medium',
-                f.invite === k
+                form.values.invite === k
                   ? 'border-blue bg-blue-soft-bg text-blue border-2'
                   : 'border-border text-text-body border bg-white',
               )}
             >
               {l}
-            </div>
+            </button>
           ))}
         </div>
-      </div>
-    </Modal>
+      </fieldset>
+    </FormModal>
   );
 }

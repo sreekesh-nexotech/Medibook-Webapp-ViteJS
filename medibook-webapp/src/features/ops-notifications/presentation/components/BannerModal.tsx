@@ -1,8 +1,7 @@
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 
-import { Button } from '@/shared/ui/Button';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { OpsField } from '@/shared/ui/OpsField';
 import { TextInput } from '@/shared/ui/TextInput';
 
@@ -30,22 +29,30 @@ const EMPTY_DRAFT: BannerDraft = { title: '', img: null, from: '', to: '' };
 const dateInputClass =
   'text-body text-text-body rounded-input border-border h-12 w-full border bg-white px-3';
 
-/** Add / edit a campaign banner, or edit the default banner (image upload + schedule). */
+/** The draft this modal opens on — a new banner, a campaign banner, or the default. */
+function initialDraft(banner: Banner | null): BannerDraft {
+  if (!banner) return EMPTY_DRAFT;
+  return {
+    title: banner.title,
+    img: banner.img,
+    from: banner.from || '',
+    to: banner.to || '',
+  };
+}
+
+/**
+ * Add / edit a campaign banner, or edit the default banner (image upload +
+ * schedule).
+ *
+ * The editor state is initialised from props rather than synced in an effect —
+ * the screen keys this component by which banner is open, so React remounts it
+ * with a fresh draft (no `set-state-in-effect`, no stale first render). Built
+ * on `FormModal`, so Enter submits (audit 3.4.5).
+ */
 export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerModalProps) {
-  const [f, setF] = useState<BannerDraft>(EMPTY_DRAFT);
+  const [f, setF] = useState<BannerDraft>(() => initialDraft(banner));
   const [err, setErr] = useState<BannerErrors>({});
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setF(
-        banner
-          ? { title: banner.title, img: banner.img, from: banner.from || '', to: banner.to || '' }
-          : EMPTY_DRAFT,
-      );
-      setErr({});
-    }
-  }, [open, banner]);
 
   const pickFile = () => fileRef.current?.click();
 
@@ -75,21 +82,13 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
   };
 
   return (
-    <Modal
+    <FormModal
       open={open}
       onClose={onClose}
       title={fallback ? 'Edit Default Banner' : banner ? 'Edit Banner' : 'Add Banner'}
       width={520}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button icon="check" onClick={submit}>
-            {banner || fallback ? 'Save Banner' : 'Add Banner'}
-          </Button>
-        </>
-      }
+      onSubmit={submit}
+      submitLabel={banner || fallback ? 'Save Banner' : 'Add Banner'}
     >
       <div className="flex flex-col gap-4">
         {fallback && (
@@ -143,7 +142,7 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
             >
               <Icon name="upload" size={20} />
               <span className="text-body">Click to upload an image</span>
-              <span className="text-caption text-text-faint">
+              <span className="text-caption text-text-muted">
                 PNG or JPG · 1200×600 (2:1) recommended · title shows as overlay text if no image
               </span>
             </button>
@@ -152,30 +151,40 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
         {!fallback && (
           <div className="grid grid-cols-2 gap-4">
             <OpsField label="Live From" required error={err.from}>
-              <input
-                type="date"
-                value={f.from}
-                onChange={(e) => {
-                  setF({ ...f, from: e.target.value });
-                  setErr({ ...err, from: null });
-                }}
-                className={dateInputClass}
-              />
+              {(field) => (
+                <input
+                  type="date"
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedById}
+                  value={f.from}
+                  onChange={(e) => {
+                    setF({ ...f, from: e.target.value });
+                    setErr({ ...err, from: null });
+                  }}
+                  className={dateInputClass}
+                />
+              )}
             </OpsField>
             <OpsField label="Live Until" required error={err.to}>
-              <input
-                type="date"
-                value={f.to}
-                onChange={(e) => {
-                  setF({ ...f, to: e.target.value });
-                  setErr({ ...err, to: null });
-                }}
-                className={dateInputClass}
-              />
+              {(field) => (
+                <input
+                  type="date"
+                  id={field.id}
+                  aria-invalid={field.invalid || undefined}
+                  aria-describedby={field.describedById}
+                  value={f.to}
+                  onChange={(e) => {
+                    setF({ ...f, to: e.target.value });
+                    setErr({ ...err, to: null });
+                  }}
+                  className={dateInputClass}
+                />
+              )}
             </OpsField>
           </div>
         )}
       </div>
-    </Modal>
+    </FormModal>
   );
 }

@@ -73,6 +73,12 @@ export const OPS_HOSPITALS: readonly OpsHospital[] = [
     bookings: 2860,
     onboarded: 'May 27, 2026',
     status: 'Suspended',
+    suspension: {
+      reason: 'Manual review',
+      since: '2026-06-08',
+      by: 'riya.sharma@medibook.in',
+      note: 'Repeated patient complaints under investigation.',
+    },
   },
   {
     id: 5,
@@ -152,6 +158,14 @@ export const OPS_HOSPITALS: readonly OpsHospital[] = [
     bookings: 860,
     onboarded: 'May 08, 2026',
     status: 'Suspended',
+    graceDays: 5,
+    suspension: {
+      reason: 'Non-payment',
+      since: '2026-06-05',
+      invoiceNo: 'INV-2026-0239',
+      by: 'riya.sharma@medibook.in',
+      note: 'May subscription unpaid past the grace window.',
+    },
   },
   {
     id: 10,
@@ -201,6 +215,19 @@ export const OPS_HOSPITALS: readonly OpsHospital[] = [
       ifsc: 'CNRB0001100',
       upi: 'charakim@canara',
     },
+  },
+  {
+    id: 14,
+    name: 'Sahyadri Speciality Hospital',
+    email: 'admin@sahyadrispeciality.in',
+    phone: '+91 97640 21188',
+    gstin: '27AAGCS6642R1Z4',
+    plan: 'Starter',
+    city: 'Nashik',
+    st: 'MH',
+    bookings: 0,
+    onboarded: 'June 11, 2026',
+    status: 'Pending verification',
   },
   {
     id: 13,

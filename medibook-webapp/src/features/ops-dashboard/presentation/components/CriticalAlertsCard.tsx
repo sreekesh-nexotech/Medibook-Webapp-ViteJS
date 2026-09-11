@@ -4,6 +4,7 @@ import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import type { IconName } from '@/shared/ui/icon-registry';
@@ -84,9 +85,13 @@ export function CriticalAlertsCard() {
           );
         })}
         {alerts.length === 0 && (
-          <div className="text-text-faint text-body py-9 text-center">
-            No critical alerts. All instances healthy.
-          </div>
+          <EmptyState
+            icon="circle-check"
+            title="No critical alerts."
+            message="Every hospital instance is healthy. Payout failures and compliance events show up here as they happen."
+            actionLabel="Open compliance logs"
+            onAction={() => navigate(opsPath('logs'))}
+          />
         )}
       </div>
     </Card>

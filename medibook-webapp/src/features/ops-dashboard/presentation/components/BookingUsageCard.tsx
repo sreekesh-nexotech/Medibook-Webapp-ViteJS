@@ -27,7 +27,7 @@ export function BookingUsageCard() {
     <Card>
       <div className="mb-4.5 flex items-baseline justify-between">
         <SectionTitle>Booking Usage</SectionTitle>
-        <span className="text-caption text-text-faint">Last 7 days</span>
+        <span className="text-caption text-text-muted">Last 7 days</span>
       </div>
       <div className="flex h-52.5 items-end gap-4.5 px-1">
         {WEEK.map(([d, v], i) => (

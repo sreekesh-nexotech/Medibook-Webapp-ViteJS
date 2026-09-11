@@ -1,9 +1,7 @@
 import { bankOf, hospName } from '@/features/ops-hospitals/application/store/hospitals.store';
-import { cn } from '@/shared/lib/cn';
 import { fmtDate, money } from '@/shared/lib/format';
-import { Button } from '@/shared/ui/Button';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { OpsField } from '@/shared/ui/OpsField';
 
 import type { PayoutRun, SettlementRow } from './settlement-model';
@@ -19,7 +17,10 @@ interface RecordRunReleaseModalProps {
   onRecord: () => void;
 }
 
-/** Record Run Release modal — per-statement list, total, skipped warning. */
+/**
+ * Record Run Release modal — per-statement list, total, skipped warning.
+ * On `FormModal`, so Enter records the run (audit 3.4.5).
+ */
 export function RecordRunReleaseModal({
   runTarget,
   runRel,
@@ -35,26 +36,17 @@ export function RecordRunReleaseModal({
     ? `Record Run Release · ${runTarget.date === 'unscheduled' ? 'Unscheduled' : fmtDate(runTarget.date)}`
     : 'Record Run Release';
   return (
-    <Modal
+    <FormModal
       open={!!runTarget}
       onClose={onClose}
       title={title}
       width={600}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={disabled ? undefined : onRecord}
-            className={cn(disabled && 'opacity-50')}
-          >
-            {busy
-              ? 'Recording…'
-              : `Record ${runRel.length} Release${runRel.length === 1 ? '' : 's'}`}
-          </Button>
-        </>
+      onSubmit={onRecord}
+      submitLabel={
+        busy ? 'Recording…' : `Record ${runRel.length} Release${runRel.length === 1 ? '' : 's'}`
       }
+      busy={busy}
+      disabled={disabled}
     >
       {runTarget && (
         <div className="flex flex-col gap-3.5">
@@ -97,15 +89,18 @@ export function RecordRunReleaseModal({
             </div>
           )}
           <OpsField label="Remark for this run (optional · visible to every hospital in it)">
-            <textarea
-              value={remark}
-              onChange={(e) => onRemarkChange(e.target.value)}
-              placeholder="e.g. Weekly payout run of 20 Jun"
-              className="border-border rounded-input text-body-lg text-text-strong h-16 w-full resize-none border p-3"
-            ></textarea>
+            {(field) => (
+              <textarea
+                id={field.id}
+                value={remark}
+                onChange={(e) => onRemarkChange(e.target.value)}
+                placeholder="e.g. Weekly payout run of 20 Jun"
+                className="border-border rounded-input text-body-lg text-text-strong h-16 w-full resize-none border p-3"
+              ></textarea>
+            )}
           </OpsField>
         </div>
       )}
-    </Modal>
+    </FormModal>
   );
 }

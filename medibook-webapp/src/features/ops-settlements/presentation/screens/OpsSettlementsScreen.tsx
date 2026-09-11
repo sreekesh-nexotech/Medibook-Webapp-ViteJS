@@ -17,6 +17,7 @@ import { useOpsAct } from '@/shared/hooks/useOpsAct';
 import { useSort } from '@/shared/hooks/useSort';
 import { fmtDate, money, moneyShort } from '@/shared/lib/format';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
@@ -260,6 +261,7 @@ export function OpsSettlementsScreen() {
         <SegTabs tabs={['By Payout Run', 'Flat List']} value={viewMode} onChange={setViewMode} />
         <FilterSelect
           value={hospF}
+          aria-label="Filter by hospital"
           options={['All Hospitals', ...new Set(all.map((r) => hospName(r)))]}
           onChange={(v) => {
             setHospF(v);
@@ -267,7 +269,8 @@ export function OpsSettlementsScreen() {
           }}
         />
         <FilterSelect
-          value={statusF}
+          value={statusF === 'All' ? 'Status: All' : statusF}
+          aria-label="Filter by settlement status"
           options={['All', 'Pending', 'Released', 'Received', 'Overdue', 'Payout failed'].map(
             (s) => (s === 'All' ? 'Status: All' : s),
           )}
@@ -293,12 +296,16 @@ export function OpsSettlementsScreen() {
           title="Expected to"
         />
         {filtersActive && (
-          <span onClick={clearAll} className="text-body text-blue cursor-pointer">
+          <button
+            type="button"
+            onClick={clearAll}
+            className="text-body text-blue cursor-pointer border-none bg-transparent p-0"
+          >
             Clear all
-          </span>
+          </button>
         )}
         <div className="flex-1"></div>
-        <span className="text-caption text-text-faint">
+        <span className="text-caption text-text-muted">
           {payoutSched} payout runs · next: 20 Jun 2026
         </span>
       </Card>
@@ -308,15 +315,24 @@ export function OpsSettlementsScreen() {
           text={`Online booking fees are collected by Medibook at booking time and become payable to the hospital only after the appointment is completed. Pre-visit cancellations are refunded per the slab policy — Medibook keeps the cancellation fee. Statements are net of the ${opsCommPct()} platform commission (set in Platform Settings). Transfers themselves happen outside Medibook — releases here are the shared record of them.`}
         />
         <div className="flex-1"></div>
-        <span className="text-caption text-text-faint">
+        <span className="text-caption text-grey-900">
           {filtered.length} statement{filtered.length === 1 ? '' : 's'} match
         </span>
       </div>
       {filtered.length === 0 ? (
         <Card>
-          <div className="text-text-faint text-body-lg py-9 text-center">
-            No settlements match your filters.
-          </div>
+          <EmptyState
+            icon="landmark"
+            title={
+              filtersActive ? 'No settlements match your filters.' : 'No settlement statements yet.'
+            }
+            message={
+              filtersActive
+                ? 'Try a wider expected-date range, or clear the filters to see every statement.'
+                : 'Statements appear here once completed bookings are ready to pay out.'
+            }
+            {...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {})}
+          />
         </Card>
       ) : viewMode === 'By Payout Run' ? (
         runs.map((g) => (

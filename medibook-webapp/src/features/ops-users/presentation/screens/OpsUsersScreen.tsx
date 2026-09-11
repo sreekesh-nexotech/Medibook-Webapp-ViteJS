@@ -16,7 +16,7 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { StatCard, type StatCardData } from '@/shared/ui/StatCard';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
-import { toast } from '@/shared/ui/toast/toast.store';
+import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import { AddOpsUserModal } from '../components/AddOpsUserModal';
 import { OpsRoleAnnotation } from '../components/OpsRoleAnnotation';
@@ -24,12 +24,27 @@ import { OpsRoleAnnotation } from '../components/OpsRoleAnnotation';
 /** Roles in the design's Role Permissions grid order. */
 const OPS_ROLE_ORDER: readonly OpsRole[] = ['Super Admin', 'Finance Admin', 'Support', 'Auditor'];
 
+const USER_COLUMNS = ['User', 'Role', '2FA', 'Last Active', 'Status', 'Action'] as const;
+
+const PERMISSION_COLUMNS = [
+  'Permission',
+  'Super Admin',
+  'Finance Admin',
+  'Support',
+  'Auditor',
+] as const;
+
+/** Which editor the modal is open on: a new invite, or an existing user. */
+type EditorState = { readonly kind: 'new' } | { readonly kind: 'edit'; readonly id: number } | null;
+
 /** Check glyph (granted) or an em-dash (no access) for a permission-matrix cell. */
 function mark(v: 0 | 1) {
   return v ? (
     <Icon name="circle-check" size={17} className="text-g-600" />
   ) : (
-    <span className="text-text-faint">—</span>
+    <span className="text-text-muted" title="No access">
+      —
+    </span>
   );
 }
 
@@ -38,7 +53,7 @@ export function OpsUsersScreen() {
   const users = useOpsUsersStore((s) => s.users);
   const deleteUser = useOpsUsersStore((s) => s.deleteUser);
   const [q, setQ] = useState('');
-  const [add, setAdd] = useState(false);
+  const [editor, setEditor] = useState<EditorState>(null);
   const [delId, setDelId] = useState<number | null>(null);
   const [busy, run] = useOpsAct();
 
@@ -51,6 +66,10 @@ export function OpsUsersScreen() {
       u.role.toLowerCase().includes(ql),
   );
   const del = users.find((u) => u.id === delId);
+  const editingUser =
+    editor?.kind === 'edit' ? (users.find((u) => u.id === editor.id) ?? null) : null;
+  /** Remount key for the editor, so its form initialises from props (no sync effect). */
+  const editorKey = editor ? (editor.kind === 'edit' ? `edit-${editor.id}` : 'new') : 'closed';
   const ct = (role: OpsRole) => users.filter((u) => u.role === role).length;
 
   const KPIS: readonly StatCardData[] = [
@@ -88,6 +107,18 @@ export function OpsUsersScreen() {
     },
   ];
 
+  const tableState: TableStateSpec | undefined =
+    filtered.length === 0
+      ? {
+          kind: 'empty',
+          icon: 'users',
+          title: 'No results match your search.',
+          message: 'Search matches name, email and role.',
+          actionLabel: 'Clear search',
+          onAction: () => setQ(''),
+        }
+      : undefined;
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex gap-4">
@@ -97,60 +128,56 @@ export function OpsUsersScreen() {
       </div>
       <Card pad={14} className="flex items-center gap-4">
         <div className="flex-1">
-          <SearchField value={q} onChange={setQ} placeholder="Search name, email or role" />
+          <SearchField
+            value={q}
+            onChange={setQ}
+            placeholder="Search name, email or role"
+            aria-label="Search internal users by name, email or role"
+          />
         </div>
-        <Button icon="plus" onClick={() => setAdd(true)}>
+        <Button icon="plus" onClick={() => setEditor({ kind: 'new' })}>
           Add User
         </Button>
       </Card>
       <Card>
-        {filtered.length > 0 ? (
-          <TableShell columns={['User', 'Role', '2FA', 'Last Active', 'Status', 'Action']}>
-            {filtered.map((u) => (
-              <tr key={u.id}>
-                <td className={tdClass}>
-                  <OpsPerson row={u} />
-                </td>
-                <td className={tdClass}>{u.role}</td>
-                <td className={tdClass}>
-                  <Badge status={u.twofa} />
-                </td>
-                <td className={tdClass}>{u.lastActive}</td>
-                <td className={tdClass}>
-                  <Badge status={u.status} />
-                </td>
-                <td className={tdClass}>
-                  <div className="flex gap-2">
-                    <IconBtn
-                      name="pencil"
-                      box={36}
-                      size={15}
-                      title="Edit user"
-                      onClick={() => toast('Edit user — demo', 'info')}
-                    />
-                    <IconBtn
-                      name="trash-2"
-                      box={36}
-                      size={15}
-                      color="var(--color-d-500)"
-                      title="Delete user"
-                      onClick={() => setDelId(u.id)}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </TableShell>
-        ) : (
-          <div className="flex flex-col items-center gap-2.5 py-11 text-center">
-            <span className="text-body text-text-strong font-medium">
-              No results match your search.
-            </span>
-            <Button variant="ghost" size="sm" onClick={() => setQ('')}>
-              Clear search
-            </Button>
-          </div>
-        )}
+        <TableShell columns={USER_COLUMNS} scrollLabel="Internal users" state={tableState}>
+          {filtered.map((u) => (
+            <tr key={u.id}>
+              <td className={tdClass}>
+                <OpsPerson row={u} />
+              </td>
+              <td className={tdClass}>{u.role}</td>
+              <td className={tdClass}>
+                <Badge status={u.twofa} />
+              </td>
+              <td className={tdClass}>{u.lastActive}</td>
+              <td className={tdClass}>
+                <Badge status={u.status} />
+              </td>
+              <td className={tdClass}>
+                <div className="flex gap-2">
+                  <IconBtn
+                    name="pencil"
+                    box={36}
+                    size={15}
+                    label="Edit user"
+                    title={`Edit ${u.name}`}
+                    onClick={() => setEditor({ kind: 'edit', id: u.id })}
+                  />
+                  <IconBtn
+                    name="trash-2"
+                    box={36}
+                    size={15}
+                    color="var(--color-d-500)"
+                    label="Delete user"
+                    title={`Delete ${u.name}`}
+                    onClick={() => setDelId(u.id)}
+                  />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </TableShell>
       </Card>
       <Card>
         <SectionTitle className="mb-1.5">Role Permissions</SectionTitle>
@@ -164,7 +191,7 @@ export function OpsUsersScreen() {
             <OpsRoleAnnotation key={r} role={r} />
           ))}
         </div>
-        <TableShell columns={['Permission', 'Super Admin', 'Finance Admin', 'Support', 'Auditor']}>
+        <TableShell columns={PERMISSION_COLUMNS} scrollLabel="Role permission matrix">
           {OPS_ROLE_PERMS.map(([p, sa, fa, sup, aud]) => (
             <tr key={p}>
               <td className="text-body text-text-strong border-border-soft w-2/5 border-b px-3.5 align-middle font-medium">
@@ -179,10 +206,12 @@ export function OpsUsersScreen() {
         </TableShell>
       </Card>
       <AddOpsUserModal
-        open={add}
-        onClose={() => setAdd(false)}
+        key={editorKey}
+        open={editor != null}
+        user={editingUser}
+        onClose={() => setEditor(null)}
         onDone={() => {
-          setAdd(false);
+          setEditor(null);
           setQ('');
         }}
       />
