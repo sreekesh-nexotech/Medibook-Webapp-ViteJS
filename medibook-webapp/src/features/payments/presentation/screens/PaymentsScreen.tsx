@@ -32,11 +32,11 @@ import {
   grossAmount,
   taxBreakdown,
 } from '@/features/appointments/application/store/appointments.logic';
+import { type Appointment } from '@/features/appointments/application/store/appointments.types';
 import {
-  DEPARTMENTS,
-  DOCTORS,
-  type Appointment,
-} from '@/features/appointments/application/store/appointments.types';
+  useCatalogDepartments,
+  useCatalogDoctorNames,
+} from '@/features/doctors/application/store/catalog.selectors';
 import { MarkPaymentModal } from '@/features/appointments/presentation/components/MarkPaymentModal';
 import { ReceiptModal } from '@/features/appointments/presentation/components/ReceiptModal';
 import { RefundModal } from '@/features/appointments/presentation/components/RefundModal';
@@ -63,6 +63,11 @@ export function PaymentsScreen() {
   const { role } = useParams();
   const appts = useAppointmentsStore((s) => s.appts);
   const ensureReceiptNo = useAppointmentsStore((s) => s.ensureReceiptNo);
+  // Department and doctor filters follow the hospital's own catalogue, so a
+  // doctor added through Doctors & Departments is filterable here (audit 2.6.3).
+  const departments = useCatalogDepartments();
+  const doctorNames = useCatalogDoctorNames();
+
   const [tab, setTab] = useState<PayTab>('All');
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState('All Sources');
@@ -325,13 +330,13 @@ export function PaymentsScreen() {
           />
           <FilterSelect
             value={deptF}
-            options={['All Departments', ...DEPARTMENTS]}
+            options={['All Departments', ...departments]}
             onChange={reset(setDeptF)}
             aria-label="Filter by department"
           />
           <FilterSelect
             value={docF}
-            options={['All Doctors', ...Object.values(DOCTORS).flat()]}
+            options={['All Doctors', ...doctorNames]}
             onChange={reset(setDocF)}
             aria-label="Filter by doctor"
           />

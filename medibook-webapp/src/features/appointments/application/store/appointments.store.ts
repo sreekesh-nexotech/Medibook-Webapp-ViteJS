@@ -14,7 +14,8 @@ import {
 } from './appointments.fixtures';
 import { doctorLoad, formatReceiptNo, grossAmount } from './appointments.logic';
 import type { DoctorLoad } from './appointments.logic';
-import { FEES } from './appointments.types';
+import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
+import { selectFee } from '@/features/doctors/application/store/catalog.selectors';
 import type {
   Appointment,
   AppointmentSource,
@@ -312,7 +313,11 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
     editAppt: (id, patch) => {
       const cur = get().appts.find((a) => a.id === id);
       const next = { ...patch };
-      if (patch.dept) next.amount = FEES[patch.dept] || cur?.amount;
+      // The catalogue's fee for the new department (a doctor's own fee wins),
+      // falling back to whatever was already charged (audit 2.6.3).
+      if (patch.dept)
+        next.amount =
+          selectFee(useCatalogStore.getState(), patch.doctor ?? patch.dept) || cur?.amount;
       get().patch(id, next);
       toast('Appointment updated', 'success');
     },
@@ -452,7 +457,7 @@ export const useAppointmentsStore = create<AppointmentsState & AppointmentsActio
         source: data.source,
         date: data.date,
         time: data.time,
-        amount: FEES[data.dept] || 600,
+        amount: selectFee(useCatalogStore.getState(), data.doctor || data.dept) || 600,
         payment: isOnline ? 'Paid' : 'Pending',
         // online bookings get a token auto-assigned at booking; walk-ins get it at payment
         token: isOnline && data.date === 'Today' ? get().nextToken(data.dept) : null,

@@ -5,8 +5,33 @@
  * constants move behind the API.
  */
 
-/** The six seeded departments (design `DEPARTMENTS`). */
+/**
+ * ============================================================================
+ * DEPRECATED master-data constants — read the hospital's own catalogue instead
+ * ============================================================================
+ * Audit 2.6.3: "The hospital app books against a fixed list of six departments
+ * and seven doctors rather than its own Doctors and Departments catalogue, so
+ * adding a doctor changes nothing anywhere."
+ *
+ * The live source of truth is `features/doctors/application/store/catalog.store.ts`,
+ * read through `catalog.selectors.ts`:
+ *
+ *   components →  useCatalogDepartments() / useCatalogDoctorNames(dept) /
+ *                 useCatalogFee(key) / useCatalogDoctor(idOrName)
+ *   stores     →  selectDepartments(useCatalogStore.getState()) etc.
+ *
+ * The values below are retained only so that any call site not yet migrated
+ * still renders the SAME data as the catalogue and the patient app — audit
+ * 2.6.2: "The mobile app and the hospital app use different departments,
+ * different doctors, different appointment statuses and different token
+ * formats. A reviewer comparing the two sees two different products."
+ * They are now the canonical 7 departments and 9 doctors from
+ * CANONICAL_MASTER_DATA, not the old divergent list.
+ *
+ * @deprecated Migrate the call site to `catalog.selectors.ts`, then delete.
+ */
 export const DEPARTMENTS = [
+  'General Medicine',
   'Cardiology',
   'Orthopedics',
   'Pediatrics',
@@ -15,20 +40,35 @@ export const DEPARTMENTS = [
   'Dermatology',
 ] as const;
 
-export type Department = (typeof DEPARTMENTS)[number];
+/**
+ * A department name. Deliberately `string`, not a union over [DEPARTMENTS]: a
+ * hospital adds and renames departments at runtime through its own catalogue,
+ * so a closed literal type is wrong by construction — it cannot describe a
+ * department the hospital created this morning.
+ */
+export type Department = string;
 
-/** Doctors per department (design `DOCTORS`). */
-export const DOCTORS: Readonly<Record<Department, readonly string[]>> = {
-  Cardiology: ['Dr. Thomas K.', 'Dr. Anil R.'],
-  Orthopedics: ['Dr. Geetha R.'],
-  Pediatrics: ['Dr. Kumar V.'],
-  Neurology: ['Dr. Maya S.'],
-  ENT: ['Dr. Arun B.'],
-  Dermatology: ['Dr. Leela P.'],
+/**
+ * @deprecated Use `useCatalogDoctorNames(dept)` / `selectDoctorNames(state, dept)`.
+ */
+export const DOCTORS: Readonly<Record<string, readonly string[]>> = {
+  'General Medicine': ['Dr. Anil Kumar', 'Dr. Meera Nair'],
+  Cardiology: ['Dr. Thomas Kurian', 'Dr. Anya Sharma'],
+  Orthopedics: ['Dr. Geetha Rao'],
+  Pediatrics: ['Dr. Kumar Venkat'],
+  Neurology: ['Dr. Maya Suresh'],
+  ENT: ['Dr. Arun Bhat'],
+  Dermatology: ['Dr. Leela Pillai'],
 };
 
-/** Consultation fee per department (design `FEES`). */
-export const FEES: Readonly<Record<Department, number>> = {
+/**
+ * Department base fee in whole rupees — now only a DEFAULT for a doctor with
+ * no fee of their own.
+ * @deprecated Use `useCatalogFee(key)` / `selectFee(state, key)`, which prefers
+ * the doctor's own fee.
+ */
+export const FEES: Readonly<Record<string, number>> = {
+  'General Medicine': 500,
   Cardiology: 800,
   Orthopedics: 700,
   Pediatrics: 600,
@@ -44,22 +84,29 @@ export interface DoctorMeta {
   readonly dept: Department;
 }
 
-/** Design `DOCTOR_META`, keyed by doctor display name. */
+/**
+ * @deprecated Use `useCatalogDoctor(idOrName)` — it carries `room`, `spec` and
+ * `depts` from the catalogue the hospital actually maintains.
+ */
 export const DOCTOR_META: Readonly<Record<string, DoctorMeta>> = {
-  'Dr. Thomas K.': { room: '101', spec: 'Cardiologist', dept: 'Cardiology' },
-  'Dr. Anil R.': { room: '102', spec: 'Cardiologist', dept: 'Cardiology' },
-  'Dr. Geetha R.': { room: '201', spec: 'Orthopedic Surgeon', dept: 'Orthopedics' },
-  'Dr. Kumar V.': { room: '301', spec: 'Pediatrician', dept: 'Pediatrics' },
-  'Dr. Maya S.': { room: '401', spec: 'Neurologist', dept: 'Neurology' },
-  'Dr. Arun B.': { room: '501', spec: 'ENT Specialist', dept: 'ENT' },
-  'Dr. Leela P.': { room: '601', spec: 'Dermatologist', dept: 'Dermatology' },
+  'Dr. Anil Kumar': { room: '101', spec: 'General Physician', dept: 'General Medicine' },
+  'Dr. Meera Nair': { room: '102', spec: 'General Physician', dept: 'General Medicine' },
+  'Dr. Thomas Kurian': { room: '201', spec: 'Cardiologist', dept: 'Cardiology' },
+  'Dr. Anya Sharma': { room: '202', spec: 'Cardiologist', dept: 'Cardiology' },
+  'Dr. Geetha Rao': { room: '301', spec: 'Orthopedic Surgeon', dept: 'Orthopedics' },
+  'Dr. Kumar Venkat': { room: '401', spec: 'Pediatrician', dept: 'Pediatrics' },
+  'Dr. Maya Suresh': { room: '501', spec: 'Neurologist', dept: 'Neurology' },
+  'Dr. Arun Bhat': { room: '601', spec: 'ENT Specialist', dept: 'ENT' },
+  'Dr. Leela Pillai': { room: '701', spec: 'Dermatologist', dept: 'Dermatology' },
 };
 
 /**
  * Design `TOKEN_PREFIX` — kept for call-site compatibility / future
- * per-department token schemes (the live scheme is hospital-wide "T-001").
+ * per-department token schemes. The live scheme is the canonical hospital-wide
+ * "T-001" (CANONICAL_MASTER_DATA section 5), shared with the patient app.
  */
-export const TOKEN_PREFIX: Readonly<Record<Department, string>> = {
+export const TOKEN_PREFIX: Readonly<Record<string, string>> = {
+  'General Medicine': 'G',
   Cardiology: 'C',
   Orthopedics: 'O',
   Pediatrics: 'P',

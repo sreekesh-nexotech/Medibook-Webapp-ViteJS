@@ -16,10 +16,11 @@ import { SkeletonKpiStrip } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
+import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
 import {
-  DEPARTMENTS,
-  DOCTOR_META,
-} from '@/features/appointments/application/store/appointments.types';
+  selectDoctorNames,
+  useCatalogDepartments,
+} from '@/features/doctors/application/store/catalog.selectors';
 
 /** Text-link action (design's clickable `<span>` with `font: var(--body-md)`, blue). */
 const LINK_CLASS = 'text-body text-blue cursor-pointer border-0 bg-transparent p-0 font-medium';
@@ -37,6 +38,8 @@ export function ReceptionistDashboardScreen() {
   const go = (view: HospitalStaticView): void => {
     navigate(hospitalPath(activeRole, view));
   };
+  // Department strip follows the hospital's own catalogue (audit 2.6.3).
+  const departments = useCatalogDepartments();
 
   const appts = useAppointmentsStore((s) => s.appts);
   const serving = useAppointmentsStore((s) => s.serving);
@@ -176,7 +179,7 @@ export function ReceptionistDashboardScreen() {
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            {DEPARTMENTS.map((d) => {
+            {departments.map((d) => {
               const w = today.filter(
                 (a) =>
                   a.dept === d &&
@@ -185,7 +188,8 @@ export function ReceptionistDashboardScreen() {
                   a.token !== serving[a.doctor],
               ).length;
               const servingDoc = Object.keys(serving).find(
-                (doc) => serving[doc] && DOCTOR_META[doc] && DOCTOR_META[doc].dept === d,
+                (doc) =>
+                  serving[doc] && selectDoctorNames(useCatalogStore.getState(), d).includes(doc),
               );
               const servTok = servingDoc ? serving[servingDoc] : null;
               return (

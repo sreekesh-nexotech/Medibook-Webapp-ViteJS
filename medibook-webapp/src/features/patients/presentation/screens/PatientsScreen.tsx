@@ -22,10 +22,8 @@ import {
   useListRefresh,
 } from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import {
-  DEPARTMENTS,
-  type Appointment,
-} from '@/features/appointments/application/store/appointments.types';
+import { type Appointment } from '@/features/appointments/application/store/appointments.types';
+import { useCatalogDepartments } from '@/features/doctors/application/store/catalog.selectors';
 import { usePatientsStore } from '@/features/patients/application/store/patients.store';
 import type { Patient } from '@/features/patients/application/store/patients.types';
 import { PatientModal } from '@/features/patients/presentation/components/PatientModal';
@@ -78,6 +76,9 @@ export function PatientsScreen() {
   const patients = usePatientsStore((s) => s.patients);
   const appts = useAppointmentsStore((s) => s.appts);
   const startBooking = useAppointmentsStore((s) => s.startBooking);
+  // The hospital's own catalogue, so a department added through Doctors &
+  // Departments shows up in this filter immediately (audit 2.6.3).
+  const departments = useCatalogDepartments();
 
   const [q, setQ] = useState('');
   const [deptF, setDeptF] = useState('All Departments');
@@ -215,7 +216,7 @@ export function PatientsScreen() {
           <RefreshBtn onRefresh={refresh} title="Refresh patients" />
           <FilterSelect
             value={deptF}
-            options={['All Departments', ...DEPARTMENTS]}
+            options={['All Departments', ...departments]}
             onChange={reset(setDeptF)}
             aria-label="Filter by department"
           />

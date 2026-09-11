@@ -26,11 +26,12 @@ import {
   taxBreakdown,
   todayISO,
 } from '@/features/appointments/application/store/appointments.logic';
+import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
 import {
-  DEPARTMENTS,
-  DOCTORS,
-  FEES,
-} from '@/features/appointments/application/store/appointments.types';
+  selectDoctorNames,
+  selectFee,
+  useCatalogDepartments,
+} from '@/features/doctors/application/store/catalog.selectors';
 import type {
   Appointment,
   Gender,
@@ -133,6 +134,8 @@ export function CreateAppointmentScreen() {
   const roleParam = useParams().role;
   const role: HospitalRole = isHospitalRole(roleParam) ? roleParam : 'receptionist';
   const onDone = () => navigate(hospitalPath(role, 'appointments'));
+  // Departments offered for booking come from the hospital's own catalogue.
+  const departments = useCatalogDepartments();
 
   const create = useAppointmentsStore((s) => s.create);
   const consumeBooking = useAppointmentsStore((s) => s.consumeBooking);
@@ -203,12 +206,12 @@ export function CreateAppointmentScreen() {
       const dateLabel = isoToRelLocal(v.iso);
       const created: Appointment[] = [];
       ready.forEach((c) => {
-        const dept = DEPARTMENTS.find((x) => x === c.dept);
-        if (!dept) return;
+        // Validate against the hospital's live catalogue, not a frozen list.
+        if (!departments.includes(c.dept)) return;
         created.push(
           create({
             ...base,
-            dept,
+            dept: c.dept,
             doctor: c.doctor,
             date: dateLabel,
             time: v.time,
@@ -258,14 +261,13 @@ export function CreateAppointmentScreen() {
   const removeConsult = (id: number) =>
     setConsults((xs) => (xs.length > 1 ? xs.filter((c) => c.id !== id) : xs));
 
-  const doctorsFor = (dept: string): readonly string[] => {
-    const d = DEPARTMENTS.find((x) => x === dept);
-    return d ? DOCTORS[d] : [];
-  };
-  const feeOf = (dept: string): number => {
-    const d = DEPARTMENTS.find((x) => x === dept);
-    return d ? FEES[d] : 0;
-  };
+  // Both read the hospital's own catalogue at call time, so a department or
+  // doctor added through Doctors & Departments is bookable immediately, and a
+  // doctor's own fee wins over the department default (audit 2.6.3).
+  const doctorsFor = (dept: string): readonly string[] =>
+    selectDoctorNames(useCatalogStore.getState(), dept);
+  const feeOf = (deptOrDoctor: string): number =>
+    selectFee(useCatalogStore.getState(), deptOrDoctor);
 
   const matches = q
     ? storePatients
@@ -464,7 +466,7 @@ export function CreateAppointmentScreen() {
                 <Select
                   value={c.dept}
                   placeholder="Select Department"
-                  options={DEPARTMENTS}
+                  options={departments}
                   onChange={(v) => setConsultDept(c.id, v)}
                   aria-label={`Department for consultation ${i + 1}`}
                 />

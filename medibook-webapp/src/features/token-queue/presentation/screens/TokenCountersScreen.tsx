@@ -16,9 +16,9 @@ import {
 } from '@/features/appointments/application/queries/useListRefresh';
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import {
-  DEPARTMENTS,
-  DOCTOR_META,
-} from '@/features/appointments/application/store/appointments.types';
+  useCatalogDepartments,
+  useCatalogDoctorNames,
+} from '@/features/doctors/application/store/catalog.selectors';
 import { DoctorQueueCard } from '@/features/token-queue/presentation/components/DoctorQueueCard';
 
 /** Doctor cards per row of the grid — also the shimmer count while refreshing. */
@@ -56,11 +56,13 @@ export function TokenCountersScreen() {
     }
   }, []);
   const { loading, error, updatedAt, refresh } = useListRefresh(reload);
+  // Department filter follows the hospital's own catalogue (audit 2.6.3).
+  const departments = useCatalogDepartments();
 
   const dept = activeDept || 'All Departments';
-  const inDept = Object.keys(DOCTOR_META).filter(
-    (d) => dept === 'All Departments' || DOCTOR_META[d].dept === dept,
-  );
+  // The live queue lists the doctors the hospital actually maintains, so a
+  // doctor added through Doctors & Departments gets a counter (audit 2.6.3).
+  const inDept = useCatalogDoctorNames(dept === 'All Departments' ? undefined : dept);
   const ql = q.trim().toLowerCase();
   const doctors = inDept.filter((d) => {
     if (docF !== 'All Doctors' && d !== docF) return false;
@@ -110,7 +112,7 @@ export function TokenCountersScreen() {
         </div>
         <FilterSelect
           value={dept}
-          options={['All Departments', ...DEPARTMENTS]}
+          options={['All Departments', ...departments]}
           onChange={(v) => {
             setDept(v);
             setDocF('All Doctors');

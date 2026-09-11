@@ -20,7 +20,7 @@ import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import { DEPARTMENTS } from '@/features/appointments/application/store/appointments.types';
+import { useCatalogDepartments } from '@/features/doctors/application/store/catalog.selectors';
 import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
 import { usePatientsStore } from '@/features/patients/application/store/patients.store';
 import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
@@ -145,6 +145,8 @@ export function AdminDashboardScreen() {
   };
 
   const appts = useAppointmentsStore((s) => s.appts);
+  // Department bars follow the hospital's own catalogue (audit 2.6.3).
+  const departments = useCatalogDepartments();
   const docStatus = useAppointmentsStore((s) => s.docStatus);
   const docs = useCatalogStore((s) => s.docs);
   const patients = usePatientsStore((s) => s.patients);
@@ -177,7 +179,7 @@ export function AdminDashboardScreen() {
 
   // Department bars: real counts for Today, the same counts scaled for the
   // sample periods (the caption under the chart says which is which).
-  const deptData: readonly BarChartDatum[] = DEPARTMENTS.map((d, i) => {
+  const deptData: readonly BarChartDatum[] = departments.map((d, i) => {
     const count = live.filter((a) => a.dept === d).length;
     return {
       l: DEPT_SHORT[d] ?? d,

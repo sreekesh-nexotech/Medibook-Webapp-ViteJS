@@ -12,11 +12,14 @@ import {
   relToISOLocal,
   todayISO,
 } from '@/features/appointments/application/store/appointments.logic';
+import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
 import {
-  DEPARTMENTS,
-  DOCTORS,
-  FEES,
-} from '@/features/appointments/application/store/appointments.types';
+  selectDepartments,
+  selectDoctorNames,
+  useCatalogDepartments,
+  useCatalogDoctorNames,
+  useCatalogFee,
+} from '@/features/doctors/application/store/catalog.selectors';
 import type {
   Appointment,
   Department,
@@ -52,10 +55,13 @@ interface EditForm {
 
 /** Inline field errors instead of the old "Select department and doctor" toast. */
 const VALIDATORS: FormValidators<EditForm> = {
-  dept: (value) => (DEPARTMENTS.includes(value) ? undefined : 'Choose a department.'),
+  dept: (value) =>
+    selectDepartments(useCatalogStore.getState()).includes(value)
+      ? undefined
+      : 'Choose a department.',
   doctor: (value, values) => {
     if (value.trim() === '') return 'Choose a doctor.';
-    const doctors: readonly string[] = DOCTORS[values.dept] ?? [];
+    const doctors = selectDoctorNames(useCatalogStore.getState(), values.dept);
     return doctors.includes(value) ? undefined : 'That doctor does not work in this department.';
   },
   iso: (value) => {
@@ -99,14 +105,22 @@ function EditApptForm({ appt, onClose }: { appt: Appointment; onClose: () => voi
     },
   });
 
+  // Departments and doctors come from the hospital's own catalogue, so a
+  // department or doctor added through Doctors & Departments appears here
+  // immediately (audit 2.6.3).
+  const departments = useCatalogDepartments();
+  const deptDoctors = useCatalogDoctorNames(form.values.dept);
+
   const onDept = (v: string): void => {
-    const dept = DEPARTMENTS.find((d) => d === v);
-    if (!dept) return;
+    if (!departments.includes(v)) return;
     // Clearing the doctor keeps the pair valid; its error appears on submit.
-    form.setValues({ dept, doctor: '' });
+    form.setValues({ dept: v, doctor: '' });
   };
 
-  const fee = FEES[form.values.dept] || appt.amount;
+  // The doctor's own fee wins over the department default; fall back to the
+  // amount already on the appointment.
+  const catalogFee = useCatalogFee(form.values.doctor || form.values.dept);
+  const fee = catalogFee || appt.amount;
 
   return (
     <FormModal
@@ -120,13 +134,13 @@ function EditApptForm({ appt, onClose }: { appt: Appointment; onClose: () => voi
     >
       <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
         <Field label="Department" required error={form.errorFor('dept')}>
-          <Select value={form.values.dept} options={DEPARTMENTS} onChange={onDept} />
+          <Select value={form.values.dept} options={departments} onChange={onDept} />
         </Field>
         <Field label="Doctor" required error={form.errorFor('doctor')}>
           <Select
             value={form.values.doctor}
             placeholder={form.values.dept ? 'Select Doctor' : 'Select department first'}
-            options={DOCTORS[form.values.dept]}
+            options={deptDoctors}
             onChange={(v) => form.setField('doctor', v)}
             onBlur={() => form.blurField('doctor')}
           />

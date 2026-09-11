@@ -5,8 +5,8 @@ import { Card } from '@/shared/ui/Card';
 import { IconBtn } from '@/shared/ui/IconBtn';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import { DOCTOR_META } from '@/features/appointments/application/store/appointments.types';
 import type { DoctorStatus } from '@/features/appointments/application/store/appointments.types';
+import { useCatalogDoctor } from '@/features/doctors/application/store/catalog.selectors';
 
 interface DoctorQueueCardProps {
   doctor: string;
@@ -46,7 +46,9 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
   const setDocStatus = useAppointmentsStore((s) => s.setDocStatus);
 
   const now = useNow(30000);
-  const meta = DOCTOR_META[doctor];
+  // Room and specialisation come from the hospital's catalogue entry for this
+  // doctor, not a parallel hardcoded map (audit 2.6.3).
+  const meta = useCatalogDoctor(doctor);
   const status = docStatus[doctor] ?? 'Available';
   const tok = serving[doctor];
   const servingAppt = tok ? appts.find((a) => a.token === tok && a.doctor === doctor) : null;
@@ -66,7 +68,7 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
         <div className="min-w-0 flex-1">
           <div className="text-body text-text-strong truncate font-medium">{doctor}</div>
           <div className="text-caption text-text-muted">
-            {meta.dept} · Room {meta.room}
+            {meta?.depts[0] ?? '—'} · Room {meta?.room ?? '—'}
           </div>
         </div>
         <span
