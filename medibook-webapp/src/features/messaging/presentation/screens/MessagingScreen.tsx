@@ -191,9 +191,7 @@ export function MessagingScreen() {
   const reach: ReachCounts = useMemo(() => {
     const byDepartment: Record<string, number> = {};
     for (const d of depts) {
-      byDepartment[d.name] = new Set(
-        appts.filter((a) => a.dept === d.name).map((a) => a.mrn),
-      ).size;
+      byDepartment[d.name] = new Set(appts.filter((a) => a.dept === d.name).map((a) => a.mrn)).size;
     }
     const byDate: Record<string, number> = {};
     for (const a of appts) {
@@ -206,8 +204,9 @@ export function MessagingScreen() {
 
   const channelTemplates = useMemo(
     () =>
-      MESSAGE_EVENTS.map((event) => templates.find((t) => t.event === event && t.channel === channel))
-        .filter((t): t is MessageTemplate => t != null),
+      MESSAGE_EVENTS.map((event) =>
+        templates.find((t) => t.event === event && t.channel === channel),
+      ).filter((t): t is MessageTemplate => t != null),
     [templates, channel],
   );
 
@@ -324,11 +323,7 @@ export function MessagingScreen() {
           message: hasOutboxFilters
             ? 'Clear the filters to see the whole outbox.'
             : 'Queue a confirmation or reminder for an appointment and it will appear here until the gateway picks it up.',
-          actionLabel: hasOutboxFilters
-            ? 'Clear filters'
-            : mayEdit
-              ? 'Send a message'
-              : undefined,
+          actionLabel: hasOutboxFilters ? 'Clear filters' : mayEdit ? 'Send a message' : undefined,
           onAction: hasOutboxFilters
             ? clearOutboxFilters
             : mayEdit
@@ -701,7 +696,9 @@ export function MessagingScreen() {
               : `“${cancelTarget.label}” will not be handed to the gateway. Cancelling cannot be undone.`
             : ''
         }
-        confirmLabel={cancelTarget?.kind === 'announcement' ? 'Cancel announcement' : 'Cancel message'}
+        confirmLabel={
+          cancelTarget?.kind === 'announcement' ? 'Cancel announcement' : 'Cancel message'
+        }
         danger
         onClose={() => setCancelTarget(null)}
         onConfirm={confirmCancel}

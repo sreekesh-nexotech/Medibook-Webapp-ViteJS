@@ -225,8 +225,8 @@ export function OpsHospitalsScreen() {
             <FilterSelect
               value={statusF}
               aria-label="Filter by instance status"
-              options={['All', 'Active', 'Pending verification', 'Suspended', 'Rejected'].map((s) =>
-                s === 'All' ? 'Status: All' : s,
+              options={['All', 'Active', 'Pending verification', 'Suspended', 'Rejected'].map(
+                (s) => (s === 'All' ? 'Status: All' : s),
               )}
               onChange={(v) => reset(setStatusF)(v === 'Status: All' ? 'All' : v)}
             />

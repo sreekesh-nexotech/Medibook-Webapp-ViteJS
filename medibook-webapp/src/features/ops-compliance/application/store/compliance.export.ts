@@ -119,7 +119,11 @@ function changeRow(c: ConfigChange, subject: string): readonly CsvCell[] {
 }
 
 /** The rows held about one hospital instance in the window. */
-function hospitalRows(hid: number, q: ExportQuery, src: ExportSources): readonly (readonly CsvCell[])[] {
+function hospitalRows(
+  hid: number,
+  q: ExportQuery,
+  src: ExportSources,
+): readonly (readonly CsvCell[])[] {
   const logins = src.logins
     .filter((l) => l.hid === hid && inRange(l.date, q.from, q.to))
     .map((l) => loginRow(l, q.subject));
@@ -130,7 +134,11 @@ function hospitalRows(hid: number, q: ExportQuery, src: ExportSources): readonly
 }
 
 /** The rows held about one staff account in the window. */
-function staffRows(email: string, q: ExportQuery, src: ExportSources): readonly (readonly CsvCell[])[] {
+function staffRows(
+  email: string,
+  q: ExportQuery,
+  src: ExportSources,
+): readonly (readonly CsvCell[])[] {
   const logins = src.logins
     .filter((l) => l.user === email && inRange(l.date, q.from, q.to))
     .map((l) => loginRow(l, q.subject));
@@ -147,7 +155,11 @@ function staffRows(email: string, q: ExportQuery, src: ExportSources): readonly 
  * so they are always included; bookings are filtered to the window. No
  * clinical data exists in this console and none is invented here.
  */
-function patientRows(email: string, q: ExportQuery, src: ExportSources): readonly (readonly CsvCell[])[] {
+function patientRows(
+  email: string,
+  q: ExportQuery,
+  src: ExportSources,
+): readonly (readonly CsvCell[])[] {
   const u = src.patients.find((p) => p.email === email);
   if (!u) return [];
   const account: readonly CsvCell[] = [
@@ -165,40 +177,43 @@ function patientRows(email: string, q: ExportQuery, src: ExportSources): readonl
     '',
   ];
   const family: readonly (readonly CsvCell[])[] = u.family.map((f) => [
-      'Family member',
-      '',
-      '',
-      q.subject,
-      u.email,
-      `${f.name} · ${f.rel} · ${f.age} · ${f.gender}`,
-      '',
-      '',
-      'Platform',
-      '',
-      '',
-      '',
+    'Family member',
+    '',
+    '',
+    q.subject,
+    u.email,
+    `${f.name} · ${f.rel} · ${f.age} · ${f.gender}`,
+    '',
+    '',
+    'Platform',
+    '',
+    '',
+    '',
   ]);
   const bookings: readonly (readonly CsvCell[])[] = u.history
     .filter((b) => inRange(displayDateToIso(b.date), q.from, q.to))
     .map((b) => [
-        'Booking',
-        displayDateToIso(b.date),
-        '',
-        q.subject,
-        u.email,
-        `${b.hospital} · ${b.department}`,
-        '',
-        '',
-        b.hospital,
-        b.status,
-        '',
-        '',
+      'Booking',
+      displayDateToIso(b.date),
+      '',
+      q.subject,
+      u.email,
+      `${b.hospital} · ${b.department}`,
+      '',
+      '',
+      b.hospital,
+      b.status,
+      '',
+      '',
     ]);
   return [account, ...family, ...bookings];
 }
 
 /** Every row the export contains, body only — the caller prepends the header. */
-export function buildExportRows(q: ExportQuery, src: ExportSources): readonly (readonly CsvCell[])[] {
+export function buildExportRows(
+  q: ExportQuery,
+  src: ExportSources,
+): readonly (readonly CsvCell[])[] {
   if (q.subjectKey.startsWith(SUBJECT_PREFIX.hospital)) {
     const hid = Number(q.subjectKey.slice(SUBJECT_PREFIX.hospital.length));
     return Number.isFinite(hid) ? hospitalRows(hid, q, src) : [];

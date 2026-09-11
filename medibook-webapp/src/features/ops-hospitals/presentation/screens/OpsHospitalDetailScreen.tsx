@@ -377,51 +377,125 @@ export function OpsHospitalDetailScreen() {
         <>
           <InfoGrid items={infoItems} />
           <Card>
-            <div className="mb-1 flex items-center gap-2.5">
-              <SectionTitle>Verification &amp; KYC</SectionTitle>
-              {(h.status === 'Pending verification' || h.status === 'Rejected') && (
-                <Badge status={kycReady ? 'Completed' : 'Pending'}>
-                  {kycReady ? 'Ready for review' : 'Documents incomplete'}
-                </Badge>
-              )}
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <SectionTitle>Verification &amp; KYC</SectionTitle>
+                {onboarding ? (
+                  <Badge status={STAGE_BADGE[stageOf(onboarding)]}>{stageOf(onboarding)}</Badge>
+                ) : (
+                  (h.status === 'Pending verification' || h.status === 'Rejected') && (
+                    <Badge status={kycReady ? 'Completed' : 'Pending'}>
+                      {kycReady ? 'Ready for review' : 'Documents incomplete'}
+                    </Badge>
+                  )
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="rocket"
+                onClick={() => navigate(opsOnboardingPath())}
+              >
+                Review in Onboarding
+              </Button>
             </div>
             <div className="text-caption text-text-muted mb-3.5">
-              Documents are requested from the admin email at onboarding. Every document must be
-              submitted before the instance can be approved.
+              {onboardingDocs
+                ? `${progress.approved} of ${progress.total} required documents approved. Each one is approved or rejected individually on the onboarding pipeline.`
+                : 'Documents are requested from the admin email at onboarding. Every document must be approved before the instance can go live.'}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {KYC_DOCS.map(([k, label]) => {
-                const st = kyc[k];
-                return (
-                  <div
-                    key={k}
-                    className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3"
-                  >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {onboardingDocs
+                ? onboardingDocs.map((doc) => (
                     <div
+                      key={doc.key}
                       className={cn(
-                        'flex size-9 flex-none items-center justify-center rounded-md',
-                        st === 'Missing' ? 'bg-d-100 text-d-500' : 'bg-blue-soft-bg text-text-navy',
+                        'flex items-center gap-3 rounded-md border px-3.5 py-3',
+                        doc.status === 'Rejected' ? 'border-d-500' : 'border-border-soft',
                       )}
                     >
-                      <Icon name="file-text" size={17} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-body text-text-strong font-medium">{label}</div>
-                      <div className="text-caption text-text-muted">
-                        {st === 'Missing'
-                          ? 'Not received'
-                          : st === 'Submitted'
-                            ? 'Received · awaiting review'
-                            : 'Verified at approval'}
+                      <div
+                        className={cn(
+                          'flex size-9 flex-none items-center justify-center rounded-md',
+                          doc.status === 'Approved'
+                            ? 'bg-g-100 text-g-600'
+                            : doc.status === 'Rejected'
+                              ? 'bg-d-100 text-d-500'
+                              : doc.status === 'Uploaded'
+                                ? 'bg-y-100 text-y-600'
+                                : 'bg-grey-300 text-text-muted',
+                        )}
+                      >
+                        <Icon name="file-text" size={17} />
                       </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-body text-text-strong font-medium">
+                          {ONBOARDING_DOC_LABEL[doc.key]}
+                          {!doc.required && (
+                            <span className="text-caption text-text-muted font-normal">
+                              {' '}
+                              (optional)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-caption text-text-muted">
+                          {doc.status === 'Requested'
+                            ? 'Requested — nothing on file yet'
+                            : doc.status === 'Uploaded'
+                              ? `On file${doc.uploadedAt ? ` since ${longDateFromIso(doc.uploadedAt)}` : ''} · awaiting review`
+                              : `${doc.status} by ${doc.reviewedBy ?? 'operations'}${doc.reviewedAt ? ` · ${doc.reviewedAt}` : ''}`}
+                        </div>
+                        {doc.status === 'Rejected' && doc.rejectReason && (
+                          <div className="text-caption text-d-700">{doc.rejectReason}</div>
+                        )}
+                      </div>
+                      <Badge status={DOC_BADGE[doc.status]}>{doc.status}</Badge>
                     </div>
-                    <Badge status={st} />
-                  </div>
-                );
-              })}
+                  ))
+                : KYC_DOCS.map(([k, label]) => {
+                    const st = kyc[k];
+                    return (
+                      <div
+                        key={k}
+                        className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3"
+                      >
+                        <div
+                          className={cn(
+                            'flex size-9 flex-none items-center justify-center rounded-md',
+                            st === 'Missing'
+                              ? 'bg-d-100 text-d-500'
+                              : 'bg-blue-soft-bg text-text-navy',
+                          )}
+                        >
+                          <Icon name="file-text" size={17} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-body text-text-strong font-medium">{label}</div>
+                          <div className="text-caption text-text-muted">
+                            {st === 'Missing'
+                              ? 'Not received'
+                              : st === 'Submitted'
+                                ? 'Received · awaiting review'
+                                : 'Verified at approval'}
+                          </div>
+                        </div>
+                        <Badge status={st} />
+                      </div>
+                    );
+                  })}
             </div>
+            {onboardingDocs && blockers.length > 0 && (
+              <ul className="mt-3.5 flex list-none flex-col gap-1.5 p-0">
+                {blockers.map((b) => (
+                  <li key={b} className="text-body text-text-body flex items-start gap-2">
+                    <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
-          <div className="flex gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {KPIS.map((k) => (
               <StatCard key={k.label} k={k} />
             ))}
@@ -429,7 +503,7 @@ export function OpsHospitalDetailScreen() {
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <SectionTitle>Recent Bookings</SectionTitle>
-              <span className="text-caption text-text-faint">
+              <span className="text-caption text-text-muted">
                 {h.name === 'Apollo Hospital'
                   ? 'Live from the hospital instance'
                   : 'Synced from the hospital instance'}
@@ -483,7 +557,7 @@ export function OpsHospitalDetailScreen() {
               </tr>
             ))}
           </TableShell>
-          <div className="text-caption text-text-faint mt-3">
+          <div className="text-caption text-text-muted mt-3">
             {depts.length} departments · {depts.reduce((a, d) => a + d.docs, 0)} doctors on the
             roster
           </div>
@@ -504,6 +578,7 @@ export function OpsHospitalDetailScreen() {
           <div className="mb-4.5 flex flex-wrap items-center gap-3">
             <FilterSelect
               value={docDeptF}
+              aria-label="Filter the roster by department"
               options={['All', ...opsDeptsFor(h).map((d) => d.name)].map((x) =>
                 x === 'All' ? 'Dept: All' : x,
               )}
@@ -518,7 +593,7 @@ export function OpsHospitalDetailScreen() {
               </span>
             )}
             <div className="flex-1"></div>
-            <span className="text-caption text-text-faint">
+            <span className="text-caption text-text-muted">
               {docs.length} of {allDocs.length} doctors
             </span>
           </div>
@@ -621,9 +696,10 @@ export function OpsHospitalDetailScreen() {
                     <td className={tdClass}>
                       <IconBtn
                         name="eye"
+                        label="View invoice"
                         box={36}
                         size={16}
-                        title="View invoice"
+                        title={`Open ${v.no}`}
                         onClick={() => navigate(billingDetailPath('invoice-detail', v.id))}
                       />
                     </td>
@@ -631,9 +707,14 @@ export function OpsHospitalDetailScreen() {
                 ))}
               </TableShell>
             ) : (
-              <div className="text-body text-text-faint py-6 text-center">
-                No invoices issued to this hospital yet.
-              </div>
+              <EmptyState
+                icon="file-text"
+                compact
+                title="No invoices issued to this hospital yet."
+                message="Subscription invoices appear here once a billing cycle has been run for this instance."
+                actionLabel="Open billing"
+                onAction={() => navigate(`${opsPath('billing')}?tab=Invoices`)}
+              />
             )}
           </Card>
           <Card>
@@ -658,9 +739,10 @@ export function OpsHospitalDetailScreen() {
                     <td className={tdClass}>
                       <IconBtn
                         name="eye"
+                        label="View payment"
                         box={36}
                         size={16}
-                        title="View payment"
+                        title={`Open ${v.txn}`}
                         onClick={() => navigate(billingDetailPath('payment-detail', v.id))}
                       />
                     </td>
@@ -668,9 +750,14 @@ export function OpsHospitalDetailScreen() {
                 ))}
               </TableShell>
             ) : (
-              <div className="text-body text-text-faint py-6 text-center">
-                No payment transactions recorded for this hospital yet.
-              </div>
+              <EmptyState
+                icon="indian-rupee"
+                compact
+                title="No payment transactions recorded yet."
+                message="Gateway payments and payments recorded by operations both appear here."
+                actionLabel="Open payments"
+                onAction={() => navigate(`${opsPath('billing')}?tab=Payments`)}
+              />
             )}
           </Card>
           <Card>
@@ -708,9 +795,14 @@ export function OpsHospitalDetailScreen() {
                 ))}
               </TableShell>
             ) : (
-              <div className="text-body text-text-faint py-6 text-center">
-                No settlement statements for this hospital yet.
-              </div>
+              <EmptyState
+                icon="banknote"
+                compact
+                title="No settlement statements for this hospital yet."
+                message="Statements are generated per payout run once the hospital takes online bookings."
+                actionLabel="Open hospital settlements"
+                onAction={() => navigate(opsPath('settlements'))}
+              />
             )}
           </Card>
         </>
@@ -744,10 +836,13 @@ export function OpsHospitalDetailScreen() {
               ))}
             </TableShell>
           ) : (
-            <div className="text-body text-text-faint py-7 text-center">
-              No logged actions reference {h.name} yet. Approvals, suspensions and settlement
-              releases will appear here.
-            </div>
+            <EmptyState
+              icon="scroll-text"
+              title={`No logged actions reference ${h.name} yet.`}
+              message="Approvals, suspensions, document decisions and settlement releases all appear here."
+              actionLabel="Open compliance logs"
+              onAction={() => navigate(opsPath('logs'))}
+            />
           )}
         </Card>
       )}
@@ -764,7 +859,16 @@ export function OpsHospitalDetailScreen() {
         busy={busy.approve}
         onConfirm={() =>
           run('approve', `${h.name} approved and live.`, () => {
-            approve(h.id);
+            // With an onboarding case, go-live runs through it so the case and
+            // the registry cannot disagree; older rows approve directly.
+            if (onboarding && onboarding.docs.length > 0) {
+              if (!goLive(h.id)) {
+                toast('Something is still blocking go-live — check the KYC list.', 'error');
+                return;
+              }
+            } else {
+              approve(h.id);
+            }
             setModal(null);
           })
         }
@@ -773,27 +877,44 @@ export function OpsHospitalDetailScreen() {
         open={modal === 'suspend'}
         onClose={() => setModal(null)}
         icon="ban"
-        tone={suspended ? 'success' : 'warning'}
-        title={suspended ? 'Reactivate this hospital?' : 'Suspend this hospital?'}
-        body={
-          suspended
-            ? `${h.name} regains access immediately and can take new bookings right away.`
-            : `${h.name} staff lose access immediately. Existing bookings are kept, but no new bookings can be made until reactivation.`
-        }
-        confirmLabel={
-          busy.suspend
-            ? suspended
-              ? 'Reactivating…'
-              : 'Suspending…'
-            : suspended
-              ? 'Reactivate'
-              : 'Suspend'
-        }
-        confirmVariant={suspended ? 'primary' : 'danger'}
+        tone="danger"
+        title="Suspend this hospital?"
+        body={`${h.name}'s staff lose access to Medibook immediately and patients can no longer book appointments there. Existing bookings are kept. Reactivation is a separate action.`}
+        summary={[
+          { k: 'Hospital', v: h.name },
+          { k: 'Plan', v: h.plan },
+          { k: 'Bookings this month', v: h.bookings.toLocaleString('en-IN'), num: true },
+          { k: 'Reason recorded', v: 'Manual review' },
+        ]}
+        confirmLabel={busy.suspend ? 'Suspending…' : 'Suspend Instance'}
+        confirmVariant="danger"
         busy={busy.suspend}
         onConfirm={() =>
-          run('suspend', suspended ? `${h.name} reactivated.` : `${h.name} suspended.`, () => {
-            toggleSuspend(h.id);
+          run('suspend', `${h.name} suspended.`, () => {
+            suspendHospital(h.id, {
+              reason: 'Manual review',
+              note: 'Suspended from the hospital profile by operations.',
+            });
+            setModal(null);
+          })
+        }
+      />
+      <OpsConfirm
+        open={modal === 'unsuspend'}
+        onClose={() => setModal(null)}
+        icon="circle-check"
+        tone="success"
+        title="Reactivate this hospital?"
+        body={`${h.name} regains access immediately and can take new bookings right away.${
+          h.suspension?.reason === 'Non-payment'
+            ? ' Its unpaid invoice stays unpaid — record the payment on the invoice as well.'
+            : ''
+        }`}
+        confirmLabel={busy.unsuspend ? 'Reactivating…' : 'Reactivate'}
+        busy={busy.unsuspend}
+        onConfirm={() =>
+          run('unsuspend', `${h.name} reactivated.`, () => {
+            unsuspendHospital(h.id);
             setModal(null);
           })
         }

@@ -97,8 +97,7 @@ export function OpsOnboardingScreen() {
     ];
   });
 
-  const countFor = (stage: OnboardingStage): number =>
-    all.filter((r) => r.stage === stage).length;
+  const countFor = (stage: OnboardingStage): number => all.filter((r) => r.stage === stage).length;
 
   const ql = q.trim().toLowerCase();
   const rows = [...all]

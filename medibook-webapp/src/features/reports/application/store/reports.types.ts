@@ -96,7 +96,12 @@ export interface ReportKpi {
  * the cell dumb is what lets one table component serve all fourteen reports.
  */
 export type ReportCell =
-  | { readonly kind: 'text'; readonly text: string; readonly sub?: string; readonly strong?: boolean }
+  | {
+      readonly kind: 'text';
+      readonly text: string;
+      readonly sub?: string;
+      readonly strong?: boolean;
+    }
   | { readonly kind: 'num'; readonly text: string; readonly sub?: string }
   | { readonly kind: 'badge'; readonly status: string; readonly label?: string };
 

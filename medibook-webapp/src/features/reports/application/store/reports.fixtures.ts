@@ -163,9 +163,7 @@ function buildFacts(): readonly ReportFact[] {
     // Sunday is closed (the seeded hospital hours), Saturday is quieter.
     if (weekday === 6) continue;
     const perDay =
-      MIN_PER_DAY +
-      Math.floor(rng() * (MAX_PER_DAY - MIN_PER_DAY + 1)) -
-      (weekday === 5 ? 1 : 0);
+      MIN_PER_DAY + Math.floor(rng() * (MAX_PER_DAY - MIN_PER_DAY + 1)) - (weekday === 5 ? 1 : 0);
 
     for (let i = 0; i < Math.max(1, perDay); i += 1) {
       const doctor = pick(rng, REPORT_DOCTORS);
@@ -183,7 +181,11 @@ function buildFacts(): readonly ReportFact[] {
 
       const fee = doctor.fee;
       const paid = status !== 'Cancelled' && (source === 'Online' || rng() < 0.86);
-      const mode: PaymentMode = !paid ? 'Unpaid' : source === 'Online' ? 'Online' : pick(rng, DESK_MODES);
+      const mode: PaymentMode = !paid
+        ? 'Unpaid'
+        : source === 'Online'
+          ? 'Online'
+          : pick(rng, DESK_MODES);
       const collected = paid ? fee : 0;
       const refund =
         status === 'Cancelled' && source === 'Online' && rng() < 0.72
@@ -213,7 +215,10 @@ function buildFacts(): readonly ReportFact[] {
         refund,
         commission,
         receipt: paid ? `MB/R/2026-27/${String(receiptSeq).padStart(6, '0')}` : null,
-        token: status === 'In Queue' || status === 'Completed' ? `T-${String((i % 40) + 1).padStart(3, '0')}` : null,
+        token:
+          status === 'In Queue' || status === 'Completed'
+            ? `T-${String((i % 40) + 1).padStart(3, '0')}`
+            : null,
         rating: status === 'Completed' ? Math.round((3.6 + rng() * 1.4) * 10) / 10 : null,
         bookedBy: source === 'Online' ? 'Patient app' : pick(rng, REPORT_STAFF),
         reason:

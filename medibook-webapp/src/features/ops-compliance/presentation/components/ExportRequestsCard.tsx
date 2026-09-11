@@ -65,7 +65,13 @@ export function ExportRequestsCard({ requests }: ExportRequestsCardProps) {
             <td className={cn(tdClass, 'whitespace-nowrap')}>
               <OpsEntity
                 icon="file-down"
-                tint={r.status === 'Completed' ? 'success' : r.status === 'Preparing' ? 'warning' : 'neutral'}
+                tint={
+                  r.status === 'Completed'
+                    ? 'success'
+                    : r.status === 'Preparing'
+                      ? 'warning'
+                      : 'neutral'
+                }
                 title={r.id}
                 sub={r.kind}
               />

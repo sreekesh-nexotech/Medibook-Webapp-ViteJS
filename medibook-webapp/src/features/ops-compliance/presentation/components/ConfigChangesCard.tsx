@@ -78,7 +78,11 @@ export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
   const pg = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
   const rows = ordered.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
 
-  const scopeOptions = [ALL, 'Platform', ...new Set(changes.filter((c) => c.scope === 'Hospital').map(scopeLabel))];
+  const scopeOptions = [
+    ALL,
+    'Platform',
+    ...new Set(changes.filter((c) => c.scope === 'Hospital').map(scopeLabel)),
+  ];
   const areaOptions = [ALL, ...new Set(changes.map((c) => c.area))];
 
   const reset =

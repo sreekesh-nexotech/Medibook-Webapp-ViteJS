@@ -147,11 +147,7 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
           <div
             className={cn(
               'flex size-10 flex-none items-center justify-center rounded-md',
-              live
-                ? 'bg-g-100 text-g-600'
-                : ready
-                  ? 'bg-g-100 text-g-600'
-                  : 'bg-y-100 text-y-600',
+              live ? 'bg-g-100 text-g-600' : ready ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
             )}
           >
             <Icon name={live ? 'rocket' : ready ? 'circle-check' : 'triangle-alert'} size={19} />
@@ -192,8 +188,9 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
         </div>
         <div className="text-caption text-text-muted mb-3.5">
           The first administrator is created here and invited by email. Delivery is not wired up
-          yet, so an invitation is recorded as <b className="text-text-strong font-medium">queued</b>{' '}
-          until someone confirms it was accepted.
+          yet, so an invitation is recorded as{' '}
+          <b className="text-text-strong font-medium">queued</b> until someone confirms it was
+          accepted.
         </div>
         <TableShell
           columns={ADMIN_COLUMNS}
@@ -357,7 +354,10 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
                       hasFile={Boolean(doc.fileName)}
                       onUpload={(file) => {
                         uploadDoc(onboarding.hid, doc.key, file);
-                        toast(`${file.name} attached to ${ONBOARDING_DOC_LABEL[doc.key]}.`, 'success');
+                        toast(
+                          `${file.name} attached to ${ONBOARDING_DOC_LABEL[doc.key]}.`,
+                          'success',
+                        );
                       }}
                       onTooLarge={(mb) =>
                         toast(`That file is larger than ${mb} MB — nothing was attached.`, 'error')
@@ -379,10 +379,8 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
                             : 'Nothing to approve — no file on record'
                       }
                       onClick={() =>
-                        run(
-                          `approve${doc.key}`,
-                          `${ONBOARDING_DOC_LABEL[doc.key]} approved.`,
-                          () => approveDoc(onboarding.hid, doc.key),
+                        run(`approve${doc.key}`, `${ONBOARDING_DOC_LABEL[doc.key]} approved.`, () =>
+                          approveDoc(onboarding.hid, doc.key),
                         )
                       }
                     />
@@ -457,7 +455,10 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
         body={`${hospital.name} starts serving patients on Medibook immediately, its instance becomes Active and its KYC is marked verified.`}
         summary={[
           { k: 'Documents approved', v: `${progress.approved} of ${progress.total}`, num: true },
-          { k: 'Administrator', v: onboarding.admins.find((a) => a.status === 'Accepted')?.email ?? '—' },
+          {
+            k: 'Administrator',
+            v: onboarding.admins.find((a) => a.status === 'Accepted')?.email ?? '—',
+          },
           { k: 'Plan', v: hospital.plan },
         ]}
         confirmLabel={busy.golive ? 'Going live…' : 'Go Live'}

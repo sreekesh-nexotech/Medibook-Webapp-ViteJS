@@ -69,27 +69,21 @@ export function OpsComplianceScreen() {
    * can be requested that this console cannot produce records for.
    */
   const subjects: readonly ExportSubjectOption[] = [
-    ...hospitals.map(
-      (h): ExportSubjectOption => ({
-        kind: 'Hospital',
-        key: `${SUBJECT_PREFIX.hospital}${h.id}`,
-        label: h.name,
-      }),
-    ),
-    ...[...new Set(logins.map((l) => l.user))].sort().map(
-      (email): ExportSubjectOption => ({
-        kind: 'Staff user',
-        key: `${SUBJECT_PREFIX.staff}${email}`,
-        label: email,
-      }),
-    ),
-    ...patients.map(
-      (p): ExportSubjectOption => ({
-        kind: 'Patient reference',
-        key: `${SUBJECT_PREFIX.patient}${p.email}`,
-        label: `${p.name} · ${p.email}`,
-      }),
-    ),
+    ...hospitals.map((h): ExportSubjectOption => ({
+      kind: 'Hospital',
+      key: `${SUBJECT_PREFIX.hospital}${h.id}`,
+      label: h.name,
+    })),
+    ...[...new Set(logins.map((l) => l.user))].sort().map((email): ExportSubjectOption => ({
+      kind: 'Staff user',
+      key: `${SUBJECT_PREFIX.staff}${email}`,
+      label: email,
+    })),
+    ...patients.map((p): ExportSubjectOption => ({
+      kind: 'Patient reference',
+      key: `${SUBJECT_PREFIX.patient}${p.email}`,
+      label: `${p.name} · ${p.email}`,
+    })),
   ];
 
   const handleRefresh = async (): Promise<void> => {
