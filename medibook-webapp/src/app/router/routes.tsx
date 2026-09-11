@@ -15,6 +15,7 @@ import {
 import { RequireAdmin } from '@/app/router/RequireAdmin';
 import { RootRedirect } from '@/app/router/RootRedirect';
 
+import { AuditTrailScreen } from '@/features/audit/presentation/screens/AuditTrailScreen';
 import { AppointmentsScreen } from '@/features/appointments/presentation/screens/AppointmentsScreen';
 import { CreateAppointmentScreen } from '@/features/appointments/presentation/screens/CreateAppointmentScreen';
 import { ForgotPasswordScreen } from '@/features/auth/presentation/screens/ForgotPasswordScreen';
@@ -22,6 +23,7 @@ import { LoginScreen } from '@/features/auth/presentation/screens/LoginScreen';
 import { DoctorDetailPageScreen } from '@/features/doctors/presentation/screens/DoctorDetailPageScreen';
 import { DoctorsDepartmentsScreen } from '@/features/doctors/presentation/screens/DoctorsDepartmentsScreen';
 import { HelpSupportScreen } from '@/features/help/presentation/screens/HelpSupportScreen';
+import { MessagingScreen } from '@/features/messaging/presentation/screens/MessagingScreen';
 import { OpsAnalyticsScreen } from '@/features/ops-analytics/presentation/screens/OpsAnalyticsScreen';
 import { OpsBillingScreen } from '@/features/ops-billing/presentation/screens/OpsBillingScreen';
 import { OpsInvoiceDetailScreen } from '@/features/ops-billing/presentation/screens/OpsInvoiceDetailScreen';
@@ -42,7 +44,10 @@ import { PatientDetailScreen } from '@/features/patients/presentation/screens/Pa
 import { PatientsScreen } from '@/features/patients/presentation/screens/PatientsScreen';
 import { PaymentsScreen } from '@/features/payments/presentation/screens/PaymentsScreen';
 import { ReportsScreen } from '@/features/reports/presentation/screens/ReportsScreen';
+import { HospitalProfileScreen } from '@/features/settings/presentation/screens/HospitalProfileScreen';
 import { HospitalSettingsScreen } from '@/features/settings/presentation/screens/HospitalSettingsScreen';
+import { ServicesPricingScreen } from '@/features/settings/presentation/screens/ServicesPricingScreen';
+import { SlotsScreen } from '@/features/slots/presentation/screens/SlotsScreen';
 import { SettlementsScreen } from '@/features/settlements/presentation/screens/SettlementsScreen';
 import { TokenCountersScreen } from '@/features/token-queue/presentation/screens/TokenCountersScreen';
 import { UsersRolesScreen } from '@/features/users-roles/presentation/screens/UsersRolesScreen';
@@ -51,48 +56,14 @@ import { UsersRolesScreen } from '@/features/users-roles/presentation/screens/Us
 const CATCH_ALL = '*';
 
 /* ============================================================================
- * ORCHESTRATOR: screens to wire once the feature agents land
+ * ORCHESTRATOR: screens still to wire
  * ============================================================================
- * The view ids, URL segments, `*Path()` helpers and sidebar nav entries for
- * every screen below already exist (`app/router/paths.ts`,
- * `app/layouts/hospital-nav.ts`, `app/layouts/ops-nav.ts`), so links and
- * `hospitalPath()` / `opsPath()` calls compile today. Only the route rows are
- * missing — deliberately, because importing a screen that does not exist yet
- * would break the build. Until each row lands the URL falls through to
- * `NotFoundScreen`, which explains itself instead of silently redirecting.
+ * The five hospital views added this round (slots, profile, services,
+ * messaging, audit) are wired below, inside `RequireAdmin`.
  *
- * HOSPITAL — every one of these is ADMIN-ONLY: add the row inside the existing
- * `{ element: <RequireAdmin />, children: [...] }` block, not beside it.
- *
- *   // ORCHESTRATOR: wire SlotsScreen here
- *   { path: HOSPITAL_VIEW_SEGMENT.slots, element: <SlotsScreen /> }
- *       url: /:role/slots        (admin only)
- *
- *   // ORCHESTRATOR: wire HospitalProfileScreen here
- *   { path: HOSPITAL_VIEW_SEGMENT.profile, element: <HospitalProfileScreen /> }
- *       url: /:role/profile      (admin only) — branches, holidays, banners
- *
- *   // ORCHESTRATOR: wire ServicesPricingScreen here
- *   { path: HOSPITAL_VIEW_SEGMENT.services, element: <ServicesPricingScreen /> }
- *       url: /:role/services     (admin only) — services & pricing, taxes, coupons
- *
- *   // ORCHESTRATOR: wire MessagingScreen here
- *   { path: HOSPITAL_VIEW_SEGMENT.messaging, element: <MessagingScreen /> }
- *       url: /:role/messaging    (admin only) — templates + announcements
- *
- *   // ORCHESTRATOR: wire AuditTrailScreen here
- *   { path: HOSPITAL_VIEW_SEGMENT.audit, element: <AuditTrailScreen /> }
- *       url: /:role/audit        (admin only)
- *
- *   // ORCHESTRATOR: wire PlanBillingScreen here — OPTIONAL
- *   { path: HOSPITAL_VIEW_SEGMENT.billing, element: <PlanBillingScreen /> }
- *       url: /:role/billing      (admin only)
- *       NOTE: plan & billing is ALREADY reachable — `PlanBilling` renders as a
- *       tab inside `SettlementsScreen`. The view id + segment + helper exist so
- *       it *can* be split out, but no sidebar entry was added and this row is
- *       only needed if the owning agent promotes it to its own screen.
- *
- * OPS — no role gate; the whole console is already behind `OpsGuard`.
+ * Still pending, because the screens do not exist yet — importing them would
+ * break the build. Until each lands, the URL falls through to
+ * `NotFoundScreen`, which explains itself instead of silently redirecting:
  *
  *   // ORCHESTRATOR: wire OpsOnboardingScreen here
  *   { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> }
@@ -101,6 +72,11 @@ const CATCH_ALL = '*';
  *   // ORCHESTRATOR: wire OpsComplianceScreen here
  *   { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> }
  *       url: /ops/compliance
+ *
+ * Deliberately NOT wired: `HOSPITAL_VIEW_SEGMENT.billing`. Plan & billing is
+ * already reachable as a tab inside `SettlementsScreen`, so a second route and
+ * nav entry would duplicate an existing screen. The view id, segment and
+ * `hospitalBillingPath()` helper exist should it ever be promoted.
  * ========================================================================== */
 
 /** The full route tree (spec §6). Guards live beside it in `app/router/`. */
@@ -130,6 +106,13 @@ export const router = createBrowserRouter([
           { path: HOSPITAL_VIEW_SEGMENT.users, element: <UsersRolesScreen /> },
           { path: HOSPITAL_VIEW_SEGMENT.reports, element: <ReportsScreen /> },
           { path: HOSPITAL_VIEW_SEGMENT.settings, element: <HospitalSettingsScreen /> },
+          // Added this round. All admin-only, so they belong inside this block
+          // (`ADMIN_ONLY_HOSPITAL_VIEWS` in `paths.ts` is the single list).
+          { path: HOSPITAL_VIEW_SEGMENT.slots, element: <SlotsScreen /> },
+          { path: HOSPITAL_VIEW_SEGMENT.profile, element: <HospitalProfileScreen /> },
+          { path: HOSPITAL_VIEW_SEGMENT.services, element: <ServicesPricingScreen /> },
+          { path: HOSPITAL_VIEW_SEGMENT.messaging, element: <MessagingScreen /> },
+          { path: HOSPITAL_VIEW_SEGMENT.audit, element: <AuditTrailScreen /> },
         ],
       },
       // Audit 3.2.4/3.7 — an unknown hospital URL explains itself instead of

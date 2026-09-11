@@ -14,7 +14,10 @@ import {
   parseDurationMinutes,
   parseTimeLabelMinutes,
 } from '@/features/settings/application/store/settings.rules';
-import { useSettingsStore } from '@/features/settings/application/store/settings.store';
+import {
+  selectSchedulingHorizonDays,
+  useSettingsStore,
+} from '@/features/settings/application/store/settings.store';
 import {
   buildSlotGrid,
   type SlotBooking,
@@ -127,6 +130,9 @@ export function useSlotGrids(
       openMinutes: parseTimeLabelMinutes(settings.hoursOpen, FALLBACK_OPEN_MINUTES),
       closeMinutes: parseTimeLabelMinutes(settings.hoursClose, FALLBACK_CLOSE_MINUTES),
       openWeekdays: Array.from({ length: WEEK_LENGTH }, (_, i) => settings.hoursDays[i] !== false),
+      // Booking is only open this far ahead, so a bulk update repeating across
+      // weeks cannot open slots the patient app would refuse to book.
+      horizonDays: selectSchedulingHorizonDays({ settings }),
     };
 
     const roster = docs

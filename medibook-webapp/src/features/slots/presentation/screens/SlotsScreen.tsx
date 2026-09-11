@@ -5,11 +5,15 @@ import { hospitalPath, isHospitalRole } from '@/app/router/paths';
 import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
 import {
   addIsoDays,
+  daysBetweenIso,
   formatIsoDayLabel,
   isoWeekdayLabel,
   todayIso,
 } from '@/features/doctors/domain/calendar';
-import { useSettingsStore } from '@/features/settings/application/store/settings.store';
+import {
+  selectSchedulingHorizonDays,
+  useSettingsStore,
+} from '@/features/settings/application/store/settings.store';
 import {
   durationCopy,
   parseDurationMinutes,
@@ -83,6 +87,11 @@ export function SlotsScreen() {
       docs.filter((d) => d.status !== 'Inactive').filter((d) => !dept || d.depts.includes(dept)),
     [docs, dept],
   );
+  // Booking is open `horizonDays` calendar days ahead, counting today, so the
+  // last bookable date is today + (horizon - 1).
+  const horizonDays = selectSchedulingHorizonDays({ settings });
+  const lastBookableIso = addIsoDays(todayIso(), Math.max(0, horizonDays - 1));
+  const atHorizon = daysBetweenIso(date, lastBookableIso) <= 0;
   const slotMinutes = parseDurationMinutes(settings.rules.duration, 0);
   const bufferMinutes = parseDurationMinutes(settings.rules.buffer, 0);
   const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== todayIso();
@@ -117,6 +126,7 @@ export function SlotsScreen() {
           <div className="w-44">
             <TextInput
               value={date}
+              max={lastBookableIso}
               type="date"
               height={40}
               aria-label="Slot grid date"
@@ -128,6 +138,7 @@ export function SlotsScreen() {
             label="Next day"
             box={40}
             size={18}
+            disabled={atHorizon}
             onClick={() => goToDate(addIsoDays(date, 1))}
           />
           <Button size="sm" variant="secondary" onClick={() => goToDate(todayIso())}>
@@ -209,6 +220,17 @@ export function SlotsScreen() {
             Open Hospital Settings
           </Button>
         </ErrorState>
+      ) : result.grid.beyondHorizon ? (
+        <Card>
+          <EmptyState
+            icon="calendar-clock"
+            title="Booking is not open this far ahead yet"
+            message={`The hospital takes bookings ${horizonDays} days ahead, to ${formatIsoDayLabel(lastBookableIso)}. No slots are generated past that, so none can be opened or blocked here. Change the scheduling horizon in Hospital Settings, or pick an earlier date.`}
+            actionLabel="Go to the last bookable date"
+            actionIcon="calendar-check"
+            onAction={() => goToDate(lastBookableIso)}
+          />
+        </Card>
       ) : result.grid.hospitalClosed ? (
         <Card>
           <EmptyState

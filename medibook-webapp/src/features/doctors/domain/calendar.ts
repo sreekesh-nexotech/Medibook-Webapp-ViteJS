@@ -55,6 +55,21 @@ export function addIsoDays(iso: string, days: number): string {
   return toIsoDate(base);
 }
 
+/**
+ * Whole calendar days from `fromIso` to `toIso` (negative when `toIso` is
+ * earlier). Compared on the local calendar date, never via `toISOString()`,
+ * which in any timezone ahead of UTC reports the previous day — the root cause
+ * of the hospital app's yesterday-date defect.
+ */
+export function daysBetweenIso(fromIso: string, toIso: string): number {
+  const from = parseIsoDate(fromIso);
+  const to = parseIsoDate(toIso);
+  if (!from || !to) return 0;
+  const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const b = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((b - a) / 86400000);
+}
+
 /** Today shifted by `days` calendar days — used by the demo fixtures. */
 export function isoFromToday(days: number): string {
   return addIsoDays(todayIso(), days);

@@ -8,7 +8,7 @@
  * stores, no clock reads — the caller passes `nowMinutes` and `today`.
  */
 
-import { minutesToTimeLabel } from '@/features/doctors/domain/calendar';
+import { daysBetweenIso, minutesToTimeLabel } from '@/features/doctors/domain/calendar';
 import {
   availabilityForDate,
   type DoctorSchedule,
@@ -49,6 +49,13 @@ export interface SlotRules {
   readonly closeMinutes: number;
   /** Monday-first open flags for the hospital week (7 entries). */
   readonly openWeekdays: readonly boolean[];
+  /**
+   * How many calendar days ahead booking is open, counting today as day 1
+   * (`selectSchedulingHorizonDays`). No slot is generated beyond it, so a
+   * bulk update that repeats across weeks cannot open slots the patient app
+   * would never be allowed to book.
+   */
+  readonly horizonDays: number;
 }
 
 export interface SlotGridInput {
@@ -190,7 +197,10 @@ export function buildSlotGrid(input: SlotGridInput): SlotGridResult {
   }
 
   const hospitalClosed = rules.openWeekdays[input.weekdayIndex] === false;
-  const rows = hospitalClosed ? [] : input.doctors.map((d) => buildRow(d, input));
+  // Day 1 is today, so a 30-day horizon reaches today + 29.
+  const beyondHorizon =
+    rules.horizonDays > 0 && daysBetweenIso(input.today, input.date) >= rules.horizonDays;
+  const rows = hospitalClosed || beyondHorizon ? [] : input.doctors.map((d) => buildRow(d, input));
   const columns = [...new Set(rows.flatMap((r) => r.slots.map((s) => s.startMinutes)))].sort(
     (a, b) => a - b,
   );
@@ -210,6 +220,7 @@ export function buildSlotGrid(input: SlotGridInput): SlotGridResult {
       openMinutes: rules.openMinutes,
       closeMinutes: rules.closeMinutes,
       hospitalClosed,
+      beyondHorizon,
       counts,
     },
   };

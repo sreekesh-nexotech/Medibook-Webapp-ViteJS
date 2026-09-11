@@ -41,6 +41,13 @@ interface TextInputProps {
   disabled?: boolean;
   readOnly?: boolean;
   maxLength?: number;
+  /**
+   * Native `min`/`max` bounds. Mainly for `type="date"`, where the browser's
+   * own picker greys out anything outside the range — so an out-of-range date
+   * cannot be chosen in the first place, rather than being rejected after.
+   */
+  min?: string | number;
+  max?: string | number;
   autoFocus?: boolean;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
   onBlur?: () => void;
@@ -66,6 +73,8 @@ export function TextInput({
   disabled = false,
   readOnly = false,
   maxLength,
+  min,
+  max,
   autoFocus,
   onKeyDown,
   onBlur,
@@ -98,6 +107,8 @@ export function TextInput({
         disabled={disabled}
         readOnly={readOnly}
         maxLength={maxLength}
+        min={min}
+        max={max}
         autoFocus={autoFocus}
         aria-invalid={isInvalid || undefined}
         aria-describedby={describedBy}

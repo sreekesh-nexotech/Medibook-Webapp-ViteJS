@@ -65,6 +65,13 @@ export interface SlotGrid {
   readonly closeMinutes: number;
   /** True when the hospital itself is shut on this weekday. */
   readonly hospitalClosed: boolean;
+  /**
+   * True when `date` falls past the hospital's scheduling horizon
+   * (`selectSchedulingHorizonDays`). Booking is simply not open that far
+   * ahead yet — it is neither an error nor a closed day, so the screen says
+   * so rather than showing an empty grid with no explanation.
+   */
+  readonly beyondHorizon: boolean;
   readonly counts: SlotCounts;
 }
 
