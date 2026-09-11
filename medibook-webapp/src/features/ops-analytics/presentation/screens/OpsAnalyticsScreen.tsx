@@ -292,7 +292,10 @@ export function OpsAnalyticsScreen() {
   const handleExport = (): void => {
     const name = `medibook-analytics-${tab.toLowerCase().replace(/\s+/g, '-')}-${periodSlug(period)}.csv`;
     downloadCsv(name, [exportHeader, ...exportRows]);
-    toast(`Exported ${exportRows.length} ${tab.toLowerCase()} rows for ${period.toLowerCase()}.`, 'success');
+    toast(
+      `Exported ${exportRows.length} ${tab.toLowerCase()} rows for ${period.toLowerCase()}.`,
+      'success',
+    );
   };
 
   const kpis =

@@ -4,6 +4,7 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
+import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 
 interface DeptDrawerProps {
@@ -12,10 +13,19 @@ interface DeptDrawerProps {
   onClose: () => void;
   onEdit: (dept: Dept) => void;
   onDelete: (dept: Dept) => void;
+  /** Way out of the empty state: start a new doctor in this department. */
+  onAddDoctor?: (dept: Dept) => void;
 }
 
 /** Department detail slide-over with its assigned doctors (design `DeptDrawer`). */
-export function DeptDrawer({ dept, docs, onClose, onEdit, onDelete }: DeptDrawerProps) {
+export function DeptDrawer({
+  dept,
+  docs,
+  onClose,
+  onEdit,
+  onDelete,
+  onAddDoctor,
+}: DeptDrawerProps) {
   if (!dept) return null;
   const inDept = docs.filter((d) => d.depts.includes(dept.name));
   return (
@@ -72,9 +82,15 @@ export function DeptDrawer({ dept, docs, onClose, onEdit, onDelete }: DeptDrawer
         Doctors in this department
       </div>
       {inDept.length === 0 ? (
-        <div className="border-border text-body text-text-faint rounded-md border border-dashed py-5 text-center">
-          No doctors assigned yet
-        </div>
+        <EmptyState
+          compact
+          icon="stethoscope"
+          title="No doctors assigned yet"
+          message={`Patients cannot book ${dept.name} until at least one doctor is assigned to it.`}
+          actionLabel={onAddDoctor ? 'Add a doctor' : undefined}
+          actionIcon="plus"
+          onAction={onAddDoctor ? () => onAddDoctor(dept) : undefined}
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {inDept.map((d) => (

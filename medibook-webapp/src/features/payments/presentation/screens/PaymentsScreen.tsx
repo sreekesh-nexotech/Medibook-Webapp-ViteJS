@@ -49,9 +49,6 @@ const PAY_TABS: readonly PayTab[] = ['All', 'Paid', 'Pending', 'Refunded', 'Waiv
 /** Records shown per page (design `PAY_PAGE`). */
 const PAY_PAGE = 9;
 
-/** Grey pill for the `Waived` payment state, which the shared status map predates. */
-const WAIVED_PILL_CLASS = 'bg-grey-300 text-text-muted';
-
 const COLUMNS = ['Patient', 'Doctor / Dept', 'Source', 'Mode', 'Amount', 'Status', 'Action'];
 
 /**
@@ -405,10 +402,7 @@ export function PaymentsScreen() {
               </td>
               <td className={tdClass}>
                 <div className="flex flex-col items-start gap-0.75">
-                  <Badge
-                    status={a.payment}
-                    className={a.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
-                  />
+                  <Badge status={a.payment} />
                   {a.payment === 'Refunded' && a.refundAmount != null && (
                     <span className="text-caption text-text-muted tabular-nums">
                       −{money(a.refundAmount)}{' '}

@@ -55,7 +55,8 @@ import { RuleCard } from '../components/RuleCard';
 import { RuleRow } from '../components/RuleRow';
 import { SettingsHead } from '../components/SettingsHead';
 
-type SettingsSection = 'General' | 'Management' | 'System Rules' | 'Working Hours' | 'Notifications';
+type SettingsSection =
+  'General' | 'Management' | 'System Rules' | 'Working Hours' | 'Notifications';
 
 const SETTINGS_NAV: readonly { readonly id: SettingsSection; readonly icon: IconName }[] = [
   { id: 'General', icon: 'building-2' },

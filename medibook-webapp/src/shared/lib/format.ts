@@ -38,23 +38,101 @@ export function fmtDate(iso: string | null | undefined): string {
   return `${d} ${MONTHS_SHORT[Number(m) - 1]} ${y}`;
 }
 
-/** ISO date -> the relative labels the hospital seed uses ("Today", "Tomorrow", "14 Jun"). */
-export function isoToRel(iso: string): string {
+/**
+ * Local calendar date as `yyyy-mm-dd`.
+ *
+ * Assembled from the local date parts on purpose. `toISOString()` converts to
+ * UTC first, so in any zone ahead of UTC a local-midnight Date serialises to
+ * the PREVIOUS day — in IST (this product's market) `relToISO('Today')` used to
+ * return yesterday, which is what made new appointments land on yesterday,
+ * disappear from the default Today view, and take a walk-in token that never
+ * reached a queue. Never reintroduce `toISOString()` here.
+ */
+export function toLocalISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Today's local calendar date as `yyyy-mm-dd`. */
+export function todayISO(): string {
+  return toLocalISO(new Date());
+}
+
+/** `yyyy-mm-dd` shifted by whole days, staying on the local calendar. */
+export function addDaysISO(iso: string, days: number): string {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return toLocalISO(d);
+}
+
+/** Whole days from today to `iso` (negative = past), on the local calendar. */
+export function daysFromTodayISO(iso: string): number {
   const t = new Date();
   t.setHours(0, 0, 0, 0);
   const d = new Date(iso + 'T00:00:00');
-  const diff = Math.round((d.getTime() - t.getTime()) / 86400000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  return Math.round((d.getTime() - t.getTime()) / 86400000);
 }
 
-/** Relative label -> ISO date (supports the "Today"/"Tomorrow" demo labels). */
+/** True when `iso` is before today (local calendar). */
+export function isPastISO(iso: string): boolean {
+  return daysFromTodayISO(iso) < 0;
+}
+
+/**
+ * ISO date -> the relative labels the hospital seed uses ("Today", "Tomorrow",
+ * "14 Jun").
+ *
+ * The month abbreviation comes from the pinned `MONTHS_SHORT` array, not from
+ * `toLocaleDateString`. ICU's en-IN short month is inconsistent in width — it
+ * yields "Sept" for September but "Jun" for June — so a locale-formatted label
+ * silently stopped matching `fmtDate`'s output (and the seed's) every
+ * September, and exact-date filters comparing the two never matched.
+ */
+export function isoToRel(iso: string): string {
+  const diff = daysFromTodayISO(iso);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  const d = new Date(iso + 'T00:00:00');
+  return `${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT[d.getMonth()]}`;
+}
+
+/**
+ * Relative label -> ISO date. Understands "Today", "Tomorrow" and the seed's
+ * "14 Jun" / "14 Jun 2026" day-month labels; anything unrecognised falls back
+ * to today.
+ *
+ * A bare day-month label carries no year, so it resolves against the current
+ * year and then rolls forward when that would put it more than six months in
+ * the past — which keeps the seed's near-future labels in the future across a
+ * year boundary instead of silently collapsing them to today.
+ */
 export function relToISO(rel: string): string {
-  const t = new Date();
-  t.setHours(0, 0, 0, 0);
-  if (rel === 'Tomorrow') t.setDate(t.getDate() + 1);
-  return t.toISOString().slice(0, 10);
+  const label = rel.trim();
+  if (label === 'Tomorrow') return addDaysISO(todayISO(), 1);
+  if (label === 'Today' || label === '') return todayISO();
+
+  const m = /^(\d{1,2})\s+([A-Za-z]{3,})\.?(?:\s+(\d{4}))?$/.exec(label);
+  if (m) {
+    const day = Number(m[1]);
+    const prefix = m[2].slice(0, 3).toLowerCase();
+    const month = MONTHS_SHORT.findIndex((x) => x.toLowerCase() === prefix);
+    if (month >= 0) {
+      const now = new Date();
+      const year = m[3] ? Number(m[3]) : now.getFullYear();
+      let d = new Date(year, month, day);
+      if (!m[3] && daysFromTodayISO(toLocalISO(d)) < -183) {
+        d = new Date(year + 1, month, day);
+      }
+      return toLocalISO(d);
+    }
+  }
+
+  // Already an ISO date.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return label;
+
+  return todayISO();
 }
 
 /** "8:30 am" -> minutes since midnight, for time-column sorting. */

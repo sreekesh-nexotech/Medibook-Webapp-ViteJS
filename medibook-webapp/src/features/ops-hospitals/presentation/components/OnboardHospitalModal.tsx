@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
-
-import { cn } from '@/shared/lib/cn';
+import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { Button } from '@/shared/ui/Button';
+import { email, required } from '@/shared/lib/validate';
+import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
-import { Modal } from '@/shared/ui/Modal';
 import { OpsField } from '@/shared/ui/OpsField';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
@@ -16,12 +14,17 @@ import { useHospitalsStore } from '@/features/ops-hospitals/application/store/ho
  * Onboard Hospital modal (design `OnboardHospitalModal`, Ops.jsx). Creates a
  * Pending-verification instance with all-Missing KYC via the hospitals store;
  * the success toast + fake latency come from `useOpsAct`, as in the prototype.
+ *
+ * Rebuilt on `FormModal` + `useForm`, which buys three audit fixes at once:
+ * Enter submits (3.4.5), an error re-checks while typing instead of vanishing
+ * on the first keystroke (3.5.4), and the reset effect that used to fire on
+ * every open is gone — the catalog screens mount this fresh, so the starting
+ * values come straight from `useState`.
+ *
+ * What happens *after* onboarding — the first administrator, the document
+ * checklist and the per-document review — lives on the onboarding pipeline
+ * (`OpsOnboardingScreen`), which this hands the new tenant id to.
  */
-
-/** Ops inline validators (design `vReqOps` / `vEmailOps`, Ops.jsx). Feature-local — not yet in shared. */
-const vEmailOps = (v: string): string | null =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v || '') ? null : 'Enter a valid email address.';
-const vReqOps = (v: string, msg: string): string | null => (v && String(v).trim() ? null : msg);
 
 interface OnboardForm {
   name: string;
@@ -30,118 +33,106 @@ interface OnboardForm {
   plan: string;
 }
 
-interface OnboardErrors {
-  name?: string | null;
-  email?: string | null;
-  city?: string | null;
-}
-
-const BLANK: OnboardForm = { name: '', email: '', city: '', plan: 'Starter' };
+const VALIDATORS: FormValidators<OnboardForm> = {
+  name: (value) => required(value, 'Hospital name'),
+  email: (value) => email(value),
+  city: (value) => required(value, 'City'),
+};
 
 interface OnboardHospitalModalProps {
   open: boolean;
   onClose: () => void;
-  onDone: () => void;
+  /** Receives the new tenant id, so the caller can jump straight to its case. */
+  onDone: (hid: number) => void;
+  /** Plan preselected in the dropdown (defaults to the first standard tier). */
+  defaultPlan?: string;
 }
 
-export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalModalProps) {
-  const [f, setF] = useState<OnboardForm>(BLANK);
-  const [err, setErr] = useState<OnboardErrors>({});
+export function OnboardHospitalModal({
+  open,
+  onClose,
+  onDone,
+  defaultPlan = 'Starter',
+}: OnboardHospitalModalProps) {
   const [busy, run] = useOpsAct();
   const plans = usePlansStore((s) => s.plans);
   const onboardHospital = useHospitalsStore((s) => s.onboardHospital);
 
-  useEffect(() => {
-    if (open) {
-      setF(BLANK);
-      setErr({});
-    }
-  }, [open]);
+  const form = useForm<OnboardForm>({
+    initial: { name: '', email: '', city: '', plan: defaultPlan },
+    validate: VALIDATORS,
+    onSubmit: (values) => {
+      run('ob', `${values.name} onboarded. KYC verification pending.`, () => {
+        const hid = onboardHospital(values);
+        onDone(hid);
+      });
+    },
+  });
 
-  const submit = () => {
-    const e: OnboardErrors = {
-      name: vReqOps(f.name, 'Hospital name is required.'),
-      email: vEmailOps(f.email),
-      city: vReqOps(f.city, 'City is required.'),
-    };
-    setErr(e);
-    if (e.name || e.email || e.city) return;
-    run('ob', `${f.name} onboarded. KYC verification pending.`, () => {
-      onboardHospital(f);
-      onDone();
-    });
-  };
+  const { values } = form;
 
   return (
-    <Modal
+    <FormModal
       open={open}
       onClose={onClose}
       title="Onboard Hospital"
       width={480}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={busy.ob ? undefined : submit}
-            className={cn(busy.ob && 'cursor-not-allowed opacity-50')}
-          >
-            {busy.ob ? 'Onboarding…' : 'Onboard Hospital'}
-          </Button>
-        </>
-      }
+      onSubmit={form.handleSubmit}
+      submitLabel="Onboard Hospital"
+      busy={busy.ob}
     >
       <div className="flex flex-col gap-4.5">
-        <OpsField label="Hospital Name" required error={err.name}>
+        <OpsField label="Hospital Name" required error={form.errorFor('name')}>
           <TextInput
-            value={f.name}
-            onChange={(v) => {
-              setF({ ...f, name: v });
-              setErr({ ...err, name: null });
-            }}
+            value={values.name}
+            onChange={(v) => form.setField('name', v)}
+            onBlur={() => form.blurField('name')}
             placeholder="e.g. Sunrise Multispeciality"
             height={48}
           />
         </OpsField>
-        <OpsField label="Admin Email" required error={err.email}>
+        <OpsField
+          label="Admin Email"
+          required
+          error={form.errorFor('email')}
+          hint="The first administrator is invited at this address on the onboarding pipeline."
+        >
           <TextInput
-            value={f.email}
-            onChange={(v) => {
-              setF({ ...f, email: v });
-              setErr({ ...err, email: null });
-            }}
+            value={values.email}
+            onChange={(v) => form.setField('email', v)}
+            onBlur={() => form.blurField('email')}
             placeholder="admin@hospital.in"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
             height={48}
           />
         </OpsField>
         <div className="grid grid-cols-2 gap-4">
-          <OpsField label="City" required error={err.city}>
+          <OpsField label="City" required error={form.errorFor('city')}>
             <TextInput
-              value={f.city}
-              onChange={(v) => {
-                setF({ ...f, city: v });
-                setErr({ ...err, city: null });
-              }}
+              value={values.city}
+              onChange={(v) => form.setField('city', v)}
+              onBlur={() => form.blurField('city')}
               placeholder="e.g. Pune"
               height={48}
             />
           </OpsField>
           <OpsField label="Subscription Plan">
             <Select
-              value={f.plan}
+              value={values.plan}
               options={plans.map((p) => p.name)}
-              onChange={(v) => setF({ ...f, plan: v })}
+              onChange={(v) => form.setField('plan', v)}
               height={48}
             />
           </OpsField>
         </div>
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
           <Icon name="info" size={14} className="mt-px flex-none" /> The hospital lands in Pending
-          verification. KYC documents (registration, GST, licence, bank proof) are requested from
-          the admin email and must all be submitted before approval.
+          verification at the start of the onboarding pipeline. Nothing is requested from it yet —
+          choose its document checklist and invite its first administrator on Network › Onboarding.
         </div>
       </div>
-    </Modal>
+    </FormModal>
   );
 }

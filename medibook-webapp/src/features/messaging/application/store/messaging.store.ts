@@ -139,7 +139,10 @@ export const useMessagingStore = create<MessagingStore>()((set, get) => ({
   },
 
   queueMessage: (input) => {
-    const id = mintId('out-', get().outbox.map((m) => m.id));
+    const id = mintId(
+      'out-',
+      get().outbox.map((m) => m.id),
+    );
     const record: OutboxMessage = {
       id,
       date: localDateIso(),
@@ -186,7 +189,10 @@ export const useMessagingStore = create<MessagingStore>()((set, get) => ({
   },
 
   publishAnnouncement: (input) => {
-    const id = mintId('ann-', get().announcements.map((a) => a.id));
+    const id = mintId(
+      'ann-',
+      get().announcements.map((a) => a.id),
+    );
     const scheduled = input.scheduledFor !== '';
     const record: Announcement = {
       id,
@@ -226,9 +232,7 @@ export const useMessagingStore = create<MessagingStore>()((set, get) => ({
     const announcement = get().announcements.find((a) => a.id === id);
     if (!announcement || announcement.status === 'Cancelled') return;
     set((s) => ({
-      announcements: s.announcements.map((a) =>
-        a.id === id ? { ...a, status: 'Cancelled' } : a,
-      ),
+      announcements: s.announcements.map((a) => (a.id === id ? { ...a, status: 'Cancelled' } : a)),
     }));
     recordAudit({
       action: 'Cancel',

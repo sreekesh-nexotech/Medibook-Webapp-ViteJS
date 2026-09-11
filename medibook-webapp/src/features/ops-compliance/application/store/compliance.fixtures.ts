@@ -9,7 +9,7 @@
  * Hospitals are referenced by tenant id (`hid`), never by name, so every
  * display name resolves through the live ops registry.
  */
-import type { ConfigChange, LoginResult, StaffLogin } from './compliance.types';
+import type { ConfigChange, ExportRequest, LoginResult, StaffLogin } from './compliance.types';
 
 /** Someone who signs in, and what they sign in from. */
 interface LoginActor {
@@ -371,7 +371,7 @@ export const CONFIG_CHANGES: readonly ConfigChange[] = [
 export const EXPORT_REQUEST_SERIES_YEAR = 2026;
 
 /** Seeded export-on-request records, newest first. */
-export const EXPORT_REQUESTS: readonly import('./compliance.types').ExportRequest[] = [
+export const EXPORT_REQUESTS: readonly ExportRequest[] = [
   {
     id: 'DSR-2026-0003',
     kind: 'Patient reference',

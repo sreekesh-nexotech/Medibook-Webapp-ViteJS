@@ -69,7 +69,11 @@ export function OpsPaymentDetailScreen() {
           [
             `Retried by operations — attempt ${pay.attempts} of ${MAX_PAYMENT_ATTEMPTS}`,
             pay.lastAttemptAt,
-            pay.status === 'Success' ? 'bg-g-600' : pay.status === 'Pending' ? 'bg-y-600' : 'bg-d-500',
+            pay.status === 'Success'
+              ? 'bg-g-600'
+              : pay.status === 'Pending'
+                ? 'bg-y-600'
+                : 'bg-d-500',
           ],
         ]
       : hist;

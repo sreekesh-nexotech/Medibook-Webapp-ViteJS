@@ -65,6 +65,26 @@ export interface OutboxMessage {
   readonly status: OutboxStatus;
 }
 
+/**
+ * One appointment the desk may message, flattened to exactly what a template
+ * needs: the recipient, the contact the channel would use, and the values the
+ * placeholders resolve to.
+ */
+export interface SendTarget {
+  readonly appointmentId: string;
+  readonly patientName: string;
+  readonly phone: string;
+  readonly email: string;
+  readonly doctorName: string;
+  readonly dept: string;
+  /** Display date, e.g. "20 Jun 2026" — already formatted for the message. */
+  readonly date: string;
+  readonly time: string;
+  /** Queue token, or an em dash when none has been issued. */
+  readonly token: string;
+  readonly bookingRef: string;
+}
+
 /** Who an announcement reaches. */
 export const ANNOUNCEMENT_AUDIENCES = [
   'All patients',

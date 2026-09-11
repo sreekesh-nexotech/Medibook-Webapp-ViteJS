@@ -42,9 +42,6 @@ import { ReceiptModal } from '@/features/appointments/presentation/components/Re
 const APPT_TABS = ['All', 'Online', 'Walk-in', 'Pending Payment', 'In Queue', 'Needs Approval'];
 const APPT_PAGE = 8;
 
-/** Grey pill for the `Waived` payment state, which the shared status map predates. */
-const WAIVED_PILL_CLASS = 'bg-grey-300 text-text-muted';
-
 const SORT_KEYS: Readonly<Record<string, string | undefined>> = {
   'MR Number': 'mrn',
   Patient: 'name',
@@ -310,10 +307,7 @@ export function AppointmentsScreen() {
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-0.75">
-                    <Badge
-                      status={a.payment}
-                      className={a.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
-                    />
+                    <Badge status={a.payment} />
                     <span className="text-caption text-text-muted tabular-nums">
                       {money(a.amount)}
                     </span>

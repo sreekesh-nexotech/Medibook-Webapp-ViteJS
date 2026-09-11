@@ -30,9 +30,6 @@ const NON_QUEUEABLE: readonly Appointment['status'][] = [
   'No-show',
 ];
 
-/** Grey pill for the `Waived` payment state, which the shared status map predates. */
-const WAIVED_PILL_CLASS = 'bg-grey-300 text-text-muted';
-
 type ConfirmKind = { kind: 'noshow' | 'undoci' } | null;
 
 interface AppointmentDrawerProps {
@@ -189,10 +186,7 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
         <div className="mb-4.5 flex flex-wrap gap-2">
           <Badge status={appt.source} />
           <Badge status={appt.status} />
-          <Badge
-            status={appt.payment}
-            className={appt.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
-          />
+          <Badge status={appt.payment} />
           {awaitingApproval && <Badge status="Pending verification">Needs approval</Badge>}
         </div>
         {awaitingApproval && (
@@ -215,13 +209,7 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
           {row('Consultation Fee', <span className="tabular-nums">{money(tax.subtotal)}</span>)}
           {row(GST_LABEL, <span className="tabular-nums">{money(tax.gst)}</span>)}
           {row('Total', <span className="tabular-nums">{money(tax.total)}</span>)}
-          {row(
-            'Payment',
-            <Badge
-              status={appt.payment}
-              className={appt.payment === 'Waived' ? WAIVED_PILL_CLASS : undefined}
-            />,
-          )}
+          {row('Payment', <Badge status={appt.payment} />)}
           {appt.receiptNo != null && row('Receipt No.', <span>{appt.receiptNo}</span>)}
           <div className="flex items-center justify-between py-3">
             <span className="text-body text-text-muted">Token</span>

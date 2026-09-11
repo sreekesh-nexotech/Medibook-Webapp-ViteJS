@@ -79,7 +79,9 @@ export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps)
             <td className={cn(tdClass, 'max-w-80')}>
               <OpsEntity
                 icon={p.icon}
-                tint={p.health === 'critical' ? 'danger' : p.health === 'warning' ? 'warning' : 'info'}
+                tint={
+                  p.health === 'critical' ? 'danger' : p.health === 'warning' ? 'warning' : 'info'
+                }
                 title={p.name}
                 sub={`${p.channel} · billed per ${p.unit.replace(/s$/, '')}`}
               />
@@ -93,9 +95,7 @@ export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps)
             </td>
             <td className={cn(tdClass, 'text-right tabular-nums')}>
               {p.overage > 0 ? (
-                <span className="text-d-700">
-                  0 · {p.overage.toLocaleString('en-IN')} over
-                </span>
+                <span className="text-d-700">0 · {p.overage.toLocaleString('en-IN')} over</span>
               ) : (
                 p.creditsLeft.toLocaleString('en-IN')
               )}

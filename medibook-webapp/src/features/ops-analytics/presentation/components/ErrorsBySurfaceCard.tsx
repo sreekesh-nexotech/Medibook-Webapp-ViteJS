@@ -29,7 +29,9 @@ export function ErrorsBySurfaceCard({ rows, title, period }: ErrorsBySurfaceCard
     <Card>
       <div className="mb-4.5 flex items-baseline justify-between gap-3">
         <SectionTitle>{title}</SectionTitle>
-        <span className="text-caption text-text-muted">failed requests · {period.toLowerCase()}</span>
+        <span className="text-caption text-text-muted">
+          failed requests · {period.toLowerCase()}
+        </span>
       </div>
       {rows.length === 0 ? (
         <EmptyState

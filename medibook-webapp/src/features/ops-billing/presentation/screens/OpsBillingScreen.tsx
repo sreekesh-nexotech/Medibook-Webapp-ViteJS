@@ -26,11 +26,17 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { OPS_BASE_PATH, OPS_VIEW_SEGMENT } from '@/app/router/paths';
 
-import { hospName, useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
+import {
+  hospName,
+  useHospitalsStore,
+} from '@/features/ops-hospitals/application/store/hospitals.store';
 import { isoFromLongDate } from '@/features/ops-hospitals/application/store/opsDates';
 
 import { invoiceTax, isUnpaid } from '@/features/ops-billing/application/store/billing.derive';
-import { billingTodayIso, useBillingStore } from '@/features/ops-billing/application/store/billing.store';
+import {
+  billingTodayIso,
+  useBillingStore,
+} from '@/features/ops-billing/application/store/billing.store';
 import type { Invoice, Payment } from '@/features/ops-billing/application/store/billing.types';
 import { InvoicePrintSheet } from '@/features/ops-billing/presentation/components/InvoicePrintSheet';
 import { SendReminderModal } from '@/features/ops-billing/presentation/components/SendReminderModal';
@@ -312,7 +318,10 @@ export function OpsBillingScreen() {
   const filtersActive = Boolean(ql || statusF !== 'All' || methodF !== 'All' || dateF || dateT);
 
   /** Loading / empty row for whichever table is on screen. */
-  const tableState = (noun: string, icon: 'file-text' | 'indian-rupee'): TableStateSpec | undefined => {
+  const tableState = (
+    noun: string,
+    icon: 'file-text' | 'indian-rupee',
+  ): TableStateSpec | undefined => {
     if (loading) return { kind: 'loading', rows: OPS_BILL_PAGE };
     if (rows.length > 0) return undefined;
     return filtersActive
@@ -395,7 +404,9 @@ export function OpsBillingScreen() {
           )}
           <FilterSelect
             value={statusF}
-            aria-label={tab === 'Invoices' ? 'Filter by invoice status' : 'Filter by payment status'}
+            aria-label={
+              tab === 'Invoices' ? 'Filter by invoice status' : 'Filter by payment status'
+            }
             options={statusOpts.map((x) => (x === 'All' ? 'Status: All' : x))}
             onChange={(v) => reset(setStatusF)(v === 'Status: All' ? 'All' : v)}
           />
@@ -582,7 +593,7 @@ export function OpsBillingScreen() {
       <div
         ref={printRef}
         aria-hidden="true"
-        className="invisible pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-white"
+        className="pointer-events-none invisible fixed inset-0 -z-10 overflow-hidden bg-white"
       >
         {printJob && (
           <InvoicePrintSheet

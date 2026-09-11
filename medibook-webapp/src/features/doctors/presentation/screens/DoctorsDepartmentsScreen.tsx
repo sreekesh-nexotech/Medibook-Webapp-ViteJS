@@ -379,6 +379,10 @@ export function DoctorsDepartmentsScreen() {
           setDeptView(null);
           setConfirm({ kind: 'dept', item: dp });
         }}
+        onAddDoctor={() => {
+          setDeptView(null);
+          openDoctor('new');
+        }}
       />
       <ConfirmModal
         open={Boolean(confirm)}

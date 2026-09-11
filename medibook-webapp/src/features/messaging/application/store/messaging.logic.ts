@@ -56,10 +56,7 @@ export function sampleValues(): Readonly<Record<string, string>> {
  * place on purpose, so the editor's warning and the preview agree about what
  * would actually reach the patient.
  */
-export function renderTemplate(
-  body: string,
-  values: Readonly<Record<string, string>>,
-): string {
+export function renderTemplate(body: string, values: Readonly<Record<string, string>>): string {
   return body.replace(PLACEHOLDER_PATTERN, (match, name: string) => {
     const key = `{{${name}}}`;
     return values[key] ?? values[match] ?? match;

@@ -20,7 +20,10 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsHospitalDetailPath } from '@/app/router/paths';
 
-import { gstinOf, useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
+import {
+  gstinOf,
+  useHospitalsStore,
+} from '@/features/ops-hospitals/application/store/hospitals.store';
 import { longDateFromIso } from '@/features/ops-hospitals/application/store/opsDates';
 import { useOpsSettingsStore } from '@/features/ops-settings/application/store/opsSettings.store';
 
@@ -29,7 +32,10 @@ import {
   invoiceTax,
   isUnpaid,
 } from '@/features/ops-billing/application/store/billing.derive';
-import { billingTodayIso, useBillingStore } from '@/features/ops-billing/application/store/billing.store';
+import {
+  billingTodayIso,
+  useBillingStore,
+} from '@/features/ops-billing/application/store/billing.store';
 import { GracePeriodModal } from '@/features/ops-billing/presentation/components/GracePeriodModal';
 import { InvoicePrintSheet } from '@/features/ops-billing/presentation/components/InvoicePrintSheet';
 import { MarkPaidModal } from '@/features/ops-billing/presentation/components/MarkPaidModal';
@@ -321,7 +327,12 @@ export function OpsInvoiceDetailScreen() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle>Reminder History</SectionTitle>
           {unpaid && (
-            <Button size="sm" variant="secondary" icon="bell-ring" onClick={() => setModal('reminder')}>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="bell-ring"
+              onClick={() => setModal('reminder')}
+            >
               Queue Reminder
             </Button>
           )}
@@ -358,8 +369,8 @@ export function OpsInvoiceDetailScreen() {
           ))}
         </TableShell>
         <div className="text-caption text-text-muted mt-3">
-          Reminders are recorded here and not transmitted — this build has no email or SMS
-          delivery, so nothing claims to have reached the hospital.
+          Reminders are recorded here and not transmitted — this build has no email or SMS delivery,
+          so nothing claims to have reached the hospital.
         </div>
       </Card>
 
@@ -443,7 +454,7 @@ export function OpsInvoiceDetailScreen() {
       <div
         ref={printRef}
         aria-hidden="true"
-        className="invisible pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-white"
+        className="pointer-events-none invisible fixed inset-0 -z-10 overflow-hidden bg-white"
       >
         <InvoicePrintSheet
           invoice={inv}
