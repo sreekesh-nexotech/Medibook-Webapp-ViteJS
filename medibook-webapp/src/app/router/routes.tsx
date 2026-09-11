@@ -31,6 +31,7 @@ import { OpsPaymentDetailScreen } from '@/features/ops-billing/presentation/scre
 import { OpsDashboardScreen } from '@/features/ops-dashboard/presentation/screens/OpsDashboardScreen';
 import { OpsHospitalDetailScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalDetailScreen';
 import { OpsHospitalsScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalsScreen';
+import { OpsOnboardingScreen } from '@/features/ops-hospitals/presentation/screens/OpsOnboardingScreen';
 import { OpsLogsScreen } from '@/features/ops-logs/presentation/screens/OpsLogsScreen';
 import { OpsNotificationsScreen } from '@/features/ops-notifications/presentation/screens/OpsNotificationsScreen';
 import { OpsPlansScreen } from '@/features/ops-plans/presentation/screens/OpsPlansScreen';
@@ -59,15 +60,12 @@ const CATCH_ALL = '*';
  * ORCHESTRATOR: screens still to wire
  * ============================================================================
  * The five hospital views added this round (slots, profile, services,
- * messaging, audit) are wired below, inside `RequireAdmin`.
+ * messaging, audit) are wired below inside `RequireAdmin`, and ops onboarding
+ * is wired in the ops block.
  *
  * Still pending, because the screens do not exist yet — importing them would
  * break the build. Until each lands, the URL falls through to
  * `NotFoundScreen`, which explains itself instead of silently redirecting:
- *
- *   // ORCHESTRATOR: wire OpsOnboardingScreen here
- *   { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> }
- *       url: /ops/onboarding
  *
  *   // ORCHESTRATOR: wire OpsComplianceScreen here
  *   { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> }
@@ -127,6 +125,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to={OPS_VIEW_SEGMENT.dashboard} replace /> },
       { path: OPS_VIEW_SEGMENT.dashboard, element: <OpsDashboardScreen /> },
       { path: OPS_VIEW_SEGMENT.hospitals, element: <OpsHospitalsScreen /> },
+      { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> },
       { path: OPS_VIEW_SEGMENT['hospital-detail'], element: <OpsHospitalDetailScreen /> },
       { path: OPS_VIEW_SEGMENT.plans, element: <OpsPlansScreen /> },
       { path: OPS_VIEW_SEGMENT.billing, element: <OpsBillingScreen /> },

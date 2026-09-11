@@ -91,6 +91,7 @@ export function OpsHospitalDetailScreen() {
 
   const [modal, setModal] = useState<DetailModal>(null);
   const [reason, setReason] = useState('');
+  const [rejectSubmitted, setRejectSubmitted] = useState(false);
   const [tab, setTab] = useState('Overview');
   const [docDeptF, setDocDeptF] = useState('All');
   const { sort: dSort, onSort: dOnSort, sorted: dSorted } = useSort<OpsDoctor>();
@@ -269,6 +270,7 @@ export function OpsHospitalDetailScreen() {
                   variant="danger"
                   onClick={() => {
                     setReason('');
+                    setRejectSubmitted(false);
                     setModal('reject');
                   }}
                 >
@@ -635,7 +637,7 @@ export function OpsHospitalDetailScreen() {
                   {d.days} days/wk
                   {d.leave && (
                     <div className="text-caption text-y-700">
-                      On leave {d.leave.from} – {d.leave.to}
+                      On leave {fmtDate(d.leave.from)} – {fmtDate(d.leave.to)}
                     </div>
                   )}
                 </td>
@@ -919,62 +921,56 @@ export function OpsHospitalDetailScreen() {
           })
         }
       />
-      {modal === 'reject' && (
-        <div
-          onClick={() => setModal(null)}
-          className="animate-fade-in bg-text-strong/45 fixed inset-0 z-50 flex items-center justify-center p-6"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="animate-pop-in shadow-pop flex w-112 max-w-full flex-col gap-4 rounded-xl bg-white p-6"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-d-100 text-d-500 flex size-11 flex-none items-center justify-center rounded-md">
-                <Icon name="ban" size={20} />
-              </div>
-              <SectionTitle size={20}>Reject this hospital?</SectionTitle>
+      <FormModal
+        open={modal === 'reject'}
+        onClose={() => setModal(null)}
+        title="Reject this hospital?"
+        width={448}
+        onSubmit={() => {
+          setRejectSubmitted(true);
+          if (!reason) return;
+          run('reject', `${h.name} rejected. The hospital has been notified.`, () => {
+            reject(h.id, reason);
+            setModal(null);
+          });
+        }}
+        submitLabel={busy.reject ? 'Rejecting…' : 'Reject Hospital'}
+        submitVariant="danger"
+        busy={busy.reject}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-d-100 text-d-500 flex size-11 flex-none items-center justify-center rounded-md">
+              <Icon name="ban" size={20} />
             </div>
-            <OpsField label="Reason for rejection" required>
-              <Select
-                value={reason}
-                placeholder="Select a reason"
-                options={[
-                  'Incomplete KYC documents',
-                  'Invalid GST or licence details',
-                  'Failed physical verification',
-                  'Duplicate registration',
-                ]}
-                onChange={setReason}
-                height={48}
-              />
-            </OpsField>
-            <p className="text-body text-text-muted m-0">
-              <b className="text-text-strong font-medium">{h.name}</b> is notified by email and
-              cannot take bookings. This decision is final.
-            </p>
-            <div className="border-border-soft flex justify-end gap-3 border-t pt-4">
-              <Button variant="secondary" onClick={() => setModal(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={
-                  !reason || busy.reject
-                    ? undefined
-                    : () =>
-                        run('reject', `${h.name} rejected. The hospital has been notified.`, () => {
-                          reject(h.id, reason);
-                          setModal(null);
-                        })
-                }
-                className={cn((!reason || busy.reject) && 'cursor-not-allowed opacity-50')}
-              >
-                {busy.reject ? 'Rejecting…' : 'Reject Hospital'}
-              </Button>
-            </div>
+            <span className="text-body text-text-body">
+              This decision is final and {h.name} cannot take bookings.
+            </span>
           </div>
+          <OpsField
+            label="Reason for rejection"
+            required
+            error={rejectSubmitted && !reason ? 'Pick a reason for the rejection.' : undefined}
+            hint="Recorded on the application and shown to the hospital."
+          >
+            <Select
+              value={reason}
+              placeholder="Select a reason"
+              options={[
+                'Incomplete KYC documents',
+                'Invalid GST or licence details',
+                'Failed physical verification',
+                'Duplicate registration',
+              ]}
+              onChange={(v) => {
+                setReason(v);
+                setRejectSubmitted(false);
+              }}
+              height={48}
+            />
+          </OpsField>
         </div>
-      )}
+      </FormModal>
     </div>
   );
 }

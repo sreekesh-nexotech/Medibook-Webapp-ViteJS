@@ -344,7 +344,7 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
                       <div className="text-caption text-d-700 mt-0.5">{doc.rejectReason}</div>
                     )}
                     {!doc.fileName && spec && (
-                      <div className="text-caption text-text-faint mt-0.5">{spec.hint}</div>
+                      <div className="text-caption text-text-muted mt-0.5">{spec.hint}</div>
                     )}
                   </div>
                   <Badge status={DOC_BADGE[doc.status]}>{doc.status}</Badge>
