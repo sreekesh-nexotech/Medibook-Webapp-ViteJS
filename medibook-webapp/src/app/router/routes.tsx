@@ -28,6 +28,7 @@ import { OpsAnalyticsScreen } from '@/features/ops-analytics/presentation/screen
 import { OpsBillingScreen } from '@/features/ops-billing/presentation/screens/OpsBillingScreen';
 import { OpsInvoiceDetailScreen } from '@/features/ops-billing/presentation/screens/OpsInvoiceDetailScreen';
 import { OpsPaymentDetailScreen } from '@/features/ops-billing/presentation/screens/OpsPaymentDetailScreen';
+import { OpsComplianceScreen } from '@/features/ops-compliance/presentation/screens/OpsComplianceScreen';
 import { OpsDashboardScreen } from '@/features/ops-dashboard/presentation/screens/OpsDashboardScreen';
 import { OpsHospitalDetailScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalDetailScreen';
 import { OpsHospitalsScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalsScreen';
@@ -57,19 +58,10 @@ import { UsersRolesScreen } from '@/features/users-roles/presentation/screens/Us
 const CATCH_ALL = '*';
 
 /* ============================================================================
- * ORCHESTRATOR: screens still to wire
+ * Every screen built this round is wired below.
  * ============================================================================
- * The five hospital views added this round (slots, profile, services,
- * messaging, audit) are wired below inside `RequireAdmin`, and ops onboarding
- * is wired in the ops block.
- *
- * Still pending, because the screens do not exist yet — importing them would
- * break the build. Until each lands, the URL falls through to
- * `NotFoundScreen`, which explains itself instead of silently redirecting:
- *
- *   // ORCHESTRATOR: wire OpsComplianceScreen here
- *   { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> }
- *       url: /ops/compliance
+ * Hospital, all admin-only and inside `RequireAdmin`: slots, profile,
+ * services, messaging, audit. Ops: onboarding and compliance.
  *
  * Deliberately NOT wired: `HOSPITAL_VIEW_SEGMENT.billing`. Plan & billing is
  * already reachable as a tab inside `SettlementsScreen`, so a second route and
@@ -135,6 +127,7 @@ export const router = createBrowserRouter([
       { path: OPS_VIEW_SEGMENT.analytics, element: <OpsAnalyticsScreen /> },
       { path: OPS_VIEW_SEGMENT.reports, element: <OpsReportsScreen /> },
       { path: OPS_VIEW_SEGMENT.logs, element: <OpsLogsScreen /> },
+      { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> },
       { path: OPS_VIEW_SEGMENT.users, element: <OpsUsersScreen /> },
       { path: OPS_VIEW_SEGMENT['platform-users'], element: <OpsPlatformUsersScreen /> },
       {

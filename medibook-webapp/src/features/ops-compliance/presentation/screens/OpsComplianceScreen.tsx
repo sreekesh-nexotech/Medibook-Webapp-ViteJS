@@ -96,24 +96,32 @@ export function OpsComplianceScreen() {
    * gathered; and only if there are any is a file written and the request
    * closed as `Completed`. An empty result closes as `No data` with an
    * explicit, non-celebratory message — no file, no success claim.
+   *
+   * The file is written inside the click itself, because a download started
+   * from a timer can be refused by the browser as not user-initiated — and
+   * this control may only claim success for a file that really arrived. The
+   * `useOpsAct` run then carries the busy state, the request's closing status
+   * and the toast.
    */
   const handleExport = (value: ExportFormValue): void => {
+    if (busy.export) return;
+    const rows = buildExportRows({ ...value }, { logins, changes, patients });
     const id = openExport({ ...value, requestedBy: OPS_ACTING_USER_EMAIL });
-    run('export', null, () => {
-      const rows = buildExportRows({ ...value }, { logins, changes, patients });
-      if (rows.length === 0) {
+    if (rows.length === 0) {
+      run('export', null, () => {
         settleExport(id, { status: 'No data', rows: 0, file: null });
         toast(
           `${id}: no records held for ${value.subject} in that date range — nothing was exported.`,
           'info',
         );
-        return;
-      }
-      const file = `medibook-export-${id.toLowerCase()}.csv`;
-      downloadCsv(file, [EXPORT_COLUMNS, ...rows]);
-      settleExport(id, { status: 'Completed', rows: rows.length, file });
-      toast(`${id}: exported ${rows.length} records for ${value.subject}.`, 'success');
-    });
+      });
+      return;
+    }
+    const file = `medibook-export-${id.toLowerCase()}.csv`;
+    downloadCsv(file, [EXPORT_COLUMNS, ...rows]);
+    run('export', `${id}: exported ${rows.length} records for ${value.subject}.`, () =>
+      settleExport(id, { status: 'Completed', rows: rows.length, file }),
+    );
   };
 
   return (

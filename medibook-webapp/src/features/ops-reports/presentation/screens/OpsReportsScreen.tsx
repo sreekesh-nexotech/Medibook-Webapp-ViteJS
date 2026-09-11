@@ -29,10 +29,17 @@ export function OpsReportsScreen() {
   const markExported = useOpsReportsStore((s) => s.markExported);
 
   const exportReport = (r: OpsReportDef, i: number): void => {
-    run(`r${i}`, `Exported ${r.name} — ${r.rows.length} rows.`, () => {
-      downloadCsv(`${r.file}-${DEMO_TODAY_ISO}.csv`, [r.columns, ...r.rows]);
-      markExported(i, r.name, r.rows.length);
-    });
+    const key = `r${i}`;
+    if (busy[key]) return;
+    // The file is written inside the click itself — a download started from a
+    // timer can be refused by the browser as not user-initiated, and this
+    // control may only claim success for a file that really arrived. The
+    // `useOpsAct` run then carries the busy state, the "last generated" stamp
+    // and the toast.
+    downloadCsv(`${r.file}-${DEMO_TODAY_ISO}.csv`, [r.columns, ...r.rows]);
+    run(key, `Exported ${r.name} — ${r.rows.length} rows.`, () =>
+      markExported(i, r.name, r.rows.length),
+    );
   };
 
   return (
@@ -58,7 +65,7 @@ export function OpsReportsScreen() {
                 busy={isBusy}
                 onClick={() => exportReport(r, i)}
               >
-                {isBusy ? 'Preparing…' : 'Download CSV'}
+                {isBusy ? 'Exporting…' : 'Download CSV'}
               </Button>
             </div>
           </Card>
