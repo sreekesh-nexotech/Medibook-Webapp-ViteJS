@@ -1,9 +1,7 @@
 import { useState } from 'react';
 
-import { useLogsStore } from '@/features/ops-logs/application/store/logs.store';
-import type { LogEntry, LogSeverity } from '@/features/ops-logs/application/store/logs.types';
+import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
-import { opsTime } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
@@ -15,17 +13,58 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
+import type { LogSeverity } from '@/features/ops-logs/application/store/logs.types';
+import { useLogsQuery } from '@/features/ops-logs/application/queries/useLogsQuery';
+import { useRefreshLogs } from '@/features/ops-logs/application/queries/useRefreshLogs';
+import type { AuditLogEntry } from '@/features/ops-logs/domain/entities/logs.types';
+import { useLogsDebouncedValue } from '@/features/ops-logs/presentation/hooks/useLogsDebouncedValue';
+
 const OPS_LOG_PAGE = 7;
 
-/** Last ms of a day, for the inclusive "to date" filter bound. */
-const END_OF_DAY_MS = 86399999;
+/** Typing pause before the search box is sent as `?q=`. */
+const SEARCH_DEBOUNCE_MS = 350;
 
 /**
- * How long the re-derive keeps the table in its loading state. The seed store
- * answers instantly, so without this the shared loading rows would flash —
- * same fake-latency convention as `useOpsAct`.
+ * The audit trail carries no severity yet (backend gap, flagged in P9): every
+ * row reads as Info until `audit_log` gains one. The Severity filter is kept
+ * on screen but cannot narrow the trail.
  */
-const REFRESH_SETTLE_MS = 420;
+const INTERIM_SEVERITY: LogSeverity = 'Info';
+
+/** Leading characters of an actor UUID shown under the action. */
+const ACTOR_ID_PREVIEW = 8;
+
+/** Shown for a missing IP or an unknown refresh time. */
+const NONE = '—';
+
+/** Audit timestamps read in IST, the console's timezone (backend `audit_log_spec`). */
+const LOG_TIME_ZONE = 'Asia/Kolkata';
+
+const logDateFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: LOG_TIME_ZONE,
+  month: 'long',
+  day: '2-digit',
+  year: 'numeric',
+});
+
+const logClockFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: LOG_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** `June 13, 2026 · 09:42` — the trail's timestamp style. */
+function formatLogTime(iso: string): string {
+  const at = new Date(iso);
+  return `${logDateFormat.format(at)} · ${logClockFormat.format(at)}`;
+}
+
+/** Who acted: the principal, plus the user id when there is one. */
+function actorLabel(entry: AuditLogEntry): string {
+  return entry.actorUserId
+    ? `${entry.principal} · ${entry.actorUserId.slice(0, ACTOR_ID_PREVIEW)}`
+    : entry.principal;
+}
 
 const SEV_TINT: Record<LogSeverity, OpsTint> = {
   Critical: 'danger',
@@ -58,10 +97,6 @@ const dateInputClass =
 
 /** Compliance logs — the platform audit trail (design `OpsLogs`, Ops.jsx). */
 export function OpsLogsScreen() {
-  const logs = useLogsStore((s) => s.logs);
-  const refreshedAt = useLogsStore((s) => s.refreshedAt);
-  const refreshLogs = useLogsStore((s) => s.refresh);
-
   const [q, setQ] = useState('');
   const [sevF, setSevF] = useState('All');
   const [modF, setModF] = useState('All');
@@ -69,25 +104,22 @@ export function OpsLogsScreen() {
   const [dateT, setDateT] = useState('');
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const { sort, onSort } = useSort<AuditLogEntry>();
+  const refreshLogs = useRefreshLogs();
 
-  const ql = q.trim().toLowerCase();
-  const filtered = logs.filter(
-    (l) =>
-      (!ql || l.action.toLowerCase().includes(ql) || l.actor.toLowerCase().includes(ql)) &&
-      (sevF === 'All' || l.sev === sevF) &&
-      (modF === 'All' || l.module === modF) &&
-      (!dateF || opsTime(l.time) >= Date.parse(dateF)) &&
-      (!dateT || opsTime(l.time) <= Date.parse(dateT) + END_OF_DAY_MS),
-  );
-  const { sort, onSort, sorted } = useSort<LogEntry>();
-  const orderedLogs = sorted([...filtered], {
-    module: (l) => l.module,
-    ip: (l) => l.ip,
-    time: (l) => opsTime(l.time),
-    sev: (l) => l.sev,
+  const ql = q.trim();
+  const debouncedQ = useLogsDebouncedValue(ql, SEARCH_DEBOUNCE_MS);
+  const logsQuery = useLogsQuery({
+    page: page + 1,
+    pageSize: OPS_LOG_PAGE,
+    ...(dateF ? { dateFrom: dateF } : {}),
+    ...(dateT ? { dateTo: dateT } : {}),
+    ...(debouncedQ ? { q: debouncedQ } : {}),
+    ...(sort.key === 'time' ? { sortDir: sort.dir } : {}),
   });
-  const pg = Math.min(page, Math.max(0, Math.ceil(filtered.length / OPS_LOG_PAGE) - 1));
-  const rows = orderedLogs.slice(pg * OPS_LOG_PAGE, pg * OPS_LOG_PAGE + OPS_LOG_PAGE);
+  const total = logsQuery.data?.total ?? 0;
+  const rows = logsQuery.data?.items ?? [];
+  const pg = Math.min(page, Math.max(0, Math.ceil(total / OPS_LOG_PAGE) - 1));
 
   const reset =
     (fn: (v: string) => void) =>
@@ -105,32 +137,34 @@ export function OpsLogsScreen() {
     setPage(0);
   };
 
-  /**
-   * Audit 3.1.1 — a real re-derive, not a toast: the store re-runs the
-   * derivation behind `logs` (picking up every entry other screens have
-   * written since), the list returns to page 1, and the "updated" stamp moves.
-   */
+  /** Re-fetch the trail from the server and return to page 1. */
   const handleRefresh = async (): Promise<void> => {
     setRefreshing(true);
-    refreshLogs();
     setPage(0);
-    await new Promise<void>((resolve) => setTimeout(resolve, REFRESH_SETTLE_MS));
+    await refreshLogs();
     setRefreshing(false);
   };
 
-  const tableState: TableStateSpec | undefined = refreshing
-    ? { kind: 'loading', rows: OPS_LOG_PAGE }
-    : rows.length === 0
-      ? {
-          kind: 'empty',
-          icon: 'scroll-text',
-          title: filtersActive ? 'No results match your filters.' : 'No audit entries yet.',
-          message: filtersActive
-            ? 'Widen the date range, or clear the filters to see the whole trail.'
-            : 'Sensitive actions across the platform are written here as they happen.',
-          ...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
-        }
-      : undefined;
+  const tableState: TableStateSpec | undefined =
+    logsQuery.isPending || refreshing
+      ? { kind: 'loading', rows: OPS_LOG_PAGE }
+      : logsQuery.isError
+        ? {
+            kind: 'error',
+            message: isFailure(logsQuery.error) ? logsQuery.error.message : undefined,
+            onRetry: () => void logsQuery.refetch(),
+          }
+        : rows.length === 0
+          ? {
+              kind: 'empty',
+              icon: 'scroll-text',
+              title: filtersActive ? 'No results match your filters.' : 'No audit entries yet.',
+              message: filtersActive
+                ? 'Widen the date range, or clear the filters to see the whole trail.'
+                : 'Sensitive actions across the platform are written here as they happen.',
+              ...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
+            }
+          : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -185,22 +219,19 @@ export function OpsLogsScreen() {
           <div className="flex-1"></div>
           <span className="text-caption text-text-muted">
             Retention: 365 days · updated{' '}
-            {new Date(refreshedAt).toLocaleTimeString('en-IN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            })}
+            {logsQuery.dataUpdatedAt
+              ? new Date(logsQuery.dataUpdatedAt).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })
+              : NONE}
           </span>
         </div>
         <TableShell
           columns={LOG_COLUMNS}
           scrollLabel="Compliance log entries"
-          sortKeys={{
-            Module: 'module',
-            'IP Address': 'ip',
-            Timestamp: 'time',
-            Severity: 'sev',
-          }}
+          sortKeys={{ Timestamp: 'time' }}
           sort={sort}
           onSort={onSort}
           state={tableState}
@@ -210,22 +241,22 @@ export function OpsLogsScreen() {
               <td className={`${tdClass} max-w-90`}>
                 <OpsEntity
                   icon="scroll-text"
-                  tint={SEV_TINT[l.sev] || 'neutral'}
+                  tint={SEV_TINT[INTERIM_SEVERITY]}
                   title={l.action}
-                  sub={l.actor}
+                  sub={actorLabel(l)}
                 />
               </td>
-              <td className={tdClass}>{l.module}</td>
-              <td className={`${tdClass} tabular-nums`}>{l.ip}</td>
-              <td className={tdClass}>{l.time}</td>
+              <td className={tdClass}>{l.resourceType}</td>
+              <td className={`${tdClass} tabular-nums`}>{l.ip ?? NONE}</td>
+              <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
               <td className={tdClass}>
-                <Badge status={l.sev} />
+                <Badge status={INTERIM_SEVERITY} />
               </td>
             </tr>
           ))}
         </TableShell>
         <Pager
-          total={filtered.length}
+          total={total}
           page={pg}
           pageSize={OPS_LOG_PAGE}
           onPage={setPage}
