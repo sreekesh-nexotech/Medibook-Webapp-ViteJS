@@ -1,10 +1,11 @@
 import { cn } from '@/shared/lib/cn';
 import { Icon } from '@/shared/ui/Icon';
 
-import { CAT_ICON_CLASS, type ReportDef } from '../reports.data';
+import { CAT_ICON_CLASS } from '../reports.data';
+import type { ReportCatalogItem } from '../reports.design';
 
 interface ReportPickerCardProps {
-  report: ReportDef;
+  report: ReportCatalogItem;
   selected: boolean;
   onSelect: () => void;
 }
@@ -31,7 +32,7 @@ export function ReportPickerCard({ report, selected, onSelect }: ReportPickerCar
         <Icon name={report.icon} size={19} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-body text-text-strong font-medium">{report.name}</div>
+        <div className="text-body text-text-strong font-medium">{report.title}</div>
         <div className="text-caption text-text-muted mt-0.5">{report.brief}</div>
       </div>
       {selected && <Icon name="check" size={16} className="text-blue flex-none" />}
