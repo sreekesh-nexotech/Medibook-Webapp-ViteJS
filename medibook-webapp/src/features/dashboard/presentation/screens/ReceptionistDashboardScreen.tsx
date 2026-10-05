@@ -1,26 +1,32 @@
-import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
+import { isFailure } from '@/core/error/failure';
 import { cn } from '@/shared/lib/cn';
-import { money } from '@/shared/lib/format';
+import { formatToken, money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
-import { SkeletonKpiStrip } from '@/shared/ui/Skeleton';
+import { SkeletonKpiStrip, SkeletonTable } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+
+import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
+import { useReceptionDashboardQuery } from '@/features/dashboard/application/queries/useReceptionDashboardQuery';
 import {
-  selectDoctorNames,
-  useCatalogDepartments,
-} from '@/features/doctors/application/store/catalog.selectors';
+  actionItems,
+  clockTime,
+  sourceBadge,
+} from '@/features/dashboard/presentation/components/dashboard.viewModel';
 
 /** Text-link action (design's clickable `<span>` with `font: var(--body-md)`, blue). */
 const LINK_CLASS = 'text-body text-blue cursor-pointer border-0 bg-transparent p-0 font-medium';
@@ -30,7 +36,19 @@ interface ReceptionKpi extends StatCardData {
   readonly go: HospitalStaticView;
 }
 
-/** Receptionist (front desk) dashboard — design `Dashboard.jsx` `ReceptionistDashboard`. */
+/** Rows the needs-action card shows before "View All". */
+const ACTION_ROWS = 5;
+
+/**
+ * Receptionist (front desk) dashboard — design `Dashboard.jsx`
+ * `ReceptionistDashboard`.
+ *
+ * Today's queue and to-dos come from `GET /hospital/dashboard/reception`
+ * (doctor sessions, queue counts, unpaid walk-ins, bookings awaiting
+ * approval); walk-in count and desk collections from
+ * `GET /hospital/dashboard/admin?period=today`. Sessions carry only a doctor
+ * id, so the per-department rows group them through the doctor roster (H1).
+ */
 export function ReceptionistDashboardScreen() {
   const navigate = useNavigate();
   const { role } = useParams();
@@ -38,52 +56,75 @@ export function ReceptionistDashboardScreen() {
   const go = (view: HospitalStaticView): void => {
     navigate(hospitalPath(activeRole, view));
   };
-  // Department strip follows the hospital's own catalogue (audit 2.6.3).
-  const departments = useCatalogDepartments();
 
-  const appts = useAppointmentsStore((s) => s.appts);
-  const serving = useAppointmentsStore((s) => s.serving);
+  const reception = useReceptionDashboardQuery();
+  const today = useAdminDashboardQuery('today');
+  const doctors = useDoctorsQuery();
+  const departments = useDepartmentsQuery();
+  // The token screen's department is still UI state in the appointments store (H7/H8 → Z).
   const setDept = useAppointmentsStore((s) => s.setDept);
-  const [loading, setLoading] = useState(false);
 
-  /**
-   * Re-derive the desk view from the appointments ledger. No API yet, so the
-   * refresh re-emits the store — queue counts, collection totals and the
-   * appointment list are all rebuilt from it — and this is where the refetch
-   * goes when one lands.
-   */
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    useAppointmentsStore.setState((s) => ({ appts: [...s.appts] }));
-    setLoading(false);
-  }, []);
+  const refresh = async (): Promise<void> => {
+    await Promise.all([
+      reception.refetch(),
+      today.refetch(),
+      doctors.refetch(),
+      departments.refetch(),
+    ]);
+  };
 
-  const today = appts.filter((a) => a.date === 'Today');
-  const inQueue = appts.filter((a) => a.status === 'In Queue');
-  const pendingPay = appts.filter((a) => a.payment === 'Pending');
-  const walkins = today.filter((a) => a.source === 'Walk-in');
-  const deskPaid = today.filter((a) => a.payment === 'Paid' && a.source === 'Walk-in');
-  const deskCash = deskPaid
-    .filter((a) => (a.payMode || 'Cash') === 'Cash')
-    .reduce((s, a) => s + a.amount, 0);
-  const deskOther = deskPaid.reduce((s, a) => s + a.amount, 0) - deskCash;
-  const onlinePrepaid = today
-    .filter((a) => a.payment === 'Paid' && a.source === 'Online')
-    .reduce((s, a) => s + a.amount, 0);
-  const waitingTotal = today.filter(
-    (a) =>
-      a.token &&
-      !['Completed', 'Cancelled', 'No-show'].includes(a.status) &&
-      a.token !== serving[a.doctor],
-  ).length;
-  const servingNow = Object.values(serving).filter(Boolean).length;
+  const data = reception.data;
+  const loading = reception.isLoading;
+
+  if (reception.isError && !data) {
+    return (
+      <ErrorState
+        title="The front desk view could not load"
+        message={
+          isFailure(reception.error)
+            ? reception.error.message
+            : 'Retrying usually fixes it — nothing has been lost.'
+        }
+        onRetry={() => void reception.refetch()}
+      />
+    );
+  }
+
+  const sessions = data?.sessions ?? [];
+  const summary = data?.queueSummary;
+  const waitingTotal = sessions.reduce((n, s) => n + s.waitingCount, 0);
+  const servingNow = sessions.filter((s) => s.currentTokenNo !== null).length;
+
+  const deptOfDoctor = new Map((doctors.data ?? []).map((d) => [d.id, d.departmentId] as const));
+  const deptRows = (departments.data ?? [])
+    .filter((d) => d.isActive)
+    .map((d) => {
+      const own = sessions.filter((s) => deptOfDoctor.get(s.doctorId) === d.id);
+      const servingSession = own.find((s) => s.currentTokenNo !== null);
+      return {
+        id: d.id,
+        name: d.name,
+        waiting: own.reduce((n, s) => n + s.waitingCount, 0),
+        servTok:
+          servingSession?.currentTokenNo != null
+            ? formatToken(servingSession.currentTokenNo)
+            : null,
+      };
+    });
+
+  const actions = data ? actionItems(data) : [];
+
+  const todayFigures = today.data;
+  const deskCash = todayFigures?.collectedByMethod.cash ?? 0;
+  const deskTotal = todayFigures?.collectedByChannel.desk ?? 0;
+  const deskOther = Math.max(0, deskTotal - deskCash);
+  const onlinePrepaid = todayFigures?.collectedByChannel.online ?? 0;
 
   const KPIS: readonly ReceptionKpi[] = [
     {
       icon: 'calendar-check',
       label: 'Appointments Today',
-      value: today.length,
+      value: summary?.total ?? 0,
       sub: 'Across all departments',
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
@@ -92,7 +133,7 @@ export function ReceptionistDashboardScreen() {
     {
       icon: 'ticket',
       label: 'In Queue',
-      value: inQueue.length,
+      value: (summary?.waiting ?? 0) + (summary?.inConsultation ?? 0),
       sub: 'Currently waiting / serving',
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
@@ -101,7 +142,7 @@ export function ReceptionistDashboardScreen() {
     {
       icon: 'indian-rupee',
       label: 'Pending Payment',
-      value: pendingPay.length,
+      value: data?.unpaidWalkIns.count ?? 0,
       sub: 'Walk-ins to collect',
       iconClass: 'bg-d-100 text-d-500',
       valueClass: 'text-d-500',
@@ -110,7 +151,7 @@ export function ReceptionistDashboardScreen() {
     {
       icon: 'footprints',
       label: 'Walk-ins Today',
-      value: walkins.length,
+      value: today.isError ? '—' : (todayFigures?.appointmentsBySource.walk_in ?? 0),
       sub: 'Booked at the desk',
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
@@ -121,7 +162,7 @@ export function ReceptionistDashboardScreen() {
   const collections: readonly { label: string; value: number; cls: string }[] = [
     { label: 'Desk Cash', value: deskCash, cls: 'text-blue' },
     { label: 'Desk UPI / Card', value: deskOther, cls: 'text-y-600' },
-    { label: 'Collected at Desk', value: deskCash + deskOther, cls: 'text-g-600' },
+    { label: 'Collected at Desk', value: deskTotal, cls: 'text-g-600' },
   ];
 
   return (
@@ -179,33 +220,31 @@ export function ReceptionistDashboardScreen() {
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            {departments.map((d) => {
-              const w = today.filter(
-                (a) =>
-                  a.dept === d &&
-                  a.token &&
-                  !['Completed', 'Cancelled', 'No-show'].includes(a.status) &&
-                  a.token !== serving[a.doctor],
-              ).length;
-              const servingDoc = Object.keys(serving).find(
-                (doc) =>
-                  serving[doc] && selectDoctorNames(useCatalogStore.getState(), d).includes(doc),
-              );
-              const servTok = servingDoc ? serving[servingDoc] : null;
-              return (
+            {loading || departments.isLoading ? (
+              <SkeletonTable rows={3} cols={3} card={false} />
+            ) : departments.isError ? (
+              <ErrorState
+                inline
+                title="Departments could not be loaded"
+                onRetry={() => void departments.refetch()}
+              />
+            ) : deptRows.length === 0 ? (
+              <EmptyState compact icon="ticket" title="No departments set up yet." />
+            ) : (
+              deptRows.map((d) => (
                 <button
                   type="button"
-                  key={d}
+                  key={d.id}
                   onClick={() => {
-                    setDept(d);
+                    setDept(d.name);
                     go('token');
                   }}
                   className="text-body hover:bg-grey-200 flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-150"
                 >
-                  <span className="text-text-body flex-1">{d}</span>
-                  {servTok ? (
+                  <span className="text-text-body flex-1">{d.name}</span>
+                  {d.servTok ? (
                     <span className="text-caption text-g-600">
-                      serving <b className="text-blue">{servTok}</b>
+                      serving <b className="text-blue">{d.servTok}</b>
                     </span>
                   ) : (
                     <span className="text-caption text-text-muted">idle</span>
@@ -213,31 +252,33 @@ export function ReceptionistDashboardScreen() {
                   <span
                     className={cn(
                       'text-caption inline-flex w-17.5 items-center justify-end gap-1',
-                      w ? 'text-text-strong' : 'text-text-muted',
+                      d.waiting ? 'text-text-strong' : 'text-text-muted',
                     )}
                   >
-                    <Icon name="users" size={13} /> {w} waiting
+                    <Icon name="users" size={13} /> {d.waiting} waiting
                   </span>
                   <Icon name="chevron-right" size={16} className="text-text-faint" />
                 </button>
-              );
-            })}
+              ))
+            )}
           </div>
         </Card>
 
         <Card className="flex-[1.4]">
           <div className="mb-3.5 flex items-center justify-between">
-            <SectionTitle size={16}>Today's Appointments</SectionTitle>
+            <SectionTitle size={16}>Needs Action Today</SectionTitle>
             <button type="button" onClick={() => go('appointments')} className={LINK_CLASS}>
               View All
             </button>
           </div>
-          {today.length === 0 ? (
+          {loading ? (
+            <SkeletonTable rows={4} cols={3} card={false} />
+          ) : actions.length === 0 ? (
             <EmptyState
               compact
               icon="calendar-days"
-              title="Nothing booked for today yet."
-              message="Book a walk-in or register an online arrival to start the queue."
+              title="Nothing needs action right now."
+              message="No unpaid walk-ins and no bookings waiting for approval."
               actionLabel="New Appointment"
               actionIcon="plus"
               actionVariant="button"
@@ -245,22 +286,28 @@ export function ReceptionistDashboardScreen() {
             />
           ) : (
             <div className="flex flex-col gap-2.5">
-              {today.slice(0, 5).map((a) => (
+              {actions.slice(0, ACTION_ROWS).map(({ appt: a, reason }) => (
                 <button
                   type="button"
                   key={a.id}
                   onClick={() => go('appointments')}
                   className="bg-blue-soft-bg flex w-full cursor-pointer items-center gap-3.5 rounded-md px-4 py-2.75 text-left"
                 >
-                  <div className="text-caption text-text-body w-14">{a.time}</div>
+                  <div className="text-caption text-text-body w-14">
+                    {clockTime(a.scheduledStartAt)}
+                  </div>
                   <div className="flex-1">
-                    <div className="text-body text-text-strong font-medium">{a.name}</div>
+                    <div className="text-body text-text-strong font-medium">{a.patientName}</div>
                     <div className="text-caption text-text-muted">
-                      {a.doctor} · {a.dept}
+                      {a.doctorName} · {a.tokenLabel ?? a.bookingRef}
                     </div>
                   </div>
-                  <Badge status={a.source} />
-                  <Badge status={a.status} />
+                  <Badge status={sourceBadge(a.source)} />
+                  {reason === 'unpaid' ? (
+                    <Badge status="Pending">Unpaid {money(a.totalRupees)}</Badge>
+                  ) : (
+                    <Badge status="Requested">Needs approval</Badge>
+                  )}
                 </button>
               ))}
             </div>
@@ -275,14 +322,24 @@ export function ReceptionistDashboardScreen() {
             Open Payments
           </button>
         </div>
-        <div className="flex gap-4">
-          {collections.map((c) => (
-            <div key={c.label} className="bg-blue-soft-bg flex-1 rounded-lg p-4.5 text-center">
-              <div className="text-body text-text-body">{c.label}</div>
-              <div className={cn('text-h2 mt-1.5 tabular-nums', c.cls)}>{money(c.value)}</div>
-            </div>
-          ))}
-        </div>
+        {today.isError ? (
+          <ErrorState
+            inline
+            title="Today's collection could not be loaded"
+            onRetry={() => void today.refetch()}
+          />
+        ) : (
+          <div className="flex gap-4">
+            {collections.map((c) => (
+              <div key={c.label} className="bg-blue-soft-bg flex-1 rounded-lg p-4.5 text-center">
+                <div className="text-body text-text-body">{c.label}</div>
+                <div className={cn('text-h2 mt-1.5 tabular-nums', c.cls)}>
+                  {today.isLoading ? '…' : money(c.value)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="bg-grey-200 text-caption text-text-muted mt-3.5 flex items-center gap-2 rounded-md px-3.5 py-2.5">
           <Icon name="smartphone" size={15} className="text-blue flex-none" /> Online prepaid today
           (collected by Medibook):{' '}
