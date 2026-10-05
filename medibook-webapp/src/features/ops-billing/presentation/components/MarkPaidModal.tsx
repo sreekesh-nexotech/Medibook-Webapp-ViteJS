@@ -1,121 +1,181 @@
+import { useState } from 'react';
+
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { money } from '@/shared/lib/format';
-import { minLen, notFutureDate } from '@/shared/lib/validate';
+import { todayISO } from '@/shared/lib/format';
+import { notFutureDate, positiveAmount } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import { opsTodayIso } from '@/features/ops-hospitals/application/store/opsDates';
-
-import { useBillingStore } from '@/features/ops-billing/application/store/billing.store';
+import { useMarkInvoicePaidMutation } from '@/features/ops-billing/application/queries/useMarkInvoicePaidMutation';
+import type {
+  BillingInvoice,
+  PaymentMethod,
+} from '@/features/ops-billing/domain/entities/billing.entities';
 import {
-  OFFLINE_PAYMENT_METHODS,
-  type Invoice,
-  type PaymentMethod,
-} from '@/features/ops-billing/application/store/billing.types';
+  METHOD_LABELS,
+  failureText,
+  fromLabel,
+  outstandingPaise,
+  rupees,
+} from '@/features/ops-billing/presentation/components/billingView';
+
+const PAISE_PER_RUPEE = 100;
+const REFERENCE_MAX_LENGTH = 200;
+const MARK_PAID_FAILED = 'The payment could not be recorded. Please try again.';
+
+/** Order the modes the way ops collects off-gateway money most often. */
+const METHOD_ORDER: readonly PaymentMethod[] = ['bank_transfer', 'manual', 'razorpay'];
+
+/** Placeholder per mode, so ops knows which reference to paste. */
+const REFERENCE_PLACEHOLDER: Readonly<Record<PaymentMethod, string>> = {
+  bank_transfer: 'UTR, e.g. HDFCN52026061300123',
+  manual: 'Cheque no., receipt no. or UPI reference',
+  razorpay: 'Razorpay payment id, e.g. pay_29QQoUBi66xm2f',
+};
 
 interface MarkPaidForm {
-  mode: PaymentMethod;
+  method: string;
+  amount: string;
   reference: string;
   dateIso: string;
 }
 
-const VALIDATORS: FormValidators<MarkPaidForm> = {
-  reference: (value) => minLen(value, 4, 'Payment reference'),
-  dateIso: (value) => notFutureDate(value, 'Payment date'),
-};
-
-/** Placeholder per mode, so ops knows which reference to paste. */
-const REFERENCE_PLACEHOLDER: Readonly<Record<PaymentMethod, string>> = {
-  'Bank transfer': 'UTR, e.g. HDFCN52026061300123',
-  Cheque: 'Cheque number, e.g. 004512',
-  Cash: 'Receipt number, e.g. MB/CASH/0042',
-  UPI: 'UPI reference, e.g. 415912345678',
-  Card: 'Gateway reference',
-  NetBanking: 'Bank reference',
-};
-
 interface MarkPaidModalProps {
-  open: boolean;
-  invoice: Invoice;
+  invoice: BillingInvoice;
   onClose: () => void;
-  onDone?: () => void;
 }
 
 /**
  * Record a payment received outside the gateway (audit SA-03: "no
- * mark-as-paid"). The mode, reference and date are all required because they
- * are what makes the record real: the store writes the payment row they
- * describe and recomputes the invoice status from it, rather than flipping a
- * status with nothing behind it.
+ * mark-as-paid"). The amount defaults to what is still owed and may be less —
+ * a partial payment keeps the invoice open. The backend writes the payment row
+ * and moves the invoice to Paid once it is covered in full.
  */
-export function MarkPaidModal({ open, invoice, onClose, onDone }: MarkPaidModalProps) {
-  const markPaid = useBillingStore((s) => s.markPaid);
-  const [busy, run] = useOpsAct();
+export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
+  const markPaid = useMarkInvoicePaidMutation();
+  // One idempotency key per opening of the modal: a retried submit is
+  // deduplicated by the backend instead of recording the money twice.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const owedPaise = outstandingPaise(invoice);
+  const owedRupees = owedPaise / PAISE_PER_RUPEE;
+
+  const validators: FormValidators<MarkPaidForm> = {
+    amount: (value) => {
+      const invalid = positiveAmount(value, 'Amount');
+      if (invalid) return invalid;
+      return Number(value) <= owedRupees
+        ? undefined
+        : `Amount cannot be more than the ${rupees(owedPaise)} still owed.`;
+    },
+    dateIso: (value) => notFutureDate(value, 'Payment date'),
+  };
 
   const form = useForm<MarkPaidForm>({
-    initial: { mode: 'Bank transfer', reference: '', dateIso: opsTodayIso() },
-    validate: VALIDATORS,
-    onSubmit: (values) => {
-      run('markpaid', `${invoice.no} marked paid — ${money(invoice.amount)} recorded.`, () => {
-        markPaid(invoice.id, {
-          mode: values.mode,
-          reference: values.reference.trim(),
-          dateIso: values.dateIso,
+    initial: {
+      method: METHOD_LABELS.bank_transfer,
+      amount: String(owedRupees),
+      reference: '',
+      dateIso: todayISO(),
+    },
+    validate: validators,
+    onSubmit: async (values) => {
+      const method = fromLabel(METHOD_LABELS, values.method) ?? 'bank_transfer';
+      const amountPaise = Math.round(Number(values.amount) * PAISE_PER_RUPEE);
+      try {
+        const updated = await markPaid.mutateAsync({
+          id: invoice.id,
+          idempotencyKey,
+          input: {
+            method,
+            reference: values.reference.trim() || null,
+            // Local midnight of the chosen day, as an ISO date-time.
+            paidAt: new Date(`${values.dateIso}T00:00:00`).toISOString(),
+            amountPaise,
+          },
         });
-        onDone?.();
-      });
+        toast(
+          updated.status === 'paid'
+            ? `${invoice.invoiceNo} marked paid — ${rupees(amountPaise)} recorded.`
+            : `${rupees(amountPaise)} recorded against ${invoice.invoiceNo}; ${rupees(outstandingPaise(updated))} still owed.`,
+          'success',
+        );
+        onClose();
+      } catch (error) {
+        toast(failureText(error, MARK_PAID_FAILED), 'error');
+      }
     },
   });
 
   const { values } = form;
+  const method = fromLabel(METHOD_LABELS, values.method) ?? 'bank_transfer';
 
   return (
     <FormModal
-      open={open}
+      open
       onClose={onClose}
-      title={`Mark ${invoice.no} as paid`}
+      title={`Mark ${invoice.invoiceNo} as paid`}
       width={520}
       onSubmit={form.handleSubmit}
-      submitLabel="Mark as Paid"
+      submitLabel="Record Payment"
       submitVariant="success"
-      busy={busy.markpaid}
+      busy={form.submitting}
     >
       <div className="flex flex-col gap-4.5">
         <div className="bg-bg-subtle border-border flex flex-col gap-2 rounded-md border px-4 py-3">
           <div className="flex justify-between gap-3">
             <span className="text-caption text-text-muted">Hospital</span>
-            <span className="text-body text-text-strong font-medium">{invoice.hospital}</span>
+            <span className="text-body text-text-strong font-medium">{invoice.hospitalName}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-caption text-text-muted">Amount (incl. 18% GST)</span>
+            <span className="text-caption text-text-muted">Invoice total (incl. GST)</span>
             <span className="text-body text-text-strong font-medium tabular-nums">
-              {money(invoice.amount)}
+              {rupees(invoice.totalPaise)}
             </span>
           </div>
+          {invoice.amountPaidPaise > 0 && (
+            <div className="flex justify-between gap-3">
+              <span className="text-caption text-text-muted">Still owed</span>
+              <span className="text-body text-text-strong font-medium tabular-nums">
+                {rupees(owedPaise)}
+              </span>
+            </div>
+          )}
         </div>
         <OpsField label="Payment Mode" required>
           <Select
-            value={values.mode}
-            options={OFFLINE_PAYMENT_METHODS}
-            onChange={(v) => form.setField('mode', v as PaymentMethod)}
+            value={values.method}
+            options={METHOD_ORDER.map((m) => METHOD_LABELS[m])}
+            onChange={(v) => form.setField('method', v)}
+            height={48}
+          />
+        </OpsField>
+        <OpsField
+          label="Amount Received (₹)"
+          required
+          error={form.errorFor('amount')}
+          hint="Less than the amount owed records a part payment; the invoice stays open."
+        >
+          <TextInput
+            value={values.amount}
+            onChange={(v) => form.setField('amount', v)}
+            onBlur={() => form.blurField('amount')}
+            inputMode="decimal"
             height={48}
           />
         </OpsField>
         <OpsField
           label="Reference"
-          required
-          error={form.errorFor('reference')}
           hint="Stored on the payment record so finance can reconcile it."
         >
           <TextInput
             value={values.reference}
             onChange={(v) => form.setField('reference', v)}
-            onBlur={() => form.blurField('reference')}
-            placeholder={REFERENCE_PLACEHOLDER[values.mode]}
+            placeholder={REFERENCE_PLACEHOLDER[method]}
+            maxLength={REFERENCE_MAX_LENGTH}
             height={48}
           />
         </OpsField>
@@ -125,13 +185,14 @@ export function MarkPaidModal({ open, invoice, onClose, onDone }: MarkPaidModalP
             onChange={(v) => form.setField('dateIso', v)}
             onBlur={() => form.blurField('dateIso')}
             type="date"
+            max={todayISO()}
             height={48}
           />
         </OpsField>
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
-          <Icon name="info" size={14} className="mt-px flex-none" /> A payment transaction is
-          created for this invoice and the invoice moves to Completed. Any suspension for
-          non-payment has to be lifted separately, on the hospital&apos;s profile.
+          <Icon name="info" size={14} className="mt-px flex-none" /> A payment record is created for
+          this invoice. Once it is paid in full, a subscription held for non-payment is reinstated
+          automatically; a manual suspension has to be lifted separately.
         </div>
       </div>
     </FormModal>

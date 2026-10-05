@@ -1,161 +1,113 @@
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
+import { daysFromTodayISO, fmtDate } from '@/shared/lib/format';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
 import { TextInput } from '@/shared/ui/TextInput';
-import { Toggle } from '@/shared/ui/Toggle';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import type { OpsHospital } from '@/features/ops-hospitals/application/store/hospitals.types';
-import { useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
+import { useSetInvoiceGraceMutation } from '@/features/ops-billing/application/queries/useSetInvoiceGraceMutation';
+import type { BillingInvoice } from '@/features/ops-billing/domain/entities/billing.entities';
 import {
-  addDaysIso,
-  daysBetweenIso,
-  isoFromLongDate,
-  longDateFromIso,
-  opsTodayIso,
-} from '@/features/ops-hospitals/application/store/opsDates';
+  type GraceView,
+  failureText,
+  plural,
+} from '@/features/ops-billing/presentation/components/billingView';
 
-import {
-  PLATFORM_GRACE_DAYS,
-  graceDaysFor,
-} from '@/features/ops-billing/application/store/billing.derive';
-import { useBillingStore } from '@/features/ops-billing/application/store/billing.store';
-import type { Invoice } from '@/features/ops-billing/application/store/billing.types';
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const GRACE_FAILED = 'The grace window could not be saved. Please try again.';
 
 interface GraceForm {
-  /** Off = fall back to the hospital / platform window. */
-  override: boolean;
-  days: string;
-  /** Apply the same window to every future invoice for this hospital. */
-  applyToHospital: boolean;
+  endsIso: string;
 }
 
-const VALIDATORS: FormValidators<GraceForm> = {
-  days: (value, values) => {
-    if (!values.override) return undefined;
-    const text = value.trim();
-    if (text === '') return 'Enter a number of days, or use the default.';
-    if (!/^\d+$/.test(text)) return 'Grace days must be a whole number of 0 or more.';
-    return Number(text) > 90
-      ? 'A grace window longer than 90 days needs finance sign-off.'
-      : undefined;
-  },
-};
-
 interface GracePeriodModalProps {
-  open: boolean;
-  invoice: Invoice;
-  hospital: OpsHospital | null;
+  invoice: BillingInvoice;
+  /** The window as it stands, so the field starts from it. */
+  grace: GraceView;
   onClose: () => void;
-  onDone?: () => void;
 }
 
 /**
- * Configure the payment grace window (audit SA-03: "no grace period"). The
- * window can be set on this invoice alone or on the hospital, so both levels
- * the audit asks for are reachable from one place; `0` is a real setting — no
- * grace at all — and is kept distinct from "not configured".
+ * Set when an unpaid invoice's grace window closes (audit SA-03: "no grace
+ * period"). The backend stores the end date on the invoice; it may not fall
+ * before the due date. Moving it past today lifts a non-payment hold the
+ * dunning job placed, if no other invoice is past its own window.
  */
-export function GracePeriodModal({
-  open,
-  invoice,
-  hospital,
-  onClose,
-  onDone,
-}: GracePeriodModalProps) {
-  const setInvoiceGrace = useBillingStore((s) => s.setInvoiceGrace);
-  const setHospitalGrace = useHospitalsStore((s) => s.setGraceDays);
-  const [busy, run] = useOpsAct();
-  const effective = graceDaysFor(invoice, hospital);
+export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalProps) {
+  const setGrace = useSetInvoiceGraceMutation();
+
+  const validators: FormValidators<GraceForm> = {
+    endsIso: (value) => {
+      if (!ISO_DATE.test(value)) return 'Pick the date the grace window closes.';
+      return value >= invoice.dueAt
+        ? undefined
+        : `The window cannot close before the due date, ${fmtDate(invoice.dueAt)}.`;
+    },
+  };
 
   const form = useForm<GraceForm>({
-    initial: {
-      override: invoice.graceDays !== undefined,
-      days: String(effective),
-      applyToHospital: false,
-    },
-    validate: VALIDATORS,
-    onSubmit: (values) => {
-      const days = values.override ? Number(values.days.trim()) : undefined;
-      run('grace', `Grace window updated for ${invoice.no}.`, () => {
-        setInvoiceGrace(invoice.id, days);
-        if (values.applyToHospital && hospital) setHospitalGrace(hospital.id, days);
-        onDone?.();
-      });
+    initial: { endsIso: grace.endsIso },
+    validate: validators,
+    onSubmit: async (values) => {
+      try {
+        await setGrace.mutateAsync({ id: invoice.id, graceEndsAt: values.endsIso });
+        toast(
+          `Grace window for ${invoice.invoiceNo} now ends ${fmtDate(values.endsIso)}.`,
+          'success',
+        );
+        onClose();
+      } catch (error) {
+        toast(failureText(error, GRACE_FAILED), 'error');
+      }
     },
   });
 
   const { values } = form;
-  const dueIso = isoFromLongDate(invoice.due);
-  const previewDays = values.override ? Number(values.days.trim() || '0') : PLATFORM_GRACE_DAYS;
-  const endsIso = dueIso && Number.isFinite(previewDays) ? addDaysIso(dueIso, previewDays) : null;
-  const left = endsIso ? daysBetweenIso(opsTodayIso(), endsIso) : null;
+  const left = ISO_DATE.test(values.endsIso) ? daysFromTodayISO(values.endsIso) : null;
 
   return (
     <FormModal
-      open={open}
+      open
       onClose={onClose}
-      title={`Grace window for ${invoice.no}`}
+      title={`Grace window for ${invoice.invoiceNo}`}
       width={520}
       onSubmit={form.handleSubmit}
       submitLabel="Save Grace Window"
-      busy={busy.grace}
+      busy={form.submitting}
     >
       <div className="flex flex-col gap-4.5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-body text-text-body">
-            Override the default of {PLATFORM_GRACE_DAYS} days
-          </span>
-          <Toggle
-            value={values.override}
-            onChange={(v) => form.setField('override', v)}
-            label="Override the default grace window"
-          />
-        </div>
         <OpsField
-          label="Grace Days After Due Date"
-          required={values.override}
-          error={form.errorFor('days')}
-          hint={
-            values.override
-              ? '0 means the invoice is actionable the day after it falls due.'
-              : `Using the ${hospital?.graceDays !== undefined ? "hospital's" : 'platform'} setting of ${effective} days.`
-          }
+          label="Grace Ends On"
+          required
+          error={form.errorFor('endsIso')}
+          hint={`Due ${fmtDate(invoice.dueAt)}. ${
+            grace.source === 'invoice'
+              ? 'Currently set on this invoice.'
+              : grace.source === 'hospital'
+                ? "Currently from the hospital's own grace setting."
+                : 'Currently the platform default.'
+          }`}
         >
           <TextInput
-            value={values.override ? values.days : String(effective)}
-            onChange={(v) => form.setField('days', v)}
-            onBlur={() => form.blurField('days')}
-            inputMode="numeric"
-            disabled={!values.override}
+            value={values.endsIso}
+            onChange={(v) => form.setField('endsIso', v)}
+            onBlur={() => form.blurField('endsIso')}
+            type="date"
+            min={invoice.dueAt}
             height={48}
           />
         </OpsField>
-        {hospital && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-body text-text-body">
-              Also apply to every future invoice for {hospital.name}
-            </span>
-            <Toggle
-              value={values.applyToHospital}
-              onChange={(v) => form.setField('applyToHospital', v)}
-              label={`Apply this grace window to all invoices for ${hospital.name}`}
-            />
-          </div>
-        )}
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
           <Icon name="info" size={14} className="mt-px flex-none" />
-          {endsIso ? (
-            <span>
-              Due {invoice.due} · grace ends {longDateFromIso(endsIso)}
-              {left !== null &&
-                (left >= 0 ? ` (in ${left} day${left === 1 ? '' : 's'})` : ` (${-left} days ago)`)}
-              . Suspension for non-payment is only offered after that.
-            </span>
-          ) : (
-            <span>This invoice has no readable due date, so no window can be counted.</span>
-          )}
+          <span>
+            {left === null
+              ? 'Pick a date to see how long the hospital has.'
+              : left >= 0
+                ? `The hospital has ${plural(left, 'day')} left to pay.`
+                : `That date is ${plural(-left, 'day')} ago, so the window stays closed.`}{' '}
+            Suspension for non-payment is only offered after the window closes.
+          </span>
         </div>
       </div>
     </FormModal>
