@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
 import { money } from '@/shared/lib/format';
 import { positiveAmount, required } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
@@ -9,10 +8,15 @@ import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SegTabs } from '@/shared/ui/SegTabs';
-import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
+import { toast } from '@/shared/ui/toast/toast.store';
 
+import { isFailure } from '@/core/error/failure';
+
+import { useCreatePlanMutation } from '@/features/ops-plans/application/queries/useCreatePlanMutation';
+import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
+import { useUpdatePlanMutation } from '@/features/ops-plans/application/queries/useUpdatePlanMutation';
 import {
   PLAN_LIMIT_META,
   UNLIMITED,
@@ -21,18 +25,18 @@ import {
   yearlyDiscountPct,
   yearlyListPrice,
 } from '@/features/ops-plans/application/store/plans.limits';
-import { usePlansStore } from '@/features/ops-plans/application/store/plans.store';
 import {
-  PLAN_LIMIT_KEYS,
-  type Plan,
-  type PlanLimit,
-  type PlanLimitKey,
-  type PlanLimits,
-} from '@/features/ops-plans/application/store/plans.types';
+  CATALOG_LIMIT_KEYS,
+  type CatalogLimitKey,
+  type CatalogPlan,
+  type CatalogPlanDraft,
+  type CatalogPlanLimit,
+  type CatalogPlanLimits,
+} from '@/features/ops-plans/domain/entities/plans.catalog';
 import { PlanLimitField } from '@/features/ops-plans/presentation/components/PlanLimitField';
 
 /** `bookingsUnlimited`, `staffUnlimited`, … — one switch per ceiling. */
-type LimitFlagKey = `${PlanLimitKey}Unlimited`;
+type LimitFlagKey = `${CatalogLimitKey}Unlimited`;
 
 /**
  * Editable form shape. Money and ceilings stay strings until submit parses
@@ -44,13 +48,9 @@ type PlanFormValues = {
   price: string;
   yearlyOn: boolean;
   yearlyPrice: string;
-  support: string;
   extra: string;
   custom: boolean;
-  popular: boolean;
-} & { [K in PlanLimitKey]: string } & { [K in LimitFlagKey]: boolean };
-
-const SUPPORT_OPTIONS = ['Email support', 'Priority support', 'Dedicated success manager'] as const;
+} & { [K in CatalogLimitKey]: string } & { [K in LimitFlagKey]: boolean };
 
 /** Default ceilings for a brand-new plan — mirrors the Starter tier. */
 const BLANK: PlanFormValues = {
@@ -58,64 +58,48 @@ const BLANK: PlanFormValues = {
   price: '',
   yearlyOn: false,
   yearlyPrice: '',
-  support: 'Email support',
   extra: '',
   custom: false,
-  popular: false,
-  bookings: '',
-  bookingsUnlimited: false,
   staff: '25',
   staffUnlimited: false,
   doctors: '10',
   doctorsUnlimited: false,
-  branches: '1',
-  branchesUnlimited: false,
   storageGb: '20',
   storageGbUnlimited: false,
-  messageCredits: '2000',
-  messageCreditsUnlimited: false,
 };
 
 /** A stored ceiling as the two form controls that edit it. */
-function limitToForm(limit: PlanLimit): { text: string; unlimited: boolean } {
+function limitToForm(limit: CatalogPlanLimit): { text: string; unlimited: boolean } {
   return limit === null ? { text: '', unlimited: true } : { text: String(limit), unlimited: false };
 }
 
 /** The form's starting values for an existing plan. */
-function planToForm(plan: Plan): PlanFormValues {
+function planToForm(plan: CatalogPlan): PlanFormValues {
   const l = plan.limits;
   return {
     name: plan.name,
-    price: String(plan.price),
-    yearlyOn: plan.yearlyPrice !== null,
-    yearlyPrice: plan.yearlyPrice === null ? '' : String(plan.yearlyPrice),
-    support: plan.support,
-    extra: plan.extra,
-    custom: plan.custom,
-    popular: plan.popular,
-    bookings: limitToForm(l.bookings).text,
-    bookingsUnlimited: limitToForm(l.bookings).unlimited,
+    price: String(plan.priceMonthly),
+    yearlyOn: plan.priceYearly !== null,
+    yearlyPrice: plan.priceYearly === null ? '' : String(plan.priceYearly),
+    extra: plan.description ?? '',
+    custom: !plan.isPublic,
     staff: limitToForm(l.staff).text,
     staffUnlimited: limitToForm(l.staff).unlimited,
     doctors: limitToForm(l.doctors).text,
     doctorsUnlimited: limitToForm(l.doctors).unlimited,
-    branches: limitToForm(l.branches).text,
-    branchesUnlimited: limitToForm(l.branches).unlimited,
     storageGb: limitToForm(l.storageGb).text,
     storageGbUnlimited: limitToForm(l.storageGb).unlimited,
-    messageCredits: limitToForm(l.messageCredits).text,
-    messageCreditsUnlimited: limitToForm(l.messageCredits).unlimited,
   };
 }
 
 /** One ceiling validator: skipped while that ceiling is unlimited. */
-function limitValidator(key: PlanLimitKey) {
+function limitValidator(key: CatalogLimitKey) {
   return (value: string, values: PlanFormValues): string | undefined =>
     values[`${key}Unlimited`] ? undefined : limitError(value, PLAN_LIMIT_META[key].label);
 }
 
 /** Read one ceiling back out of the form. Validation has already passed. */
-function limitFromForm(key: PlanLimitKey, values: PlanFormValues): PlanLimit {
+function limitFromForm(key: CatalogLimitKey, values: PlanFormValues): CatalogPlanLimit {
   if (values[`${key}Unlimited`]) return UNLIMITED;
   return parseLimitInput(values[key]) ?? 0;
 }
@@ -123,32 +107,42 @@ function limitFromForm(key: PlanLimitKey, values: PlanFormValues): PlanLimit {
 interface PlanModalProps {
   open: boolean;
   /** The plan being edited, or `null` to create a new one. */
-  plan: Plan | null;
+  plan: CatalogPlan | null;
   onClose: () => void;
   onDone: () => void;
 }
 
 /**
  * Create / edit a subscription plan (design `Ops.jsx` `PlanModal`), rebuilt on
- * `FormModal` so Enter submits (audit 3.4.5) and extended for SA-02: a yearly
- * price beside the monthly one with the discount it implies, and all six
- * ceilings with their own unlimited switch.
+ * `FormModal` so Enter submits (audit 3.4.5): a yearly price beside the
+ * monthly one with the discount it implies, and the three ceilings the
+ * backend stores, each with its own unlimited switch. Saves through
+ * `POST /platform/plans` or `PATCH /platform/plans/{id}` (If-Match).
  *
  * Mounted fresh per plan (the catalog screen keys it), so the starting values
  * come straight from `useState` instead of a reset effect.
  */
 export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
-  const plans = usePlansStore((s) => s.plans);
-  const savePlan = usePlansStore((s) => s.savePlan);
-  const [busy, run] = useOpsAct();
+  const plans = usePlansQuery().data;
+  const createMutation = useCreatePlanMutation();
+  const updateMutation = useUpdatePlanMutation();
   const isNew = !plan;
+  /** The server's verdict on the name (a taken plan code), shown until the name changes. */
+  const [nameServerError, setNameServerError] = useState<string | undefined>(undefined);
+
+  const handleError = (error: unknown) => {
+    const message = isFailure(error) ? error.message : 'Could not save the plan.';
+    const codeError = isFailure(error) ? error.fieldErrors.code?.[0] : undefined;
+    if (codeError) setNameServerError(`${codeError} Choose a different plan name.`);
+    toast(message, 'error');
+  };
 
   const validate = useMemo<FormValidators<PlanFormValues>>(
     () => ({
       name: (value) => {
         const missing = required(value, 'Plan name');
         if (missing) return missing;
-        const taken = plans.some(
+        const taken = (plans ?? []).some(
           (p) =>
             p.name.trim().toLowerCase() === value.trim().toLowerCase() &&
             (isNew || p.id !== plan?.id),
@@ -167,12 +161,9 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
           ? `A yearly price above ${money(full)} costs more than paying monthly.`
           : undefined;
       },
-      bookings: limitValidator('bookings'),
       staff: limitValidator('staff'),
       doctors: limitValidator('doctors'),
-      branches: limitValidator('branches'),
       storageGb: limitValidator('storageGb'),
-      messageCredits: limitValidator('messageCredits'),
     }),
     [plans, isNew, plan?.id],
   );
@@ -182,28 +173,32 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
     validate,
     onSubmit: (values) => {
       const name = values.name.trim();
-      const limits: PlanLimits = {
-        bookings: limitFromForm('bookings', values),
+      const limits: CatalogPlanLimits = {
         staff: limitFromForm('staff', values),
         doctors: limitFromForm('doctors', values),
-        branches: limitFromForm('branches', values),
         storageGb: limitFromForm('storageGb', values),
-        messageCredits: limitFromForm('messageCredits', values),
       };
-      run('plan', isNew ? `Plan "${name}" created.` : `Plan "${name}" updated.`, () => {
-        const base = {
-          name,
-          price: Number(values.price),
-          yearlyPrice: values.yearlyOn ? Number(values.yearlyPrice) : null,
-          limits,
-          support: values.support,
-          extra: values.extra,
-          popular: values.popular,
-          custom: values.custom,
-        };
-        savePlan(plan ? { id: plan.id, ...base } : base);
+      const extra = values.extra.trim();
+      const draft: CatalogPlanDraft = {
+        name,
+        description: extra === '' ? null : extra,
+        priceMonthly: Number(values.price),
+        priceYearly: values.yearlyOn ? Number(values.yearlyPrice) : null,
+        limits,
+        isPublic: !values.custom,
+      };
+      const onSuccess = () => {
+        toast(isNew ? `Plan "${name}" created.` : `Plan "${name}" updated.`);
         onDone();
-      });
+      };
+      if (plan) {
+        updateMutation.mutate(
+          { planId: plan.id, draft, version: plan.version },
+          { onSuccess, onError: handleError },
+        );
+      } else {
+        createMutation.mutate(draft, { onSuccess, onError: handleError });
+      }
     },
   });
 
@@ -221,7 +216,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
       width={620}
       onSubmit={form.handleSubmit}
       submitLabel={isNew ? 'Create Plan' : 'Save Plan'}
-      busy={busy.plan}
+      busy={createMutation.isPending || updateMutation.isPending}
     >
       <div className="flex flex-col gap-4.5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -230,14 +225,6 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
             value={values.custom ? 'Hospital-specific' : 'Standard'}
             onChange={(v) => form.setField('custom', v === 'Hospital-specific')}
           />
-          <span className="flex items-center gap-2.5">
-            <Toggle
-              value={values.popular}
-              onChange={(v) => form.setField('popular', v)}
-              label="Mark as Most Popular"
-            />
-            <span className="text-body text-text-body">Mark as Most Popular</span>
-          </span>
         </div>
         {values.custom && (
           <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
@@ -246,10 +233,13 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
             Hospital&quot;) so it&apos;s recognisable everywhere plans appear.
           </div>
         )}
-        <OpsField label="Plan Name" required error={form.errorFor('name')}>
+        <OpsField label="Plan Name" required error={form.errorFor('name') ?? nameServerError}>
           <TextInput
             value={values.name}
-            onChange={(v) => form.setField('name', v)}
+            onChange={(v) => {
+              setNameServerError(undefined);
+              form.setField('name', v);
+            }}
             onBlur={() => form.blurField('name')}
             placeholder={values.custom ? 'e.g. Custom — Apollo Hospital' : 'e.g. Growth'}
             height={48}
@@ -312,7 +302,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
         <div className="flex flex-col gap-3.5">
           <SectionTitle size={16}>Plan limits</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
-            {PLAN_LIMIT_KEYS.map((key) => (
+            {CATALOG_LIMIT_KEYS.map((key) => (
               <PlanLimitField
                 key={key}
                 limitKey={key}
@@ -327,14 +317,6 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <OpsField label="Support Level">
-            <Select
-              value={values.support}
-              options={SUPPORT_OPTIONS}
-              onChange={(v) => form.setField('support', v)}
-              height={48}
-            />
-          </OpsField>
           <OpsField label="Extra Feature Line (optional)">
             <TextInput
               value={values.extra}
