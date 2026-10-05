@@ -1,5 +1,3 @@
-import { DEMO_TODAY_ISO } from '@/core/config/demo';
-import { bankOf } from '@/features/ops-hospitals/application/store/hospitals.store';
 import { cn } from '@/shared/lib/cn';
 import { fmtDate, money, moneyShort } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
@@ -8,33 +6,49 @@ import { Icon } from '@/shared/ui/Icon';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TableShell } from '@/shared/ui/TableShell';
 
-import { releasable, type PayoutRun, type SettlementRow } from './settlement-model';
-import { SettlementQueueRow } from './SettlementQueueRow';
+import {
+  RUN_STATUS_LABEL,
+  runnablePeriods,
+  type LedgerRow,
+  type RunGroup,
+} from '@/features/ops-settlements/presentation/components/opsSettlements.viewModel';
+import { SettlementQueueRow } from '@/features/ops-settlements/presentation/components/SettlementQueueRow';
 
 interface PayoutRunCardProps {
-  run: PayoutRun;
-  /** The commission column label (carries the live commission %). */
-  commCol: string;
-  onOpenRun: (date: string) => void;
-  onOpenHosp: (hid: number) => void;
-  onRelease: (row: SettlementRow) => void;
-  onRetry: (row: SettlementRow) => void;
+  group: RunGroup;
+  /** ISO today, for the "due" highlight. */
+  today: string;
+  /** True while this card's approve request is in flight. */
+  approving: boolean;
+  onApprove: (runId: string) => void;
+  onReleaseRun: (group: RunGroup) => void;
+  onCreateRun: () => void;
+  onOpenHosp: (hospitalId: string) => void;
+  onRelease: (row: LedgerRow) => void;
 }
 
-/** One payout-run card — due highlight, skipped caption, bulk Release Run. */
+/**
+ * One payout-run card. A real run shows its number, status and scheduled
+ * date, with Approve (draft) or Release Run (approved); the unassigned group
+ * collects closed periods no run has picked up yet, with Create Payout Run.
+ */
 export function PayoutRunCard({
-  run,
-  commCol,
-  onOpenRun,
+  group,
+  today,
+  approving,
+  onApprove,
+  onReleaseRun,
+  onCreateRun,
   onOpenHosp,
   onRelease,
-  onRetry,
 }: PayoutRunCardProps) {
-  const relRows = run.rows.filter((r) => releasable(r) && bankOf(r.hid));
-  const skipRows = run.rows.filter((r) => releasable(r) && !bankOf(r.hid));
-  const total = run.rows.reduce((a, r) => a + r.net, 0);
-  const relTotal = relRows.reduce((a, r) => a + r.net, 0);
-  const due = run.date !== 'unscheduled' && run.date <= DEMO_TODAY_ISO;
+  const { run, rows } = group;
+  const relRows = rows.filter((r) => r.releasable && r.payout?.hasBankAccount);
+  const skipRows = rows.filter((r) => r.releasable && !r.payout?.hasBankAccount);
+  const total = rows.reduce((a, r) => a + r.netRupees, 0);
+  const relTotal = relRows.reduce((a, r) => a + r.netRupees, 0);
+  const runnable = run === null ? runnablePeriods(rows) : [];
+  const due = run?.scheduledFor != null && run.scheduledFor <= today && relRows.length > 0;
   return (
     <Card>
       <div className="mb-3.5 flex flex-wrap items-center gap-3">
@@ -48,34 +62,45 @@ export function PayoutRunCard({
         </div>
         <div className="min-w-0">
           <SectionTitle size={16}>
-            Payout run · {run.date === 'unscheduled' ? 'Unscheduled' : fmtDate(run.date)}
-            {due && relRows.length > 0 ? ' — due' : ''}
+            {run
+              ? `Payout run ${run.runNo} · ${run.scheduledFor ? fmtDate(run.scheduledFor) : 'Unscheduled'}${due ? ' — due' : ''}`
+              : 'Not in a payout run'}
           </SectionTitle>
           <div className="text-caption text-text-muted">
-            {run.rows.length} statement{run.rows.length === 1 ? '' : 's'} · net {money(total)}
+            {run ? `${RUN_STATUS_LABEL[run.status]} · ` : ''}
+            {rows.length} statement{rows.length === 1 ? '' : 's'} · net {money(total)}
             {skipRows.length > 0 ? ` · ${skipRows.length} not releasable (no payout account)` : ''}
           </div>
         </div>
         <div className="flex-1"></div>
-        {relRows.length > 0 && (
-          <Button size="sm" icon="landmark" onClick={() => onOpenRun(run.date)}>
+        {run === null && runnable.length > 0 && (
+          <Button size="sm" icon="plus" onClick={onCreateRun}>
+            Create Payout Run ({runnable.length})
+          </Button>
+        )}
+        {run?.status === 'draft' && (
+          <Button size="sm" icon="check" busy={approving} onClick={() => onApprove(run.id)}>
+            Approve Run
+          </Button>
+        )}
+        {run && relRows.length > 0 && (
+          <Button size="sm" icon="landmark" onClick={() => onReleaseRun(group)}>
             Release Run ({relRows.length} · {moneyShort(relTotal)})
           </Button>
         )}
       </div>
       <TableShell
-        columns={['Statement', 'Gross', commCol, 'Net Payable', 'Status', 'Action']}
+        columns={['Statement', 'Gross', 'Commission', 'Net Payable', 'Status', 'Action']}
         scrollLabel="Statements in this payout run"
-        rightCols={['Gross', commCol, 'Net Payable']}
+        rightCols={['Gross', 'Commission', 'Net Payable']}
       >
-        {run.rows.map((s) => (
+        {rows.map((s) => (
           <SettlementQueueRow
             key={s.id}
             s={s}
             showDate={false}
             onOpenHosp={onOpenHosp}
             onRelease={onRelease}
-            onRetry={onRetry}
           />
         ))}
       </TableShell>
