@@ -1,30 +1,24 @@
 import { useState } from 'react';
 
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { downloadCsv } from '@/shared/lib/download';
 import { Card } from '@/shared/ui/Card';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SegTabs } from '@/shared/ui/SegTabs';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
-import { usePlatformUsersStore } from '@/features/ops-platform-users/application/store/platformUsers.store';
+import { isFailure } from '@/core/error/failure';
 
-import {
-  buildExportRows,
-  EXPORT_COLUMNS,
-  SUBJECT_PREFIX,
-} from '@/features/ops-compliance/application/store/compliance.export';
-import {
-  OPS_ACTING_USER_EMAIL,
-  useComplianceStore,
-} from '@/features/ops-compliance/application/store/compliance.store';
-import { ConfigChangesCard } from '@/features/ops-compliance/presentation/components/ConfigChangesCard';
+import { useCreateComplianceDataExportMutation } from '@/features/ops-compliance/application/queries/useCreateComplianceDataExportMutation';
+import { useProcessComplianceDataRequestMutation } from '@/features/ops-compliance/application/queries/useProcessComplianceDataRequestMutation';
+import { useRefreshCompliance } from '@/features/ops-compliance/application/queries/useRefreshCompliance';
 import type {
-  ExportFormValue,
-  ExportSubjectOption,
+  DataRequest,
+  DataRequestProcessOutcome,
+} from '@/features/ops-compliance/domain/entities/compliance.entities';
+import { ConfigChangesCard } from '@/features/ops-compliance/presentation/components/ConfigChangesCard';
+import {
+  ExportRequestForm,
+  type ExportFormValue,
 } from '@/features/ops-compliance/presentation/components/ExportRequestForm';
-import { ExportRequestForm } from '@/features/ops-compliance/presentation/components/ExportRequestForm';
 import { ExportRequestsCard } from '@/features/ops-compliance/presentation/components/ExportRequestsCard';
 import { LoginHistoryCard } from '@/features/ops-compliance/presentation/components/LoginHistoryCard';
 
@@ -36,91 +30,77 @@ const TABS: readonly ComplianceTab[] = [
   'Export on Request',
 ];
 
-/**
- * How long the re-derive keeps the Refresh control spinning. The seed store
- * answers instantly — same fake-latency convention as `useOpsAct`.
- */
-const REFRESH_SETTLE_MS = 420;
+/** The toast that says exactly what processing did — never more. */
+function announceOutcome(requestNo: string, outcome: DataRequestProcessOutcome): void {
+  if (outcome.status === 'deferred') {
+    toast(`${requestNo} is filed — the nightly run will prepare the export.`, 'info');
+    return;
+  }
+  const { request } = outcome;
+  if (request.status === 'completed' && request.exportFileId) {
+    toast(`${requestNo}: export ready — download it from Recorded Requests.`, 'success');
+  } else if (request.status === 'no_data') {
+    toast(`${requestNo}: no records are held for this account — nothing was exported.`, 'info');
+  } else {
+    toast(`${requestNo} is ${request.status.replace('_', ' ')}.`, 'info');
+  }
+}
 
 /**
- * Compliance (audit 2.5 / SA-06) — the three records that had no screen:
- * staff login history, configuration-change detail with before → after
- * values, and export on request.
+ * Compliance (audit 2.5 / SA-06) on `/platform/compliance/*` — staff login
+ * history, configuration-change detail with before → after values, and
+ * data-subject export requests.
  *
- * Table and filter treatment is deliberately identical to `OpsLogsScreen`, so
- * the log screens read as one product.
+ * Each card owns its own server-side query; Refresh refetches them all.
+ * Table and filter treatment matches `OpsLogsScreen`, so the log screens read
+ * as one product.
  */
 export function OpsComplianceScreen() {
-  const logins = useComplianceStore((s) => s.logins);
-  const changes = useComplianceStore((s) => s.changes);
-  const requests = useComplianceStore((s) => s.requests);
-  const refreshCompliance = useComplianceStore((s) => s.refresh);
-  const openExport = useComplianceStore((s) => s.openExport);
-  const settleExport = useComplianceStore((s) => s.settleExport);
-  const hospitals = useHospitalsStore((s) => s.hospitals);
-  const patients = usePlatformUsersStore((s) => s.users);
-
   const [tab, setTab] = useState<ComplianceTab>('Staff Logins');
-  const [busy, run] = useOpsAct();
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const refresh = useRefreshCompliance();
+  const createExport = useCreateComplianceDataExportMutation();
+  const processRequest = useProcessComplianceDataRequestMutation();
 
-  /**
-   * Subjects come from live data — the hospital registry, the accounts that
-   * actually appear in the login history, and the patient roster — so nothing
-   * can be requested that this console cannot produce records for.
-   */
-  const subjects: readonly ExportSubjectOption[] = [
-    ...hospitals.map((h): ExportSubjectOption => ({
-      kind: 'Hospital',
-      key: `${SUBJECT_PREFIX.hospital}${h.id}`,
-      label: h.name,
-    })),
-    ...[...new Set(logins.map((l) => l.user))].sort().map((email): ExportSubjectOption => ({
-      kind: 'Staff user',
-      key: `${SUBJECT_PREFIX.staff}${email}`,
-      label: email,
-    })),
-    ...patients.map((p): ExportSubjectOption => ({
-      kind: 'Patient reference',
-      key: `${SUBJECT_PREFIX.patient}${p.email}`,
-      label: `${p.name} · ${p.email}`,
-    })),
-  ];
-
-  const handleRefresh = async (): Promise<void> => {
-    refreshCompliance();
-    await new Promise<void>((resolve) => setTimeout(resolve, REFRESH_SETTLE_MS));
+  const prepare = (request: DataRequest): void => {
+    setProcessingId(request.id);
+    processRequest.mutate(request.id, {
+      onSuccess: (outcome) => announceOutcome(request.requestNo, outcome),
+      onError: (error) =>
+        toast(
+          `${request.requestNo} could not be prepared now: ${
+            isFailure(error) ? error.message : 'please try again.'
+          }`,
+          'error',
+        ),
+      onSettled: () => setProcessingId(null),
+    });
   };
 
   /**
-   * THE LAW. The request is filed first with status `Preparing`; the rows are
-   * gathered; and only if there are any is a file written and the request
-   * closed as `Completed`. An empty result closes as `No data` with an
-   * explicit, non-celebratory message — no file, no success claim.
-   *
-   * The file is written inside the click itself, because a download started
-   * from a timer can be refused by the browser as not user-initiated — and
-   * this control may only claim success for a file that really arrived. The
-   * `useOpsAct` run then carries the busy state, the request's closing status
-   * and the toast.
+   * THE LAW: the request is filed first and shows as Requested; it is then
+   * prepared, and only a file the server actually wrote is reported as an
+   * export. When the renderer is not available to a live request, the
+   * request stays filed for the nightly run and the toast says so.
    */
   const handleExport = (value: ExportFormValue): void => {
-    if (busy.export) return;
-    const rows = buildExportRows({ ...value }, { logins, changes, patients });
-    const id = openExport({ ...value, requestedBy: OPS_ACTING_USER_EMAIL });
-    if (rows.length === 0) {
-      run('export', null, () => {
-        settleExport(id, { status: 'No data', rows: 0, file: null });
-        toast(
-          `${id}: no records held for ${value.subject} in that date range — nothing was exported.`,
-          'info',
-        );
-      });
-      return;
-    }
-    const file = `medibook-export-${id.toLowerCase()}.csv`;
-    downloadCsv(file, [EXPORT_COLUMNS, ...rows]);
-    run('export', `${id}: exported ${rows.length} records for ${value.subject}.`, () =>
-      settleExport(id, { status: 'Completed', rows: rows.length, file }),
+    if (createExport.isPending || processingId) return;
+    createExport.mutate(
+      {
+        subjectUserId: value.subjectUserId,
+        subjectKind: value.subjectKind,
+        idempotencyKey: crypto.randomUUID(),
+      },
+      {
+        onSuccess: (request) => prepare(request),
+        onError: (error) =>
+          toast(
+            isFailure(error)
+              ? error.message
+              : `The export for ${value.subjectLabel} could not be filed.`,
+            'error',
+          ),
+      },
     );
   };
 
@@ -136,22 +116,18 @@ export function OpsComplianceScreen() {
           }}
         />
         <div className="flex-1"></div>
-        <span className="text-caption text-text-muted tabular-nums">
-          {logins.length} sign-ins · {changes.length} changes · {requests.length} exports
-        </span>
-        <RefreshBtn onRefresh={handleRefresh} title="Refresh compliance records" />
+        <RefreshBtn onRefresh={refresh} title="Refresh compliance records" />
       </Card>
 
-      {tab === 'Staff Logins' && <LoginHistoryCard logins={logins} />}
-      {tab === 'Configuration Changes' && <ConfigChangesCard changes={changes} />}
+      {tab === 'Staff Logins' && <LoginHistoryCard />}
+      {tab === 'Configuration Changes' && <ConfigChangesCard />}
       {tab === 'Export on Request' && (
         <>
           <ExportRequestForm
-            subjects={subjects}
-            busy={Boolean(busy.export)}
+            busy={createExport.isPending || processingId != null}
             onSubmit={handleExport}
           />
-          <ExportRequestsCard requests={requests} />
+          <ExportRequestsCard processingId={processingId} onProcess={prepare} />
         </>
       )}
     </div>

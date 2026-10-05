@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -18,72 +17,95 @@ import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { hospName } from '@/features/ops-hospitals/application/store/hospitals.store';
+import { isFailure } from '@/core/error/failure';
 
-import type { ConfigChange } from '@/features/ops-compliance/application/store/compliance.types';
+import { useComplianceConfigChangesQuery } from '@/features/ops-compliance/application/queries/useComplianceConfigChangesQuery';
+import { useComplianceHospitalsQuery } from '@/features/ops-compliance/application/queries/useComplianceHospitalsQuery';
+import { useExportComplianceConfigChangesMutation } from '@/features/ops-compliance/application/queries/useExportComplianceConfigChangesMutation';
+import type {
+  ConfigChangeFilters,
+  ConfigChangeRecord,
+  ConfigChangeSortField,
+} from '@/features/ops-compliance/domain/entities/compliance.entities';
 import { ComplianceDateInput } from '@/features/ops-compliance/presentation/components/ComplianceDateInput';
+import {
+  CONFIG_AREAS,
+  configAreaOf,
+  exportedMessage,
+  fmtComplianceWhen,
+  fmtConfigValue,
+  principalLabel,
+} from '@/features/ops-compliance/presentation/components/compliance.labels';
 
 const PAGE_SIZE = 8;
 
 const COLUMNS = ['Setting', 'Actor', 'When', 'Scope', 'Before', 'After'] as const;
 
-const ALL = 'All';
+const ALL_SCOPES = 'Scope: All';
+const PLATFORM = 'Platform';
+const ALL_HOSPITALS = 'All hospitals';
+const ALL_AREAS = 'Area: All';
 
-interface ConfigChangesCardProps {
-  changes: readonly ConfigChange[];
-}
+/** Column → server sort field. */
+const SORT_FIELDS: Readonly<Record<string, ConfigChangeSortField>> = {
+  setting: 'setting_key',
+  when: 'occurred_at',
+};
 
-/** What the change applied to: the platform, or one named hospital. */
-function scopeLabel(c: ConfigChange): string {
-  return c.scope === 'Hospital' && c.hid != null ? hospName(c.hid) : 'Platform';
-}
+const SORT_KEYS: Readonly<Record<string, string>> = { Setting: 'setting', When: 'when' };
 
 /**
- * Configuration-change detail (audit 2.5 / SA-06) — actor, timestamp, the
- * setting, its **before → after** values and the scope it applied to.
+ * Configuration-change detail (audit 2.5 / SA-06) on `GET /platform/
+ * compliance/config-changes` — the setting, who made it, when, the scope, and
+ * its **before → after** values.
  *
- * The before/after pair is the substance of the finding: a change log without
- * both values cannot answer "what was it before?", which is the only question
- * an auditor asks. Both values are their own sortable, exportable columns.
+ * Scope, area (setting-key prefix), date filters, sort and paging run on the
+ * server. The record carries the actor's account id but not their name, so
+ * the Actor column says which kind of staff made the change. The search box
+ * narrows the rows on this page by setting or value.
  */
-export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
+export function ConfigChangesCard() {
   const [q, setQ] = useState('');
-  const [scopeF, setScopeF] = useState(ALL);
-  const [areaF, setAreaF] = useState(ALL);
+  const [scopeF, setScopeF] = useState(ALL_SCOPES);
+  const [areaF, setAreaF] = useState(ALL_AREAS);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
+  const { sort, onSort } = useSort<never>({ key: 'when', dir: 'desc' });
+
+  const hospitalsQuery = useComplianceHospitalsQuery();
+  const hospitals = hospitalsQuery.data?.items ?? [];
+  const scopeLabel = (c: ConfigChangeRecord): string =>
+    c.scope === 'platform'
+      ? PLATFORM
+      : (hospitals.find((h) => h.id === c.hospitalId)?.name ?? 'Hospital instance');
+
+  const filters: ConfigChangeFilters = {
+    dateFrom: from,
+    dateTo: to,
+    scope: scopeF === PLATFORM ? 'platform' : scopeF === ALL_HOSPITALS ? 'hospital' : null,
+    settingKeyPrefix: CONFIG_AREAS.find((a) => a.label === areaF)?.prefix ?? null,
+  };
+  const changesQuery = useComplianceConfigChangesQuery({
+    ...filters,
+    page: page + 1,
+    pageSize: PAGE_SIZE,
+    sortField: SORT_FIELDS[sort.key ?? 'when'] ?? 'occurred_at',
+    sortDirection: sort.dir,
+  });
+  const exportMutation = useExportComplianceConfigChangesMutation();
 
   const ql = q.trim().toLowerCase();
-  const filtered = changes.filter(
-    (c) =>
-      (!ql ||
-        c.setting.toLowerCase().includes(ql) ||
-        c.actor.toLowerCase().includes(ql) ||
-        c.before.toLowerCase().includes(ql) ||
-        c.after.toLowerCase().includes(ql)) &&
-      (scopeF === ALL || scopeLabel(c) === scopeF) &&
-      (areaF === ALL || c.area === areaF) &&
-      (!from || c.date >= from) &&
-      (!to || c.date <= to),
-  );
-
-  const { sort, onSort, sorted } = useSort<ConfigChange>();
-  const ordered = sorted([...filtered], {
-    setting: (c) => c.setting,
-    actor: (c) => c.actor,
-    when: (c) => `${c.date} ${c.time}`,
-    scope: (c) => scopeLabel(c),
-  });
-  const pg = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
-  const rows = ordered.slice(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE);
-
-  const scopeOptions = [
-    ALL,
-    'Platform',
-    ...new Set(changes.filter((c) => c.scope === 'Hospital').map(scopeLabel)),
-  ];
-  const areaOptions = [ALL, ...new Set(changes.map((c) => c.area))];
+  const pageRows = changesQuery.data?.items ?? [];
+  const rows = ql
+    ? pageRows.filter(
+        (c) =>
+          c.settingKey.toLowerCase().includes(ql) ||
+          fmtConfigValue(c.beforeValue).toLowerCase().includes(ql) ||
+          fmtConfigValue(c.afterValue).toLowerCase().includes(ql),
+      )
+    : pageRows;
+  const total = changesQuery.data?.total ?? 0;
 
   const reset =
     (fn: (v: string) => void) =>
@@ -91,11 +113,11 @@ export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
       fn(v);
       setPage(0);
     };
-  const filtersActive = Boolean(ql || scopeF !== ALL || areaF !== ALL || from || to);
+  const filtersActive = Boolean(scopeF !== ALL_SCOPES || areaF !== ALL_AREAS || from || to);
   const clearAll = (): void => {
     setQ('');
-    setScopeF(ALL);
-    setAreaF(ALL);
+    setScopeF(ALL_SCOPES);
+    setAreaF(ALL_AREAS);
     setFrom('');
     setTo('');
     setPage(0);
@@ -103,69 +125,106 @@ export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
 
   /** THE LAW: write the file first, then report exactly what landed. */
   const exportCsv = (): void => {
-    downloadCsv('medibook-configuration-changes.csv', [
-      ['Date', 'Time', 'Actor', 'Area', 'Setting', 'Before', 'After', 'Scope'],
-      ...ordered.map((c) => [
-        c.date,
-        c.time,
-        c.actor,
-        c.area,
-        c.setting,
-        c.before,
-        c.after,
-        scopeLabel(c),
-      ]),
-    ]);
-    toast(`Exported ${ordered.length} configuration changes as CSV.`, 'success');
+    exportMutation.mutate(filters, {
+      onSuccess: ({ rows: all, truncated }) => {
+        downloadCsv('medibook-configuration-changes.csv', [
+          [
+            'When (UTC)',
+            'Actor account',
+            'Actor type',
+            'Area',
+            'Setting',
+            'Before',
+            'After',
+            'Scope',
+          ],
+          ...all.map((c) => [
+            c.occurredAt,
+            c.actorUserId,
+            principalLabel(c.scope),
+            configAreaOf(c.settingKey),
+            c.settingKey,
+            fmtConfigValue(c.beforeValue),
+            fmtConfigValue(c.afterValue),
+            scopeLabel(c),
+          ]),
+        ]);
+        toast(exportedMessage(all.length, 'configuration changes', truncated), 'success');
+      },
+      onError: (error) =>
+        toast(
+          isFailure(error) ? error.message : 'The configuration changes could not be exported.',
+          'error',
+        ),
+    });
   };
 
-  const tableState: TableStateSpec | undefined =
-    rows.length === 0
+  const tableState: TableStateSpec | undefined = changesQuery.isLoading
+    ? { kind: 'loading', rows: PAGE_SIZE }
+    : changesQuery.isError
       ? {
-          kind: 'empty',
-          icon: 'sliders-horizontal',
-          title: filtersActive ? 'No changes match your filters.' : 'No configuration changes yet.',
-          message: filtersActive
-            ? 'Widen the date range, or clear the filters to see the whole change log.'
-            : 'Platform and hospital settings changes are recorded here with their old and new values.',
-          ...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
+          kind: 'error',
+          title: "Configuration changes didn't load.",
+          message: isFailure(changesQuery.error) ? changesQuery.error.message : undefined,
+          onRetry: () => void changesQuery.refetch(),
         }
-      : undefined;
+      : rows.length === 0
+        ? {
+            kind: 'empty',
+            icon: 'sliders-horizontal',
+            title:
+              filtersActive || ql
+                ? 'No changes match your filters.'
+                : 'No configuration changes yet.',
+            message: ql
+              ? 'The search only looks at this page — clear it, or narrow the filters instead.'
+              : filtersActive
+                ? 'Widen the date range, or clear the filters to see the whole change log.'
+                : 'Platform and hospital settings changes are recorded here with their old and new values.',
+            ...(filtersActive || ql ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
+          }
+        : undefined;
 
   return (
     <Card>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SectionTitle>Configuration Changes</SectionTitle>
-        <InfoDot text="Every settings change with the value on both sides of it, so a change can be read back and reversed. Platform-scoped rows come from Platform Settings, plans and roles; hospital-scoped rows from one instance's own settings. Changes you make in Platform Settings appear here immediately." />
+        <InfoDot text="Every settings change with the value on both sides of it, so a change can be read back and reversed. Platform-scoped rows come from Platform Settings, feature flags, plans and roles; hospital-scoped rows from one instance's own settings. The server records each change as it is saved." />
         <div className="flex-1"></div>
-        <Button size="sm" variant="secondary" icon="download" onClick={exportCsv}>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="download"
+          onClick={exportCsv}
+          busy={exportMutation.isPending}
+        >
           Export CSV
         </Button>
       </div>
       <div className="mb-4">
         <SearchField
           value={q}
-          onChange={reset(setQ)}
-          placeholder="Search setting, actor or value"
-          aria-label="Search configuration changes by setting, actor or value"
+          onChange={setQ}
+          placeholder="Search this page by setting or value"
+          aria-label="Search the configuration changes on this page by setting or value"
         />
       </div>
       <div className="mb-4.5 flex flex-wrap items-center gap-3">
         <FilterSelect
-          value={scopeF === ALL ? 'Scope: All' : scopeF}
+          value={scopeF}
           aria-label="Filter by scope"
-          options={scopeOptions.map((s) => (s === ALL ? 'Scope: All' : s))}
-          onChange={(v) => reset(setScopeF)(v === 'Scope: All' ? ALL : v)}
+          options={[ALL_SCOPES, PLATFORM, ALL_HOSPITALS]}
+          onChange={reset(setScopeF)}
         />
         <FilterSelect
-          value={areaF === ALL ? 'Area: All' : areaF}
+          value={areaF}
           aria-label="Filter by settings area"
-          options={areaOptions.map((a) => (a === ALL ? 'Area: All' : a))}
-          onChange={(v) => reset(setAreaF)(v === 'Area: All' ? ALL : v)}
+          options={[ALL_AREAS, ...CONFIG_AREAS.map((a) => a.label)]}
+          onChange={reset(setAreaF)}
         />
         <ComplianceDateInput value={from} onChange={reset(setFrom)} title="From date" />
         <ComplianceDateInput value={to} onChange={reset(setTo)} title="To date" />
-        {filtersActive && (
+        {(filtersActive || ql) && (
           <button
             type="button"
             onClick={clearAll}
@@ -176,15 +235,18 @@ export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
         )}
         <div className="flex-1"></div>
         <span className="text-caption text-text-muted tabular-nums">
-          {filtered.length} change{filtered.length === 1 ? '' : 's'}
+          {total.toLocaleString('en-IN')} change{total === 1 ? '' : 's'}
         </span>
       </div>
       <TableShell
         columns={COLUMNS}
         scrollLabel="Configuration change log"
-        sortKeys={{ Setting: 'setting', Actor: 'actor', When: 'when', Scope: 'scope' }}
+        sortKeys={SORT_KEYS}
         sort={sort}
-        onSort={onSort}
+        onSort={(key) => {
+          onSort(key);
+          setPage(0);
+        }}
         state={tableState}
       >
         {rows.map((c) => (
@@ -192,37 +254,39 @@ export function ConfigChangesCard({ changes }: ConfigChangesCardProps) {
             <td className={cn(tdClass, 'max-w-80')}>
               <OpsEntity
                 icon="sliders-horizontal"
-                tint={c.scope === 'Platform' ? 'primary' : 'info'}
-                title={c.setting}
-                sub={c.area}
+                tint={c.scope === 'platform' ? 'primary' : 'info'}
+                title={c.settingKey}
+                sub={configAreaOf(c.settingKey)}
               />
             </td>
-            <td className={tdClass}>{c.actor}</td>
+            <td className={tdClass} title={c.actorUserId}>
+              {principalLabel(c.scope === 'platform' ? 'platform' : 'hospital')}
+            </td>
             <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
-              {fmtDate(c.date)} · {c.time}
+              {fmtComplianceWhen(c.occurredAt)}
             </td>
             <td className={tdClass}>
-              <Badge status={c.scope === 'Platform' ? 'Medibook' : 'In Queue'}>
+              <Badge status={c.scope === 'platform' ? 'Medibook' : 'In Queue'}>
                 {scopeLabel(c)}
               </Badge>
             </td>
-            <td className={cn(tdClass, 'text-text-muted')}>{c.before}</td>
-            <td className={cn(tdClass, 'text-text-strong font-medium')}>
+            <td className={cn(tdClass, 'text-text-muted max-w-60 break-words')}>
+              {fmtConfigValue(c.beforeValue)}
+            </td>
+            <td className={cn(tdClass, 'text-text-strong max-w-60 font-medium break-words')}>
               <span className="flex items-center gap-1.5">
-                <Icon name="arrow-left" size={13} className="text-text-faint rotate-180" />
-                {c.after}
+                <Icon
+                  name="arrow-left"
+                  size={13}
+                  className="text-text-faint flex-none rotate-180"
+                />
+                {fmtConfigValue(c.afterValue)}
               </span>
             </td>
           </tr>
         ))}
       </TableShell>
-      <Pager
-        total={filtered.length}
-        page={pg}
-        pageSize={PAGE_SIZE}
-        onPage={setPage}
-        noun="changes"
-      />
+      <Pager total={total} page={page} pageSize={PAGE_SIZE} onPage={setPage} noun="changes" />
     </Card>
   );
 }
