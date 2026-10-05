@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 
+import { useNow } from '@/shared/hooks/useNow';
 import { useCan } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
@@ -26,21 +27,33 @@ import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import type { HospitalRole } from '@/app/router/paths';
 
-import { roleHolders, useRbacStore } from '@/features/users-roles/application/store/rbac.store';
+import { useDeactivateStaffMutation } from '@/features/users-roles/application/queries/useDeactivateStaffMutation';
+import { usePendingInvitationsQuery } from '@/features/users-roles/application/queries/usePendingInvitationsQuery';
+import { useRolePreviewQuery } from '@/features/users-roles/application/queries/useRolePreviewQuery';
+import { useStaffMembersQuery } from '@/features/users-roles/application/queries/useStaffMembersQuery';
+import { useStaffRolesQuery } from '@/features/users-roles/application/queries/useStaffRolesQuery';
 import {
   PERM_ACTIONS,
   RBAC_MODULES,
-  type HospitalUser,
   type PermsGrid,
-  type Role,
 } from '@/features/users-roles/application/store/rbac.types';
 import { defaultSignInAs } from '@/features/users-roles/presentation/components/access-preview';
 import { AddUserModal } from '@/features/users-roles/presentation/components/AddUserModal';
 import { ResetModal } from '@/features/users-roles/presentation/components/ResetModal';
 import { RoleAccessPreview } from '@/features/users-roles/presentation/components/RoleAccessPreview';
-import { RoleDeleteModal } from '@/features/users-roles/presentation/components/RoleDeleteModal';
 import { RoleEditor } from '@/features/users-roles/presentation/components/RoleEditor';
 import { UserDrawer } from '@/features/users-roles/presentation/components/UserDrawer';
+import { UsersRolesChangeRoleModal } from '@/features/users-roles/presentation/components/UsersRolesChangeRoleModal';
+import {
+  failureText,
+  invitationToRow,
+  lastActiveLabel,
+  previewToPermsGrid,
+  staffToRow,
+  toRoleView,
+  type RoleView,
+  type UserRow,
+} from '@/features/users-roles/presentation/components/usersRoles.viewModel';
 
 /** Module coverage summary for a role card (design `permSummary`). */
 function permSummary(perms: PermsGrid): { count: number; full: number } {
@@ -71,56 +84,72 @@ const USER_SORT_KEYS: Readonly<Record<string, string | undefined>> = {
   Status: 'status',
 };
 
-/** Which drawer/modal the screen currently has open. */
-type RoleEditTarget = { readonly role: Role | null } | null;
+const STATUS_OPTIONS = [ALL_STATUS, 'Active', 'Inactive', 'Pending'] as const;
+
+/** Staff members holding `roleId` (pending invitations hold no role yet). */
+function roleHolders(users: readonly UserRow[], roleId: string): readonly UserRow[] {
+  return users.filter((u) => u.kind === 'staff' && u.roleId === roleId);
+}
 
 /**
  * Users & Roles (hospital RBAC), admin-only. A Users / Roles & Permissions /
  * Access Preview segmented view: users get KPI tiles, search + role/status
- * filters, a sortable table with loading, empty and integrity-error states, a
- * detail drawer and an add-user modal; roles get a card grid with live
- * permission summaries plus the role editor drawer. Design `Rbac.jsx`.
+ * filters, a sortable table with loading, error and empty states, a detail
+ * drawer and an invite-user modal; roles get a card grid with live permission
+ * summaries plus the role editor drawer. Design `Rbac.jsx`.
+ *
+ * Data: `GET /hospital/staff` and `GET /hospital/staff/invitations` (pending
+ * invitations are listed as users-to-be), `GET /hospital/roles` — the four
+ * fixed system roles, so there is no create or delete — and
+ * `GET /hospital/roles/{code}/preview` for the third tab.
  *
  * The third tab is the demonstrable half of audit 2.4 / X-01 / Q-03: pick any
- * role in the RBAC grid — including `Accountant` and `Department Front Desk`,
- * which the topbar role switcher cannot reach — and see the sidebar it gets,
- * the actions it holds and the screens it is refused, computed from the same
- * nav model and permission grid the live sidebar and route guards use.
+ * role — including `Accountant` and `Department Front Desk`, which the topbar
+ * role switcher cannot reach — and see the sidebar it gets, the actions it
+ * holds and the screens it is refused, computed from the server's effective
+ * access for the role and the same nav model the live sidebar uses.
  */
 export function UsersRolesScreen() {
-  const roles = useRbacStore((s) => s.roles);
-  const users = useRbacStore((s) => s.users);
-  const rbacUpdateUser = useRbacStore((s) => s.rbacUpdateUser);
   const canAddUser = useCan('Users & Roles.add');
+  const now = useNow();
+
+  const staffQuery = useStaffMembersQuery();
+  const invitationsQuery = usePendingInvitationsQuery(canAddUser);
+  const rolesQuery = useStaffRolesQuery();
+  const deactivateStaff = useDeactivateStaffMutation();
 
   const [tab, setTab] = useState<string>(TABS[0]);
   const [add, setAdd] = useState(false);
-  const [roleEdit, setRoleEdit] = useState<RoleEditTarget>(null);
-  const [userView, setUserView] = useState<HospitalUser | null>(null);
-  const [reset, setReset] = useState<HospitalUser | null>(null);
-  const [deactivate, setDeactivate] = useState<HospitalUser | null>(null);
-  const [roleDelete, setRoleDelete] = useState<Role | null>(null);
+  const [roleEdit, setRoleEdit] = useState<RoleView | null>(null);
+  const [userView, setUserView] = useState<UserRow | null>(null);
+  const [reset, setReset] = useState<UserRow | null>(null);
+  const [deactivate, setDeactivate] = useState<UserRow | null>(null);
+  const [roleChange, setRoleChange] = useState<UserRow | null>(null);
   const [q, setQ] = useState('');
   const [roleFilter, setRoleFilter] = useState(ALL_ROLES);
   const [statusFilter, setStatusFilter] = useState(ALL_STATUS);
-  const [loading, setLoading] = useState(false);
-  const [previewRoleId, setPreviewRoleId] = useState(roles[0]?.id ?? '');
+  const [previewRoleId, setPreviewRoleId] = useState<string | null>(null);
   const [signInAs, setSignInAs] = useState<HospitalRole | null>(null);
 
-  /**
-   * Re-derive the screen from the store. There is no users API yet, so the
-   * refresh re-emits the live store state — every row, KPI and role card is
-   * rebuilt from it — and this is where the refetch goes when that API lands.
-   */
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    useRbacStore.setState((s) => ({ roles: [...s.roles], users: [...s.users] }));
-    setLoading(false);
-  }, []);
+  const roles: readonly RoleView[] = (rolesQuery.data ?? []).map(toRoleView);
+  // Pending invitations first: they are the rows an administrator acts on next.
+  const users: readonly UserRow[] = [
+    ...(invitationsQuery.data ?? []).map(invitationToRow),
+    ...(staffQuery.data ?? []).map(staffToRow),
+  ];
+
+  const loading = staffQuery.isLoading || rolesQuery.isLoading || invitationsQuery.isLoading;
+
+  const refresh = async (): Promise<void> => {
+    await Promise.all([
+      staffQuery.refetch(),
+      rolesQuery.refetch(),
+      canAddUser ? invitationsQuery.refetch() : Promise.resolve(),
+    ]);
+  };
 
   const roleById = Object.fromEntries(roles.map((r) => [r.id, r] as const));
-  const { sort, onSort, sorted } = useSort<HospitalUser>();
+  const { sort, onSort, sorted } = useSort<UserRow>();
 
   const shown = users.filter((u) => {
     if (q && !(u.name + u.email + u.username).toLowerCase().includes(q.toLowerCase())) return false;
@@ -129,16 +158,11 @@ export function UsersRolesScreen() {
     return true;
   });
 
-  // Referential integrity: a user must always point at a role that exists.
-  // `rbacDeleteRole` refuses to orphan holders, so this should be impossible —
-  // if it ever happens the screen says so instead of rendering a blank cell.
-  const orphaned = users.filter((u) => !roleById[u.roleId]);
-
   const kpis: readonly Kpi[] = [
     {
       icon: 'users',
       label: 'Total Users',
-      value: users.length,
+      value: users.filter((u) => u.kind === 'staff').length,
       fg: 'text-blue',
       bg: 'bg-blue-soft-bg',
     },
@@ -168,6 +192,13 @@ export function UsersRolesScreen() {
 
   let tableState: TableStateSpec | undefined;
   if (loading) tableState = { kind: 'loading', rows: 5 };
+  else if (staffQuery.isError)
+    tableState = {
+      kind: 'error',
+      title: 'Users could not be loaded',
+      message: failureText(staffQuery.error, 'Check your connection and try again.'),
+      onRetry: () => void staffQuery.refetch(),
+    };
   else if (shown.length === 0)
     tableState = {
       kind: 'empty',
@@ -184,6 +215,33 @@ export function UsersRolesScreen() {
     };
 
   const previewRole = roles.find((r) => r.id === previewRoleId) ?? roles[0];
+  const previewQuery = useRolePreviewQuery(
+    tab === TABS[2] && previewRole ? previewRole.code : null,
+  );
+  const previewPerms: PermsGrid | null = previewQuery.data
+    ? previewToPermsGrid(previewQuery.data.modules)
+    : null;
+
+  const rolesError = rolesQuery.isError ? (
+    <ErrorState
+      inline
+      title="Roles could not be loaded"
+      message={failureText(rolesQuery.error, 'Check your connection and try again.')}
+      onRetry={() => void rolesQuery.refetch()}
+    />
+  ) : null;
+
+  const handleDeactivate = (user: UserRow): void =>
+    deactivateStaff.mutate(user.id, {
+      onSuccess: () => {
+        toast(`${user.name} deactivated — they can no longer sign in`, 'info');
+        setDeactivate(null);
+      },
+      onError: (failure) => {
+        toast(failureText(failure, `Could not deactivate ${user.name}.`), 'error');
+        setDeactivate(null);
+      },
+    });
 
   return (
     <div className="flex flex-col gap-5">
@@ -195,12 +253,6 @@ export function UsersRolesScreen() {
             <Can perm="Users & Roles.add">
               <Button icon="user-plus" onClick={() => setAdd(true)}>
                 Add User
-              </Button>
-            </Can>
-          ) : tab === 'Roles & Permissions' ? (
-            <Can perm="Users & Roles.add">
-              <Button icon="plus" onClick={() => setRoleEdit({ role: null })}>
-                Create Role
               </Button>
             </Can>
           ) : null}
@@ -249,7 +301,7 @@ export function UsersRolesScreen() {
               />
               <FilterSelect
                 value={statusFilter}
-                options={[ALL_STATUS, 'Active', 'Inactive']}
+                options={STATUS_OPTIONS}
                 onChange={setStatusFilter}
                 aria-label="Filter users by status"
               />
@@ -259,14 +311,18 @@ export function UsersRolesScreen() {
                 {shown.length} of {users.length} users
               </span>
             </div>
-            {orphaned.length > 0 && (
+            {invitationsQuery.isError && (
               <ErrorState
                 inline
-                title="Some users have no role"
-                message={`${orphaned.map((u) => u.name).join(', ')} point at a role that no longer exists. Reassign them from the role editor.`}
-                onRetry={refresh}
+                title="Pending invitations could not be loaded"
+                message={failureText(
+                  invitationsQuery.error,
+                  'Only active and inactive users are shown.',
+                )}
+                onRetry={() => void invitationsQuery.refetch()}
               />
             )}
+            {rolesError}
             <TableShell
               columns={USER_COLUMNS}
               sortKeys={USER_SORT_KEYS}
@@ -284,7 +340,7 @@ export function UsersRolesScreen() {
                 const r = roleById[u.roleId];
                 return (
                   <tr
-                    key={u.id}
+                    key={u.key}
                     onClick={() => setUserView(u)}
                     className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
                   >
@@ -311,7 +367,9 @@ export function UsersRolesScreen() {
                         <span className="text-body text-d-700 font-medium">Role missing</span>
                       )}
                     </td>
-                    <td className={cn(tdClass, 'text-text-muted')}>{u.last}</td>
+                    <td className={cn(tdClass, 'text-text-muted')}>
+                      {lastActiveLabel(u.lastLoginAt, now)}
+                    </td>
                     <td className={tdClass}>
                       <Badge status={u.status} />
                     </td>
@@ -325,16 +383,18 @@ export function UsersRolesScreen() {
                           title={`View ${u.name}`}
                           onClick={() => setUserView(u)}
                         />
-                        <Can perm="Users & Roles.edit" disableInstead>
-                          <IconBtn
-                            name="key-round"
-                            label="Reset password"
-                            box={34}
-                            size={15}
-                            title={`Reset password for ${u.name}`}
-                            onClick={() => setReset(u)}
-                          />
-                        </Can>
+                        {u.kind === 'staff' && (
+                          <Can perm="Users & Roles.edit" disableInstead>
+                            <IconBtn
+                              name="key-round"
+                              label="Reset password"
+                              box={34}
+                              size={15}
+                              title={`Reset password for ${u.name}`}
+                              onClick={() => setReset(u)}
+                            />
+                          </Can>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -346,13 +406,15 @@ export function UsersRolesScreen() {
       ) : tab === 'Roles & Permissions' ? (
         loading ? (
           <SkeletonCards count={3} lines={4} />
+        ) : rolesQuery.isError ? (
+          rolesError
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {roles.map((r) => {
               const s = permSummary(r.perms);
               const count = roleHolders(users, r.id).length;
               return (
-                <Card key={r.id} pad={18} hover onClick={() => setRoleEdit({ role: r })}>
+                <Card key={r.id} pad={18} hover onClick={() => setRoleEdit(r)}>
                   <div className="mb-2 flex items-center gap-2">
                     <span className="size-2.5 rounded-[3px]" style={{ background: r.color }} />
                     <span className="text-body text-text-strong font-medium">{r.name}</span>
@@ -378,17 +440,6 @@ export function UsersRolesScreen() {
                 </Card>
               );
             })}
-            <Can perm="Users & Roles.add">
-              <Card
-                pad={18}
-                hover
-                onClick={() => setRoleEdit({ role: null })}
-                className="border-border text-text-muted flex min-h-30 flex-col items-center justify-center gap-2 border-[1.5px] border-dashed"
-              >
-                <Icon name="plus" size={24} />
-                <span className="text-body font-medium">Create Role</span>
-              </Card>
-            </Can>
           </div>
         )
       ) : (
@@ -413,20 +464,31 @@ export function UsersRolesScreen() {
               aria-label="Preview access for this role"
             />
           </div>
-          {previewRole ? (
-            <RoleAccessPreview
-              roleName={previewRole.name}
-              roleColor={previewRole.color}
-              perms={previewRole.perms}
-              signInAs={signInAs ?? defaultSignInAs(previewRole)}
-              onSignInAsChange={setSignInAs}
-            />
-          ) : (
+          {loading || previewQuery.isLoading ? (
+            <SkeletonCards count={2} lines={4} />
+          ) : rolesQuery.isError ? (
+            rolesError
+          ) : !previewRole ? (
             <ErrorState
               inline
               title="No roles to preview"
-              message="Create a role first, then come back to see what it reaches."
-              onRetry={refresh}
+              message="This hospital has no roles provisioned yet."
+              onRetry={() => void rolesQuery.refetch()}
+            />
+          ) : previewQuery.isError || !previewPerms ? (
+            <ErrorState
+              inline
+              title={`${previewRole.name} access could not be loaded`}
+              message={failureText(previewQuery.error, 'Check your connection and try again.')}
+              onRetry={() => void previewQuery.refetch()}
+            />
+          ) : (
+            <RoleAccessPreview
+              roleName={previewRole.name}
+              roleColor={previewRole.color}
+              perms={previewPerms}
+              signInAs={signInAs ?? defaultSignInAs({ ...previewRole, perms: previewPerms })}
+              onSignInAsChange={setSignInAs}
             />
           )}
           <div className="border-border-soft mt-4 border-t pt-3">
@@ -444,17 +506,7 @@ export function UsersRolesScreen() {
       )}
 
       {add && <AddUserModal roles={roles} onClose={() => setAdd(false)} />}
-      {roleEdit && (
-        <RoleEditor
-          role={roleEdit.role}
-          onClose={() => setRoleEdit(null)}
-          onRequestDelete={(r) => {
-            setRoleEdit(null);
-            setRoleDelete(r);
-          }}
-        />
-      )}
-      {roleDelete && <RoleDeleteModal role={roleDelete} onClose={() => setRoleDelete(null)} />}
+      {roleEdit && <RoleEditor role={roleEdit} onClose={() => setRoleEdit(null)} />}
       {userView && (
         <UserDrawer
           user={userView}
@@ -468,9 +520,20 @@ export function UsersRolesScreen() {
             setUserView(null);
             setDeactivate(u);
           }}
+          onEditRole={(u) => {
+            setUserView(null);
+            setRoleChange(u);
+          }}
         />
       )}
       {reset && <ResetModal user={reset} onClose={() => setReset(null)} />}
+      {roleChange && (
+        <UsersRolesChangeRoleModal
+          user={roleChange}
+          roles={roles}
+          onClose={() => setRoleChange(null)}
+        />
+      )}
       {deactivate && (
         <ConfirmModal
           open
@@ -485,11 +548,7 @@ export function UsersRolesScreen() {
             </>
           }
           onClose={() => setDeactivate(null)}
-          onConfirm={() => {
-            rbacUpdateUser(deactivate.id, { status: 'Inactive' });
-            toast(`${deactivate.name} deactivated — they can no longer sign in`, 'info');
-            setDeactivate(null);
-          }}
+          onConfirm={() => handleDeactivate(deactivate)}
         />
       )}
     </div>
