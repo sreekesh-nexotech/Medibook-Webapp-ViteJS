@@ -1,79 +1,95 @@
 import { useState } from 'react';
 
+import { isFailure } from '@/core/error/failure';
 import { downloadCsv, type CsvCell } from '@/shared/lib/download';
 import { money } from '@/shared/lib/format';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
+import { SkeletonCards, SkeletonKpiStrip } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import {
-  aggregateErrorTrend,
-  deriveAnalytics,
-  rupeesFromPaise,
-  summariseErrors,
-  totalSpendPaise,
-} from '@/features/ops-analytics/application/store/analytics.derive';
+import type {
+  AnalyticsOverview,
+  AnalyticsWindow,
+  ApiErrorRow,
+} from '@/features/ops-analytics/domain/entities/analytics.entities';
+import { useAnalyticsOverviewQuery } from '@/features/ops-analytics/application/queries/useAnalyticsOverviewQuery';
+import { useApiErrorsQuery } from '@/features/ops-analytics/application/queries/useApiErrorsQuery';
+import { useBookingsByMonthQuery } from '@/features/ops-analytics/application/queries/useBookingsByMonthQuery';
+import { useDepartmentsSplitQuery } from '@/features/ops-analytics/application/queries/useDepartmentsSplitQuery';
+import { useProviderUsageQuery } from '@/features/ops-analytics/application/queries/useProviderUsageQuery';
+import { useTopHospitalsQuery } from '@/features/ops-analytics/application/queries/useTopHospitalsQuery';
 import { useAnalyticsStore } from '@/features/ops-analytics/application/store/analytics.store';
-import type { AnalyticsSnapshot } from '@/features/ops-analytics/application/store/analytics.types';
 import { AnalyticsHeader } from '@/features/ops-analytics/presentation/components/AnalyticsHeader';
+import {
+  deptRows,
+  errorRows,
+  hospitalRows,
+  monthSeries,
+  PERIOD_CODE,
+  pct,
+  providerRows,
+  surfaceRows,
+  windowDays,
+  windowLabel,
+  type DeptRow,
+  type ErrorRow,
+  type HospitalRow,
+  type ProviderRow,
+} from '@/features/ops-analytics/presentation/components/analytics.view';
 import { BookingsTrendCard } from '@/features/ops-analytics/presentation/components/BookingsTrendCard';
 import { DepartmentSplitCard } from '@/features/ops-analytics/presentation/components/DepartmentSplitCard';
 import { ErrorRatesCard } from '@/features/ops-analytics/presentation/components/ErrorRatesCard';
 import { ErrorsBySurfaceCard } from '@/features/ops-analytics/presentation/components/ErrorsBySurfaceCard';
-import { ErrorTrendCard } from '@/features/ops-analytics/presentation/components/ErrorTrendCard';
 import { ProviderSpendCard } from '@/features/ops-analytics/presentation/components/ProviderSpendCard';
 import { ProviderUsageCard } from '@/features/ops-analytics/presentation/components/ProviderUsageCard';
 import { TopHospitalsByUsageCard } from '@/features/ops-analytics/presentation/components/TopHospitalsByUsageCard';
 
-import { hospName } from '@/features/ops-hospitals/application/store/hospitals.store';
-
-/** Longest bucket that still reads as a week rather than a month. */
-const WEEK_DAYS = 7;
-
 const ALL_SCOPES = 'All scopes';
+const ONE_DECIMAL = 10;
+const LOAD_FAILED = 'Analytics could not be loaded. Please try again.';
 
-/** Signed percentage, so a KPI sub-line reads "+8.2%" / "−2.1%". */
-function signedPct(n: number): string {
-  const sign = n > 0 ? '+' : n < 0 ? '−' : '';
-  return `${sign}${Math.abs(n)}%`;
-}
+/** Overview metrics in the bookings CSV, in reading order. */
+const OVERVIEW_CSV: readonly (readonly [string, (o: AnalyticsOverview) => number])[] = [
+  ['Total bookings', (o) => o.bookingsTotal],
+  ['Online bookings', (o) => o.bookingsOnline],
+  ['Walk-in bookings', (o) => o.bookingsWalkIn],
+  ['Completed', (o) => o.completed],
+  ['Cancellations', (o) => o.cancellations],
+  ['No-shows', (o) => o.noShows],
+  ['Revenue (INR)', (o) => o.revenueRupees],
+  ['Refunds (INR)', (o) => o.refundsRupees],
+  ['New patients', (o) => o.newPatients],
+];
 
-/** A period name as a filename fragment: "Last 30 days" → "last-30-days". */
-function periodSlug(period: string): string {
-  return period.toLowerCase().replace(/\s+/g, '-');
-}
-
-/** What one bucket of the selected period covers. */
-function bucketLabel(days: number): string {
-  if (days === 1) return 'Per day';
-  return days <= WEEK_DAYS ? 'Per week' : 'Per month';
-}
-
-function bookingKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
-  const t = data.totals;
+function bookingKpis(o: AnalyticsOverview): readonly StatCardData[] {
+  const days = windowDays(o.window);
   return [
     {
       icon: 'calendar-check',
       label: 'Total Bookings',
-      value: t.bookings.toLocaleString('en-IN'),
-      sub: `${signedPct(t.bookingsDeltaPct)} vs previous ${t.days} days`,
+      value: o.bookingsTotal.toLocaleString('en-IN'),
+      sub: `${o.bookingsOnline.toLocaleString('en-IN')} online · ${o.bookingsWalkIn.toLocaleString('en-IN')} walk-in`,
       iconClass: 'bg-blue-soft-bg text-text-navy',
       valueClass: 'text-text-navy',
-      subClass: t.bookingsDeltaPct >= 0 ? 'text-g-600' : 'text-d-500',
+      subClass: 'text-text-muted',
     },
     {
       icon: 'trending-up',
       label: 'Avg Daily Bookings',
-      value: t.avgDaily.toLocaleString('en-IN'),
-      sub: `${signedPct(t.avgDailyDeltaPct)} vs previous period`,
+      value: (Math.round((o.bookingsTotal / days) * ONE_DECIMAL) / ONE_DECIMAL).toLocaleString(
+        'en-IN',
+      ),
+      sub: windowLabel(o.window),
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
-      subClass: t.avgDailyDeltaPct >= 0 ? 'text-g-600' : 'text-d-500',
+      subClass: 'text-text-muted',
     },
     {
       icon: 'circle-check',
       label: 'Booking Success Rate',
-      value: `${t.successPct}%`,
+      value: `${pct(o.completed, o.bookingsTotal)}%`,
       sub: 'Completed vs total bookings',
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
@@ -81,68 +97,78 @@ function bookingKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
     {
       icon: 'circle-x',
       label: 'Cancellation Rate',
-      value: `${t.cancelPct}%`,
-      sub: `${signedPct(t.cancelDeltaPct)} vs previous period · ${t.noShowPct}% no-show`,
+      value: `${pct(o.cancellations, o.bookingsTotal)}%`,
+      sub: `${pct(o.noShows, o.bookingsTotal)}% no-show`,
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
-      subClass: t.cancelDeltaPct <= 0 ? 'text-g-600' : 'text-d-500',
+      subClass: 'text-text-muted',
     },
   ];
 }
 
-function providerKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
-  const spend = totalSpendPaise(data.providers);
-  const units = data.providers.reduce((sum, p) => sum + p.used, 0);
-  const overage = data.providers.reduce((sum, p) => sum + p.overage, 0);
-  const flagged = data.providers.filter((p) => p.health !== 'healthy');
+function providerKpis(
+  rows: readonly ProviderRow[],
+  window: AnalyticsWindow,
+): readonly StatCardData[] {
+  const spend = rows.reduce((sum, p) => sum + p.costRupees, 0);
+  const requests = rows.reduce((sum, p) => sum + p.requests, 0);
+  const messages = rows.reduce((sum, p) => sum + p.messages, 0);
+  const errors = rows.reduce((sum, p) => sum + p.errors, 0);
   return [
     {
       icon: 'indian-rupee',
       label: 'Provider Spend',
-      value: money(rupeesFromPaise(spend)),
-      sub: `${data.providers.length} providers · ${data.period.toLowerCase()}`,
+      value: money(spend),
+      sub: `${rows.length} providers · ${windowLabel(window)}`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
       subClass: 'text-text-muted',
     },
     {
-      icon: 'send',
-      label: 'Units Consumed',
-      value: units.toLocaleString('en-IN'),
-      sub: 'Messages, notifications, transactions and transfer',
+      icon: 'activity',
+      label: 'Provider Requests',
+      value: requests.toLocaleString('en-IN'),
+      sub: 'Calls made to third-party providers',
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
       subClass: 'text-text-muted',
     },
     {
-      icon: 'triangle-alert',
-      label: 'Over or Near Plan',
-      value: String(flagged.length),
-      sub: flagged.length > 0 ? flagged.map((p) => p.channel).join(', ') : 'Every provider healthy',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      icon: 'send',
+      label: 'Messages Sent',
+      value: messages.toLocaleString('en-IN'),
+      sub: 'SMS, WhatsApp, email and push',
+      iconClass: 'bg-blue-soft-bg text-text-navy',
+      valueClass: 'text-text-navy',
       subClass: 'text-text-muted',
     },
     {
-      icon: 'wallet',
-      label: 'Billable Overage',
-      value: overage.toLocaleString('en-IN'),
-      sub: 'Units consumed beyond the plan allowance',
-      iconClass: overage > 0 ? 'bg-d-100 text-d-500' : 'bg-grey-300 text-text-muted',
-      valueClass: overage > 0 ? 'text-d-500' : 'text-text-muted',
+      icon: 'triangle-alert',
+      label: 'Provider Errors',
+      value: errors.toLocaleString('en-IN'),
+      sub: `${pct(errors, requests)}% of requests`,
+      iconClass: errors > 0 ? 'bg-d-100 text-d-500' : 'bg-grey-300 text-text-muted',
+      valueClass: errors > 0 ? 'text-d-500' : 'text-text-muted',
       subClass: 'text-text-muted',
     },
   ];
 }
 
-function errorKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
-  const s = summariseErrors(data.errors);
+function errorKpis(
+  api: readonly ApiErrorRow[],
+  rows: readonly ErrorRow[],
+): readonly StatCardData[] {
+  const requests = api.reduce((sum, r) => sum + r.requests, 0);
+  const failed = api.reduce((sum, r) => sum + r.errors4xx + r.errors5xx, 0);
+  const server = api.reduce((sum, r) => sum + r.errors5xx, 0);
+  const worstP95 = api.reduce((worst, r) => Math.max(worst, r.p95Ms), 0);
+  const flagged = rows.filter((r) => r.health !== 'healthy').length;
   return [
     {
       icon: 'activity',
-      label: 'Requests',
-      value: s.requests.toLocaleString('en-IN'),
-      sub: `Across ${data.errors.length} providers and surfaces`,
+      label: 'API Requests',
+      value: requests.toLocaleString('en-IN'),
+      sub: `Across ${api.length} surface and endpoint groups`,
       iconClass: 'bg-blue-soft-bg text-text-navy',
       valueClass: 'text-text-navy',
       subClass: 'text-text-muted',
@@ -150,8 +176,8 @@ function errorKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
     {
       icon: 'circle-x',
       label: 'Failed Requests',
-      value: s.errors.toLocaleString('en-IN'),
-      sub: `${data.period.toLowerCase()}`,
+      value: failed.toLocaleString('en-IN'),
+      sub: `${server.toLocaleString('en-IN')} server errors (5xx)`,
       iconClass: 'bg-d-100 text-d-500',
       valueClass: 'text-d-500',
       subClass: 'text-text-muted',
@@ -159,8 +185,8 @@ function errorKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
     {
       icon: 'percent',
       label: 'Error Rate',
-      value: `${s.errorPct}%`,
-      sub: 'Volume-weighted across everything measured',
+      value: `${pct(failed, requests)}%`,
+      sub: 'Failed share of all API requests',
       iconClass: 'bg-y-100 text-y-600',
       valueClass: 'text-y-600',
       subClass: 'text-text-muted',
@@ -168,8 +194,8 @@ function errorKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
     {
       icon: 'hourglass',
       label: 'Worst p95 Latency',
-      value: `${s.worstP95Ms.toLocaleString('en-IN')} ms`,
-      sub: `${s.flagged} of ${data.errors.length} rows flagged`,
+      value: `${worstP95.toLocaleString('en-IN')} ms`,
+      sub: `${flagged} of ${rows.length} rows flagged`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
       subClass: 'text-text-muted',
@@ -177,68 +203,73 @@ function errorKpis(data: AnalyticsSnapshot): readonly StatCardData[] {
   ];
 }
 
-/** Long-format rows for the bookings tab: the trend, the mix and the leaderboard. */
-function bookingCsvRows(data: AnalyticsSnapshot): readonly (readonly CsvCell[])[] {
-  const trend = data.buckets.map((b) => [
-    'Bookings trend',
-    b.label,
-    b.days,
-    b.bookings,
-    Math.round((b.bookings / Math.max(1, data.totals.bookings)) * 1000) / 10,
-  ]);
-  const depts = data.depts.map((d) => ['Department split', d.dept, null, d.bookings, d.pct]);
-  const hospitals = data.hospitals.map((h) => [
-    'Top hospitals',
-    hospName(h.hid),
-    null,
-    h.bookings,
-    h.pct,
-  ]);
-  return [...trend, ...depts, ...hospitals];
+interface BookingsView {
+  readonly window: AnalyticsWindow;
+  readonly overview: AnalyticsOverview;
+  readonly series: ReturnType<typeof monthSeries>;
+  readonly depts: readonly DeptRow[];
+  readonly hospitals: readonly HospitalRow[];
 }
 
-function providerCsvRows(data: AnalyticsSnapshot): readonly (readonly CsvCell[])[] {
-  return data.providers.map((p) => [
-    p.name,
-    p.channel,
-    p.unit,
-    p.used,
-    p.allowance,
-    p.creditsLeft,
-    p.overage,
-    p.usagePct,
-    rupeesFromPaise(p.costPaise),
+function bookingCsvRows(v: BookingsView): readonly (readonly CsvCell[])[] {
+  return [
+    ...OVERVIEW_CSV.map(([label, read]) => ['Overview', label, read(v.overview), null]),
+    ...v.series.map((m) => ['Bookings by month', m.label, m.value, null]),
+    ...v.depts.map((d) => ['Department split', d.label, d.bookings, d.pct]),
+    ...v.hospitals.map((h) => ['Top hospitals', h.name, h.bookings, h.pct]),
+  ];
+}
+
+function providerCsvRows(rows: readonly ProviderRow[]): readonly (readonly CsvCell[])[] {
+  return rows.map((p) => [
+    p.label,
+    p.id,
+    p.requests,
+    p.messages,
+    p.errors,
+    p.errorPct,
+    p.costRupees,
     p.health,
   ]);
 }
 
-function errorCsvRows(data: AnalyticsSnapshot): readonly (readonly CsvCell[])[] {
-  return data.errors.map((r) => {
-    const peak = r.trend.reduce(
-      (worst, p) => (p.value > worst.value ? p : worst),
-      r.trend[0] ?? { label: '—', value: 0 },
-    );
-    return [
-      r.scope,
-      r.name,
-      r.requests,
-      r.errors,
-      r.errorPct,
-      r.p95Ms,
-      peak.value,
-      peak.label,
-      r.health,
-    ];
-  });
+function errorCsvRows(rows: readonly ErrorRow[]): readonly (readonly CsvCell[])[] {
+  return rows.map((r) => [r.scope, r.name, r.requests, r.errors, r.errorPct, r.p95Ms, r.health]);
 }
 
+const CSV_HEADERS = {
+  Bookings: ['Section', 'Label', 'Value', 'Share %'],
+  Providers: [
+    'Provider',
+    'Code',
+    'Requests',
+    'Messages',
+    'Errors',
+    'Error %',
+    'Cost (INR)',
+    'Status',
+  ],
+  'Error Rates': [
+    'Scope',
+    'Provider / surface',
+    'Requests',
+    'Errors',
+    'Error %',
+    'p95 latency (ms)',
+    'Status',
+  ],
+} as const;
+
 /**
- * Ops → Usage Analytics (design `OpsAnalytics`), rebuilt for audit 2.5 / SA-05.
+ * Ops → Usage Analytics (design `OpsAnalytics`), on the platform analytics
+ * API (`/platform/analytics/*`, nightly rollups — every window ends
+ * yesterday).
  *
- * Every figure is derived from the selected period, so the period control
- * genuinely moves the numbers; provider usage and error rates — which had no
- * screen at all — are the two new sections; and the export writes a real CSV
- * of whatever section is on screen.
+ * Each tab fetches only what it shows, for the selected period: Bookings reads
+ * the overview, monthly bookings, department split and top hospitals;
+ * Providers reads metered provider usage; Error Rates reads the API error
+ * rollup plus provider failures. The export writes a CSV of exactly the
+ * server figures on screen.
  */
 export function OpsAnalyticsScreen() {
   const period = useAnalyticsStore((s) => s.period);
@@ -247,106 +278,137 @@ export function OpsAnalyticsScreen() {
   const setTab = useAnalyticsStore((s) => s.setTab);
   const [scope, setScope] = useState<string>(ALL_SCOPES);
 
-  const data = deriveAnalytics(period);
-  const apiRows = data.errors.filter((r) => r.scope === 'API');
-  const errorTrend = aggregateErrorTrend(data.errors, data.buckets);
-  const errorPeakPct = errorTrend.reduce((worst, p) => Math.max(worst, p.value), 0);
+  const code = PERIOD_CODE[period];
+  const isBookings = tab === 'Bookings';
+  const isProviders = tab === 'Providers';
+  const isErrors = tab === 'Error Rates';
 
-  const exportRows =
-    tab === 'Bookings'
-      ? bookingCsvRows(data)
-      : tab === 'Providers'
-        ? providerCsvRows(data)
-        : errorCsvRows(data);
+  const overview = useAnalyticsOverviewQuery(code, isBookings);
+  const months = useBookingsByMonthQuery(code, isBookings);
+  const depts = useDepartmentsSplitQuery(code, isBookings);
+  const top = useTopHospitalsQuery(code, isBookings);
+  const providers = useProviderUsageQuery(code, isProviders || isErrors);
+  const apiErrors = useApiErrorsQuery(code, isErrors);
 
-  const exportHeader: readonly CsvCell[] =
-    tab === 'Bookings'
-      ? ['Section', 'Label', 'Days', 'Bookings', 'Share %']
-      : tab === 'Providers'
-        ? [
-            'Provider',
-            'Channel',
-            'Unit',
-            'Used',
-            'Plan allowance',
-            'Credits left',
-            'Overage',
-            'Usage %',
-            'Cost (INR)',
-            'Status',
-          ]
-        : [
-            'Scope',
-            'Provider / surface',
-            'Requests',
-            'Errors',
-            'Error %',
-            'p95 latency (ms)',
-            'Peak error %',
-            'Peak bucket',
-            'Status',
-          ];
+  const active = isBookings
+    ? [overview, months, depts, top]
+    : isProviders
+      ? [providers]
+      : [providers, apiErrors];
+  const failed = active.find((q) => q.isError);
+  const isLoading = active.some((q) => q.isPending);
+
+  const bookings: BookingsView | null =
+    overview.data && months.data && depts.data && top.data
+      ? {
+          window: overview.data.window,
+          overview: overview.data,
+          series: monthSeries(months.data.items),
+          depts: deptRows(depts.data.items),
+          hospitals: hospitalRows(top.data.items, overview.data.bookingsTotal),
+        }
+      : null;
+  const providerList = providers.data ? providerRows(providers.data.items) : null;
+  const errorList =
+    providerList && apiErrors.data ? errorRows(providerList, apiErrors.data.items) : null;
+
+  const exportRows = isBookings
+    ? bookings
+      ? bookingCsvRows(bookings)
+      : []
+    : isProviders
+      ? providerList
+        ? providerCsvRows(providerList)
+        : []
+      : errorList
+        ? errorCsvRows(errorList)
+        : [];
+  const shownWindow = isBookings ? overview.data?.window : providers.data?.window;
 
   /**
    * THE LAW: the file is written first, then the toast reports what landed —
    * with the row count, so the claim is checkable.
    */
   const handleExport = (): void => {
-    const name = `medibook-analytics-${tab.toLowerCase().replace(/\s+/g, '-')}-${periodSlug(period)}.csv`;
-    downloadCsv(name, [exportHeader, ...exportRows]);
+    if (!shownWindow) return;
+    const slug = tab.toLowerCase().replace(/\s+/g, '-');
+    downloadCsv(`medibook-analytics-${slug}-${shownWindow.dateFrom}-to-${shownWindow.dateTo}.csv`, [
+      CSV_HEADERS[tab],
+      ...exportRows,
+    ]);
     toast(
-      `Exported ${exportRows.length} ${tab.toLowerCase()} rows for ${period.toLowerCase()}.`,
-      'success',
+      `Exported ${exportRows.length} ${tab.toLowerCase()} rows for ${windowLabel(shownWindow)}.`,
     );
   };
 
-  const kpis =
-    tab === 'Bookings'
-      ? bookingKpis(data)
-      : tab === 'Providers'
-        ? providerKpis(data)
-        : errorKpis(data);
+  const retry = (): void => {
+    for (const q of active) if (q.isError) void q.refetch();
+  };
+
+  const header = (
+    <AnalyticsHeader
+      tab={tab}
+      onTab={setTab}
+      period={period}
+      onPeriod={setPeriod}
+      onExport={handleExport}
+      exportRows={exportRows.length}
+      exportDisabled={isLoading || failed !== undefined}
+    />
+  );
+
+  if (failed) {
+    return (
+      <div className="flex flex-col gap-5">
+        {header}
+        <ErrorState
+          title="Analytics didn't load"
+          message={isFailure(failed.error) ? failed.error.message : LOAD_FAILED}
+          onRetry={retry}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
-      <AnalyticsHeader
-        tab={tab}
-        onTab={setTab}
-        period={period}
-        onPeriod={setPeriod}
-        onExport={handleExport}
-        exportRows={exportRows.length}
-      />
-      <KpiStrip items={kpis} />
+      {header}
 
-      {tab === 'Bookings' && (
+      {isBookings && bookings && (
         <>
+          <KpiStrip items={bookingKpis(bookings.overview)} />
           <div className="grid items-stretch gap-5 lg:grid-cols-[2fr_1fr]">
-            <BookingsTrendCard
-              series={data.series}
-              bucketLabel={bucketLabel(data.buckets[0]?.days ?? 1)}
-              period={period}
-            />
-            <DepartmentSplitCard depts={data.depts} />
+            <BookingsTrendCard series={bookings.series} bucketLabel="Per month" period={period} />
+            <DepartmentSplitCard depts={bookings.depts} />
           </div>
-          <TopHospitalsByUsageCard hospitals={data.hospitals} />
+          <TopHospitalsByUsageCard hospitals={bookings.hospitals} />
         </>
       )}
 
-      {tab === 'Providers' && (
+      {isProviders && providerList && providers.data && (
         <>
-          <ProviderSpendCard providers={data.providers} period={period} />
-          <ProviderUsageCard providers={data.providers} period={period} />
+          <KpiStrip items={providerKpis(providerList, providers.data.window)} />
+          <ProviderSpendCard providers={providerList} period={period} />
+          <ProviderUsageCard providers={providerList} period={period} />
         </>
       )}
 
-      {tab === 'Error Rates' && (
+      {isErrors && errorList && apiErrors.data && (
         <>
-          <div className="grid items-stretch gap-5 lg:grid-cols-2">
-            <ErrorTrendCard trend={errorTrend} period={period} peakPct={errorPeakPct} />
-            <ErrorsBySurfaceCard rows={apiRows} title="Errors by API Surface" period={period} />
-          </div>
-          <ErrorRatesCard rows={data.errors} period={period} scope={scope} onScope={setScope} />
+          <KpiStrip items={errorKpis(apiErrors.data.items, errorList)} />
+          <ErrorsBySurfaceCard
+            rows={surfaceRows(apiErrors.data.items).filter((r) => r.errors > 0)}
+            title="Errors by API Surface"
+            period={period}
+          />
+          <ErrorRatesCard rows={errorList} period={period} scope={scope} onScope={setScope} />
+        </>
+      )}
+
+      {isLoading && (
+        <>
+          <SkeletonKpiStrip count={4} />
+          <SkeletonCards count={2} lines={4} />
         </>
       )}
     </div>

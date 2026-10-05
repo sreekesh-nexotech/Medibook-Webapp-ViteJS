@@ -13,11 +13,11 @@ import {
   ERROR_PCT_WARNING,
   P95_CRITICAL_MS,
   P95_WARNING_MS,
-} from '@/features/ops-analytics/application/store/analytics.fixtures';
+} from '@/features/ops-analytics/domain/entities/analytics.entities';
 import type {
-  ErrorRateRow,
-  UsageHealth,
-} from '@/features/ops-analytics/application/store/analytics.types';
+  ErrorRow,
+  Health,
+} from '@/features/ops-analytics/presentation/components/analytics.view';
 import { HEALTH_STATUS } from '@/features/ops-analytics/presentation/components/health';
 
 const COLUMNS = [
@@ -27,20 +27,19 @@ const COLUMNS = [
   'Errors',
   'Error %',
   'p95 latency',
-  'Peak in window',
   'Status',
 ] as const;
 
 const SCOPE_OPTIONS = ['All scopes', 'Provider', 'API'] as const;
 
-const HEALTH_LABEL: Readonly<Record<UsageHealth, string>> = {
+const HEALTH_LABEL: Readonly<Record<Health, string>> = {
   healthy: 'Healthy',
   warning: 'Elevated',
   critical: 'Critical',
 };
 
 interface ErrorRatesCardProps {
-  rows: readonly ErrorRateRow[];
+  rows: readonly ErrorRow[];
   period: string;
   scope: string;
   onScope: (scope: string) => void;
@@ -48,19 +47,19 @@ interface ErrorRatesCardProps {
 
 /**
  * "Error Rates" — request volume, failures, error share and p95 latency per
- * provider and per API surface for the selected period, with the worst bucket
- * of the window alongside so a spike inside a calm average is still visible
- * (audit 2.5 / SA-05).
+ * provider and per API surface + endpoint group for the selected period
+ * (audit 2.5 / SA-05). Latency is measured for our own API only; p95 is the
+ * worst daily p95 in the window.
  */
 export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardProps) {
-  const { sort, onSort, sorted } = useSort<ErrorRateRow>();
+  const { sort, onSort, sorted } = useSort<ErrorRow>();
   const ordered = sorted([...rows], {
     name: (r) => r.name,
     scope: (r) => r.scope,
     requests: (r) => r.requests,
     errors: (r) => r.errors,
     errorPct: (r) => r.errorPct,
-    p95: (r) => r.p95Ms,
+    p95: (r) => r.p95Ms ?? null,
   });
   const scoped = scope === 'All scopes' ? ordered : ordered.filter((r) => r.scope === scope);
 
@@ -69,7 +68,7 @@ export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardP
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SectionTitle>Error Rates</SectionTitle>
         <InfoDot
-          text={`Per provider integration and per API surface for ${period.toLowerCase()}. A row is flagged at ${ERROR_PCT_WARNING}% errors or ${P95_WARNING_MS}ms p95, and critical at ${ERROR_PCT_CRITICAL}% or ${P95_CRITICAL_MS}ms. "Peak in window" is the worst single bucket, so a short outage inside a healthy average still shows.`}
+          text={`Per provider integration and per API surface for ${period.toLowerCase()}. A row is flagged at ${ERROR_PCT_WARNING}% errors or ${P95_WARNING_MS}ms p95, and critical at ${ERROR_PCT_CRITICAL}% or ${P95_CRITICAL_MS}ms. p95 latency is the worst daily p95 in the window.`}
         />
         <div className="flex-1"></div>
         <FilterSelect
@@ -82,7 +81,7 @@ export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardP
       <TableShell
         columns={COLUMNS}
         scrollLabel="Error rates by provider and API surface"
-        rightCols={['Requests', 'Errors', 'Error %', 'p95 latency', 'Peak in window']}
+        rightCols={['Requests', 'Errors', 'Error %', 'p95 latency']}
         sortKeys={{
           'Provider / surface': 'name',
           Scope: 'scope',
@@ -107,10 +106,6 @@ export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardP
         }
       >
         {scoped.map((r) => {
-          const peak = r.trend.reduce(
-            (worst, p) => (p.value > worst.value ? p : worst),
-            r.trend[0] ?? { label: '—', value: 0 },
-          );
           return (
             <tr key={r.id}>
               <td className={cn(tdClass, 'max-w-80')}>
@@ -120,7 +115,7 @@ export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardP
                     r.health === 'critical' ? 'danger' : r.health === 'warning' ? 'warning' : 'info'
                   }
                   title={r.name}
-                  sub={r.scope === 'API' ? 'Medibook API surface' : 'Third-party integration'}
+                  sub={r.sub}
                 />
               </td>
               <td className={tdClass}>{r.scope}</td>
@@ -147,17 +142,14 @@ export function ErrorRatesCard({ rows, period, scope, onScope }: ErrorRatesCardP
                 className={cn(
                   tdClass,
                   'text-right tabular-nums',
-                  r.p95Ms >= P95_CRITICAL_MS
+                  (r.p95Ms ?? 0) >= P95_CRITICAL_MS
                     ? 'text-d-700'
-                    : r.p95Ms >= P95_WARNING_MS
+                    : (r.p95Ms ?? 0) >= P95_WARNING_MS
                       ? 'text-y-800'
                       : 'text-text-body',
                 )}
               >
-                {r.p95Ms.toLocaleString('en-IN')} ms
-              </td>
-              <td className={cn(tdClass, 'text-right tabular-nums')}>
-                {peak.value}% <span className="text-caption text-text-muted">({peak.label})</span>
+                {r.p95Ms === null ? '—' : `${r.p95Ms.toLocaleString('en-IN')} ms`}
               </td>
               <td className={tdClass}>
                 <Badge status={HEALTH_STATUS[r.health]}>{HEALTH_LABEL[r.health]}</Badge>

@@ -20,6 +20,8 @@ interface AnalyticsHeaderProps {
   onExport: () => void;
   /** How many rows that export will contain — stated next to the button. */
   exportRows: number;
+  /** Nothing loaded to export yet (loading or failed). */
+  exportDisabled?: boolean;
 }
 
 /** Narrow a raw select value back to the closed `AnalyticsPeriod` set. */
@@ -36,7 +38,7 @@ function isTab(value: string): value is AnalyticsTab {
  * Analytics toolbar: section tabs, the reporting window, and the export.
  *
  * The period select is the screen's only data input — every figure below is
- * derived from it (audit 2.5).
+ * fetched for it (audit 2.5).
  */
 export function AnalyticsHeader({
   tab,
@@ -45,6 +47,7 @@ export function AnalyticsHeader({
   onPeriod,
   onExport,
   exportRows,
+  exportDisabled = false,
 }: AnalyticsHeaderProps) {
   return (
     <Card pad={16} className="flex flex-wrap items-center gap-3">
@@ -65,7 +68,13 @@ export function AnalyticsHeader({
         }}
       />
       <span className="text-caption text-text-muted tabular-nums">{exportRows} rows</span>
-      <Button size="sm" variant="secondary" icon="download" onClick={onExport}>
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="download"
+        onClick={onExport}
+        disabled={exportDisabled || exportRows === 0}
+      >
         Export CSV
       </Button>
     </Card>

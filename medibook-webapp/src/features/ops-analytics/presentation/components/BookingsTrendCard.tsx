@@ -2,14 +2,14 @@ import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
-import type { SeriesPoint } from '@/features/ops-analytics/application/store/analytics.types';
+import type { ChartPoint } from '@/features/ops-analytics/presentation/components/analytics.view';
 
 /** Headroom above the tallest bar, so the peak never touches the card edge. */
 const BAR_HEADROOM = 1.12;
 
 interface BookingsTrendCardProps {
   /** One point per bucket of the selected period. */
-  series: readonly SeriesPoint[];
+  series: readonly ChartPoint[];
   /** What the buckets are — "Per day", "Per week", "Per month". */
   bucketLabel: string;
   /** The selected reporting window, shown as the card's caption. */
@@ -17,8 +17,8 @@ interface BookingsTrendCardProps {
 }
 
 /**
- * Bookings over the selected period — the prototype's inline bar chart, now
- * driven by the derived series instead of a hardcoded 12-month array. Each
+ * Bookings over the selected period — the prototype's inline bar chart, one
+ * bar per calendar month (the backend rolls bookings up by month). Each
  * column reveals its value on hover (the design's `hover === i` swap, as CSS
  * group-hover).
  */
@@ -37,7 +37,7 @@ export function BookingsTrendCard({ series, bucketLabel, period }: BookingsTrend
           compact
           icon="calendar-check"
           title="No bookings in this window."
-          message="Pick a longer reporting period to see the trend."
+          message="Bookings appear here the day after they are made, once the nightly rollup runs."
         />
       ) : (
         <div className="flex h-52.5 items-end gap-2.5 px-1">
