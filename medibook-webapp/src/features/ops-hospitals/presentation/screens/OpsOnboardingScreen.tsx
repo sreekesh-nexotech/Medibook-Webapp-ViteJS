@@ -1,11 +1,14 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
+
+import { isFailure } from '@/core/error/failure';
 
 import { cn } from '@/shared/lib/cn';
+import { fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
-import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ClearChip } from '@/shared/ui/ClearChip';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
@@ -13,123 +16,74 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 
-import { useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
-import type { OpsHospital } from '@/features/ops-hospitals/application/store/hospitals.types';
-import {
-  docProgress,
-  goLiveBlockers,
-  stageOf,
-} from '@/features/ops-hospitals/application/store/onboarding.derive';
-import { useOnboardingStore } from '@/features/ops-hospitals/application/store/onboarding.store';
-import {
-  ONBOARDING_STAGES,
-  type OnboardingCase,
-  type OnboardingStage,
-} from '@/features/ops-hospitals/application/store/onboarding.types';
+import type { OnboardingCaseStage } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
+import { useOnboardingCasesQuery } from '@/features/ops-hospitals/application/queries/useOnboardingCasesQuery';
 import { OnboardingCasePanel } from '@/features/ops-hospitals/presentation/components/OnboardingCasePanel';
-import { OnboardHospitalModal } from '@/features/ops-hospitals/presentation/components/OnboardHospitalModal';
 import {
-  STAGE_BADGE,
-  STAGE_HINT,
-  STAGE_ICON,
-} from '@/features/ops-hospitals/presentation/components/onboarding.view';
+  PIPELINE_STAGES,
+  STAGE_CONTEXT,
+  STAGE_GLYPH,
+  STAGE_LABEL,
+  STAGE_PILL,
+  STAGE_TINT,
+} from '@/features/ops-hospitals/presentation/components/onboarding.status';
 
-/** One pipeline row: the application and the registry record it belongs to. */
-interface PipelineRow {
-  readonly hospital: OpsHospital;
-  readonly onboarding: OnboardingCase;
-  readonly stage: OnboardingStage;
-  readonly blockers: number;
+const ALL_STAGES = 'Stage: All';
+
+/** ISO timestamp → "12 Oct 2026"; empty for none. */
+function dateCopy(iso: string | null): string {
+  return iso ? fmtDate(iso.slice(0, 10)) : '';
 }
 
-/** Tinted icon box per stage, reusing the ops accent pairs. */
-const STAGE_TINT: Readonly<Record<OnboardingStage, string>> = {
-  Application: 'bg-blue-soft-bg text-blue',
-  'Documents requested': 'bg-y-100 text-y-600',
-  'Under review': 'bg-badge-noshow-bg text-orange',
-  Approved: 'bg-g-100 text-g-600',
-  Live: 'bg-g-100 text-g-700',
-};
-
 /**
- * Hospital onboarding pipeline — audit SA-01 (`/ops/onboarding`).
+ * Hospital onboarding pipeline — audit SA-01 (`/ops/onboarding`), on
+ * `/platform/onboarding/cases` (P3).
  *
- * The audit found no screen that "creates the hospital's first administrator,
- * sends an invitation, or requests documents", and no way to approve KYC
- * documents "one by one". This is that screen: applications counted by stage
- * (application → documents requested → under review → approved → live), and
- * one selected application's administrators, checklist and per-document review
- * beside it, with go-live gated on every required document being approved and
- * an administrator having accepted.
+ * Applications counted by the server's stage (application → documents
+ * requested → under review → approved → live, plus rejected), and one
+ * selected application's checklist, administrator status and go-live gate
+ * beside it. New hospitals are created from the Hospitals registry; the
+ * console's Onboard Hospital modal is not wired to the API yet, so it is not
+ * offered here.
  */
 export function OpsOnboardingScreen() {
-  const hospitals = useHospitalsStore((s) => s.hospitals);
-  const syncedAt = useHospitalsStore((s) => s.syncedAt);
-  const resyncHospitals = useHospitalsStore((s) => s.resync);
-  const cases = useOnboardingStore((s) => s.cases);
-  const resyncCases = useOnboardingStore((s) => s.resync);
+  const pipeline = useOnboardingCasesQuery();
 
   const [q, setQ] = useState('');
-  const [stageF, setStageF] = useState<OnboardingStage | 'All'>('All');
-  const [picked, setPicked] = useState<number | null>(null);
-  const [onboarding, setOnboarding] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [stageF, setStageF] = useState<OnboardingCaseStage | 'All'>('All');
+  const [picked, setPicked] = useState<string | null>(null);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    try {
-      await Promise.all([resyncHospitals(), resyncCases()]);
-    } finally {
-      setLoading(false);
-    }
-  }, [resyncHospitals, resyncCases]);
-
-  const all: readonly PipelineRow[] = cases.flatMap((c) => {
-    const hospital = hospitals.find((h) => h.id === c.hid);
-    if (!hospital) return [];
-    return [
-      {
-        hospital,
-        onboarding: c,
-        stage: stageOf(c),
-        blockers: goLiveBlockers(c).length,
-      },
-    ];
-  });
-
-  const countFor = (stage: OnboardingStage): number => all.filter((r) => r.stage === stage).length;
+  const cases = pipeline.data?.cases ?? [];
+  const counts = pipeline.data?.counts;
 
   const ql = q.trim().toLowerCase();
-  const rows = [...all]
+  const rows = cases
     .filter(
-      (r) =>
-        (stageF === 'All' || r.stage === stageF) &&
-        (!ql ||
-          r.hospital.name.toLowerCase().includes(ql) ||
-          r.hospital.city.toLowerCase().includes(ql) ||
-          r.hospital.email.toLowerCase().includes(ql)),
+      (c) =>
+        (stageF === 'All' || c.stage === stageF) &&
+        (!ql || c.hospitalName.toLowerCase().includes(ql)),
     )
     // Applications that need work first, in pipeline order, then by name.
     .sort(
       (a, b) =>
-        ONBOARDING_STAGES.indexOf(a.stage) - ONBOARDING_STAGES.indexOf(b.stage) ||
-        a.hospital.name.localeCompare(b.hospital.name),
+        PIPELINE_STAGES.indexOf(a.stage) - PIPELINE_STAGES.indexOf(b.stage) ||
+        a.hospitalName.localeCompare(b.hospitalName),
     );
 
-  // Selection is derived, not stored in an effect: the picked hospital wins
-  // while it is still in the filtered list, otherwise the first row does.
-  const active = rows.find((r) => r.hospital.id === picked) ?? rows[0] ?? null;
+  // Selection is derived, not stored in an effect: the picked case wins while
+  // it is still in the filtered list, otherwise the first row does.
+  const active = rows.find((c) => c.id === picked) ?? rows[0] ?? null;
   const filtersActive = Boolean(ql) || stageF !== 'All';
   const clearAll = (): void => {
     setQ('');
     setStageF('All');
   };
+  const truncated = pipeline.data ? pipeline.data.total > cases.length : false;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {ONBOARDING_STAGES.map((stage) => {
-          const count = countFor(stage);
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        {PIPELINE_STAGES.map((stage) => {
           const selected = stageF === stage;
           return (
             <Card
@@ -146,12 +100,16 @@ export function OpsOnboardingScreen() {
                     STAGE_TINT[stage],
                   )}
                 >
-                  <Icon name={STAGE_ICON[stage]} size={18} />
+                  <Icon name={STAGE_GLYPH[stage]} size={18} />
                 </div>
-                <span className="text-stat text-text-navy tabular-nums">{count}</span>
+                <span className="text-stat text-text-navy tabular-nums">
+                  {counts ? counts[stage] : '—'}
+                </span>
               </div>
-              <div className="text-body text-text-strong mt-2.5 font-medium">{stage}</div>
-              <div className="text-caption text-text-muted">{STAGE_HINT[stage]}</div>
+              <div className="text-body text-text-strong mt-2.5 font-medium">
+                {STAGE_LABEL[stage]}
+              </div>
+              <div className="text-caption text-text-muted">{STAGE_CONTEXT[stage]}</div>
             </Card>
           );
         })}
@@ -159,64 +117,75 @@ export function OpsOnboardingScreen() {
 
       <Card>
         <div className="mb-4">
-          <SearchField
-            value={q}
-            onChange={setQ}
-            placeholder="Search applicant hospital, city or admin email"
-          />
+          <SearchField value={q} onChange={setQ} placeholder="Search applicant hospital by name" />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <RefreshBtn onRefresh={refresh} title="Refresh the onboarding pipeline" />
+          <RefreshBtn
+            onRefresh={async () => {
+              await pipeline.refetch();
+            }}
+            title="Refresh the onboarding pipeline"
+          />
           <FilterSelect
-            value={stageF}
+            value={stageF === 'All' ? ALL_STAGES : STAGE_LABEL[stageF]}
             aria-label="Filter by onboarding stage"
-            options={['Stage: All', ...ONBOARDING_STAGES]}
-            onChange={(v) => setStageF(v === 'Stage: All' ? 'All' : (v as OnboardingStage))}
+            options={[ALL_STAGES, ...PIPELINE_STAGES.map((s) => STAGE_LABEL[s])]}
+            onChange={(v) => setStageF(PIPELINE_STAGES.find((s) => STAGE_LABEL[s] === v) ?? 'All')}
           />
           {filtersActive && <ClearChip onClick={clearAll} />}
           <div className="flex-1"></div>
-          <span className="text-caption text-text-muted">Updated {syncedAt}</span>
-          <Button icon="plus" onClick={() => setOnboarding(true)}>
-            Onboard Hospital
-          </Button>
+          {truncated && pipeline.data && (
+            <span className="text-caption text-text-muted">
+              Showing the newest {cases.length} of {pipeline.data.total} applications
+            </span>
+          )}
         </div>
       </Card>
 
-      {loading ? (
+      {pipeline.isPending ? (
         <SkeletonCards count={3} lines={4} />
-      ) : rows.length === 0 ? (
+      ) : pipeline.isError ? (
+        <ErrorState
+          title="The onboarding pipeline didn't load"
+          message={isFailure(pipeline.error) ? pipeline.error.message : undefined}
+          onRetry={() => void pipeline.refetch()}
+        />
+      ) : cases.length === 0 ? (
         <Card>
           <EmptyState
             icon="rocket"
+            title="No applications yet."
+            message="A case opens here as soon as a hospital is created in the Hospitals registry."
+          />
+        </Card>
+      ) : rows.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon="search"
             title="No applications match your filters."
-            message="Every hospital in the network sits somewhere in this pipeline — clear the filters to see them all, or onboard a new applicant."
+            message="Clear the filters to see the whole pipeline."
             actionLabel="Clear filters"
             onAction={clearAll}
-          >
-            <Button size="sm" icon="plus" onClick={() => setOnboarding(true)}>
-              Onboard Hospital
-            </Button>
-          </EmptyState>
+          />
         </Card>
       ) : (
         <div className="grid items-start gap-5 lg:grid-cols-3">
           <Card className="lg:col-span-1">
             <div className="mb-3.5 flex items-center justify-between gap-3">
               <SectionTitle size={16}>
-                {stageF === 'All' ? 'All applications' : stageF}
+                {stageF === 'All' ? 'All applications' : STAGE_LABEL[stageF]}
               </SectionTitle>
               <span className="text-caption text-text-muted tabular-nums">{rows.length}</span>
             </div>
             <div className="flex max-h-150 flex-col gap-2 overflow-y-auto">
-              {rows.map((r) => {
-                const selected = active?.hospital.id === r.hospital.id;
-                const progress = docProgress(r.onboarding);
+              {rows.map((c) => {
+                const selected = active?.id === c.id;
                 return (
                   <button
-                    key={r.hospital.id}
+                    key={c.id}
                     type="button"
                     aria-current={selected ? 'true' : undefined}
-                    onClick={() => setPicked(r.hospital.id)}
+                    onClick={() => setPicked(c.id)}
                     className={cn(
                       'flex w-full flex-col gap-1.5 rounded-md border px-3.5 py-3 text-left transition-colors duration-150',
                       selected
@@ -226,23 +195,14 @@ export function OpsOnboardingScreen() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-body text-text-strong truncate font-medium">
-                        {r.hospital.name}
+                        {c.hospitalName}
                       </span>
-                      <Badge status={STAGE_BADGE[r.stage]}>{r.stage}</Badge>
+                      <Badge status={STAGE_PILL[c.stage]}>{STAGE_LABEL[c.stage]}</Badge>
                     </div>
                     <span className="text-caption text-text-muted truncate">
-                      {r.hospital.city}
-                      {r.hospital.st ? `, ${r.hospital.st}` : ''} · {r.hospital.plan}
-                      {progress.total > 0
-                        ? ` · ${progress.approved}/${progress.total} documents approved`
-                        : ' · no checklist yet'}
+                      Instance {c.hospitalStatus}
+                      {c.submittedAt ? ` · applied ${dateCopy(c.submittedAt)}` : ''}
                     </span>
-                    {r.blockers > 0 && (
-                      <span className="text-caption text-y-700 flex items-center gap-1.5">
-                        <Icon name="circle-alert" size={13} className="flex-none" />
-                        {r.blockers} blocker{r.blockers === 1 ? '' : 's'} before go-live
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -250,36 +210,18 @@ export function OpsOnboardingScreen() {
           </Card>
           <div className="lg:col-span-2">
             {active ? (
-              <OnboardingCasePanel
-                key={active.hospital.id}
-                hospital={active.hospital}
-                onboarding={active.onboarding}
-              />
+              <OnboardingCasePanel key={active.id} summary={active} />
             ) : (
               <Card>
                 <EmptyState
                   icon="building-2"
                   title="Pick an application."
-                  message="Choose a hospital on the left to review its administrators and documents."
+                  message="Choose a hospital on the left to review its checklist and go-live gate."
                 />
               </Card>
             )}
           </div>
         </div>
-      )}
-
-      {onboarding && (
-        <OnboardHospitalModal
-          open
-          onClose={() => setOnboarding(false)}
-          onDone={(hid) => {
-            setOnboarding(false);
-            // Land straight on the new application's case.
-            setQ('');
-            setStageF('All');
-            setPicked(hid);
-          }}
-        />
       )}
     </div>
   );

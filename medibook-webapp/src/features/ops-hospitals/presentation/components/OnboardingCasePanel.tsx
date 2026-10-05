@@ -1,99 +1,212 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
+import { opsPath } from '@/app/router/paths';
+
+import { isFailure } from '@/core/error/failure';
+
+import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
 import { cn } from '@/shared/lib/cn';
+import { fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
-import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import { Select } from '@/shared/ui/Select';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { opsHospitalDetailPath } from '@/app/router/paths';
-
-import type { OpsHospital } from '@/features/ops-hospitals/application/store/hospitals.types';
-import {
-  ONBOARDING_DOC_CATALOG,
-  ONBOARDING_DOC_LABEL,
-} from '@/features/ops-hospitals/application/store/onboarding.fixtures';
-import {
-  docProgress,
-  goLiveBlockers,
-  stageOf,
-} from '@/features/ops-hospitals/application/store/onboarding.derive';
-import { useOnboardingStore } from '@/features/ops-hospitals/application/store/onboarding.store';
 import type {
-  OnboardingCase,
-  OnboardingDoc,
-  OnboardingDocKey,
-} from '@/features/ops-hospitals/application/store/onboarding.types';
-import { longDateFromIso } from '@/features/ops-hospitals/application/store/opsDates';
-import { AdminInviteModal } from '@/features/ops-hospitals/presentation/components/AdminInviteModal';
-import { RejectDocumentModal } from '@/features/ops-hospitals/presentation/components/RejectDocumentModal';
-import { RequestDocumentsModal } from '@/features/ops-hospitals/presentation/components/RequestDocumentsModal';
+  ChecklistItem,
+  ChecklistUpdate,
+  OnboardingCaseSummary,
+} from '@/features/ops-hospitals/domain/entities/onboarding.entity';
+import { useHospitalQuery } from '@/features/ops-hospitals/application/queries/useHospitalQuery';
+import { useApproveHospitalMutation } from '@/features/ops-hospitals/application/queries/useApproveHospitalMutation';
+import { useGoLiveMutation } from '@/features/ops-hospitals/application/queries/useGoLiveMutation';
+import { useOnboardingCaseQuery } from '@/features/ops-hospitals/application/queries/useOnboardingCaseQuery';
+import { useRejectOnboardingCaseMutation } from '@/features/ops-hospitals/application/queries/useRejectOnboardingCaseMutation';
+import { useSetOnboardingStageMutation } from '@/features/ops-hospitals/application/queries/useSetOnboardingStageMutation';
+import { useUpdateChecklistItemMutation } from '@/features/ops-hospitals/application/queries/useUpdateChecklistItemMutation';
+import { useUploadKycScanMutation } from '@/features/ops-hospitals/application/queries/useUploadKycScanMutation';
 import { DocUploadButton } from '@/features/ops-hospitals/presentation/components/DocUploadButton';
 import {
-  DOC_BADGE,
-  INVITE_BADGE,
-  STAGE_BADGE,
-  formatFileSize,
-} from '@/features/ops-hospitals/presentation/components/onboarding.view';
+  CHECKLIST_LABEL,
+  CHECKLIST_PILL,
+  CHECKLIST_TINT,
+  MANUAL_STAGES,
+  NO_ADMIN_BLOCKER,
+  REJECT_APPLICATION_REASONS,
+  SEND_BACK_REASONS,
+  STAGE_LABEL,
+  STAGE_PILL,
+  blockerCopy,
+  isManualStage,
+} from '@/features/ops-hospitals/presentation/components/onboarding.status';
+import { RejectDocumentModal } from '@/features/ops-hospitals/presentation/components/RejectDocumentModal';
+import { RequestDocumentsModal } from '@/features/ops-hospitals/presentation/components/RequestDocumentsModal';
 
-const ADMIN_COLUMNS = ['Administrator', 'Role', 'Status', 'Invitation', 'Action'] as const;
+const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 /** Which dialog the panel has open. */
-type PanelModal = 'invite' | 'docs' | 'golive' | null;
+type PanelModal = 'docs' | 'golive' | 'reject' | null;
 
-/** Hint per document status, so a row always says what happens next. */
-function docHint(doc: OnboardingDoc): string {
-  switch (doc.status) {
-    case 'Requested':
-      return 'Requested — nothing on file yet';
-    case 'Uploaded':
-      return `On file${doc.uploadedAt ? ` since ${longDateFromIso(doc.uploadedAt)}` : ''} · awaiting your decision`;
-    case 'Approved':
-      return `Approved by ${doc.reviewedBy ?? 'operations'}${doc.reviewedAt ? ` · ${doc.reviewedAt}` : ''}`;
-    case 'Rejected':
-      return `Rejected by ${doc.reviewedBy ?? 'operations'}${doc.reviewedAt ? ` · ${doc.reviewedAt}` : ''}`;
+function errorCopy(error: unknown): string {
+  return isFailure(error) ? error.message : FALLBACK_ERROR;
+}
+
+/** ISO timestamp → "12 Oct 2026"; empty for none. */
+function dateCopy(iso: string | null): string {
+  return iso ? fmtDate(iso.slice(0, 10)) : '';
+}
+
+/** What happens next for a checklist row, in one line. */
+function itemHint(item: ChecklistItem): string {
+  switch (item.status) {
+    case 'pending':
+      return item.note ? 'Sent back — waiting for a corrected document' : 'Not collected yet';
+    case 'received':
+      return `Received${item.receivedAt ? ` ${dateCopy(item.receivedAt)}` : ''} · waiting to be verified`;
+    case 'verified':
+      return `Verified${item.verifiedAt ? ` ${dateCopy(item.verifiedAt)}` : ''}`;
+    case 'waived':
+      return `Waived${item.verifiedAt ? ` ${dateCopy(item.verifiedAt)}` : ''} — not needed for go-live`;
   }
 }
 
 interface OnboardingCasePanelProps {
-  hospital: OpsHospital;
-  onboarding: OnboardingCase;
+  summary: OnboardingCaseSummary;
 }
 
 /**
- * One hospital's onboarding case (audit SA-01): its administrator invitations,
- * its document checklist with a **per-document** Approve and Reject, and the
- * go-live gate that lists exactly what is still blocking.
+ * One hospital's onboarding case (audit SA-01, P3): its go-live blockers, the
+ * administrator status, and the physical-document checklist with a
+ * per-document decision. Documents are handed over in person (backend Q66),
+ * so each row is ticked received → verified (or waived), optionally with a
+ * scan attached, and can be sent back with a reason. Approve, reject and
+ * go-live act on the whole application.
  *
- * There is deliberately no "approve everything" control. The audit finding is
- * that KYC documents "cannot be uploaded or approved one by one", so each row
- * carries its own upload, its own decision, its own reviewer and timestamp,
- * and a rejection carries the reason the hospital is given.
+ * There is deliberately no "verify everything" control: each document carries
+ * its own decision and timestamp.
  */
-export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePanelProps) {
+export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const navigate = useNavigate();
-  const approveDoc = useOnboardingStore((s) => s.approveDoc);
-  const uploadDoc = useOnboardingStore((s) => s.uploadDoc);
-  const resendInvite = useOnboardingStore((s) => s.resendInvite);
-  const markInviteAccepted = useOnboardingStore((s) => s.markInviteAccepted);
-  const goLive = useOnboardingStore((s) => s.goLive);
-  const [modal, setModal] = useState<PanelModal>(null);
-  const [rejecting, setRejecting] = useState<OnboardingDocKey | null>(null);
-  const [busy, run] = useOpsAct();
+  const caseQuery = useOnboardingCaseQuery(summary.id);
+  const hospitalQuery = useHospitalQuery(summary.hospitalId);
 
-  const stage = stageOf(onboarding);
-  const blockers = goLiveBlockers(onboarding);
-  const progress = docProgress(onboarding);
-  const live = Boolean(onboarding.liveAt);
-  const ready = !live && blockers.length === 0;
+  const updateItem = useUpdateChecklistItemMutation();
+  const uploadScan = useUploadKycScanMutation();
+  const setStage = useSetOnboardingStageMutation();
+  const rejectCase = useRejectOnboardingCaseMutation();
+  const approve = useApproveHospitalMutation();
+  const goLive = useGoLiveMutation();
+  const downloadScan = useFileDownloadMutation();
+
+  const [modal, setModal] = useState<PanelModal>(null);
+  const [sendingBack, setSendingBack] = useState<ChecklistItem | null>(null);
+  const [uploadingCode, setUploadingCode] = useState<string | null>(null);
+
+  if (caseQuery.isPending) return <SkeletonCards count={3} lines={4} />;
+
+  if (caseQuery.isError) {
+    return (
+      <ErrorState
+        title="This application didn't load"
+        message={errorCopy(caseQuery.error)}
+        onRetry={() => void caseQuery.refetch()}
+      />
+    );
+  }
+
+  const detail = caseQuery.data;
+  const hospital = hospitalQuery.data;
+  const stage = detail.stage;
+  const live = stage === 'live';
+  const closed = live || stage === 'rejected';
+  const blockers = detail.blockers;
+  const ready = !closed && blockers.length === 0;
+  const adminAccepted = !blockers.some((b) => b.code === NO_ADMIN_BLOCKER);
+  const settled = detail.checklist.filter(
+    (i) => i.status === 'verified' || i.status === 'waived',
+  ).length;
+  const total = detail.checklist.length;
+  const planCode = hospital?.subscription?.planCode ?? '—';
+
+  const tick = (item: ChecklistItem, update: ChecklistUpdate, done: string): void => {
+    updateItem.mutate(
+      { caseId: detail.id, code: item.code, update },
+      {
+        onSuccess: () => toast(done, 'success'),
+        onError: (error) => toast(errorCopy(error), 'error'),
+      },
+    );
+  };
+
+  const attachScan = (item: ChecklistItem, file: File): void => {
+    setUploadingCode(item.code);
+    uploadScan.mutate(file, {
+      onSuccess: (fileId) =>
+        tick(
+          item,
+          { status: item.status === 'verified' ? 'verified' : 'received', fileId },
+          `Scan attached to ${item.name}.`,
+        ),
+      onError: (error) => toast(errorCopy(error), 'error'),
+      onSettled: () => setUploadingCode(null),
+    });
+  };
+
+  const sendBack = async (reason: string): Promise<boolean> => {
+    if (!sendingBack) return false;
+    try {
+      await updateItem.mutateAsync({
+        caseId: detail.id,
+        code: sendingBack.code,
+        update: { status: 'pending', note: reason },
+      });
+      toast(`${sendingBack.name} sent back to ${detail.hospitalName}.`, 'info');
+      return true;
+    } catch (error) {
+      toast(errorCopy(error), 'error');
+      return false;
+    }
+  };
+
+  const rejectApplication = async (reason: string): Promise<boolean> => {
+    try {
+      await rejectCase.mutateAsync({ caseId: detail.id, reason });
+      toast(`${detail.hospitalName}'s application was rejected.`, 'info');
+      return true;
+    } catch (error) {
+      toast(errorCopy(error), 'error');
+      return false;
+    }
+  };
+
+  const approveCase = (): void => {
+    approve.mutate(detail.hospitalId, {
+      onSuccess: () => toast(`${detail.hospitalName} approved — waiting on go-live.`, 'success'),
+      onError: (error) => toast(errorCopy(error), 'error'),
+    });
+  };
+
+  const confirmGoLive = (): void => {
+    goLive.mutate(detail.hospitalId, {
+      onSuccess: () => {
+        toast(`${detail.hospitalName} is live on Medibook.`, 'success');
+        setModal(null);
+      },
+      onError: (error) => {
+        toast(errorCopy(error), 'error');
+        setModal(null);
+      },
+    });
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -104,28 +217,66 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
           </div>
           <div className="flex min-w-50 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-3">
-              <SectionTitle size={18}>{hospital.name}</SectionTitle>
-              <Badge status={STAGE_BADGE[stage]}>{stage}</Badge>
+              <SectionTitle size={18}>{detail.hospitalName}</SectionTitle>
+              <Badge status={STAGE_PILL[stage]}>{STAGE_LABEL[stage]}</Badge>
             </div>
             <span className="text-caption text-text-muted">
-              {hospital.email} · {hospital.city}
-              {hospital.st ? `, ${hospital.st}` : ''} · applied{' '}
-              {longDateFromIso(onboarding.startedAt)}
-              {onboarding.liveAt ? ` · live ${longDateFromIso(onboarding.liveAt)}` : ''}
+              {hospital
+                ? `${hospital.email} · ${hospital.city}${hospital.state ? `, ${hospital.state}` : ''} · plan ${planCode}`
+                : hospitalQuery.isError
+                  ? 'Hospital details unavailable'
+                  : 'Loading hospital details…'}
+              {detail.submittedAt ? ` · applied ${dateCopy(detail.submittedAt)}` : ''}
+              {detail.approvedAt ? ` · approved ${dateCopy(detail.approvedAt)}` : ''}
+              {live && hospital?.goLiveAt ? ` · live ${dateCopy(hospital.goLiveAt)}` : ''}
             </span>
           </div>
           <div className="flex-1"></div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate(opsHospitalDetailPath(hospital.id))}>
+            <Button
+              variant="ghost"
+              onClick={() => navigate(`${opsPath('hospitals')}/${detail.hospitalId}`)}
+            >
               Hospital Profile
             </Button>
-            <Button variant="secondary" icon="send" onClick={() => setModal('docs')}>
-              {onboarding.docs.length === 0 ? 'Request Documents' : 'Update Checklist'}
-            </Button>
-            <Button variant="secondary" icon="user-plus" onClick={() => setModal('invite')}>
-              Add Administrator
-            </Button>
-            {!live && (
+            {isManualStage(stage) && (
+              <div className="w-48">
+                <Select
+                  value={STAGE_LABEL[stage]}
+                  options={MANUAL_STAGES.map((s) => STAGE_LABEL[s])}
+                  onChange={(label) => {
+                    const next = MANUAL_STAGES.find((s) => STAGE_LABEL[s] === label);
+                    if (!next || next === stage) return;
+                    setStage.mutate(
+                      { caseId: detail.id, stage: next },
+                      {
+                        onSuccess: () => toast(`Moved to ${STAGE_LABEL[next]}.`, 'success'),
+                        onError: (error) => toast(errorCopy(error), 'error'),
+                      },
+                    );
+                  }}
+                  height={40}
+                  aria-label="Onboarding stage"
+                  disabled={setStage.isPending}
+                />
+              </div>
+            )}
+            {!closed && stage !== 'approved' && (
+              <Button
+                variant="secondary"
+                icon="circle-check"
+                busy={approve.isPending}
+                onClick={approveCase}
+              >
+                Approve
+              </Button>
+            )}
+            {!closed && (
+              <Button variant="secondary" icon="circle-x" onClick={() => setModal('reject')}>
+                Reject
+              </Button>
+            )}
+            {!closed && (
               <span
                 title={
                   ready
@@ -142,308 +293,264 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
         </div>
       </Card>
 
-      <Card pad={16}>
-        <div className="flex flex-wrap items-start gap-3.5">
-          <div
-            className={cn(
-              'flex size-10 flex-none items-center justify-center rounded-md',
-              live ? 'bg-g-100 text-g-600' : ready ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
-            )}
-          >
-            <Icon name={live ? 'rocket' : ready ? 'circle-check' : 'triangle-alert'} size={19} />
+      {stage === 'rejected' && (
+        <Card pad={16} className="flex items-start gap-3">
+          <Icon name="circle-x" size={18} className="text-d-500 mt-0.5 flex-none" />
+          <div className="text-body text-text-body">
+            <span className="text-text-strong font-medium">Application rejected.</span>{' '}
+            {detail.rejectionReason ?? 'No reason was recorded.'}
           </div>
-          <div className="min-w-50 flex-1">
-            <div className="text-body text-text-strong font-medium">
-              {live
-                ? `Live since ${longDateFromIso(onboarding.liveAt)}`
-                : ready
-                  ? 'Ready to go live — nothing is blocking'
-                  : `${blockers.length} thing${blockers.length === 1 ? '' : 's'} still blocking go-live`}
+        </Card>
+      )}
+
+      {stage !== 'rejected' && (
+        <Card pad={16}>
+          <div className="flex flex-wrap items-start gap-3.5">
+            <div
+              className={cn(
+                'flex size-10 flex-none items-center justify-center rounded-md',
+                live || ready ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+              )}
+            >
+              <Icon name={live ? 'rocket' : ready ? 'circle-check' : 'triangle-alert'} size={19} />
             </div>
-            <div className="text-caption text-text-muted">
-              {progress.total === 0
-                ? 'No required documents on the checklist yet'
-                : `${progress.approved} of ${progress.total} required documents approved`}
+            <div className="min-w-50 flex-1">
+              <div className="text-body text-text-strong font-medium">
+                {live
+                  ? 'Live on Medibook'
+                  : ready
+                    ? 'Ready to go live — nothing is blocking'
+                    : `${blockers.length} thing${blockers.length === 1 ? '' : 's'} still blocking go-live`}
+              </div>
+              <div className="text-caption text-text-muted">
+                {total === 0
+                  ? 'Nothing on the document checklist'
+                  : `${settled} of ${total} checklist documents verified or waived`}
+              </div>
+              {!live && blockers.length > 0 && (
+                <ul className="mt-2.5 flex list-none flex-col gap-1.5 p-0">
+                  {blockers.map((b) => (
+                    <li key={b.code} className="text-body text-text-body flex items-start gap-2">
+                      <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
+                      {blockerCopy(b, detail.checklist)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {!live && blockers.length > 0 && (
-              <ul className="mt-2.5 flex list-none flex-col gap-1.5 p-0">
-                {blockers.map((b) => (
-                  <li key={b} className="text-body text-text-body flex items-start gap-2">
-                    <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
-                    {b}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle>Hospital Administrators</SectionTitle>
-          <Button size="sm" variant="secondary" icon="user-plus" onClick={() => setModal('invite')}>
-            Add Administrator
-          </Button>
+        <SectionTitle>Hospital Administrator</SectionTitle>
+        <div className="mt-3 flex items-start gap-3">
+          <div
+            className={cn(
+              'flex size-9 flex-none items-center justify-center rounded-md',
+              adminAccepted ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+            )}
+          >
+            <Icon name={adminAccepted ? 'user-check' : 'user-plus'} size={17} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-body text-text-strong font-medium">
+              {adminAccepted
+                ? 'An administrator has accepted the invitation'
+                : 'Waiting for the first administrator to accept'}
+            </div>
+            <div className="text-caption text-text-muted">
+              The first administrator is invited when the hospital is created. Inviting, resending
+              or adding administrators from the console is not yet available from the server.
+            </div>
+          </div>
         </div>
-        <div className="text-caption text-text-muted mb-3.5">
-          The first administrator is created here and invited by email. Delivery is not wired up
-          yet, so an invitation is recorded as{' '}
-          <b className="text-text-strong font-medium">queued</b> until someone confirms it was
-          accepted.
-        </div>
-        <TableShell
-          columns={ADMIN_COLUMNS}
-          scrollLabel="Hospital administrators"
-          state={
-            onboarding.admins.length === 0
-              ? {
-                  kind: 'empty',
-                  icon: 'user-plus',
-                  title: 'No administrator for this hospital yet.',
-                  message:
-                    'Nobody can sign in to the hospital instance until its first administrator exists.',
-                  actionLabel: 'Create the first administrator',
-                  onAction: () => setModal('invite'),
-                }
-              : undefined
-          }
-        >
-          {onboarding.admins.map((a) => (
-            <tr key={a.id}>
-              <td className={tdClass}>
-                <div className="text-body text-text-strong font-medium">{a.name}</div>
-                <div className="text-caption text-text-muted">
-                  {a.email} · {a.phone}
-                </div>
-              </td>
-              <td className={tdClass}>{a.role}</td>
-              <td className={tdClass}>
-                <Badge status={INVITE_BADGE[a.status]}>{a.status}</Badge>
-              </td>
-              <td className={tdClass}>
-                <div className="text-body text-text-body">
-                  Queued {longDateFromIso(a.invitedAt)}
-                </div>
-                <div className="text-caption text-text-muted">
-                  {a.status === 'Accepted' && a.acceptedAt
-                    ? `Accepted ${a.acceptedAt}`
-                    : `Last queued ${a.lastQueuedAt}${a.resends > 0 ? ` · ${a.resends} resend${a.resends === 1 ? '' : 's'}` : ''}`}
-                </div>
-              </td>
-              <td className={tdClass}>
-                <div className="flex gap-2">
-                  <IconBtn
-                    name="send"
-                    label="Resend invitation"
-                    box={36}
-                    size={16}
-                    disabled={a.status === 'Accepted'}
-                    busy={busy[`resend${a.id}`]}
-                    title={
-                      a.status === 'Accepted'
-                        ? 'Already accepted — nothing to resend'
-                        : `Re-queue the invitation to ${a.email}`
-                    }
-                    onClick={() =>
-                      run(`resend${a.id}`, `Invitation re-queued for ${a.email}.`, () =>
-                        resendInvite(onboarding.hid, a.id),
-                      )
-                    }
-                  />
-                  <IconBtn
-                    name="user-check"
-                    label="Record invitation accepted"
-                    box={36}
-                    size={16}
-                    disabled={a.status === 'Accepted'}
-                    busy={busy[`accept${a.id}`]}
-                    title={
-                      a.status === 'Accepted'
-                        ? `Accepted ${a.acceptedAt ?? ''}`
-                        : `Record that ${a.name} has accepted and set their password`
-                    }
-                    onClick={() =>
-                      run(`accept${a.id}`, `${a.name} recorded as accepted.`, () =>
-                        markInviteAccepted(onboarding.hid, a.id),
-                      )
-                    }
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
-        </TableShell>
       </Card>
 
       <Card>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle>KYC Documents</SectionTitle>
-          <Button size="sm" variant="secondary" icon="send" onClick={() => setModal('docs')}>
-            {onboarding.docs.length === 0 ? 'Request Documents' : 'Update Checklist'}
-          </Button>
+          {!closed && (
+            <Button size="sm" variant="secondary" icon="send" onClick={() => setModal('docs')}>
+              Update Checklist
+            </Button>
+          )}
         </div>
         <div className="text-caption text-text-muted mb-3.5">
-          Every document is reviewed on its own: approve the ones that are right, reject the rest
-          with a reason, and the hospital re-uploads only what failed.
+          Documents are collected from the hospital in person. Tick each one as received, attach a
+          scan if you have one, then verify it — or waive it, or send it back with a reason.
         </div>
-        {onboarding.docs.length === 0 ? (
+        {total === 0 ? (
           <EmptyState
             icon="file-text"
-            title="No documents requested yet."
-            message="Pick the checklist this hospital must provide — registration, GST, licence, bank proof and anything else its specialisation needs."
-            actionLabel="Request documents"
+            title="Nothing on the checklist."
+            message="Add the documents this hospital must provide from the platform catalogue."
+            actionLabel={closed ? undefined : 'Update checklist'}
             actionIcon="send"
             actionVariant="button"
-            onAction={() => setModal('docs')}
+            onAction={closed ? undefined : () => setModal('docs')}
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {onboarding.docs.map((doc) => {
-              const spec = ONBOARDING_DOC_CATALOG.find((s) => s.key === doc.key);
-              return (
+            {detail.checklist.map((item) => (
+              <div
+                key={item.code}
+                className={cn(
+                  'flex flex-wrap items-center gap-3 rounded-md border px-3.5 py-3',
+                  item.status === 'pending' && item.note ? 'border-d-500' : 'border-border-soft',
+                )}
+              >
                 <div
-                  key={doc.key}
                   className={cn(
-                    'flex flex-wrap items-center gap-3 rounded-md border px-3.5 py-3',
-                    doc.status === 'Rejected' ? 'border-d-500' : 'border-border-soft',
+                    'flex size-9 flex-none items-center justify-center rounded-md',
+                    CHECKLIST_TINT[item.status],
                   )}
                 >
-                  <div
-                    className={cn(
-                      'flex size-9 flex-none items-center justify-center rounded-md',
-                      doc.status === 'Approved'
-                        ? 'bg-g-100 text-g-600'
-                        : doc.status === 'Rejected'
-                          ? 'bg-d-100 text-d-500'
-                          : doc.status === 'Uploaded'
-                            ? 'bg-y-100 text-y-600'
-                            : 'bg-grey-300 text-text-muted',
-                    )}
-                  >
-                    <Icon name="file-text" size={17} />
-                  </div>
-                  <div className="min-w-50 flex-1">
-                    <div className="text-body text-text-strong flex flex-wrap items-center gap-2 font-medium">
-                      {ONBOARDING_DOC_LABEL[doc.key]}
-                      {!doc.required && (
-                        <span className="text-caption text-text-muted font-normal">(optional)</span>
+                  <Icon name="file-text" size={17} />
+                </div>
+                <div className="min-w-50 flex-1">
+                  <div className="text-body text-text-strong font-medium">{item.name}</div>
+                  <div className="text-caption text-text-muted">{itemHint(item)}</div>
+                  {item.fileId && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        item.fileId &&
+                        downloadScan.mutate(
+                          { fileId: item.fileId },
+                          { onError: (error) => toast(errorCopy(error), 'error') },
+                        )
+                      }
+                      className="text-caption text-blue mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
+                    >
+                      <Icon name="file-down" size={13} className="flex-none" /> Download scan
+                    </button>
+                  )}
+                  {item.note && (
+                    <div
+                      className={cn(
+                        'text-caption mt-0.5',
+                        item.status === 'pending' ? 'text-d-700' : 'text-text-muted',
                       )}
+                    >
+                      {item.note}
                     </div>
-                    <div className="text-caption text-text-muted">{docHint(doc)}</div>
-                    {doc.fileName && (
-                      <div className="text-caption text-text-body mt-0.5 flex items-center gap-1.5">
-                        <Icon name="file-down" size={13} className="flex-none" />
-                        <span className="truncate">{doc.fileName}</span>
-                        <span className="text-text-muted tabular-nums">
-                          {formatFileSize(doc.fileSize)}
-                        </span>
-                      </div>
-                    )}
-                    {doc.status === 'Rejected' && doc.rejectReason && (
-                      <div className="text-caption text-d-700 mt-0.5">{doc.rejectReason}</div>
-                    )}
-                    {!doc.fileName && spec && (
-                      <div className="text-caption text-text-muted mt-0.5">{spec.hint}</div>
-                    )}
-                  </div>
-                  <Badge status={DOC_BADGE[doc.status]}>{doc.status}</Badge>
+                  )}
+                </div>
+                <Badge status={CHECKLIST_PILL[item.status]}>{CHECKLIST_LABEL[item.status]}</Badge>
+                {!closed && (
                   <div className="flex flex-none items-center gap-2">
                     <DocUploadButton
-                      docLabel={ONBOARDING_DOC_LABEL[doc.key]}
-                      hasFile={Boolean(doc.fileName)}
-                      onUpload={(file) => {
-                        uploadDoc(onboarding.hid, doc.key, file);
-                        toast(
-                          `${file.name} attached to ${ONBOARDING_DOC_LABEL[doc.key]}.`,
-                          'success',
-                        );
-                      }}
+                      docLabel={item.name}
+                      hasFile={item.fileId !== null}
+                      busy={uploadingCode === item.code}
+                      disabled={uploadScan.isPending || item.status === 'waived'}
+                      onUpload={(file) => attachScan(item, file)}
                       onTooLarge={(mb) =>
                         toast(`That file is larger than ${mb} MB — nothing was attached.`, 'error')
                       }
                     />
                     <IconBtn
-                      name="circle-check"
-                      label="Approve document"
+                      name="check-check"
+                      label="Mark received"
                       box={36}
                       size={16}
-                      color="var(--color-g-600)"
-                      disabled={doc.status !== 'Uploaded'}
-                      busy={busy[`approve${doc.key}`]}
+                      disabled={item.status !== 'pending' || updateItem.isPending}
                       title={
-                        doc.status === 'Uploaded'
-                          ? `Approve ${ONBOARDING_DOC_LABEL[doc.key]}`
-                          : doc.status === 'Approved'
-                            ? 'Already approved'
-                            : 'Nothing to approve — no file on record'
+                        item.status === 'pending'
+                          ? `Mark ${item.name} received (no scan)`
+                          : 'Already received'
                       }
                       onClick={() =>
-                        run(`approve${doc.key}`, `${ONBOARDING_DOC_LABEL[doc.key]} approved.`, () =>
-                          approveDoc(onboarding.hid, doc.key),
-                        )
+                        tick(item, { status: 'received' }, `${item.name} marked received.`)
                       }
                     />
                     <IconBtn
-                      name="circle-x"
-                      label="Reject document"
+                      name="circle-check"
+                      label="Verify document"
+                      box={36}
+                      size={16}
+                      color="var(--color-g-600)"
+                      disabled={item.status !== 'received' || updateItem.isPending}
+                      title={
+                        item.status === 'received'
+                          ? `Verify ${item.name}`
+                          : item.status === 'verified'
+                            ? 'Already verified'
+                            : 'Mark it received first'
+                      }
+                      onClick={() => tick(item, { status: 'verified' }, `${item.name} verified.`)}
+                    />
+                    <IconBtn
+                      name="circle-slash"
+                      label="Waive document"
+                      box={36}
+                      size={16}
+                      disabled={
+                        item.status === 'verified' ||
+                        item.status === 'waived' ||
+                        updateItem.isPending
+                      }
+                      title={
+                        item.status === 'waived'
+                          ? 'Already waived'
+                          : `Waive ${item.name} — it no longer blocks go-live`
+                      }
+                      onClick={() => tick(item, { status: 'waived' }, `${item.name} waived.`)}
+                    />
+                    <IconBtn
+                      name="undo-2"
+                      label="Send document back"
                       box={36}
                       size={16}
                       color="var(--color-d-500)"
-                      disabled={doc.status === 'Requested'}
+                      disabled={item.status === 'pending' || updateItem.isPending}
                       title={
-                        doc.status === 'Requested'
-                          ? 'Nothing to reject — no file on record'
-                          : `Reject ${ONBOARDING_DOC_LABEL[doc.key]} with a reason`
+                        item.status === 'pending'
+                          ? 'Nothing to send back yet'
+                          : `Send ${item.name} back with a reason`
                       }
-                      onClick={() => setRejecting(doc.key)}
+                      onClick={() => setSendingBack(item)}
                     />
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {onboarding.requests.length > 0 && (
-          <div className="border-border-soft mt-4 flex flex-col gap-2 border-t pt-3.5">
-            <span className="text-label text-text-strong font-ui">Request history</span>
-            {onboarding.requests.map((r) => (
-              <div key={r.id} className="text-caption text-text-muted">
-                {r.at} · {r.by} requested {r.keys.map((k) => ONBOARDING_DOC_LABEL[k]).join(', ')}
-                {r.note ? ` · “${r.note}”` : ''}
+                )}
               </div>
             ))}
           </div>
         )}
       </Card>
 
-      {modal === 'invite' && (
-        <AdminInviteModal
-          open
-          hid={onboarding.hid}
-          hospitalName={hospital.name}
-          defaultEmail={onboarding.admins.length === 0 ? hospital.email : ''}
-          onClose={() => setModal(null)}
-          onDone={() => setModal(null)}
-        />
-      )}
       {modal === 'docs' && (
         <RequestDocumentsModal
           open
-          hospitalName={hospital.name}
-          onboarding={onboarding}
+          caseId={detail.id}
+          hospitalName={detail.hospitalName}
+          existingCodes={detail.checklist.map((i) => i.code)}
           onClose={() => setModal(null)}
-          onDone={() => setModal(null)}
         />
       )}
-      {rejecting && (
+      {sendingBack && (
         <RejectDocumentModal
           open
-          hid={onboarding.hid}
-          hospitalName={hospital.name}
-          docKey={rejecting}
-          onClose={() => setRejecting(null)}
-          onDone={() => setRejecting(null)}
+          title={`Send ${sendingBack.name} back?`}
+          reasons={SEND_BACK_REASONS}
+          submitLabel="Send Back"
+          info={`The document returns to pending with your reason. The rest of the checklist keeps its own status.`}
+          notePlaceholder="e.g. The GST certificate is registered to a different entity"
+          onClose={() => setSendingBack(null)}
+          onSubmit={sendBack}
+        />
+      )}
+      {modal === 'reject' && (
+        <RejectDocumentModal
+          open
+          title={`Reject ${detail.hospitalName}'s application?`}
+          reasons={REJECT_APPLICATION_REASONS}
+          submitLabel="Reject Application"
+          info="The case closes as rejected and the reason is recorded. The hospital does not go live."
+          notePlaceholder="e.g. The registration certificate could not be verified with the state"
+          onClose={() => setModal(null)}
+          onSubmit={rejectApplication}
         />
       )}
       <OpsConfirm
@@ -452,25 +559,15 @@ export function OnboardingCasePanel({ hospital, onboarding }: OnboardingCasePane
         icon="rocket"
         tone="success"
         title="Take this hospital live?"
-        body={`${hospital.name} starts serving patients on Medibook immediately, its instance becomes Active and its KYC is marked verified.`}
+        body={`${detail.hospitalName} starts serving patients on Medibook immediately and its instance becomes Active.`}
         summary={[
-          { k: 'Documents approved', v: `${progress.approved} of ${progress.total}`, num: true },
-          {
-            k: 'Administrator',
-            v: onboarding.admins.find((a) => a.status === 'Accepted')?.email ?? '—',
-          },
-          { k: 'Plan', v: hospital.plan },
+          { k: 'Checklist', v: `${settled} of ${total} verified or waived`, num: true },
+          { k: 'Administrator', v: adminAccepted ? 'Accepted' : 'Not accepted' },
+          { k: 'Plan', v: planCode },
         ]}
-        confirmLabel={busy.golive ? 'Going live…' : 'Go Live'}
-        busy={busy.golive}
-        onConfirm={() =>
-          run('golive', `${hospital.name} is live on Medibook.`, () => {
-            if (!goLive(onboarding.hid)) {
-              toast('Something is still blocking go-live — check the list again.', 'error');
-            }
-            setModal(null);
-          })
-        }
+        confirmLabel={goLive.isPending ? 'Going live…' : 'Go Live'}
+        busy={goLive.isPending}
+        onConfirm={confirmGoLive}
       />
     </div>
   );
