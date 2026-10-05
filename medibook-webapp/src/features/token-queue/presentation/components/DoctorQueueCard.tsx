@@ -1,105 +1,176 @@
-import { useNow } from '@/shared/hooks/useNow';
+import { useState } from 'react';
+
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
+import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
+import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { IconBtn } from '@/shared/ui/IconBtn';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import type { DoctorStatus } from '@/features/appointments/application/store/appointments.types';
-import { useCatalogDoctor } from '@/features/doctors/application/store/catalog.selectors';
+import { isFailure } from '@/core/error/failure';
 
-interface DoctorQueueCardProps {
-  doctor: string;
-}
+import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
+import type { QueueSession } from '@/features/token-queue/domain/entities/tokenQueue.entities';
+import {
+  useSessionCommandMutation,
+  useSkipTokenMutation,
+  useTokenCommandMutation,
+} from '@/features/token-queue/application/queries/tokenQueue.mutations';
 
-/**
- * Live queue card for one doctor (design `Screens.jsx` `DoctorQueueCard` +
- * `DOC_STATUS_META`): status dot + pill, the now-serving box with elapsed
- * minutes, the up-next token chips (+N overflow) and the Done / Call Next /
- * Skip / break-toggle controls with the prototype's exact enable rules.
- */
+import { isServing, minutesSince, pillFor, upNextFor, type QueuePill } from './tokenQueue.view';
+
+/** Up-next chips shown before collapsing into "+N". */
+const UP_NEXT_CHIPS = 3;
+
+/** Minutes after which an open call is flagged (design threshold). */
+const LONG_WAIT_MINUTES = 20;
 
 /** Per-status dot fill (design `DOC_STATUS_META[...].fg`). */
-const STATUS_DOT: Readonly<Record<DoctorStatus, string>> = {
+const STATUS_DOT: Readonly<Record<QueuePill, string>> = {
   Consulting: 'bg-g-700',
   Waiting: 'bg-y-700',
   'On Break': 'bg-text-muted',
   Available: 'bg-blue',
+  'Not opened': 'bg-grey-300',
+  Closed: 'bg-grey-300',
 };
 
 /** Per-status pill background + text (design `DOC_STATUS_META`). */
-const STATUS_PILL: Readonly<Record<DoctorStatus, string>> = {
+const STATUS_PILL: Readonly<Record<QueuePill, string>> = {
   Consulting: 'bg-g-100 text-g-700',
   Waiting: 'bg-y-100 text-y-700',
   'On Break': 'bg-grey-300 text-text-muted',
   Available: 'bg-blue-soft-bg text-blue',
+  'Not opened': 'bg-grey-200 text-text-muted',
+  Closed: 'bg-grey-200 text-text-muted',
 };
 
-export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
-  const appts = useAppointmentsStore((s) => s.appts);
-  const serving = useAppointmentsStore((s) => s.serving);
-  const docStatus = useAppointmentsStore((s) => s.docStatus);
-  const queueForDoctor = useAppointmentsStore((s) => s.queueForDoctor);
-  const callNext = useAppointmentsStore((s) => s.callNext);
-  const complete = useAppointmentsStore((s) => s.complete);
-  const skip = useAppointmentsStore((s) => s.skip);
-  const setDocStatus = useAppointmentsStore((s) => s.setDocStatus);
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
 
-  const now = useNow(30000);
-  // Room and specialisation come from the hospital's catalogue entry for this
-  // doctor, not a parallel hardcoded map (audit 2.6.3).
-  const meta = useCatalogDoctor(doctor);
-  const status = docStatus[doctor] ?? 'Available';
-  const tok = serving[doctor];
-  const servingAppt = tok ? appts.find((a) => a.token === tok && a.doctor === doctor) : null;
-  const elapsed =
-    servingAppt && servingAppt.calledAt
-      ? Math.max(0, Math.round((now - servingAppt.calledAt) / 60000))
-      : null;
-  const queue = queueForDoctor(doctor);
-  const upNext = queue.slice(0, 3);
-  const onBreak = status === 'On Break';
-  const canCall = !onBreak && queue.length > 0;
+interface DoctorQueueCardProps {
+  session: QueueSession;
+  doctorName: string;
+  departmentName: string;
+  room: string | null;
+  /** Today's appointments (H7) — the source of patient names and up-next tokens. */
+  appointments: readonly DeskAppointment[];
+  /** Clock for the elapsed timers (re-renders every 30 s). */
+  now: number;
+}
+
+/**
+ * Live queue card for one doctor session (design `DoctorQueueCard`): status
+ * pill, the now-serving box with elapsed minutes, the up-next token chips and
+ * the desk controls — Open, Call Next, Start, Done, Skip (offering a no-show
+ * after the hospital's attempt limit), Pause / Resume and Close. Every
+ * control is a backend session command; the card re-renders from the
+ * snapshot the command (or the live socket) returns.
+ */
+export function DoctorQueueCard({
+  session,
+  doctorName,
+  departmentName,
+  room,
+  appointments,
+  now,
+}: DoctorQueueCardProps) {
+  const sessionCommand = useSessionCommandMutation();
+  const tokenCommand = useTokenCommandMutation();
+  const skip = useSkipTokenMutation();
+  const [offerNoShow, setOfferNoShow] = useState<number | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const pill = pillFor(session);
+  const serving = isServing(session);
+  const servingAppt = appointments.find((a) => a.id === session.currentAppointmentId) ?? null;
+  const tokenLabel = servingAppt?.tokenLabel ?? (serving ? `#${session.currentTokenNo}` : null);
+  const elapsed = serving ? minutesSince(session.lastCalledAt, now) : null;
+  const queue = upNextFor(session, appointments);
+  const upNext = queue.slice(0, UP_NEXT_CHIPS);
+  const isOpen = session.status === 'open';
+  const isPaused = session.status === 'paused';
+  const isLive = isOpen || isPaused;
+  const busy = sessionCommand.isPending || tokenCommand.isPending || skip.isPending;
+  const canCall = isOpen && session.waitingCount > 0 && session.queueState !== 'consulting';
+
+  const onError = (fallback: string) => (error: unknown) =>
+    toast(failureText(error, fallback), 'error');
+
+  const runSession = (command: 'open' | 'call-next' | 'pause' | 'resume' | 'close') =>
+    sessionCommand.mutate(
+      { sessionId: session.id, command },
+      { onError: onError('The queue did not accept that.') },
+    );
+
+  const runToken = (command: 'serve' | 'complete' | 'no-show', tokenNo: number) =>
+    tokenCommand.mutate(
+      { sessionId: session.id, command, tokenNo },
+      { onError: onError('The queue did not accept that.') },
+    );
+
+  const skipCurrent = (): void => {
+    const tokenNo = session.currentTokenNo;
+    if (tokenNo === null) return;
+    skip.mutate(
+      { sessionId: session.id, tokenNo },
+      {
+        onSuccess: (outcome) => {
+          if (outcome.offerNoShow) setOfferNoShow(tokenNo);
+          else toast(`Skipped — attempt ${outcome.attempts}`, 'info');
+        },
+        onError: onError('Could not skip the token.'),
+      },
+    );
+  };
 
   return (
     <Card pad={16} className="flex flex-col gap-2.75">
       <div className="flex items-center gap-2.5">
-        <span className={cn('size-2.25 flex-none rounded-full', STATUS_DOT[status])} />
+        <span className={cn('size-2.25 flex-none rounded-full', STATUS_DOT[pill])} />
         <div className="min-w-0 flex-1">
-          <div className="text-body text-text-strong truncate font-medium">{doctor}</div>
+          <div className="text-body text-text-strong truncate font-medium">
+            {doctorName} · {session.label}
+          </div>
           <div className="text-caption text-text-muted">
-            {meta?.depts[0] ?? '—'} · Room {meta?.room ?? '—'}
+            {departmentName || '—'} · Room {room || '—'}
           </div>
         </div>
         <span
           className={cn(
             'text-caption inline-flex flex-none rounded-full px-2.5 py-0.75 font-semibold',
-            STATUS_PILL[status],
+            STATUS_PILL[pill],
           )}
         >
-          {status}
+          {pill}
         </span>
       </div>
 
       <div
         className={cn(
           'flex min-h-13.5 items-center gap-3.5 rounded-md px-3.5 py-2.25',
-          servingAppt ? 'bg-blue-soft-bg' : 'bg-grey-200',
+          serving ? 'bg-blue-soft-bg' : 'bg-grey-200',
         )}
       >
-        {servingAppt ? (
+        {serving ? (
           <>
-            <span className="text-stat text-blue flex-none leading-none font-extrabold">{tok}</span>
+            <span className="text-stat text-blue flex-none leading-none font-extrabold">
+              {tokenLabel}
+            </span>
             <div className="min-w-0 flex-1">
-              <div className="text-caption text-text-muted">Now serving</div>
+              <div className="text-caption text-text-muted">
+                {session.queueState === 'consulting' ? 'In consultation' : 'Called'}
+              </div>
               <div className="text-body text-text-strong truncate font-medium">
-                {servingAppt.name}
+                {servingAppt?.patient?.fullName ?? '—'}
               </div>
             </div>
             <span
               className={cn(
                 'text-caption flex-none font-semibold',
-                elapsed != null && elapsed > 20 ? 'text-d-500' : 'text-text-muted',
+                elapsed != null && elapsed > LONG_WAIT_MINUTES ? 'text-d-500' : 'text-text-muted',
               )}
             >
               {elapsed == null ? '' : elapsed === 0 ? 'just now' : `${elapsed} min`}
@@ -107,13 +178,23 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
           </>
         ) : (
           <span className="text-body text-text-muted">
-            {onBreak ? 'On a break' : queue.length ? 'Ready to call next' : 'No patients waiting'}
+            {session.status === 'scheduled'
+              ? 'Open the session to start calling'
+              : !isLive
+                ? 'Session closed'
+                : isPaused
+                  ? 'On a break'
+                  : session.waitingCount
+                    ? 'Ready to call next'
+                    : 'No patients waiting'}
           </span>
         )}
       </div>
 
       <div className="flex min-h-6 items-center gap-2">
-        <span className="text-caption text-text-muted flex-none">Up next</span>
+        <span className="text-caption text-text-muted flex-none" title="Next by booking order">
+          Up next
+        </span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {upNext.length === 0 ? (
             <span className="text-caption text-text-muted">nobody yet</span>
@@ -121,71 +202,130 @@ export function DoctorQueueCard({ doctor }: DoctorQueueCardProps) {
             upNext.map((a) => (
               <span
                 key={a.id}
-                title={a.name}
+                title={a.patient?.fullName ?? undefined}
                 className="text-caption text-blue bg-blue-soft-bg rounded-full px-2.25 py-0.5 font-semibold"
               >
-                {a.token}
+                {a.tokenLabel ?? '—'}
               </span>
             ))
           )}
-          {queue.length > 3 && (
-            <span className="text-caption text-text-muted">{`+${queue.length - 3}`}</span>
+          {queue.length > UP_NEXT_CHIPS && (
+            <span className="text-caption text-text-muted">{`+${queue.length - UP_NEXT_CHIPS}`}</span>
           )}
         </div>
         <span
           className={cn(
             'text-caption flex-none font-semibold',
-            queue.length ? 'text-text-strong' : 'text-text-muted',
+            session.waitingCount ? 'text-text-strong' : 'text-text-muted',
           )}
         >
-          {queue.length} waiting
+          {session.waitingCount} waiting
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
-        {servingAppt ? (
-          <>
-            <Button
-              size="sm"
-              variant="success"
-              icon="check"
-              className="flex-1"
-              onClick={() => complete(doctor)}
-            >
-              Done
+      <Can
+        perm="Token Management.edit"
+        disableInstead
+        disabledTitle="Your role cannot run the queue"
+      >
+        <div className="flex w-full items-center gap-2">
+          {session.status === 'scheduled' ? (
+            <Button size="sm" className="flex-1" busy={busy} onClick={() => runSession('open')}>
+              Open session
             </Button>
+          ) : !isLive ? (
+            <span className="text-caption text-text-muted flex-1">
+              {session.completedCount} seen · {session.noShowCount} no-show
+            </span>
+          ) : serving && session.currentTokenNo !== null ? (
+            <>
+              {session.queueState === 'waiting' && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  disabled={busy}
+                  onClick={() => runToken('serve', session.currentTokenNo ?? 0)}
+                >
+                  Start
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="success"
+                icon="check"
+                className="flex-1"
+                disabled={busy}
+                onClick={() => runToken('complete', session.currentTokenNo ?? 0)}
+              >
+                Done
+              </Button>
+              {session.queueState === 'waiting' && (
+                <IconBtn
+                  name="skip-forward"
+                  label="Skip — call again later"
+                  box={34}
+                  size={15}
+                  onClick={skipCurrent}
+                />
+              )}
+            </>
+          ) : (
             <Button
               size="sm"
-              variant="secondary"
               className="flex-1"
-              disabled={queue.length === 0}
-              onClick={() => callNext(doctor)}
+              disabled={!canCall || busy}
+              onClick={() => runSession('call-next')}
             >
               Call Next
             </Button>
+          )}
+          {isLive && (
             <IconBtn
-              name="skip-forward"
-              label="Skip — move to end of queue"
+              name={isPaused ? 'play' : 'pause'}
+              label="Pause or resume doctor"
+              title={isPaused ? 'Resume' : 'Take a break'}
               box={34}
               size={15}
-              onClick={() => skip(doctor)}
+              color={isPaused ? 'var(--color-g-600)' : undefined}
+              onClick={() => runSession(isPaused ? 'resume' : 'pause')}
             />
-          </>
-        ) : (
-          <Button size="sm" className="flex-1" disabled={!canCall} onClick={() => callNext(doctor)}>
-            Call Next
-          </Button>
-        )}
-        <IconBtn
-          name={onBreak ? 'play' : 'pause'}
-          label="Pause or resume doctor"
-          title={onBreak ? 'Resume' : 'Take a break'}
-          box={34}
-          size={15}
-          color={onBreak ? 'var(--color-g-600)' : undefined}
-          onClick={() => setDocStatus(doctor, onBreak ? 'Available' : 'On Break')}
-        />
-      </div>
+          )}
+          {isLive && !serving && session.waitingCount === 0 && (
+            <IconBtn
+              name="x"
+              label="Close session"
+              title="Close the session"
+              box={34}
+              size={15}
+              onClick={() => setConfirmClose(true)}
+            />
+          )}
+        </div>
+      </Can>
+
+      <ConfirmModal
+        open={offerNoShow !== null}
+        title="Mark as no-show?"
+        body={`Token ${tokenLabel ?? ''} has been called the most times this hospital allows. Mark it as a no-show? It is never done automatically.`}
+        confirmLabel="Mark No-show"
+        onClose={() => setOfferNoShow(null)}
+        onConfirm={() => {
+          if (offerNoShow !== null) runToken('no-show', offerNoShow);
+          setOfferNoShow(null);
+        }}
+      />
+      <ConfirmModal
+        open={confirmClose}
+        title="Close this session?"
+        body={`Close ${doctorName}'s ${session.label} session for today? No more tokens can be called in it.`}
+        confirmLabel="Close session"
+        onClose={() => setConfirmClose(false)}
+        onConfirm={() => {
+          setConfirmClose(false);
+          runSession('close');
+        }}
+      />
     </Card>
   );
 }

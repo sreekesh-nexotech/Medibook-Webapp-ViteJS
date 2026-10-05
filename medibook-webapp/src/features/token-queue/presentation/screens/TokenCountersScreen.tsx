@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useNow } from '@/shared/hooks/useNow';
 import { cn } from '@/shared/lib/cn';
@@ -10,73 +10,95 @@ import { Icon } from '@/shared/ui/Icon';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 
-import {
-  formatUpdatedAt,
-  useListRefresh,
-} from '@/features/appointments/application/queries/useListRefresh';
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import {
-  useCatalogDepartments,
-  useCatalogDoctorNames,
-} from '@/features/doctors/application/store/catalog.selectors';
-import { DoctorQueueCard } from '@/features/token-queue/presentation/components/DoctorQueueCard';
+import { isFailure } from '@/core/error/failure';
 
-/** Doctor cards per row of the grid — also the shimmer count while refreshing. */
+import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
+import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+import { useQueueSessionsQuery } from '@/features/token-queue/application/queries/tokenQueue.queries';
+import { useQueueLive } from '@/features/token-queue/application/queries/useQueueLive';
+import { DoctorQueueCard } from '@/features/token-queue/presentation/components/DoctorQueueCard';
+import {
+  isServing,
+  minutesSince,
+} from '@/features/token-queue/presentation/components/tokenQueue.view';
+
+/** Doctor cards per row of the grid — also the shimmer count while loading. */
 const CARD_COLUMNS = 2;
 
+/** Elapsed timers tick every 30 s (design behaviour). */
+const TICK_MS = 30_000;
+
+/** Minutes after which the longest open call turns red (design threshold). */
+const LONG_WAIT_MINUTES = 20;
+
+const ALL_DEPTS = 'All Departments';
+const ALL_DOCTORS = 'All Doctors';
+
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /**
- * Live token queue (design `Screens.jsx` `TokenCounters`): a doctor-centric
- * department front desk — search + department/doctor filters + a wired refresh,
- * a Serving / Waiting / On break / Longest stat strip (Longest turns danger red
- * past 20 min), and a two-column grid of `DoctorQueueCard`s. A 30-second tick
- * keeps every card's elapsed timer live.
+ * Live token queue (design `TokenCounters`) on the hospital API: one card per
+ * doctor **session** today (the backend's queue unit), kept live over the
+ * `ws/hospital/queue` socket with a refetch as the safety net. Search +
+ * department / doctor filters, a Serving / Waiting / On break / Longest
+ * strip, and loading / error / empty states.
  */
 export function TokenCountersScreen() {
-  const appts = useAppointmentsStore((s) => s.appts);
-  const serving = useAppointmentsStore((s) => s.serving);
-  const docStatus = useAppointmentsStore((s) => s.docStatus);
-  const activeDept = useAppointmentsStore((s) => s.activeDept);
-  const setDept = useAppointmentsStore((s) => s.setDept);
-  const queueForDoctor = useAppointmentsStore((s) => s.queueForDoctor);
+  const today = localToday();
+  const sessionsQuery = useQueueSessionsQuery(today);
+  const doctorsQuery = useDoctorsQuery();
+  const departmentsQuery = useDepartmentsQuery();
+  const appointmentsQuery = useAppointmentsQuery({ dateFrom: today, dateTo: today });
+  const socketStatus = useQueueLive();
+  const now = useNow(TICK_MS);
 
   const [q, setQ] = useState('');
-  const [docF, setDocF] = useState('All Doctors');
-  // Re-render every 30s so the elapsed timers stay live (design behaviour).
-  const now = useNow(30000);
+  const [deptF, setDeptF] = useState(ALL_DEPTS);
+  const [docF, setDocF] = useState(ALL_DOCTORS);
 
-  /**
-   * Audit 3.1.1 — Refresh re-reads the live queue out of the store and every
-   * card re-derives from it, with the shared loading state while it runs. On a
-   * queue screen this is the control the desk reaches for most.
-   */
-  const reload = useCallback((): void => {
-    const state = useAppointmentsStore.getState();
-    if (!Array.isArray(state.appts) || state.serving == null) {
-      throw new Error('The live queue is unavailable.');
-    }
-  }, []);
-  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
-  // Department filter follows the hospital's own catalogue (audit 2.6.3).
-  const departments = useCatalogDepartments();
+  const doctorsById = useMemo(
+    () => new Map((doctorsQuery.data ?? []).map((d) => [d.id, d])),
+    [doctorsQuery.data],
+  );
+  const deptNameById = useMemo(
+    () => new Map((departmentsQuery.data ?? []).map((d) => [d.id, d.name])),
+    [departmentsQuery.data],
+  );
+  const departments = (departmentsQuery.data ?? []).map((d) => d.name);
+  const appointments = appointmentsQuery.data ?? [];
 
-  const dept = activeDept || 'All Departments';
-  // The live queue lists the doctors the hospital actually maintains, so a
-  // doctor added through Doctors & Departments gets a counter (audit 2.6.3).
-  const inDept = useCatalogDoctorNames(dept === 'All Departments' ? undefined : dept);
+  const sessions = sessionsQuery.data ?? [];
+  const doctorNamesInDept = Array.from(
+    new Set(
+      sessions
+        .map((s) => doctorsById.get(s.doctorId))
+        .filter((d) => d && (deptF === ALL_DEPTS || deptNameById.get(d.departmentId) === deptF))
+        .map((d) => d?.name ?? ''),
+    ),
+  ).filter(Boolean);
+
   const ql = q.trim().toLowerCase();
-  const doctors = inDept.filter((d) => {
-    if (docF !== 'All Doctors' && d !== docF) return false;
-    if (ql && !d.toLowerCase().includes(ql)) return false;
+  const shown = sessions.filter((s) => {
+    const doc = doctorsById.get(s.doctorId);
+    const name = doc?.name ?? '';
+    const dept = doc ? (deptNameById.get(doc.departmentId) ?? '') : '';
+    if (deptF !== ALL_DEPTS && dept !== deptF) return false;
+    if (docF !== ALL_DOCTORS && name !== docF) return false;
+    if (ql && !`${name} ${s.label}`.toLowerCase().includes(ql)) return false;
     return true;
   });
 
-  const servingCount = doctors.filter((d) => serving[d]).length;
-  const waitingCount = doctors.reduce((n, d) => n + queueForDoctor(d).length, 0);
-  const breakCount = doctors.filter((d) => docStatus[d] === 'On Break').length;
-  const longest = doctors.reduce((mx, d) => {
-    const a = appts.find((x) => x.token === serving[d] && x.doctor === d);
-    if (a && a.calledAt) return Math.max(mx, Math.round((now - a.calledAt) / 60000));
-    return mx;
+  const servingCount = shown.filter(isServing).length;
+  const waitingCount = shown.reduce((n, s) => n + s.waitingCount, 0);
+  const breakCount = shown.filter((s) => s.queueState === 'on_break').length;
+  const longest = shown.reduce((mx, s) => {
+    const m = isServing(s) ? minutesSince(s.lastCalledAt, now) : null;
+    return m == null ? mx : Math.max(mx, m);
   }, 0);
 
   const stats: readonly { label: string; val: number | string; color: string }[] = [
@@ -86,16 +108,23 @@ export function TokenCountersScreen() {
     {
       label: 'Longest',
       val: longest ? `${longest}m` : '—',
-      color: longest > 20 ? 'text-d-500' : 'text-g-600',
+      color: longest > LONG_WAIT_MINUTES ? 'text-d-500' : 'text-g-600',
     },
   ];
 
-  const filtersActive = q !== '' || docF !== 'All Doctors' || dept !== 'All Departments';
+  const filtersActive = q !== '' || docF !== ALL_DOCTORS || deptF !== ALL_DEPTS;
   const clearAll = (): void => {
     setQ('');
-    setDocF('All Doctors');
-    setDept('All Departments');
+    setDocF(ALL_DOCTORS);
+    setDeptF(ALL_DEPTS);
   };
+
+  const refresh = async (): Promise<void> => {
+    await Promise.all([sessionsQuery.refetch(), appointmentsQuery.refetch()]);
+  };
+
+  const isLoading = sessionsQuery.isPending || doctorsQuery.isPending;
+  const loadError = sessionsQuery.error ?? doctorsQuery.error;
 
   return (
     <div className="flex flex-col gap-4">
@@ -111,17 +140,17 @@ export function TokenCountersScreen() {
           />
         </div>
         <FilterSelect
-          value={dept}
-          options={['All Departments', ...departments]}
+          value={deptF}
+          options={[ALL_DEPTS, ...departments]}
           onChange={(v) => {
-            setDept(v);
-            setDocF('All Doctors');
+            setDeptF(v);
+            setDocF(ALL_DOCTORS);
           }}
           aria-label="Filter by department"
         />
         <FilterSelect
           value={docF}
-          options={['All Doctors', ...inDept]}
+          options={[ALL_DOCTORS, ...doctorNamesInDept]}
           onChange={setDocF}
           aria-label="Filter by doctor"
         />
@@ -130,42 +159,71 @@ export function TokenCountersScreen() {
         <div className="flex items-center gap-5 pr-1">
           {stats.map((st) => (
             <div key={st.label} className="flex min-w-13 flex-col gap-px text-center">
-              <span className={cn('text-[22px] font-bold tabular-nums', st.color)}>{st.val}</span>
+              <span className={cn('text-h2 font-bold tabular-nums', st.color)}>{st.val}</span>
               <span className="text-caption text-text-muted">{st.label}</span>
             </div>
           ))}
         </div>
-        <span className="text-caption text-text-muted whitespace-nowrap">
-          Updated {formatUpdatedAt(updatedAt)}
+        <span
+          className="text-caption text-text-muted inline-flex items-center gap-1.5 whitespace-nowrap"
+          title={socketStatus === 'open' ? 'Live updates on' : 'Live updates reconnecting'}
+        >
+          <span
+            className={cn('size-2 rounded-full', socketStatus === 'open' ? 'bg-g-600' : 'bg-y-700')}
+          />
+          {socketStatus === 'open' ? 'Live' : 'Reconnecting'} · Updated{' '}
+          {sessionsQuery.dataUpdatedAt ? formatUpdatedAt(sessionsQuery.dataUpdatedAt) : '—'}
         </span>
       </Card>
 
-      {loading ? (
+      {isLoading ? (
         <SkeletonCards count={CARD_COLUMNS} lines={4} pad={16} />
-      ) : error ? (
+      ) : loadError ? (
         <Card pad={24}>
           <ErrorState
             inline
-            title="The live queue didn't reload"
-            message={error}
-            onRetry={() => void refresh()}
+            title="The live queue didn't load"
+            message={isFailure(loadError) ? loadError.message : undefined}
+            onRetry={() => {
+              void sessionsQuery.refetch();
+              void doctorsQuery.refetch();
+            }}
           />
         </Card>
-      ) : doctors.length === 0 ? (
+      ) : sessions.length === 0 ? (
+        <Card pad={24}>
+          <EmptyState
+            icon="calendar-days"
+            title="No doctor sessions today."
+            message="Sessions come from each doctor's weekly hours. Check Doctors & Departments or Slots & Availability if a doctor should be consulting today."
+          />
+        </Card>
+      ) : shown.length === 0 ? (
         <Card pad={24}>
           <EmptyState
             icon="stethoscope"
             title="No doctors match your search."
-            message="No doctor in this department matches the current filters."
+            message="No session today matches the current filters."
             actionLabel={filtersActive ? 'Clear filters' : undefined}
             onAction={filtersActive ? clearAll : undefined}
           />
         </Card>
       ) : (
         <div className="grid grid-cols-2 gap-3.5">
-          {doctors.map((d) => (
-            <DoctorQueueCard key={d} doctor={d} />
-          ))}
+          {shown.map((s) => {
+            const doc = doctorsById.get(s.doctorId);
+            return (
+              <DoctorQueueCard
+                key={s.id}
+                session={s}
+                doctorName={doc?.name ?? 'Doctor'}
+                departmentName={doc ? (deptNameById.get(doc.departmentId) ?? '') : ''}
+                room={doc?.room ?? null}
+                appointments={appointments}
+                now={now}
+              />
+            );
+          })}
         </div>
       )}
     </div>
