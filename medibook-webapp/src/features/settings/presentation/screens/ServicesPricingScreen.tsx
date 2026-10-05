@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react';
 
-import { DEMO_TODAY_ISO } from '@/core/config/demo';
+import { isFailure } from '@/core/error/failure';
 
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate, money } from '@/shared/lib/format';
+import { fmtDate, money, todayISO } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -30,22 +31,42 @@ import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 import { Toggle } from '@/shared/ui/Toggle';
 
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import {
+  useDeleteCouponMutation,
+  useDeleteServiceMutation,
+  useDeleteTaxRateMutation,
+  useSaveCouponMutation,
+  useSaveServiceMutation,
+  useSaveTaxRateMutation,
+} from '@/features/settings/application/queries/services.mutations';
+import {
+  useCouponsQuery,
+  useServicesQuery,
+  useTaxRatesQuery,
+} from '@/features/settings/application/queries/services.queries';
+import type {
+  CouponInput,
+  HospitalCoupon,
+  PricedService,
+  ServiceInput,
+  ServiceTaxRate,
+  TaxRateInput,
+} from '@/features/settings/domain/entities/services.entities';
 import {
   couponDiscount,
-  couponRemaining,
-  couponScopeCopy,
-  couponStateOn,
-  priceWithTaxes,
-} from '@/features/settings/application/store/services.logic';
-import { useServicesStore } from '@/features/settings/application/store/services.store';
-import type {
-  Coupon,
-  HospitalService,
-  TaxRate,
-} from '@/features/settings/application/store/services.types';
+  couponState,
+  lastValidDay,
+  localDay,
+  priceService,
+  serviceTaxOptions,
+} from '@/features/settings/domain/services.pricing';
 import { CouponModal } from '@/features/settings/presentation/components/CouponModal';
 import { ServiceModal } from '@/features/settings/presentation/components/ServiceModal';
+import {
+  appliesToLabel,
+  taxLabel,
+} from '@/features/settings/presentation/components/services.labels';
 import { TaxModal } from '@/features/settings/presentation/components/TaxModal';
 
 type PricingTab = 'Services' | 'Taxes' | 'Coupons';
@@ -54,7 +75,57 @@ const TABS: readonly PricingTab[] = ['Services', 'Taxes', 'Coupons'];
 
 const SERVICE_PAGE_SIZE = 8;
 const COUPON_PAGE_SIZE = 6;
-const REFRESH_MS = 420;
+
+/** A sample order the coupon table prices a percent discount against. */
+const SAMPLE_ORDER = 2000;
+
+/** The amount the tax list previews each rate on. */
+const TAX_PREVIEW_AMOUNT = 1000;
+
+/** How many services the receipt preview shows. */
+const RECEIPT_PREVIEW_ROWS = 3;
+
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
+/** The input that re-saves a service unchanged except for `isActive`. */
+function serviceInputOf(s: PricedService, isActive: boolean): ServiceInput {
+  return {
+    name: s.name,
+    departmentId: s.departmentId,
+    description: s.description,
+    durationMinutes: s.durationMinutes,
+    priceRupees: s.priceRupees,
+    taxRateId: s.taxRateId,
+    isActive,
+  };
+}
+
+function taxInputOf(t: ServiceTaxRate, isActive: boolean): TaxRateInput {
+  return {
+    name: t.name,
+    percent: t.percent,
+    isInclusive: t.isInclusive,
+    appliesTo: t.appliesTo,
+    isActive,
+  };
+}
+
+function couponInputOf(c: HospitalCoupon, isActive: boolean): CouponInput {
+  return {
+    code: c.code,
+    kind: c.kind,
+    value: c.value,
+    validFrom: c.validFrom,
+    validTo: c.validTo,
+    usageCap: c.usageCap,
+    minOrderRupees: c.minOrderRupees,
+    departmentIds: c.departmentIds,
+    serviceIds: c.serviceIds,
+    isActive,
+  };
+}
 
 const ANY_DEPT = 'Department: All';
 const ANY_STATE = 'Status: All';
@@ -108,26 +179,30 @@ interface DeleteTarget {
  * Services & Pricing — audit HA-04 (§2.4): "A department carries one base fee.
  * Services, per-service pricing, taxes and coupons have no screen."
  *
- * Three tabs over one store: the service catalogue with its own prices, the
- * tax rates receipts print as separate lines, and the coupons the desk may
- * apply. Every price shown here is a whole-rupee integer run through
- * `priceWithTaxes`, so what the table says is what a receipt would total.
+ * Three tabs over the hospital API: the service catalogue with its own prices
+ * and tax rate, the tax rates (the hospital's own plus read-only platform
+ * defaults), and the coupons the desk may apply. Every price shown is run
+ * through `priceService` — the backend's per-service tax rule — so what the
+ * table says is what a receipt would total.
  */
 export function ServicesPricingScreen() {
-  const services = useServicesStore((s) => s.services);
-  const taxes = useServicesStore((s) => s.taxes);
-  const coupons = useServicesStore((s) => s.coupons);
-  const saveService = useServicesStore((s) => s.saveService);
-  const deleteService = useServicesStore((s) => s.deleteService);
-  const toggleService = useServicesStore((s) => s.toggleService);
-  const saveTax = useServicesStore((s) => s.saveTax);
-  const deleteTax = useServicesStore((s) => s.deleteTax);
-  const toggleTax = useServicesStore((s) => s.toggleTax);
-  const saveCoupon = useServicesStore((s) => s.saveCoupon);
-  const deleteCoupon = useServicesStore((s) => s.deleteCoupon);
-  const toggleCoupon = useServicesStore((s) => s.toggleCoupon);
+  const servicesQuery = useServicesQuery();
+  const taxRatesQuery = useTaxRatesQuery();
+  const couponsQuery = useCouponsQuery();
+  const departmentsQuery = useDepartmentsQuery();
+  const saveService = useSaveServiceMutation();
+  const deleteService = useDeleteServiceMutation();
+  const saveTax = useSaveTaxRateMutation();
+  const deleteTax = useDeleteTaxRateMutation();
+  const saveCoupon = useSaveCouponMutation();
+  const deleteCoupon = useDeleteCouponMutation();
 
-  const depts = useCatalogStore((s) => s.depts);
+  const services = useMemo(() => servicesQuery.data ?? [], [servicesQuery.data]);
+  const taxes = useMemo(() => taxRatesQuery.data ?? [], [taxRatesQuery.data]);
+  const coupons = useMemo(() => couponsQuery.data ?? [], [couponsQuery.data]);
+  const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
+  const today = todayISO();
+
   const { can } = usePermission();
   const mayEdit = can('Hospital Settings.edit');
 
@@ -136,18 +211,41 @@ export function ServicesPricingScreen() {
   const [dept, setDept] = useState(ANY_DEPT);
   const [state, setState] = useState(ANY_STATE);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(false);
 
-  const [serviceEdit, setServiceEdit] = useState<{ service: HospitalService | null } | null>(null);
-  const [taxEdit, setTaxEdit] = useState<{ tax: TaxRate | null } | null>(null);
-  const [couponEdit, setCouponEdit] = useState<{ coupon: Coupon | null } | null>(null);
+  const [serviceEdit, setServiceEdit] = useState<{ service: PricedService | null } | null>(null);
+  const [taxEdit, setTaxEdit] = useState<{ tax: ServiceTaxRate | null } | null>(null);
+  const [couponEdit, setCouponEdit] = useState<{ coupon: HospitalCoupon | null } | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
 
-  const departmentNames = useMemo(() => depts.map((d) => d.name), [depts]);
-  const activeTaxes = useMemo(() => taxes.filter((t) => t.active), [taxes]);
+  const departmentNames = useMemo(() => departments.map((d) => d.name), [departments]);
+  const deptNameById = useMemo(
+    () => new Map(departments.map((d) => [d.id, d.name])),
+    [departments],
+  );
+  const deptName = (id: string | null): string => (id ? (deptNameById.get(id) ?? '—') : 'All');
+  const selectedDeptId = departments.find((d) => d.name === dept)?.id ?? null;
+  const taxById = useMemo(() => new Map(taxes.map((t) => [t.id, t])), [taxes]);
+  const taxOf = (s: PricedService): ServiceTaxRate | null =>
+    s.taxRateId ? (taxById.get(s.taxRateId) ?? null) : null;
+  const activeTaxes = useMemo(() => taxes.filter((t) => t.isActive), [taxes]);
+  const taxOptions = useMemo(() => serviceTaxOptions(taxes), [taxes]);
 
-  const serviceSort = useSort<HospitalService>({ key: 'name', dir: 'asc' });
-  const couponSort = useSort<Coupon>({ key: 'from', dir: 'desc' });
+  /** "All services" / "Cardiology · 2 services" — any scope may match. */
+  const scopeCopy = (c: HospitalCoupon): string => {
+    const parts: string[] = [];
+    if (c.departmentIds.length > 0)
+      parts.push(c.departmentIds.map((id) => deptName(id)).join(', '));
+    if (c.serviceIds.length > 0) {
+      const names = c.serviceIds
+        .map((id) => services.find((x) => x.id === id)?.name)
+        .filter((n): n is string => Boolean(n));
+      parts.push(names.length <= 2 ? names.join(', ') : `${names.length} services`);
+    }
+    return parts.length === 0 ? 'All services' : parts.join(' or ');
+  };
+
+  const serviceSort = useSort<PricedService>({ key: 'name', dir: 'asc' });
+  const couponSort = useSort<HospitalCoupon>({ key: 'from', dir: 'desc' });
 
   const ql = q.trim().toLowerCase();
   const hasFilters = ql !== '' || dept !== ANY_DEPT || state !== ANY_STATE;
@@ -158,13 +256,13 @@ export function ServicesPricingScreen() {
         (s) =>
           (ql === '' ||
             s.name.toLowerCase().includes(ql) ||
-            s.dept.toLowerCase().includes(ql) ||
+            (deptNameById.get(s.departmentId ?? '') ?? '').toLowerCase().includes(ql) ||
             s.description.toLowerCase().includes(ql)) &&
-          (dept === ANY_DEPT || s.dept === dept) &&
+          (dept === ANY_DEPT || s.departmentId === selectedDeptId) &&
           (state === ANY_STATE ||
-            (state === 'Bookable' ? s.active : state === 'Retired' ? !s.active : true)),
+            (state === 'Bookable' ? s.isActive : state === 'Retired' ? !s.isActive : true)),
       ),
-    [services, ql, dept, state],
+    [services, deptNameById, ql, dept, selectedDeptId, state],
   );
 
   const filteredCoupons = useMemo(
@@ -173,27 +271,33 @@ export function ServicesPricingScreen() {
         (c) =>
           (ql === '' ||
             c.code.toLowerCase().includes(ql) ||
-            c.departments.join(' ').toLowerCase().includes(ql)) &&
-          (dept === ANY_DEPT || c.departments.length === 0 || c.departments.includes(dept)) &&
-          (state === ANY_STATE || couponStateOn(c, DEMO_TODAY_ISO) === state),
+            c.departmentIds
+              .map((id) => deptNameById.get(id) ?? '')
+              .join(' ')
+              .toLowerCase()
+              .includes(ql)) &&
+          (dept === ANY_DEPT ||
+            c.departmentIds.length === 0 ||
+            (selectedDeptId !== null && c.departmentIds.includes(selectedDeptId))) &&
+          (state === ANY_STATE || couponState(c, today) === state),
       ),
-    [coupons, ql, dept, state],
+    [coupons, deptNameById, ql, dept, selectedDeptId, state, today],
   );
 
   const orderedServices = serviceSort.sorted([...filteredServices], {
     name: (s) => s.name,
-    dept: (s) => s.dept,
+    dept: (s) => deptName(s.departmentId),
     duration: (s) => s.durationMinutes,
-    price: (s) => s.price,
+    price: (s) => s.priceRupees,
   });
 
   const orderedCoupons = couponSort.sorted([...filteredCoupons], {
     code: (c) => c.code,
-    value: (c) => (c.type === 'Percent' ? c.value : c.value),
-    from: (c) => c.from,
-    used: (c) => c.used,
-    minOrder: (c) => c.minOrder,
-    state: (c) => couponStateOn(c, DEMO_TODAY_ISO),
+    value: (c) => c.value,
+    from: (c) => c.validFrom,
+    used: (c) => c.usedCount,
+    minOrder: (c) => c.minOrderRupees,
+    state: (c) => couponState(c, today),
   });
 
   const servicePage = Math.min(
@@ -226,23 +330,59 @@ export function ServicesPricingScreen() {
     clearFilters();
   };
 
+  /** Re-read everything this screen shows from the server. */
   const refresh = async (): Promise<void> => {
-    setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, REFRESH_MS));
-    setLoading(false);
+    await Promise.all([
+      servicesQuery.refetch(),
+      taxRatesQuery.refetch(),
+      couponsQuery.refetch(),
+      departmentsQuery.refetch(),
+    ]);
+  };
+
+  /** Run a save; toast the failure and resolve `false` so the modal stays open. */
+  const persist = async (run: () => Promise<unknown>, done: string): Promise<boolean> => {
+    try {
+      await run();
+      toast(done, 'success');
+      return true;
+    } catch (error) {
+      toast(failureText(error, 'Could not save. Please try again.'), 'error');
+      return false;
+    }
+  };
+
+  const toggleService = (s: PricedService): void => {
+    saveService.mutate(
+      { input: serviceInputOf(s, !s.isActive), existing: { id: s.id, version: s.version } },
+      { onError: (error) => toast(failureText(error, 'Could not update the service.'), 'error') },
+    );
+  };
+
+  const toggleTax = (t: ServiceTaxRate): void => {
+    saveTax.mutate(
+      { input: taxInputOf(t, !t.isActive), existing: { id: t.id, version: t.version } },
+      { onError: (error) => toast(failureText(error, 'Could not update the tax rate.'), 'error') },
+    );
+  };
+
+  const toggleCoupon = (c: HospitalCoupon): void => {
+    saveCoupon.mutate(
+      { input: couponInputOf(c, !c.isActive), existing: { id: c.id, version: c.version } },
+      { onError: (error) => toast(failureText(error, 'Could not update the coupon.'), 'error') },
+    );
   };
 
   const kpis: readonly StatCardData[] = useMemo(() => {
-    const bookable = services.filter((s) => s.active);
+    const bookable = services.filter((s) => s.isActive);
     const averagePrice =
       bookable.length === 0
         ? 0
-        : Math.round(bookable.reduce((sum, s) => sum + s.price, 0) / bookable.length);
-    const liveCoupons = coupons.filter((c) => couponStateOn(c, DEMO_TODAY_ISO) === 'Active');
+        : Math.round(bookable.reduce((sum, s) => sum + s.priceRupees, 0) / bookable.length);
+    const liveCoupons = coupons.filter((c) => couponState(c, today) === 'Active');
+    const taxed = bookable.filter((s) => s.taxRateId !== null).length;
     const taxCopy =
-      activeTaxes.length === 0
-        ? 'none applied'
-        : activeTaxes.map((t) => `${t.name} ${t.percent}%`).join(' + ');
+      activeTaxes.length === 0 ? 'none active' : activeTaxes.map((t) => taxLabel(t)).join(', ');
     return [
       {
         icon: 'layers',
@@ -264,8 +404,8 @@ export function ServicesPricingScreen() {
       },
       {
         icon: 'percent',
-        label: 'Tax on Receipts',
-        value: `${activeTaxes.reduce((sum, t) => sum + t.percent, 0)}%`,
+        label: 'Taxed Services',
+        value: `${taxed} of ${bookable.length}`,
         sub: taxCopy,
         iconClass: 'bg-y-100 text-y-600',
         valueClass: 'text-y-600',
@@ -281,18 +421,18 @@ export function ServicesPricingScreen() {
         subClass: 'text-text-muted',
       },
     ];
-  }, [services, coupons, activeTaxes]);
+  }, [services, coupons, activeTaxes, today]);
 
   const exportServicesCsv = (): void => {
     downloadCsv('medibook-services-pricing.csv', [
       ['Service', 'Department', 'Duration (min)', 'Price', 'With tax', 'Bookable', 'Description'],
       ...orderedServices.map((s) => [
         s.name,
-        s.dept,
+        deptName(s.departmentId),
         s.durationMinutes,
-        s.price,
-        priceWithTaxes(s.price, activeTaxes).total,
-        s.active ? 'Yes' : 'No',
+        s.priceRupees,
+        priceService(s.priceRupees, taxOf(s)).total,
+        s.isActive ? 'Yes' : 'No',
         s.description,
       ]),
     ]);
@@ -316,16 +456,16 @@ export function ServicesPricingScreen() {
       ],
       ...orderedCoupons.map((c) => [
         c.code,
-        c.type,
+        c.kind === 'percent' ? 'Percent' : 'Flat',
         c.value,
-        c.from,
-        c.to,
-        c.usageCap === 0 ? 'Unlimited' : c.usageCap,
-        c.used,
-        c.minOrder,
-        c.departments.join(' | '),
-        c.serviceIds.join(' | '),
-        couponStateOn(c, DEMO_TODAY_ISO),
+        localDay(c.validFrom),
+        lastValidDay(c.validTo),
+        c.usageCap ?? 'Unlimited',
+        c.usedCount,
+        c.minOrderRupees,
+        c.departmentIds.map((id) => deptName(id)).join(' | '),
+        c.serviceIds.map((id) => services.find((x) => x.id === id)?.name ?? id).join(' | '),
+        couponState(c, today),
       ]),
     ]);
     toast(`Exported ${orderedCoupons.length} coupons as CSV`, 'success');
@@ -333,10 +473,17 @@ export function ServicesPricingScreen() {
 
   const confirmDelete = (): void => {
     if (!toDelete) return;
-    if (toDelete.kind === 'Services') deleteService(toDelete.id);
-    if (toDelete.kind === 'Taxes') deleteTax(toDelete.id);
-    if (toDelete.kind === 'Coupons') deleteCoupon(toDelete.id);
+    const target = toDelete;
     setToDelete(null);
+    const run =
+      target.kind === 'Services'
+        ? deleteService.mutateAsync
+        : target.kind === 'Taxes'
+          ? deleteTax.mutateAsync
+          : deleteCoupon.mutateAsync;
+    run(target.id)
+      .then(() => toast(`“${target.label}” deleted`, 'info'))
+      .catch((error: unknown) => toast(failureText(error, 'Could not delete it.'), 'error'));
   };
 
   if (!can('Hospital Settings.view')) {
@@ -351,52 +498,70 @@ export function ServicesPricingScreen() {
     );
   }
 
-  const serviceTableState: TableStateSpec | undefined = loading
+  const serviceTableState: TableStateSpec | undefined = servicesQuery.isPending
     ? { kind: 'loading', rows: SERVICE_PAGE_SIZE }
-    : serviceRows.length === 0
+    : servicesQuery.isError
       ? {
-          kind: 'empty',
-          icon: hasFilters ? 'search' : 'layers',
-          title: hasFilters ? 'No services match your filters.' : 'No services yet.',
-          message: hasFilters
-            ? 'Clear the filters to see the whole catalogue.'
-            : 'Add the procedures and tests patients can book, each with its own price.',
-          actionLabel: hasFilters ? 'Clear filters' : mayEdit ? 'Add a service' : undefined,
-          onAction: hasFilters
-            ? clearFilters
-            : mayEdit
-              ? () => setServiceEdit({ service: null })
-              : undefined,
+          kind: 'error',
+          title: 'Could not load services',
+          message: failureText(servicesQuery.error, 'Please try again.'),
+          onRetry: () => void servicesQuery.refetch(),
         }
-      : undefined;
+      : serviceRows.length === 0
+        ? {
+            kind: 'empty',
+            icon: hasFilters ? 'search' : 'layers',
+            title: hasFilters ? 'No services match your filters.' : 'No services yet.',
+            message: hasFilters
+              ? 'Clear the filters to see the whole catalogue.'
+              : 'Add the procedures and tests patients can book, each with its own price.',
+            actionLabel: hasFilters ? 'Clear filters' : mayEdit ? 'Add a service' : undefined,
+            onAction: hasFilters
+              ? clearFilters
+              : mayEdit
+                ? () => setServiceEdit({ service: null })
+                : undefined,
+          }
+        : undefined;
 
-  const couponTableState: TableStateSpec | undefined = loading
+  const couponTableState: TableStateSpec | undefined = couponsQuery.isPending
     ? { kind: 'loading', rows: COUPON_PAGE_SIZE }
-    : couponRows.length === 0
+    : couponsQuery.isError
       ? {
-          kind: 'empty',
-          icon: hasFilters ? 'search' : 'ticket',
-          title: hasFilters ? 'No coupons match your filters.' : 'No coupons yet.',
-          message: hasFilters
-            ? 'Clear the filters to see every code.'
-            : 'Create a code the desk or the patient app can apply at checkout.',
-          actionLabel: hasFilters ? 'Clear filters' : mayEdit ? 'Create a coupon' : undefined,
-          onAction: hasFilters
-            ? clearFilters
-            : mayEdit
-              ? () => setCouponEdit({ coupon: null })
-              : undefined,
+          kind: 'error',
+          title: 'Could not load coupons',
+          message: failureText(couponsQuery.error, 'Please try again.'),
+          onRetry: () => void couponsQuery.refetch(),
         }
-      : undefined;
+      : couponRows.length === 0
+        ? {
+            kind: 'empty',
+            icon: hasFilters ? 'search' : 'ticket',
+            title: hasFilters ? 'No coupons match your filters.' : 'No coupons yet.',
+            message: hasFilters
+              ? 'Clear the filters to see every code.'
+              : 'Create a code the desk or the patient app can apply at checkout.',
+            actionLabel: hasFilters ? 'Clear filters' : mayEdit ? 'Create a coupon' : undefined,
+            onAction: hasFilters
+              ? clearFilters
+              : mayEdit
+                ? () => setCouponEdit({ coupon: null })
+                : undefined,
+          }
+        : undefined;
 
   return (
     <div className="flex flex-col gap-5">
-      {loading ? <SkeletonKpiStrip /> : <KpiStrip items={kpis} />}
+      {servicesQuery.isPending || taxRatesQuery.isPending || couponsQuery.isPending ? (
+        <SkeletonKpiStrip />
+      ) : (
+        <KpiStrip items={kpis} />
+      )}
 
       <Card pad={16} className="flex flex-wrap items-center gap-3">
         <SegTabs tabs={TABS} value={tab} onChange={(t) => switchTab(t as PricingTab)} />
         <span className="text-caption text-text-muted">
-          Prices are per service and independent of a department&apos;s base consultation fee.
+          Prices are per service, each billed with its own tax rate.
         </span>
         <div className="flex-1" />
         {tab === 'Services' && (
@@ -490,7 +655,7 @@ export function ServicesPricingScreen() {
                 scrollLabel="Services catalogue"
               >
                 {serviceRows.map((s) => {
-                  const priced = priceWithTaxes(s.price, activeTaxes);
+                  const priced = priceService(s.priceRupees, taxOf(s));
                   return (
                     <tr key={s.id}>
                       <td className={cn(tdClass, 'max-w-90')}>
@@ -501,13 +666,17 @@ export function ServicesPricingScreen() {
                           </span>
                         </div>
                       </td>
-                      <td className={tdClass}>{s.dept}</td>
+                      <td className={tdClass}>{deptName(s.departmentId)}</td>
                       <td className={tdClass}>{s.durationMinutes} min</td>
-                      <td className={cn(tdClass, 'text-right tabular-nums')}>{money(s.price)}</td>
+                      <td className={cn(tdClass, 'text-right tabular-nums')}>
+                        {money(s.priceRupees)}
+                      </td>
                       <td className={cn(tdClass, 'text-right tabular-nums')}>
                         <span className="text-text-strong font-medium">{money(priced.total)}</span>
                         <span className="text-caption text-text-muted block">
-                          incl. {money(priced.taxTotal)} tax
+                          {priced.tax === 0
+                            ? 'tax exempt'
+                            : `${priced.isInclusive ? 'incl.' : '+'} ${money(priced.tax)} tax`}
                         </span>
                       </td>
                       <td className={tdClass}>
@@ -517,8 +686,8 @@ export function ServicesPricingScreen() {
                           disabledTitle="Your role cannot change services"
                         >
                           <Toggle
-                            value={s.active}
-                            onChange={() => toggleService(s.id)}
+                            value={s.isActive}
+                            onChange={() => toggleService(s)}
                             label={`Make ${s.name} bookable`}
                           />
                         </Can>
@@ -578,8 +747,9 @@ export function ServicesPricingScreen() {
                 scrollLabel="Coupons"
               >
                 {couponRows.map((c) => {
-                  const remaining = couponRemaining(c);
-                  const cState = couponStateOn(c, DEMO_TODAY_ISO);
+                  const remaining =
+                    c.usageCap === null ? null : Math.max(0, c.usageCap - c.usedCount);
+                  const cState = couponState(c, today);
                   return (
                     <tr key={c.id}>
                       <td className={tdClass}>
@@ -588,25 +758,25 @@ export function ServicesPricingScreen() {
                         </span>
                       </td>
                       <td className={cn(tdClass, 'text-right tabular-nums')}>
-                        {c.type === 'Percent' ? `${c.value}%` : money(c.value)}
+                        {c.kind === 'percent' ? `${c.value}%` : money(c.value)}
                         <span className="text-caption text-text-muted block">
-                          {c.type === 'Percent'
-                            ? `${money(couponDiscount(c, 2000))} on a ${money(2000)} order`
+                          {c.kind === 'percent'
+                            ? `${money(couponDiscount(c, SAMPLE_ORDER))} on a ${money(SAMPLE_ORDER)} order`
                             : 'flat'}
                         </span>
                       </td>
-                      <td className={cn(tdClass, 'max-w-60')}>{couponScopeCopy(c, services)}</td>
+                      <td className={cn(tdClass, 'max-w-60')}>{scopeCopy(c)}</td>
                       <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
-                        {fmtDate(c.from)} – {fmtDate(c.to)}
+                        {fmtDate(localDay(c.validFrom))} – {fmtDate(lastValidDay(c.validTo))}
                       </td>
                       <td className={tdClass}>
-                        {c.used} used
+                        {c.usedCount} used
                         <span className="text-caption text-text-muted block">
                           {remaining == null ? 'unlimited' : `${remaining} left`}
                         </span>
                       </td>
                       <td className={cn(tdClass, 'text-right tabular-nums')}>
-                        {c.minOrder === 0 ? '—' : money(c.minOrder)}
+                        {c.minOrderRupees === 0 ? '—' : money(c.minOrderRupees)}
                       </td>
                       <td className={tdClass}>
                         <Badge status={cState === 'Exhausted' ? 'Blocked' : cState}>{cState}</Badge>
@@ -619,12 +789,12 @@ export function ServicesPricingScreen() {
                             disabledTitle="Your role cannot change coupons"
                           >
                             <IconBtn
-                              name={c.active ? 'pause' : 'play'}
-                              label={c.active ? 'Pause coupon' : 'Resume coupon'}
-                              title={`${c.active ? 'Pause' : 'Resume'} ${c.code}`}
+                              name={c.isActive ? 'pause' : 'play'}
+                              label={c.isActive ? 'Pause coupon' : 'Resume coupon'}
+                              title={`${c.isActive ? 'Pause' : 'Resume'} ${c.code}`}
                               box={36}
                               size={15}
-                              onClick={() => toggleCoupon(c.id)}
+                              onClick={() => toggleCoupon(c)}
                             />
                           </Can>
                           <Can
@@ -677,12 +847,19 @@ export function ServicesPricingScreen() {
           <Card>
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <SectionTitle>Tax Rates</SectionTitle>
-              <InfoDot text="Receipts print tax as its own line, never baked into the fee — so an exclusive rate is added on top of the service price, and an inclusive rate is broken back out of it." />
+              <InfoDot text="Each service is billed with the one rate picked on it; consultations use the best matching rate. An exclusive rate is added on top of the price, an inclusive one is broken back out of it. Platform defaults are set by Medibook." />
               <div className="flex-1" />
               <RefreshBtn onRefresh={refresh} title="Refresh tax rates" />
             </div>
-            {loading ? (
+            {taxRatesQuery.isPending ? (
               <SkeletonTable rows={2} cols={4} card={false} />
+            ) : taxRatesQuery.isError ? (
+              <ErrorState
+                inline
+                title="Could not load tax rates"
+                message={failureText(taxRatesQuery.error, 'Please try again.')}
+                onRetry={() => void taxRatesQuery.refetch()}
+              />
             ) : taxes.length === 0 ? (
               <EmptyState
                 icon="percent"
@@ -705,7 +882,7 @@ export function ServicesPricingScreen() {
                     <div
                       className={cn(
                         'flex size-9.5 flex-none items-center justify-center rounded-md',
-                        t.active ? 'bg-y-100 text-y-600' : 'bg-grey-300 text-text-muted',
+                        t.isActive ? 'bg-y-100 text-y-600' : 'bg-grey-300 text-text-muted',
                       )}
                     >
                       <Icon name="percent" size={18} />
@@ -715,57 +892,64 @@ export function ServicesPricingScreen() {
                         {t.name} · {t.percent}%
                       </div>
                       <div className="text-caption text-text-muted">
-                        {t.mode === 'Exclusive'
-                          ? 'Added on top of the service price'
-                          : 'Already inside the service price'}
+                        {appliesToLabel(t.appliesTo)} ·{' '}
+                        {t.isInclusive ? 'already inside the price' : 'added on top of the price'}
                       </div>
                     </div>
                     <div className="text-caption text-text-muted">
-                      A {money(1000)} service becomes{' '}
+                      A {money(TAX_PREVIEW_AMOUNT)} service becomes{' '}
                       <span className="text-text-strong font-medium tabular-nums">
-                        {money(priceWithTaxes(1000, [{ ...t, active: true }]).total)}
+                        {money(priceService(TAX_PREVIEW_AMOUNT, { ...t, isActive: true }).total)}
                       </span>
                     </div>
                     <div className="flex-1" />
-                    <Badge status={t.active ? 'Enabled' : 'Inactive'}>
-                      {t.active ? 'On receipts' : 'Not applied'}
+                    <Badge status={t.isActive ? 'Enabled' : 'Inactive'}>
+                      {t.isActive ? 'On receipts' : 'Not applied'}
                     </Badge>
-                    <Can
-                      perm="Hospital Settings.edit"
-                      disableInstead
-                      disabledTitle="Your role cannot change tax rates"
-                    >
-                      <Toggle
-                        value={t.active}
-                        onChange={() => toggleTax(t.id)}
-                        label={`Apply ${t.name} to receipts`}
-                      />
-                    </Can>
-                    <Can
-                      perm="Hospital Settings.edit"
-                      disableInstead
-                      disabledTitle="Your role cannot change tax rates"
-                    >
-                      <IconBtn
-                        name="pencil"
-                        label="Edit tax rate"
-                        title={`Edit ${t.name}`}
-                        box={36}
-                        size={15}
-                        onClick={() => setTaxEdit({ tax: t })}
-                      />
-                    </Can>
-                    <Can perm="Hospital Settings.del">
-                      <IconBtn
-                        name="trash-2"
-                        label="Delete tax rate"
-                        title={`Delete ${t.name}`}
-                        box={36}
-                        size={15}
-                        color="var(--color-d-500)"
-                        onClick={() => setToDelete({ kind: 'Taxes', id: t.id, label: t.name })}
-                      />
-                    </Can>
+                    {t.isPlatformDefault ? (
+                      <span className="text-caption text-text-muted inline-flex items-center gap-1.5">
+                        <Icon name="lock" size={13} /> Platform default
+                      </span>
+                    ) : (
+                      <>
+                        <Can
+                          perm="Hospital Settings.edit"
+                          disableInstead
+                          disabledTitle="Your role cannot change tax rates"
+                        >
+                          <Toggle
+                            value={t.isActive}
+                            onChange={() => toggleTax(t)}
+                            label={`Apply ${t.name} to receipts`}
+                          />
+                        </Can>
+                        <Can
+                          perm="Hospital Settings.edit"
+                          disableInstead
+                          disabledTitle="Your role cannot change tax rates"
+                        >
+                          <IconBtn
+                            name="pencil"
+                            label="Edit tax rate"
+                            title={`Edit ${t.name}`}
+                            box={36}
+                            size={15}
+                            onClick={() => setTaxEdit({ tax: t })}
+                          />
+                        </Can>
+                        <Can perm="Hospital Settings.del">
+                          <IconBtn
+                            name="trash-2"
+                            label="Delete tax rate"
+                            title={`Delete ${t.name}`}
+                            box={36}
+                            size={15}
+                            color="var(--color-d-500)"
+                            onClick={() => setToDelete({ kind: 'Taxes', id: t.id, label: t.name })}
+                          />
+                        </Can>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -775,38 +959,30 @@ export function ServicesPricingScreen() {
           <Card>
             <SectionTitle className="mb-3">What a receipt will show</SectionTitle>
             <div className="text-caption text-text-muted mb-3">
-              Derived from the rates above and the three most expensive bookable services — change a
-              rate and these totals move.
+              The three most expensive bookable services, each with its own tax rate — change a rate
+              or a service and these totals move.
             </div>
             <TableShell
-              columns={[
-                'Service',
-                'Price',
-                ...activeTaxes.map((t) => `${t.name} ${t.percent}%`),
-                'Patient pays',
-              ]}
-              rightCols={[
-                'Price',
-                ...activeTaxes.map((t) => `${t.name} ${t.percent}%`),
-                'Patient pays',
-              ]}
+              columns={['Service', 'Price', 'Tax', 'Patient pays']}
+              rightCols={['Price', 'Tax', 'Patient pays']}
               scrollLabel="Receipt preview"
             >
               {[...services]
-                .filter((s) => s.active)
-                .sort((a, b) => b.price - a.price)
-                .slice(0, 3)
+                .filter((s) => s.isActive)
+                .sort((a, b) => b.priceRupees - a.priceRupees)
+                .slice(0, RECEIPT_PREVIEW_ROWS)
                 .map((s) => {
-                  const priced = priceWithTaxes(s.price, activeTaxes);
+                  const tax = taxOf(s);
+                  const priced = priceService(s.priceRupees, tax);
                   return (
                     <tr key={s.id}>
                       <td className={tdClass}>{s.name}</td>
-                      <td className={cn(tdClass, 'text-right tabular-nums')}>{money(s.price)}</td>
-                      {activeTaxes.map((t) => (
-                        <td key={t.id} className={cn(tdClass, 'text-right tabular-nums')}>
-                          {money(priced.taxes.find((l) => l.name === t.name)?.amount ?? 0)}
-                        </td>
-                      ))}
+                      <td className={cn(tdClass, 'text-right tabular-nums')}>
+                        {money(s.priceRupees)}
+                      </td>
+                      <td className={cn(tdClass, 'text-right tabular-nums')}>
+                        {tax ? `${money(priced.tax)} · ${taxLabel(tax)}` : 'Exempt'}
+                      </td>
                       <td
                         className={cn(
                           tdClass,
@@ -828,9 +1004,20 @@ export function ServicesPricingScreen() {
           key={serviceEdit.service?.id ?? 'new-service'}
           open
           service={serviceEdit.service}
-          departments={departmentNames}
+          departments={departments}
+          taxOptions={taxOptions}
           onClose={() => setServiceEdit(null)}
-          onSave={saveService}
+          onSave={(input) => {
+            const existing = serviceEdit.service;
+            return persist(
+              () =>
+                saveService.mutateAsync({
+                  input,
+                  existing: existing ? { id: existing.id, version: existing.version } : undefined,
+                }),
+              existing ? 'Service saved' : 'Service added',
+            );
+          }}
         />
       )}
       {taxEdit && (
@@ -839,7 +1026,17 @@ export function ServicesPricingScreen() {
           open
           tax={taxEdit.tax}
           onClose={() => setTaxEdit(null)}
-          onSave={saveTax}
+          onSave={(input) => {
+            const existing = taxEdit.tax;
+            return persist(
+              () =>
+                saveTax.mutateAsync({
+                  input,
+                  existing: existing ? { id: existing.id, version: existing.version } : undefined,
+                }),
+              existing ? 'Tax rate saved' : 'Tax rate added',
+            );
+          }}
         />
       )}
       {couponEdit && (
@@ -848,9 +1045,19 @@ export function ServicesPricingScreen() {
           open
           coupon={couponEdit.coupon}
           services={services}
-          departments={departmentNames}
+          departments={departments}
           onClose={() => setCouponEdit(null)}
-          onSave={saveCoupon}
+          onSave={(input) => {
+            const existing = couponEdit.coupon;
+            return persist(
+              () =>
+                saveCoupon.mutateAsync({
+                  input,
+                  existing: existing ? { id: existing.id, version: existing.version } : undefined,
+                }),
+              existing ? 'Coupon saved' : 'Coupon created',
+            );
+          }}
         />
       )}
 

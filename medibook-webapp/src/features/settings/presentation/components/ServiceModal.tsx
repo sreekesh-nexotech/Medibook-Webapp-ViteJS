@@ -7,22 +7,32 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 
-import type { ServiceDraft } from '@/features/settings/application/store/services.store';
-import type { HospitalService } from '@/features/settings/application/store/services.types';
+import type { Department } from '@/features/doctors/domain/entities/doctors.types';
+import type {
+  PricedService,
+  ServiceInput,
+  ServiceTaxRate,
+} from '@/features/settings/domain/entities/services.entities';
+import { priceService } from '@/features/settings/domain/services.pricing';
+import {
+  NO_TAX_LABEL,
+  taxLabel,
+} from '@/features/settings/presentation/components/services.labels';
 
 /** Editable shape — numbers are held as text while the field is being typed. */
 interface ServiceForm {
   name: string;
-  dept: string;
+  departmentId: string;
   durationMinutes: string;
   price: string;
+  taxRateId: string;
   description: string;
   active: boolean;
 }
 
 const VALIDATORS: FormValidators<ServiceForm> = {
   name: (v) => required(v, 'Service name'),
-  dept: (v) => required(v, 'Department'),
+  departmentId: (v) => required(v, 'Department'),
   durationMinutes: (v) => positiveAmount(v, 'Duration'),
   price: (v) => positiveAmount(v, 'Price'),
 };
@@ -30,47 +40,68 @@ const VALIDATORS: FormValidators<ServiceForm> = {
 interface ServiceModalProps {
   open: boolean;
   /** The service being edited, or null to add one. */
-  service: HospitalService | null;
-  /** Department names from the hospital's master data. */
-  departments: readonly string[];
+  service: PricedService | null;
+  /** The hospital's departments (H1). */
+  departments: readonly Department[];
+  /** Rates a service may be billed with (active, for services or everything). */
+  taxOptions: readonly ServiceTaxRate[];
   onClose: () => void;
-  onSave: (draft: ServiceDraft) => void;
+  /** Persist; resolves `true` when saved (the caller reports failures). */
+  onSave: (input: ServiceInput) => Promise<boolean>;
 }
 
 /**
- * Add / edit one priced service (audit HA-04). The price lives here, not on
- * the department, which is the whole point: a department's base fee is the
- * consultation, a service carries its own price.
+ * Add / edit one priced service (audit HA-04). A service carries its own
+ * price and its **own** tax rate — the backend bills a service with that one
+ * rate (none = exempt), so the hint shows exactly what a patient pays.
  *
  * Mount it with a `key` that changes per edited service so the form starts
  * from the right values without a state-syncing effect.
  */
-export function ServiceModal({ open, service, departments, onClose, onSave }: ServiceModalProps) {
+export function ServiceModal({
+  open,
+  service,
+  departments,
+  taxOptions,
+  onClose,
+  onSave,
+}: ServiceModalProps) {
   const form = useForm<ServiceForm>({
     initial: {
       name: service?.name ?? '',
-      dept: service?.dept ?? departments[0] ?? '',
+      departmentId: service?.departmentId ?? departments[0]?.id ?? '',
       durationMinutes: String(service?.durationMinutes ?? 15),
-      price: String(service?.price ?? ''),
+      price: service ? String(service.priceRupees) : '',
+      taxRateId: service?.taxRateId ?? '',
       description: service?.description ?? '',
-      active: service?.active ?? true,
+      active: service?.isActive ?? true,
     },
     validate: VALIDATORS,
-    onSubmit: (v) => {
-      onSave({
-        ...(service ? { id: service.id } : {}),
+    onSubmit: async (v) => {
+      const saved = await onSave({
         name: v.name.trim(),
-        dept: v.dept,
+        departmentId: v.departmentId || null,
         durationMinutes: Number(v.durationMinutes),
-        price: Number(v.price),
+        priceRupees: Number(v.price),
+        taxRateId: v.taxRateId || null,
         description: v.description.trim(),
-        active: v.active,
+        isActive: v.active,
       });
-      onClose();
+      if (saved) onClose();
     },
   });
 
   const price = Number(form.values.price);
+  const tax = taxOptions.find((t) => t.id === form.values.taxRateId) ?? null;
+  const priced = priceService(Number.isFinite(price) ? price : 0, tax);
+  const deptName = departments.find((d) => d.id === form.values.departmentId)?.name ?? '';
+  const taxNames = [NO_TAX_LABEL, ...taxOptions.map(taxLabel)];
+  // A service may point at a rate that is no longer offered (inactive) — keep it visible.
+  const currentTax = tax
+    ? taxLabel(tax)
+    : form.values.taxRateId
+      ? 'Current rate (inactive)'
+      : NO_TAX_LABEL;
 
   return (
     <FormModal
@@ -94,11 +125,22 @@ export function ServiceModal({ open, service, departments, onClose, onSave }: Se
           />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Department" required error={form.errorFor('dept')}>
+          <Field
+            label="Department"
+            required
+            error={form.errorFor('departmentId')}
+            hint={
+              departments.length === 0
+                ? 'Add a department in Doctors & Departments first.'
+                : undefined
+            }
+          >
             <Select
-              value={form.values.dept}
-              options={departments}
-              onChange={(v) => form.setField('dept', v)}
+              value={deptName}
+              options={departments.map((d) => d.name)}
+              onChange={(name) =>
+                form.setField('departmentId', departments.find((d) => d.name === name)?.id ?? '')
+              }
               placeholder="Select a department"
               height={48}
             />
@@ -118,24 +160,41 @@ export function ServiceModal({ open, service, departments, onClose, onSave }: Se
             />
           </Field>
         </div>
-        <Field
-          label="Price (₹)"
-          required
-          error={form.errorFor('price')}
-          hint={
-            Number.isFinite(price) && price > 0
-              ? `${money(price)} before tax — independent of the department base fee.`
-              : 'Whole rupees, before tax.'
-          }
-        >
-          <TextInput
-            value={form.values.price}
-            onChange={(v) => form.setField('price', v.replace(/[^0-9]/g, ''))}
-            onBlur={() => form.blurField('price')}
-            inputMode="numeric"
-            height={48}
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field
+            label="Price (₹)"
+            required
+            error={form.errorFor('price')}
+            hint="Whole rupees, before tax."
+          >
+            <TextInput
+              value={form.values.price}
+              onChange={(v) => form.setField('price', v.replace(/[^0-9]/g, ''))}
+              onBlur={() => form.blurField('price')}
+              inputMode="numeric"
+              height={48}
+            />
+          </Field>
+          <Field
+            label="Tax"
+            hint={
+              Number.isFinite(price) && price > 0
+                ? priced.isInclusive
+                  ? `Patient pays ${money(priced.total)} (includes ${money(priced.tax)} tax).`
+                  : `Patient pays ${money(priced.total)}${priced.tax ? ` (${money(priced.tax)} tax)` : ''}.`
+                : 'The one tax this service is billed with.'
+            }
+          >
+            <Select
+              value={currentTax}
+              options={taxNames.includes(currentTax) ? taxNames : [currentTax, ...taxNames]}
+              onChange={(label) =>
+                form.setField('taxRateId', taxOptions.find((t) => taxLabel(t) === label)?.id ?? '')
+              }
+              height={48}
+            />
+          </Field>
+        </div>
         <Field label="Description" hint="Shown to patients in the Medibook app.">
           <textarea
             value={form.values.description}
