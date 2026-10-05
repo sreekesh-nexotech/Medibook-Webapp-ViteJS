@@ -1,82 +1,123 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
+import { MAX_PAGE_SIZE } from '@/core/api/pagination';
 import { cn } from '@/shared/lib/cn';
-import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoGrid } from '@/shared/ui/InfoGrid';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
 
-import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsHospitalDetailPath } from '@/app/router/paths';
+import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsPath } from '@/app/router/paths';
 
-import { useBillingStore } from '@/features/ops-billing/application/store/billing.store';
-import { hospName, opsHospById } from '@/features/ops-hospitals/application/store/hospitals.store';
+import { usePaymentsQuery } from '@/features/ops-billing/application/queries/usePaymentsQuery';
+import type {
+  PaymentListParams,
+  SubscriptionPayment,
+} from '@/features/ops-billing/domain/entities/billing.entities';
+import { BillingHospitalName } from '@/features/ops-billing/presentation/components/BillingHospitalName';
+import {
+  METHOD_LABELS,
+  PAYMENT_STATUS_BADGES,
+  failureText,
+  fmtDateTime,
+  rupees,
+} from '@/features/ops-billing/presentation/components/billingView';
 
 /** One status-history row: label, timestamp, and the dot's token bg class. */
 type HistoryStep = readonly [string, string, string];
 
-/** Attempts a gateway payment gets before ops has to collect it manually. */
-const MAX_PAYMENT_ATTEMPTS = 3;
+/** Router state the billing screens pass, so the payment can be found by its invoice. */
+function invoiceIdFrom(state: unknown): string | null {
+  if (typeof state !== 'object' || state === null || !('invoiceId' in state)) return null;
+  const { invoiceId } = state;
+  return typeof invoiceId === 'string' ? invoiceId : null;
+}
+
+function historyOf(pay: SubscriptionPayment): readonly HistoryStep[] {
+  const steps: HistoryStep[] = [
+    [
+      pay.attemptNo > 1 ? `Payment attempt ${pay.attemptNo} started` : 'Payment started',
+      fmtDateTime(pay.attemptedAt),
+      'bg-text-faint',
+    ],
+  ];
+  if (pay.status === 'captured' || pay.status === 'refunded') {
+    steps.push(['Payment received', fmtDateTime(pay.capturedAt ?? pay.attemptedAt), 'bg-g-600']);
+  }
+  if (pay.status === 'refunded') steps.push(['Refunded', '—', 'bg-d-500']);
+  if (pay.status === 'failed') {
+    steps.push([
+      pay.failureReason ? `Failed — ${pay.failureReason}` : 'Payment failed',
+      fmtDateTime(pay.attemptedAt),
+      'bg-d-500',
+    ]);
+  }
+  if (pay.status === 'created') steps.push(['Awaiting confirmation', 'In progress', 'bg-y-600']);
+  return steps;
+}
 
 /**
- * Ops payment detail (design `Ops.jsx` `OpsPaymentDetail`): the selected
- * payment resolves from the `:id` URL param with a first-record fallback.
- * Header + View Hospital / View Invoice links, the reference InfoGrid (gateway
- * ref `GW-<88000 + id * 7>`), and the status-history timeline whose dot colors
- * branch on the payment's status.
- *
- * A failed payment can be retried here (audit SA-03: "no retry"). The retry is
- * honest about what it does: the attempt counter moves and the payment goes
- * back to Pending with the gateway — nothing claims the bank has approved it.
+ * Ops payment detail (design `Ops.jsx` `OpsPaymentDetail`). The API has no
+ * single-payment read, so the payment is found among its invoice's payments
+ * (the billing screens pass the invoice id in router state); a bare link
+ * searches the newest 100 payments instead.
  */
 export function OpsPaymentDetailScreen() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const invoices = useBillingStore((s) => s.invoices);
-  const payments = useBillingStore((s) => s.payments);
-  const retryPayment = useBillingStore((s) => s.retryPayment);
-  const [busy, run] = useOpsAct();
+  const { id = '' } = useParams();
+  const invoiceId = invoiceIdFrom(useLocation().state);
 
-  const pay = payments.find((x) => x.id === Number(id)) ?? payments[0];
-  const linked = invoices.find((x) => x.no === pay.inv);
-  const retryable = pay.status === 'Payment failed' && pay.attempts < MAX_PAYMENT_ATTEMPTS;
+  const params: PaymentListParams = {
+    page: 1,
+    pageSize: MAX_PAGE_SIZE,
+    statuses: [],
+    method: null,
+    invoiceId,
+    sortField: 'attempted_at',
+    sortDirection: 'desc',
+  };
+  const paymentsQuery = usePaymentsQuery(params);
+  const pay = paymentsQuery.data?.items.find((p) => p.id === id);
 
-  const hist: readonly HistoryStep[] =
-    pay.status === 'Success'
-      ? [
-          ['Payment initiated', `${pay.date} · 10:41`, 'bg-text-faint'],
-          ['Authorized by gateway', `${pay.date} · 10:41`, 'bg-text-faint'],
-          ['Captured', `${pay.date} · 10:42`, 'bg-g-600'],
-        ]
-      : pay.status === 'Pending'
-        ? [
-            ['Payment initiated', `${pay.date} · 10:41`, 'bg-text-faint'],
-            ['Awaiting confirmation', 'In progress', 'bg-y-600'],
-          ]
-        : [
-            ['Payment initiated', `${pay.date} · 10:41`, 'bg-text-faint'],
-            ['Authorized by gateway', `${pay.date} · 10:41`, 'bg-text-faint'],
-            ['Payment failed — declined by bank', `${pay.date} · 10:42`, 'bg-d-500'],
-          ];
+  if (paymentsQuery.isPending) return <SkeletonCards count={1} lines={4} pad={24} />;
+  if (paymentsQuery.isError) {
+    return (
+      <Card pad={32}>
+        <ErrorState
+          inline
+          title="This payment didn't load"
+          message={failureText(paymentsQuery.error, 'Please try again.')}
+          onRetry={() => void paymentsQuery.refetch()}
+        />
+      </Card>
+    );
+  }
+  if (!pay) {
+    return (
+      <Card pad={32}>
+        <EmptyState
+          icon="indian-rupee"
+          title="Payment not found."
+          message={
+            invoiceId
+              ? 'It is no longer recorded against its invoice.'
+              : 'Only the newest payments can be opened from a link. Open it from the Payments tab or its invoice.'
+          }
+          actionLabel="Back to payments"
+          onAction={() => navigate(`${opsPath('billing')}?tab=Payments`)}
+        />
+      </Card>
+    );
+  }
 
-  const history: readonly HistoryStep[] =
-    pay.attempts > 1 && pay.lastAttemptAt
-      ? [
-          ...hist,
-          [
-            `Retried by operations — attempt ${pay.attempts} of ${MAX_PAYMENT_ATTEMPTS}`,
-            pay.lastAttemptAt,
-            pay.status === 'Success'
-              ? 'bg-g-600'
-              : pay.status === 'Pending'
-                ? 'bg-y-600'
-                : 'bg-d-500',
-          ],
-        ]
-      : hist;
+  const badge = PAYMENT_STATUS_BADGES[pay.status];
+  const history = historyOf(pay);
+  const reference = pay.gatewayPaymentId ?? pay.referenceNote ?? 'Manual payment';
 
   return (
     <div className="flex flex-col gap-5">
@@ -88,78 +129,56 @@ export function OpsPaymentDetailScreen() {
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-3">
               <SectionTitle size={20}>
-                <span className="tabular-nums">{pay.txn}</span>
+                <span className="tabular-nums">{reference}</span>
               </SectionTitle>
-              <Badge status={pay.status} />
+              <Badge status={badge.status}>{badge.label}</Badge>
             </div>
             <span className="text-caption text-text-muted">
-              {hospName(pay)} · {pay.method} · {pay.date}
+              <BillingHospitalName hospitalId={pay.hospitalId} /> · {METHOD_LABELS[pay.method]} ·{' '}
+              {fmtDateTime(pay.attemptedAt)}
             </span>
           </div>
           <div className="flex-1"></div>
           <Button
             variant="ghost"
-            onClick={() => {
-              if (pay.hid && opsHospById(pay.hid)) navigate(opsHospitalDetailPath(pay.hid));
-            }}
+            onClick={() =>
+              navigate(`${opsPath('hospitals')}/${encodeURIComponent(pay.hospitalId)}`)
+            }
           >
             View Hospital
           </Button>
           <Button
             variant="secondary"
             icon="file-text"
-            onClick={() => {
-              if (linked)
-                navigate(
-                  `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['invoice-detail'].replace(
-                    ':id',
-                    String(linked.id),
-                  )}`,
-                );
-            }}
+            onClick={() =>
+              navigate(
+                `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['invoice-detail'].replace(':id', pay.invoiceId)}`,
+              )
+            }
           >
             View Invoice
           </Button>
-          {pay.status === 'Payment failed' && (
-            <span
-              title={
-                retryable
-                  ? `Retry ${pay.txn} (attempt ${pay.attempts + 1})`
-                  : `${MAX_PAYMENT_ATTEMPTS} attempts have failed — collect this payment manually`
-              }
-            >
-              <Button
-                icon="rotate-ccw"
-                disabled={!retryable}
-                busy={busy.retry}
-                onClick={() =>
-                  run(
-                    'retry',
-                    `Retry queued for ${pay.txn} — attempt ${pay.attempts + 1} is pending with the gateway.`,
-                    () => retryPayment(pay.id),
-                  )
-                }
-              >
-                Retry Payment
-              </Button>
-            </span>
-          )}
         </div>
       </Card>
+      {pay.status === 'failed' && (
+        <Card pad={14} className="flex flex-wrap items-center gap-2">
+          <Icon name="triangle-alert" size={16} className="text-y-700" />
+          <span className="text-body text-text-body">
+            Gateway retries aren&apos;t available yet. If the hospital paid another way, record it
+            with Mark as Paid on the invoice.
+          </span>
+        </Card>
+      )}
       <InfoGrid
         items={[
-          { k: 'Amount', v: money(pay.amount), num: true },
-          { k: 'Method', v: pay.method },
-          { k: 'Reference', v: pay.txn, num: true },
-          { k: 'Gateway Ref', v: `GW-${88000 + pay.id * 7}`, num: true },
-          { k: 'Date', v: pay.date },
-          { k: 'Linked Invoice', v: pay.inv, num: true },
-          {
-            k: 'Attempts',
-            v: `${pay.attempts} of ${MAX_PAYMENT_ATTEMPTS}`,
-            num: true,
-          },
-          { k: 'Last Attempt', v: pay.lastAttemptAt ?? pay.date },
+          { k: 'Amount', v: rupees(pay.amountPaise), num: true },
+          { k: 'Method', v: METHOD_LABELS[pay.method] },
+          { k: 'Reference', v: pay.referenceNote ?? '—', num: Boolean(pay.referenceNote) },
+          { k: 'Gateway Ref', v: pay.gatewayPaymentId ?? '—', num: Boolean(pay.gatewayPaymentId) },
+          { k: 'Attempted', v: fmtDateTime(pay.attemptedAt) },
+          { k: 'Received', v: fmtDateTime(pay.capturedAt) },
+          { k: 'Linked Invoice', v: pay.invoiceNo, num: true },
+          { k: 'Attempt', v: pay.attemptNo, num: true },
         ]}
       />
       <Card>
