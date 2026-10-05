@@ -1,12 +1,14 @@
 import { useState } from 'react';
 
+import { isFailure } from '@/core/error/failure';
 import { useOpsAct } from '@/shared/hooks/useOpsAct';
 import { cn } from '@/shared/lib/cn';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, todayISO } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { InfoDot } from '@/shared/ui/InfoDot';
@@ -16,29 +18,42 @@ import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SegTabs } from '@/shared/ui/SegTabs';
 import { Select } from '@/shared/ui/Select';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import {
-  AUDIENCES,
-  BAN_TODAY,
-} from '@/features/ops-notifications/application/store/notifications.fixtures';
+import { useBannerPermissions } from '@/features/ops-notifications/application/queries/useBannerPermissions';
+import { useBannersQuery } from '@/features/ops-notifications/application/queries/useBannersQuery';
+import { useDeleteBannerMutation } from '@/features/ops-notifications/application/queries/useDeleteBannerMutation';
+import { useReorderBannersMutation } from '@/features/ops-notifications/application/queries/useReorderBannersMutation';
+import { useSaveBannerMutation } from '@/features/ops-notifications/application/queries/useSaveBannerMutation';
+import { useToggleBannerMutation } from '@/features/ops-notifications/application/queries/useToggleBannerMutation';
+import { AUDIENCES } from '@/features/ops-notifications/application/store/notifications.fixtures';
 import { useNotificationsStore } from '@/features/ops-notifications/application/store/notifications.store';
+import type { PushAudience } from '@/features/ops-notifications/application/store/notifications.types';
 import type {
-  Banner,
-  PushAudience,
-} from '@/features/ops-notifications/application/store/notifications.types';
+  BannerDraft,
+  CampaignBanner,
+} from '@/features/ops-notifications/domain/entities/notifications.entities';
 import { BannerModal } from '@/features/ops-notifications/presentation/components/BannerModal';
 import { BannerThumb } from '@/features/ops-notifications/presentation/components/BannerThumb';
 
 type BannerStateLabel = 'Paused' | 'Expired' | 'Scheduled' | 'Live';
 
-/** Derived banner state vs the demo "today" (design `bannerState` / `BAN_TODAY`). */
-function bannerState(b: Banner): BannerStateLabel {
+/** Derived banner state vs today (design `bannerState`); an open-ended window never expires. */
+function bannerState(b: CampaignBanner, today: string): BannerStateLabel {
   if (!b.active) return 'Paused';
-  if (b.to < BAN_TODAY) return 'Expired';
-  if (b.from > BAN_TODAY) return 'Scheduled';
+  if (b.to && b.to < today) return 'Expired';
+  if (b.from && b.from > today) return 'Scheduled';
   return 'Live';
+}
+
+const EMPTY_BANNERS: readonly CampaignBanner[] = [];
+
+/** A failed action's user-safe message (the typed `Failure`'s own, when there is one). */
+function failureMessage(error: unknown, fallbackMessage: string): string {
+  return isFailure(error) ? error.message : fallbackMessage;
 }
 
 type NotificationsTab = 'App Banners' | 'Push Notifications';
@@ -48,7 +63,7 @@ interface EditNew {
   new: true;
 }
 interface EditBanner {
-  banner: Banner;
+  banner: CampaignBanner;
 }
 interface EditFallback {
   fallback: true;
@@ -92,38 +107,90 @@ const PUSH_COLUMNS = [
 
 /** Patient-app notifications — home-screen banners + push composer (design OpsNotifications). */
 export function OpsNotificationsScreen() {
-  const banners = useNotificationsStore((s) => s.banners);
+  const bannersQuery = useBannersQuery();
+  const banners = bannersQuery.data ?? EMPTY_BANNERS;
+  const saveMutation = useSaveBannerMutation();
+  const deleteMutation = useDeleteBannerMutation();
+  const toggleMutation = useToggleBannerMutation();
+  const reorderMutation = useReorderBannersMutation();
+  const { canAdd, canEdit, canDelete } = useBannerPermissions();
+  const today = todayISO();
+
+  // Not in the backend yet (P12 gap): the default banner and push notifications
+  // still read the legacy store.
   const fallback = useNotificationsStore((s) => s.fallback);
   const pushes = useNotificationsStore((s) => s.pushes);
-  const move = useNotificationsStore((s) => s.move);
-  const saveBanner = useNotificationsStore((s) => s.saveBanner);
-  const deleteBanner = useNotificationsStore((s) => s.deleteBanner);
-  const togglePause = useNotificationsStore((s) => s.togglePause);
+  const saveFallback = useNotificationsStore((s) => s.saveBanner);
   const sendPush = useNotificationsStore((s) => s.sendPush);
   const schedulePush = useNotificationsStore((s) => s.schedulePush);
   const cancelPush = useNotificationsStore((s) => s.cancelPush);
 
   const [tab, setTab] = useState<NotificationsTab>('App Banners');
   const [edit, setEdit] = useState<EditState>(null);
-  const [delId, setDelId] = useState<number | null>(null);
+  const [delId, setDelId] = useState<string | null>(null);
   const [busy, run] = useOpsAct();
   const [p, setP] = useState<PushComposer>(EMPTY_COMPOSER);
   const [pErr, setPErr] = useState<PushErrors>({});
   const [confirmSend, setConfirmSend] = useState(false);
   const [cancelId, setCancelId] = useState<number | null>(null);
 
-  const liveNow = [...banners]
-    .filter((b) => bannerState(b) === 'Live')
-    .sort((a, b) => banners.indexOf(a) - banners.indexOf(b))[0];
+  const liveNow = banners.find((b) => bannerState(b, today) === 'Live');
 
   const editBanner = edit && 'banner' in edit ? edit.banner : null;
   const editFallback = edit != null && 'fallback' in edit;
 
-  const onSaveBanner = (f: Parameters<typeof saveBanner>[1]) => {
-    if (editFallback) saveBanner({ fallback: true }, f);
-    else if (editBanner) saveBanner({ bannerId: editBanner.id }, f);
-    else saveBanner({}, f);
-    setEdit(null);
+  const onSaveBanner = (draft: BannerDraft, preview: string | null) => {
+    if (editFallback) {
+      saveFallback({ fallback: true }, { title: draft.title, img: preview, from: '', to: '' });
+      setEdit(null);
+      return;
+    }
+    const nextSortOrder = Math.max(-1, ...banners.map((b) => b.sortOrder)) + 1;
+    saveMutation.mutate(
+      { target: editBanner, draft, nextSortOrder },
+      {
+        onSuccess: () => {
+          toast(
+            editBanner ? 'Banner updated.' : 'Banner added — it goes live on its start date.',
+            'success',
+          );
+          setEdit(null);
+        },
+        onError: (error) => toast(failureMessage(error, 'Could not save the banner.'), 'error'),
+      },
+    );
+  };
+
+  /** Swap the banner at index i with i+dir and save the new rotation order. */
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= banners.length) return;
+    const next = [...banners];
+    [next[i], next[j]] = [next[j], next[i]];
+    reorderMutation.mutate(next, {
+      onError: (error) =>
+        toast(failureMessage(error, 'Could not change the rotation order.'), 'error'),
+    });
+  };
+
+  const togglePause = (b: CampaignBanner) =>
+    toggleMutation.mutate(b, {
+      onError: (error) =>
+        toast(
+          failureMessage(error, `Could not ${b.active ? 'pause' : 'resume'} the banner.`),
+          'error',
+        ),
+    });
+
+  const confirmDelete = () => {
+    if (!delBanner) return;
+    deleteMutation.mutate(delBanner, {
+      onSuccess: () => {
+        toast('Banner deleted.', 'success');
+        setDelId(null);
+      },
+      onError: (error) => toast(failureMessage(error, 'Could not delete the banner.'), 'error'),
+    });
   };
 
   const delBanner = banners.find((b) => b.id === delId);
@@ -168,7 +235,7 @@ export function OpsNotificationsScreen() {
     });
   };
 
-  const liveCount = banners.filter((b) => bannerState(b) === 'Live').length;
+  const liveCount = banners.filter((b) => bannerState(b, today) === 'Live').length;
 
   /** The banner the editor is opened on — also its remount key (no sync effect). */
   const editKey = editFallback
@@ -189,13 +256,24 @@ export function OpsNotificationsScreen() {
         />
         <div className="flex-1"></div>
         {tab === 'App Banners' && (
-          <Button icon="plus" onClick={() => setEdit({ new: true })}>
+          <Button icon="plus" disabled={!canAdd} onClick={() => setEdit({ new: true })}>
             Add Banner
           </Button>
         )}
       </Card>
 
-      {tab === 'App Banners' ? (
+      {tab === 'App Banners' && bannersQuery.isPending ? (
+        <SkeletonCards count={1} lines={5} />
+      ) : tab === 'App Banners' && bannersQuery.isError ? (
+        <ErrorState
+          title="Banners didn't load"
+          message={failureMessage(
+            bannersQuery.error,
+            "That didn't load. Retrying usually fixes it.",
+          )}
+          onRetry={() => void bannersQuery.refetch()}
+        />
+      ) : tab === 'App Banners' ? (
         <>
           <Card pad={16} className="flex items-center gap-3">
             <div className="bg-g-100 text-g-600 flex size-9.5 flex-none items-center justify-center rounded-md">
@@ -252,11 +330,11 @@ export function OpsNotificationsScreen() {
                   actionLabel="Add Banner"
                   actionIcon="plus"
                   actionVariant="button"
-                  onAction={() => setEdit({ new: true })}
+                  onAction={canAdd ? () => setEdit({ new: true }) : undefined}
                 />
               )}
               {banners.map((b, i) => {
-                const st = bannerState(b);
+                const st = bannerState(b, today);
                 return (
                   <div
                     key={b.id}
@@ -272,7 +350,7 @@ export function OpsNotificationsScreen() {
                         size={15}
                         label="Move up"
                         title={`Move “${b.title}” up the rotation`}
-                        disabled={i === 0}
+                        disabled={i === 0 || !canEdit || reorderMutation.isPending}
                         onClick={() => move(i, -1)}
                       />
                       <IconBtn
@@ -281,14 +359,14 @@ export function OpsNotificationsScreen() {
                         size={15}
                         label="Move down"
                         title={`Move “${b.title}” down the rotation`}
-                        disabled={i === banners.length - 1}
+                        disabled={i === banners.length - 1 || !canEdit || reorderMutation.isPending}
                         onClick={() => move(i, 1)}
                       />
                     </div>
                     <span className="text-body text-text-muted w-4.5 flex-none text-center font-medium tabular-nums">
                       {i + 1}
                     </span>
-                    <BannerThumb img={b.img} title={b.title} />
+                    <BannerThumb fileId={b.imageFileId} title={b.title} />
                     <div className="min-w-0 flex-1">
                       <div className="text-body text-text-strong truncate font-medium">
                         {b.title}
@@ -299,7 +377,13 @@ export function OpsNotificationsScreen() {
                     </div>
                     <Badge status={st} />
                     {st !== 'Expired' && (
-                      <Button size="sm" variant="secondary" onClick={() => togglePause(b.id)}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!canEdit}
+                        busy={toggleMutation.isPending && toggleMutation.variables.id === b.id}
+                        onClick={() => togglePause(b)}
+                      >
                         {b.active ? 'Pause' : 'Resume'}
                       </Button>
                     )}
@@ -309,6 +393,7 @@ export function OpsNotificationsScreen() {
                       size={15}
                       label="Edit banner"
                       title={`Edit “${b.title}”`}
+                      disabled={!canEdit}
                       onClick={() => setEdit({ banner: b })}
                     />
                     <IconBtn
@@ -318,6 +403,7 @@ export function OpsNotificationsScreen() {
                       color="var(--color-d-500)"
                       label="Delete banner"
                       title={`Delete “${b.title}”`}
+                      disabled={!canDelete}
                       onClick={() => setDelId(b.id)}
                     />
                   </div>
@@ -473,6 +559,7 @@ export function OpsNotificationsScreen() {
         open={edit != null}
         banner={editBanner}
         fallback={editFallback}
+        busy={saveMutation.isPending}
         onClose={() => setEdit(null)}
         onSave={onSaveBanner}
       />
@@ -487,16 +574,10 @@ export function OpsNotificationsScreen() {
             ? `“${delBanner.title}” is removed from the app immediately. This cannot be undone.`
             : ''
         }
-        confirmLabel={busy.delb ? 'Deleting…' : 'Delete Banner'}
+        confirmLabel={deleteMutation.isPending ? 'Deleting…' : 'Delete Banner'}
         confirmVariant="danger"
-        busy={busy.delb}
-        onConfirm={() =>
-          run('delb', 'Banner deleted.', () => {
-            if (delId == null) return;
-            deleteBanner(delId);
-            setDelId(null);
-          })
-        }
+        busy={deleteMutation.isPending}
+        onConfirm={confirmDelete}
       />
       <OpsConfirm
         open={confirmSend}
