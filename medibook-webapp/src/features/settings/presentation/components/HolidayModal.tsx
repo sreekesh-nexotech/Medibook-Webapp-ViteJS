@@ -6,14 +6,13 @@ import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
-import type { HolidayDraft } from '@/features/settings/application/store/profile.store';
-import { datesOf } from '@/features/settings/application/store/profile.logic';
+import type { Holiday, HolidayInput } from '@/features/settings/domain/entities/profile.entities';
 import {
-  HOLIDAY_SCOPES,
-  type HolidayScope,
-  type HospitalBranch,
-  type HospitalHoliday,
-} from '@/features/settings/application/store/profile.types';
+  HOLIDAY_SCOPE_OPTIONS,
+  type HolidayScopeOption,
+  holidayDayCount,
+  holidayScopeOf,
+} from '@/features/settings/application/store/profile.form';
 
 const DATE_INPUT_CLASS =
   'rounded-input border-border text-body text-text-body h-12 w-full border bg-white px-3';
@@ -22,8 +21,8 @@ interface HolidayForm {
   name: string;
   from: string;
   to: string;
-  scope: HolidayScope;
-  scopeRef: string;
+  scope: HolidayScopeOption;
+  departmentId: string;
   note: string;
 }
 
@@ -31,89 +30,63 @@ const VALIDATORS: FormValidators<HolidayForm> = {
   name: (v) => required(v, 'Closure name'),
   from: (v) => required(v, 'Start date'),
   to: (v, values) => dateRange(values.from, v),
-  scopeRef: (v, values) =>
+  departmentId: (v, values) =>
     values.scope === 'Whole hospital' || v.trim() !== ''
       ? undefined
-      : values.scope === 'Branch'
-        ? 'Pick the branch that is closed.'
-        : 'Pick the department that is closed.',
+      : 'Pick the department that is closed.',
 };
+
+/** A department as the scope picker lists it. */
+export interface HolidayDepartmentOption {
+  readonly id: string;
+  readonly name: string;
+}
 
 interface HolidayModalProps {
   open: boolean;
   /** The closure being edited, or null to add one. */
-  holiday: HospitalHoliday | null;
-  branches: readonly HospitalBranch[];
-  departments: readonly string[];
+  holiday: Holiday | null;
+  departments: readonly HolidayDepartmentOption[];
   onClose: () => void;
-  onSave: (draft: HolidayDraft) => void;
+  /**
+   * Save the closure. Resolves `true` when the modal's job is done (applied,
+   * or handed to the screen's impact confirmation); `false` keeps it open.
+   */
+  onSave: (input: HolidayInput) => Promise<boolean>;
 }
 
 /**
  * Add / edit a closure in the holiday calendar (audit HA-03). This calendar is
  * what slot generation reads, so the modal states that consequence plainly and
- * shows how many days the closure will remove.
+ * shows how many days the closure will remove. The backend checks which
+ * bookings it would cancel before anything is applied.
  */
-export function HolidayModal({
-  open,
-  holiday,
-  branches,
-  departments,
-  onClose,
-  onSave,
-}: HolidayModalProps) {
+export function HolidayModal({ open, holiday, departments, onClose, onSave }: HolidayModalProps) {
   const form = useForm<HolidayForm>({
     initial: {
       name: holiday?.name ?? '',
       from: holiday?.from ?? '',
       to: holiday?.to ?? '',
-      scope: holiday?.scope ?? 'Whole hospital',
-      scopeRef: holiday?.scopeRef ?? '',
+      scope: holiday ? holidayScopeOf(holiday) : 'Whole hospital',
+      departmentId: holiday?.departmentId ?? '',
       note: holiday?.note ?? '',
     },
     validate: VALIDATORS,
-    onSubmit: (v) => {
-      onSave({
-        ...(holiday ? { id: holiday.id } : {}),
+    onSubmit: async (v) => {
+      const note = v.note.trim();
+      const done = await onSave({
         name: v.name.trim(),
         from: v.from,
         to: v.to || v.from,
-        scope: v.scope,
-        scopeRef: v.scope === 'Whole hospital' ? '' : v.scopeRef,
-        note: v.note.trim(),
+        departmentId: v.scope === 'Whole hospital' ? null : v.departmentId,
+        note: note === '' ? null : note,
       });
-      onClose();
+      if (done) onClose();
     },
   });
 
-  const dayCount =
-    form.values.from && form.values.to && form.values.to >= form.values.from
-      ? datesOf({
-          id: 'preview',
-          name: '',
-          from: form.values.from,
-          to: form.values.to,
-          scope: form.values.scope,
-          scopeRef: form.values.scopeRef,
-          note: '',
-        }).length
-      : 0;
-
-  const scopeOptions =
-    form.values.scope === 'Branch' ? branches.map((b) => b.name) : [...departments];
-
-  const scopeValue =
-    form.values.scope === 'Branch'
-      ? (branches.find((b) => b.id === form.values.scopeRef)?.name ?? '')
-      : form.values.scopeRef;
-
-  const onScopeRef = (label: string): void => {
-    if (form.values.scope === 'Branch') {
-      form.setField('scopeRef', branches.find((b) => b.name === label)?.id ?? '');
-      return;
-    }
-    form.setField('scopeRef', label);
-  };
+  const dayCount = holidayDayCount(form.values.from, form.values.to);
+  const departmentName = departments.find((d) => d.id === form.values.departmentId)?.name ?? '';
 
   return (
     <FormModal
@@ -174,28 +147,24 @@ export function HolidayModal({
           <Field label="Applies to">
             <Select
               value={form.values.scope}
-              options={HOLIDAY_SCOPES}
+              options={HOLIDAY_SCOPE_OPTIONS}
               onChange={(v) => {
-                form.setField('scope', v as HolidayScope);
-                form.setField('scopeRef', '');
+                form.setField('scope', v === 'Department' ? 'Department' : 'Whole hospital');
+                form.setField('departmentId', '');
               }}
               height={48}
             />
           </Field>
-          {form.values.scope !== 'Whole hospital' && (
-            <Field
-              label={form.values.scope === 'Branch' ? 'Branch' : 'Department'}
-              required
-              error={form.errorFor('scopeRef')}
-            >
+          {form.values.scope === 'Department' && (
+            <Field label="Department" required error={form.errorFor('departmentId')}>
               <Select
-                value={scopeValue}
-                options={scopeOptions}
-                onChange={onScopeRef}
-                onBlur={() => form.blurField('scopeRef')}
-                placeholder={
-                  form.values.scope === 'Branch' ? 'Select a branch' : 'Select a department'
+                value={departmentName}
+                options={departments.map((d) => d.name)}
+                onChange={(name) =>
+                  form.setField('departmentId', departments.find((d) => d.name === name)?.id ?? '')
                 }
+                onBlur={() => form.blurField('departmentId')}
+                placeholder={departments.length > 0 ? 'Select a department' : 'No departments yet'}
                 height={48}
               />
             </Field>
@@ -216,10 +185,8 @@ export function HolidayModal({
               ? `No slots will be generated for ${dayCount} ${dayCount === 1 ? 'day' : 'days'} — ${
                   form.values.scope === 'Whole hospital'
                     ? 'across the whole hospital'
-                    : form.values.scope === 'Branch'
-                      ? `at ${scopeValue || 'the selected branch'}`
-                      : `for ${scopeValue || 'the selected department'}`
-                }. Existing appointments on those days must be rescheduled.`
+                    : `for ${departmentName || 'the selected department'}`
+                }. Before anything is saved you will see any booked appointments it would cancel (with a full refund).`
               : 'Pick a date range to see how many days this closure removes from booking.'}
           </span>
         </div>
