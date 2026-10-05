@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { OPS_ROLE_PERMS } from '@/features/ops-users/application/store/opsUsers.fixtures';
-import { useOpsUsersStore } from '@/features/ops-users/application/store/opsUsers.store';
-import type { OpsRole } from '@/features/ops-users/application/store/opsUsers.types';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
+import { isFailure } from '@/core/error/failure';
+
+import { useDeactivateOpsStaffMutation } from '@/features/ops-users/application/queries/useDeactivateOpsStaffMutation';
+import { useOpsPermissionsQuery } from '@/features/ops-users/application/queries/useOpsPermissionsQuery';
+import { useOpsRolesQuery } from '@/features/ops-users/application/queries/useOpsRolesQuery';
+import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
+import { useOpsUsersAccess } from '@/features/ops-users/application/queries/useOpsUsersAccess';
+import { useReactivateOpsStaffMutation } from '@/features/ops-users/application/queries/useReactivateOpsStaffMutation';
+import { useUnlockOpsStaffMutation } from '@/features/ops-users/application/queries/useUnlockOpsStaffMutation';
+import type { OpsStaffMember } from '@/features/ops-users/domain/entities/opsUsers.types';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -17,45 +23,69 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { StatCard, type StatCardData } from '@/shared/ui/StatCard';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
+import { toast } from '@/shared/ui/toast/toast.store';
 
 import { AddOpsUserModal } from '../components/AddOpsUserModal';
+import {
+  STAFF_STATUS_LABEL,
+  actionsLabel,
+  catalogueModules,
+  isLocked,
+  lastActiveLabel,
+  moduleAccess,
+  roleLook,
+  roleReach,
+  type ModuleAccess,
+} from '../components/opsUsers.display';
 import { OpsRoleAnnotation } from '../components/OpsRoleAnnotation';
-
-/** Roles in the design's Role Permissions grid order. */
-const OPS_ROLE_ORDER: readonly OpsRole[] = ['Super Admin', 'Finance Admin', 'Support', 'Auditor'];
 
 const USER_COLUMNS = ['User', 'Role', '2FA', 'Last Active', 'Status', 'Action'] as const;
 
-const PERMISSION_COLUMNS = [
-  'Permission',
-  'Super Admin',
-  'Finance Admin',
-  'Support',
-  'Auditor',
-] as const;
-
 /** Which editor the modal is open on: a new invite, or an existing user. */
-type EditorState = { readonly kind: 'new' } | { readonly kind: 'edit'; readonly id: number } | null;
+type EditorState = { readonly kind: 'new' } | { readonly kind: 'edit'; readonly id: string } | null;
 
-/** Check glyph (granted) or an em-dash (no access) for a permission-matrix cell. */
-function mark(v: 0 | 1) {
-  return v ? (
-    <Icon name="circle-check" size={17} className="text-g-600" />
-  ) : (
-    <span className="text-text-muted" title="No access">
-      —
-    </span>
-  );
+/** The access-changing action awaiting confirmation. */
+type PendingAction = { readonly kind: 'deactivate' | 'reactivate'; readonly id: string } | null;
+
+/** Check glyph (full access), em-dash (no access) or the actions held, for one matrix cell. */
+function mark(access: ModuleAccess) {
+  if (access.kind === 'full') {
+    return <Icon name="circle-check" size={17} className="text-g-600" />;
+  }
+  if (access.kind === 'none') {
+    return (
+      <span className="text-text-muted" title="No access">
+        —
+      </span>
+    );
+  }
+  return <span className="text-caption text-text-body">{actionsLabel(access.actions)}</span>;
+}
+
+/** Toast a failed mutation with the backend's own message. */
+function failToast(failure: unknown, fallback: string) {
+  toast(isFailure(failure) ? failure.message : fallback, 'error');
 }
 
 /** Internal Medibook users & roles (design `OpsUsers`). */
 export function OpsUsersScreen() {
-  const users = useOpsUsersStore((s) => s.users);
-  const deleteUser = useOpsUsersStore((s) => s.deleteUser);
+  const staffQuery = useOpsStaffQuery();
+  const rolesQuery = useOpsRolesQuery();
+  const permissionsQuery = useOpsPermissionsQuery();
+  const access = useOpsUsersAccess();
+  const deactivate = useDeactivateOpsStaffMutation();
+  const reactivate = useReactivateOpsStaffMutation();
+  const unlock = useUnlockOpsStaffMutation();
   const [q, setQ] = useState('');
   const [editor, setEditor] = useState<EditorState>(null);
-  const [delId, setDelId] = useState<number | null>(null);
-  const [busy, run] = useOpsAct();
+  const [pending, setPending] = useState<PendingAction>(null);
+
+  const users: readonly OpsStaffMember[] = staffQuery.data?.items ?? [];
+  const roles = rolesQuery.data ?? [];
+  const modules = useMemo(
+    () => catalogueModules(permissionsQuery.data ?? []),
+    [permissionsQuery.data],
+  );
 
   const ql = q.trim().toLowerCase();
   const filtered = users.filter(
@@ -63,69 +93,100 @@ export function OpsUsersScreen() {
       !ql ||
       u.name.toLowerCase().includes(ql) ||
       u.email.toLowerCase().includes(ql) ||
-      u.role.toLowerCase().includes(ql),
+      u.role.name.toLowerCase().includes(ql),
   );
-  const del = users.find((u) => u.id === delId);
+  const target = users.find((u) => u.id === pending?.id);
   const editingUser =
     editor?.kind === 'edit' ? (users.find((u) => u.id === editor.id) ?? null) : null;
   /** Remount key for the editor, so its form initialises from props (no sync effect). */
   const editorKey = editor ? (editor.kind === 'edit' ? `edit-${editor.id}` : 'new') : 'closed';
-  const ct = (role: OpsRole) => users.filter((u) => u.role === role).length;
+  const ct = (roleId: string) => users.filter((u) => u.role.id === roleId).length;
 
-  const KPIS: readonly StatCardData[] = [
-    {
-      icon: 'shield-check',
-      label: 'Super Admins',
-      value: ct('Super Admin'),
-      sub: 'Full platform control',
-      iconClass: 'bg-blue-soft-bg text-text-navy',
-      valueClass: 'text-text-navy',
-    },
-    {
-      icon: 'indian-rupee',
-      label: 'Finance Admins',
-      value: ct('Finance Admin'),
-      sub: 'Billing and settlements',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
-    },
-    {
-      icon: 'headset',
-      label: 'Support',
-      value: ct('Support'),
-      sub: 'Hospital assistance',
-      iconClass: 'bg-blue-soft-bg text-blue',
-      valueClass: 'text-blue',
-    },
-    {
-      icon: 'eye',
-      label: 'Auditors',
-      value: ct('Auditor'),
-      sub: 'Read-only compliance access',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
-    },
-  ];
+  const KPIS: readonly StatCardData[] = roles.map((r) => {
+    const look = roleLook(r.code);
+    return {
+      icon: look.icon,
+      label: r.name,
+      value: staffQuery.data ? ct(r.id) : '—',
+      sub: roleReach(r, modules),
+      iconClass: look.iconClass,
+      valueClass: look.valueClass,
+    };
+  });
 
-  const tableState: TableStateSpec | undefined =
-    filtered.length === 0
+  const tableState: TableStateSpec | undefined = staffQuery.isPending
+    ? { kind: 'loading' }
+    : staffQuery.isError
       ? {
-          kind: 'empty',
-          icon: 'users',
-          title: 'No results match your search.',
-          message: 'Search matches name, email and role.',
-          actionLabel: 'Clear search',
-          onAction: () => setQ(''),
+          kind: 'error',
+          title: "Internal users didn't load",
+          message: isFailure(staffQuery.error) ? staffQuery.error.message : undefined,
+          onRetry: () => void staffQuery.refetch(),
         }
-      : undefined;
+      : users.length === 0
+        ? {
+            kind: 'empty',
+            icon: 'users',
+            title: 'No internal users yet.',
+            message: 'Invite a colleague with Add User.',
+          }
+        : filtered.length === 0
+          ? {
+              kind: 'empty',
+              icon: 'users',
+              title: 'No results match your search.',
+              message: 'Search matches name, email and role.',
+              actionLabel: 'Clear search',
+              onAction: () => setQ(''),
+            }
+          : undefined;
+
+  const rolesError = rolesQuery.isError || permissionsQuery.isError;
+  const rolesState: TableStateSpec | undefined =
+    rolesQuery.isPending || permissionsQuery.isPending
+      ? { kind: 'loading', rows: 4 }
+      : rolesError
+        ? {
+            kind: 'error',
+            title: "Role permissions didn't load",
+            onRetry: () => {
+              void rolesQuery.refetch();
+              void permissionsQuery.refetch();
+            },
+          }
+        : modules.length === 0
+          ? { kind: 'empty', icon: 'shield-check', title: 'No permissions are defined.' }
+          : undefined;
+
+  const doUnlock = (u: OpsStaffMember) =>
+    unlock.mutate(u.id, {
+      onSuccess: () => toast(`${u.name} can sign in again.`),
+      onError: (f) => failToast(f, 'Could not unlock this user.'),
+    });
+
+  const confirmPending = () => {
+    if (!pending || !target) return;
+    const mutation = pending.kind === 'deactivate' ? deactivate : reactivate;
+    mutation.mutate(target.id, {
+      onSuccess: () => {
+        toast(pending.kind === 'deactivate' ? 'User deactivated.' : 'User reactivated.');
+        setPending(null);
+      },
+      onError: (f) => failToast(f, 'Could not change this user.'),
+    });
+  };
+  const confirmBusy = deactivate.isPending || reactivate.isPending;
+  const isDeactivating = pending?.kind !== 'reactivate';
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-4">
-        {KPIS.map((k) => (
-          <StatCard key={k.label} k={k} />
-        ))}
-      </div>
+      {KPIS.length > 0 && (
+        <div className="flex gap-4">
+          {KPIS.map((k) => (
+            <StatCard key={k.label} k={k} />
+          ))}
+        </div>
+      )}
       <Card pad={14} className="flex items-center gap-4">
         <div className="flex-1">
           <SearchField
@@ -135,72 +196,129 @@ export function OpsUsersScreen() {
             aria-label="Search internal users by name, email or role"
           />
         </div>
-        <Button icon="plus" onClick={() => setEditor({ kind: 'new' })}>
-          Add User
-        </Button>
+        {access.canAdd && (
+          <Button
+            icon="plus"
+            disabled={roles.length === 0}
+            onClick={() => setEditor({ kind: 'new' })}
+          >
+            Add User
+          </Button>
+        )}
       </Card>
       <Card>
         <TableShell columns={USER_COLUMNS} scrollLabel="Internal users" state={tableState}>
-          {filtered.map((u) => (
-            <tr key={u.id}>
-              <td className={tdClass}>
-                <OpsPerson row={u} />
-              </td>
-              <td className={tdClass}>{u.role}</td>
-              <td className={tdClass}>
-                <Badge status={u.twofa} />
-              </td>
-              <td className={tdClass}>{u.lastActive}</td>
-              <td className={tdClass}>
-                <Badge status={u.status} />
-              </td>
-              <td className={tdClass}>
-                <div className="flex gap-2">
-                  <IconBtn
-                    name="pencil"
-                    box={36}
-                    size={15}
-                    label="Edit user"
-                    title={`Edit ${u.name}`}
-                    onClick={() => setEditor({ kind: 'edit', id: u.id })}
-                  />
-                  <IconBtn
-                    name="trash-2"
-                    box={36}
-                    size={15}
-                    color="var(--color-d-500)"
-                    label="Delete user"
-                    title={`Delete ${u.name}`}
-                    onClick={() => setDelId(u.id)}
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
+          {filtered.map((u) => {
+            const locked = isLocked(u);
+            const isSelf = u.userId === access.selfUserId;
+            return (
+              <tr key={u.id}>
+                <td className={tdClass}>
+                  <OpsPerson row={u} />
+                </td>
+                <td className={tdClass}>{u.role.name}</td>
+                <td className={tdClass}>
+                  <span className="text-text-muted" title="Not reported by the server">
+                    —
+                  </span>
+                </td>
+                <td className={tdClass}>{lastActiveLabel(u.lastLoginAt)}</td>
+                <td className={tdClass}>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge status={STAFF_STATUS_LABEL[u.status]} />
+                    {locked && <Badge status="Suspended">Locked</Badge>}
+                  </div>
+                </td>
+                <td className={tdClass}>
+                  {access.canEdit ? (
+                    <div className="flex gap-2">
+                      {u.status !== 'deactivated' && (
+                        <IconBtn
+                          name="pencil"
+                          box={36}
+                          size={15}
+                          label="Edit user"
+                          title={`Edit ${u.name}`}
+                          onClick={() => setEditor({ kind: 'edit', id: u.id })}
+                        />
+                      )}
+                      {locked && (
+                        <IconBtn
+                          name="lock"
+                          box={36}
+                          size={15}
+                          label="Unlock sign-in"
+                          title={`Unlock ${u.name}`}
+                          disabled={unlock.isPending}
+                          onClick={() => doUnlock(u)}
+                        />
+                      )}
+                      {u.status === 'deactivated' ? (
+                        <IconBtn
+                          name="user-check"
+                          box={36}
+                          size={15}
+                          label="Reactivate user"
+                          title={`Reactivate ${u.name}`}
+                          onClick={() => setPending({ kind: 'reactivate', id: u.id })}
+                        />
+                      ) : (
+                        !isSelf && (
+                          <IconBtn
+                            name="user-x"
+                            box={36}
+                            size={15}
+                            color="var(--color-d-500)"
+                            label="Deactivate user"
+                            title={`Deactivate ${u.name}`}
+                            onClick={() => setPending({ kind: 'deactivate', id: u.id })}
+                          />
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-text-muted">—</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </TableShell>
+        {staffQuery.data?.hasNext && (
+          <div className="text-caption text-text-muted mt-3">
+            Showing the first {users.length} of {staffQuery.data.total} users.
+          </div>
+        )}
       </Card>
       <Card>
         <SectionTitle className="mb-1.5">Role Permissions</SectionTitle>
         <div className="text-caption text-text-muted mb-4">
-          Roles are fixed platform profiles — assign the narrowest one that covers the job. Patient
-          account detail requires its own permission, separate from the account list. Every detail
-          view is written to Compliance Logs.
+          Each role grants a set of module permissions — assign the narrowest one that covers the
+          job. Patient account detail requires its own permission, separate from the account list.
+          Every detail view is written to Compliance Logs.
         </div>
-        <div className="mb-4.5 grid grid-cols-2 gap-3">
-          {OPS_ROLE_ORDER.map((r) => (
-            <OpsRoleAnnotation key={r} role={r} />
-          ))}
-        </div>
-        <TableShell columns={PERMISSION_COLUMNS} scrollLabel="Role permission matrix">
-          {OPS_ROLE_PERMS.map(([p, sa, fa, sup, aud]) => (
-            <tr key={p}>
+        {!rolesState && (
+          <div className="mb-4.5 grid grid-cols-2 gap-3">
+            {roles.map((r) => (
+              <OpsRoleAnnotation key={r.id} role={r} modules={modules} />
+            ))}
+          </div>
+        )}
+        <TableShell
+          columns={['Permission', ...roles.map((r) => r.name)]}
+          scrollLabel="Role permission matrix"
+          state={rolesState}
+        >
+          {modules.map((m) => (
+            <tr key={m.module}>
               <td className="text-body text-text-strong border-border-soft w-2/5 border-b px-3.5 align-middle font-medium">
-                {p}
+                {m.label}
               </td>
-              <td className={cn(tdClass, 'text-center')}>{mark(sa)}</td>
-              <td className={cn(tdClass, 'text-center')}>{mark(fa)}</td>
-              <td className={cn(tdClass, 'text-center')}>{mark(sup)}</td>
-              <td className={cn(tdClass, 'text-center')}>{mark(aud)}</td>
+              {roles.map((r) => (
+                <td key={r.id} className={cn(tdClass, 'text-center')}>
+                  {mark(moduleAccess(r, m))}
+                </td>
+              ))}
             </tr>
           ))}
         </TableShell>
@@ -209,6 +327,8 @@ export function OpsUsersScreen() {
         key={editorKey}
         open={editor != null}
         user={editingUser}
+        roles={roles}
+        modules={modules}
         onClose={() => setEditor(null)}
         onDone={() => {
           setEditor(null);
@@ -216,26 +336,30 @@ export function OpsUsersScreen() {
         }}
       />
       <OpsConfirm
-        open={Boolean(del)}
-        onClose={() => setDelId(null)}
-        icon="trash-2"
-        tone="danger"
-        title="Delete this user?"
+        open={Boolean(target)}
+        onClose={() => setPending(null)}
+        icon={isDeactivating ? 'user-x' : 'user-check'}
+        tone={isDeactivating ? 'danger' : 'success'}
+        title={isDeactivating ? 'Deactivate this user?' : 'Reactivate this user?'}
         body={
-          del
-            ? `This permanently removes ${del.name} and their access. You won't be able to recover it later.`
+          target
+            ? isDeactivating
+              ? `${target.name} loses access and is signed out everywhere. You can reactivate them later.`
+              : `${target.name} gets access again with their ${target.role.name} role.`
             : ''
         }
-        confirmLabel={busy.del ? 'Deleting…' : 'Delete User'}
-        confirmVariant="danger"
-        busy={busy.del}
-        onConfirm={() => {
-          if (!del) return;
-          run('del', 'User deleted.', () => {
-            deleteUser(del.id);
-            setDelId(null);
-          });
-        }}
+        confirmLabel={
+          confirmBusy
+            ? isDeactivating
+              ? 'Deactivating…'
+              : 'Reactivating…'
+            : isDeactivating
+              ? 'Deactivate User'
+              : 'Reactivate User'
+        }
+        confirmVariant={isDeactivating ? 'danger' : 'primary'}
+        busy={confirmBusy}
+        onConfirm={confirmPending}
       />
     </div>
   );
