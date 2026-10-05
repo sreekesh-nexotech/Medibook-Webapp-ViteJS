@@ -1,14 +1,20 @@
 import { formatIsoDayLabel, minutesToTimeLabel } from '@/features/doctors/domain/calendar';
-import type { DoctorSlotRow, Slot, SlotGrid as SlotGridModel } from '@/features/slots/domain/slot';
+import type {
+  SlotCellView,
+  SlotGridView,
+  SlotRowView,
+} from '@/features/slots/presentation/components/slotsGridView';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 
 import { SlotCell } from './SlotCell';
 
 interface SlotGridProps {
-  grid: SlotGridModel;
+  grid: SlotGridView;
   /** Open / block one slot. Omit for a read-only grid (no edit permission). */
-  onToggleSlot?: (row: DoctorSlotRow, slot: Slot) => void;
+  onToggleSlot?: (row: SlotRowView, slot: SlotCellView) => void;
+  /** The slot whose change is in flight, if any. */
+  busySlotId?: string | null;
   /** Start a bulk update already scoped to one doctor. */
   onBulkForDoctor?: (doctorId: string) => void;
   /** Jump to the doctor's Availability tab to fix their hours. */
@@ -25,7 +31,13 @@ interface SlotGridProps {
  * real buttons carrying their own accessible names, so a screen-reader user
  * hears "Dr. Anya Sharma, 10:30 am — Available. Block this slot."
  */
-export function SlotGrid({ grid, onToggleSlot, onBulkForDoctor, onOpenDoctor }: SlotGridProps) {
+export function SlotGrid({
+  grid,
+  onToggleSlot,
+  busySlotId = null,
+  onBulkForDoctor,
+  onOpenDoctor,
+}: SlotGridProps) {
   return (
     <div
       role="region"
@@ -59,11 +71,6 @@ export function SlotGrid({ grid, onToggleSlot, onBulkForDoctor, onOpenDoctor }: 
                   {row.dept}
                   {row.room ? ` · Room ${row.room}` : ''}
                 </div>
-                {row.sourceNote && (
-                  <div className="text-caption text-blue flex items-center gap-1">
-                    <Icon name="clock" size={12} /> {row.sourceNote}
-                  </div>
-                )}
               </div>
               {onBulkForDoctor && (
                 <IconBtn
@@ -99,6 +106,7 @@ export function SlotGrid({ grid, onToggleSlot, onBulkForDoctor, onOpenDoctor }: 
                       <SlotCell
                         slot={slot}
                         doctorName={row.doctorName}
+                        busy={slot.id === busySlotId}
                         onToggle={onToggleSlot ? (s) => onToggleSlot(row, s) : undefined}
                       />
                     ) : (
