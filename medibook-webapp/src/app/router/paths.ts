@@ -26,6 +26,27 @@ export const AUTH_LOGIN_PATH = '/auth/login';
 export const AUTH_FORGOT_PATH = '/auth/forgot';
 export const OPS_BASE_PATH = '/ops';
 
+/*
+ * Public pages opened from emailed links. The backend builds these URLs as
+ * `{FRONTEND_HOSPITAL_URL}/reset-password?token=…`,
+ * `{FRONTEND_PLATFORM_URL}/reset-password?token=…` and
+ * `{FRONTEND_HOSPITAL_URL}/accept-invite?token=…` (`messaging/services/context.py`),
+ * so with one app serving both surfaces `FRONTEND_PLATFORM_URL` must be set
+ * to `<app origin>/ops`.
+ */
+export const AUTH_RESET_PATH = '/reset-password';
+export const OPS_RESET_PATH = `${OPS_BASE_PATH}/reset-password`;
+export const AUTH_INVITE_PATH = '/accept-invite';
+
+/** Query param carrying an emailed token (reset or invitation). */
+export const AUTH_TOKEN_PARAM = 'token';
+
+/** Query param telling the forgot-password screen which surface to email from. */
+export const AUTH_SURFACE_PARAM = 'surface';
+
+/** `AUTH_SURFACE_PARAM` value for the operations console. */
+export const AUTH_SURFACE_OPS = 'ops';
+
 /* ------------------------------------------------------- hospital views */
 
 /**
@@ -63,7 +84,9 @@ export type HospitalView =
   /** Hospital-side audit trail. Admin-only. */
   | 'audit'
   /** Plan & billing (today a tab inside `settlements`). Admin-only. */
-  | 'billing';
+  | 'billing'
+  /** The signed-in user's own account: name, password, sessions. Every role. */
+  | 'account';
 
 /** Detail views whose URL carries a param (`OpsSel`/`Store` selection → URL). */
 export type HospitalDetailView = 'patient-detail' | 'doctor-detail';
@@ -93,6 +116,7 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   messaging: 'messaging',
   audit: 'audit',
   billing: 'billing',
+  account: 'account',
 };
 
 /**
@@ -150,6 +174,10 @@ export function hospitalBillingPath(role: HospitalRole): string {
   return hospitalPath(role, 'billing');
 }
 
+export function hospitalAccountPath(role: HospitalRole): string {
+  return hospitalPath(role, 'account');
+}
+
 /** List views resolvable 1:1 from their first URL segment. */
 const HOSPITAL_SEGMENT_VIEWS: readonly HospitalView[] = [
   'dashboard',
@@ -169,6 +197,7 @@ const HOSPITAL_SEGMENT_VIEWS: readonly HospitalView[] = [
   'messaging',
   'audit',
   'billing',
+  'account',
 ];
 
 /** Current hospital view id from a `/:role/...` pathname (design `parseHash`). */
@@ -206,7 +235,9 @@ export type OpsView =
   /** Hospital onboarding pipeline (applications, KYC, go-live). */
   | 'onboarding'
   /** Document/regulatory compliance per hospital. */
-  | 'compliance';
+  | 'compliance'
+  /** The signed-in user's own account: name, password, sessions. */
+  | 'account';
 
 /** Ops detail views whose URL carries a param (`OpsSel` selection → URL). */
 export type OpsDetailView =
@@ -235,6 +266,7 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   settings: 'settings',
   onboarding: 'onboarding',
   compliance: 'compliance',
+  account: 'account',
 };
 
 /** Absolute path for a param-free ops view. */
@@ -257,6 +289,10 @@ export function opsCompliancePath(): string {
   return opsPath('compliance');
 }
 
+export function opsAccountPath(): string {
+  return opsPath('account');
+}
+
 /** Ops list views resolvable 1:1 from their first URL segment. */
 const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'dashboard',
@@ -273,6 +309,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'settings',
   'onboarding',
   'compliance',
+  'account',
 ];
 
 /** Current ops view id from an `/ops/...` pathname. */

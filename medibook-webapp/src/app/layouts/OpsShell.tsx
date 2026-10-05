@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
@@ -8,7 +8,7 @@ import { Modal } from '@/shared/ui/Modal';
 import { OpsSkeleton } from '@/shared/ui/OpsSkeleton';
 
 import {
-  AUTH_LOGIN_PATH,
+  opsAccountPath,
   opsHospitalDetailPath,
   opsPath,
   opsViewFromPath,
@@ -16,7 +16,7 @@ import {
   type OpsView,
 } from '@/app/router/paths';
 
-import { useAuthStore } from '@/features/auth/application/store/auth.store';
+import type { PlatformSession } from '@/features/auth/domain/entities/auth.types';
 import { useOpsSettingsStore } from '@/features/ops-settings/application/store/opsSettings.store';
 
 import { ErrorBoundary } from './ErrorBoundary';
@@ -33,7 +33,8 @@ const SKELETON_MS = 450;
 
 /**
  * Module-level visited-view stack (the prototype's `OpsShell` histRef);
- * recorded synchronously during render, cleared on logout.
+ * recorded synchronously during render, cleared when the shell unmounts
+ * (logout or session expiry), so the next user never inherits it.
  */
 const history = createViewHistory<OpsView>();
 
@@ -43,11 +44,18 @@ interface SkeletonPhase {
   readonly loading: boolean;
 }
 
+interface OpsShellProps {
+  /** The validated session (`GET /platform/me`). */
+  session: PlatformSession;
+  onLogout: () => void;
+}
+
 /** Ops console frame: sidebar + topbar + skeleton + error boundary (design `OpsShell`). */
-export function OpsShell() {
+export function OpsShell({ session, onLogout }: OpsShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const logout = useAuthStore((s) => s.logout);
+  const { user } = session;
+  const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
   const sessTimeout = useOpsSettingsStore((s) => s.settings.sessTimeout);
 
   const view = opsViewFromPath(location.pathname);
@@ -91,11 +99,9 @@ export function OpsShell() {
     navigate(opsPath(target));
   };
 
-  const handleLogout = () => {
-    logout();
-    history.clear();
-    navigate(AUTH_LOGIN_PATH);
-  };
+  useEffect(() => () => history.clear(), []);
+
+  const handleLogout = onLogout;
 
   // Audit 3.7.5 — the Session Timeout setting now has a timer behind it:
   // "30 min" means 30 idle minutes, with a warning at T-60s.
@@ -118,6 +124,13 @@ export function OpsShell() {
           onNavigate={handleNavigate}
           onOpenHospital={(id) => navigate(opsHospitalDetailPath(id))}
           onLogout={handleLogout}
+          onAccount={() => {
+            setNavOpen(false);
+            navigate(opsAccountPath());
+          }}
+          userName={userName}
+          userEmail={user.email}
+          roleName={session.role.name}
           onBack={onBack}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
@@ -128,7 +141,13 @@ export function OpsShell() {
               <ScreenError onRetry={reset} onHome={() => handleNavigate('dashboard')} />
             )}
           >
-            {loading ? <OpsSkeleton /> : <Outlet />}
+            {loading ? (
+              <OpsSkeleton />
+            ) : (
+              <Suspense fallback={<OpsSkeleton />}>
+                <Outlet />
+              </Suspense>
+            )}
           </ErrorBoundary>
         </div>
       </div>

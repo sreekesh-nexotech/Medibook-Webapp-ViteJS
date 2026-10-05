@@ -155,6 +155,20 @@ export const sharedApi = createClient('/shared', activeSurface);
 /** `/api/v1/shared/…` with no credentials — public endpoints read before login. */
 export const publicApi = axios.create({ baseURL: `${API_ROOT}/shared`, timeout: API_TIMEOUT_MS });
 
+const publicSurfaceClients: Readonly<Record<ApiSurface, AxiosInstance>> = {
+  hospital: axios.create({ baseURL: `${API_ROOT}/hospital`, timeout: API_TIMEOUT_MS }),
+  platform: axios.create({ baseURL: `${API_ROOT}/platform`, timeout: API_TIMEOUT_MS }),
+};
+
+/**
+ * `/api/v1/<surface>/…` with no credentials and no refresh — for the
+ * pre-auth endpoints (login, password forgot/reset, invitations), which must
+ * never send or rotate a stale token from an earlier session.
+ */
+export function publicApiFor(surface: ApiSurface): AxiosInstance {
+  return publicSurfaceClients[surface];
+}
+
 /** The authenticated client for `surface`. */
 export function apiFor(surface: ApiSurface): AxiosInstance {
   return surface === 'hospital' ? hospitalApi : platformApi;

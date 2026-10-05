@@ -19,6 +19,14 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    // Libraries change far less often than app code: one long-cached vendor
+    // chunk, and (with the lazy screens in `app/router/lazyScreens.ts`) an
+    // entry chunk well under the 500 kB warning.
+    build: {
+      rolldownOptions: {
+        output: { codeSplitting: { groups: [{ name: 'vendor', test: /node_modules/ }] } },
+      },
+    },
     // Dev only: the page and the API share one origin, so the backend's
     // per-surface CORS allowlist never needs this worktree's port.
     server: {

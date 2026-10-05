@@ -7,12 +7,12 @@ import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { HOSPITAL_ROLES, type HospitalRole } from '@/app/router/paths';
+import type { HospitalRole } from '@/app/router/paths';
 
 import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
 
-import { ROLE_USERS, type HospitalNavView } from './hospital-nav';
+import type { HospitalNavView } from './hospital-nav';
 
 interface HospitalNotif {
   readonly icon: IconName;
@@ -28,8 +28,13 @@ interface HospitalTopbarProps {
   title: string;
   subtitle: string | null;
   onBack: (() => void) | null;
+  /** URL role — selects the shell's notification set. */
   role: HospitalRole;
-  onRoleChange: (role: HospitalRole | '__logout') => void;
+  /** Signed-in user's display name and role (from `/hospital/me`). */
+  userName: string;
+  roleName: string;
+  onAccount: () => void;
+  onLogout: () => void;
   onNavigate: (view: HospitalNavView) => void;
   /**
    * Opens the off-canvas sidebar. Rendered as a hamburger below `lg` only, so
@@ -38,13 +43,20 @@ interface HospitalTopbarProps {
   onMenu?: () => void;
 }
 
-/** Hospital shell topbar with notification bell + role-switch menu (design `Topbar`). */
+/**
+ * Hospital shell topbar with notification bell + account menu (design
+ * `Topbar`). The design's role switcher is gone: a real user has exactly one
+ * role, so the menu shows who is signed in, My Account and Log Out.
+ */
 export function HospitalTopbar({
   title,
   subtitle,
   onBack,
   role,
-  onRoleChange,
+  userName,
+  roleName,
+  onAccount,
+  onLogout,
   onNavigate,
   onMenu,
 }: HospitalTopbarProps) {
@@ -52,7 +64,6 @@ export function HospitalTopbar({
   const [notif, setNotif] = useState(false);
   const appts = useAppointmentsStore((s) => s.appts);
   const settlements = useSettlementsStore((s) => s.settlements);
-  const u = ROLE_USERS[role];
   const pendingPay = appts.filter((a) => a.payment === 'Pending').length;
   const overdue = settlements.filter((r) => r.status === 'Overdue');
   const notifs: HospitalNotif[] =
@@ -229,10 +240,10 @@ export function HospitalTopbar({
           onClick={() => setMenu((m) => !m)}
           className="flex cursor-pointer items-center gap-2.5"
         >
-          <Avatar name={u.name} size={38} />
+          <Avatar name={userName} size={38} />
           <div className="hidden flex-col items-start sm:flex">
-            <span className="text-body text-text-strong font-medium">{u.name}</span>
-            <span className="text-caption text-text-muted">{u.role}</span>
+            <span className="text-body text-text-strong font-medium">{userName}</span>
+            <span className="text-caption text-text-muted">{roleName}</span>
           </div>
           <Icon name="chevron-down" size={16} className="text-text-muted" />
         </button>
@@ -240,36 +251,28 @@ export function HospitalTopbar({
           <>
             <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
             <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-58 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
-              <div className="text-tiny text-text-faint px-2.5 pt-2 pb-1.5 font-semibold tracking-[.06em] uppercase">
-                Switch Role
+              <div className="flex items-center gap-2.5 px-2.5 py-2.25">
+                <Avatar name={userName} size={32} />
+                <div className="min-w-0">
+                  <div className="text-body text-text-strong font-medium">{userName}</div>
+                  <div className="text-caption text-text-muted">{roleName}</div>
+                </div>
               </div>
-              {HOSPITAL_ROLES.map((rk) => {
-                const ru = ROLE_USERS[rk];
-                return (
-                  <div
-                    key={rk}
-                    onClick={() => {
-                      onRoleChange(rk);
-                      setMenu(false);
-                    }}
-                    className={cn(
-                      'hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150',
-                      rk === role && 'bg-blue-soft-bg',
-                    )}
-                  >
-                    <Avatar name={ru.name} size={30} />
-                    <div className="flex-1">
-                      <div className="text-body text-text-strong font-medium">{ru.role}</div>
-                    </div>
-                    {rk === role && <Icon name="check" size={16} className="text-blue" />}
-                  </div>
-                );
-              })}
               <div className="bg-border-soft mx-1 my-1.5 h-px" />
               <div
                 onClick={() => {
                   setMenu(false);
-                  onRoleChange('__logout');
+                  onAccount();
+                }}
+                className="text-text-body hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
+              >
+                <Icon name="user" size={18} />{' '}
+                <span className="text-body font-medium">My Account</span>
+              </div>
+              <div
+                onClick={() => {
+                  setMenu(false);
+                  onLogout();
                 }}
                 className="text-d-500 hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
               >

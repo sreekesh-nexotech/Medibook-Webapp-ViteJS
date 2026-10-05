@@ -97,6 +97,7 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Applications, KYC verification and go-live across the onboarding pipeline',
   ],
   compliance: ['Compliance', 'Registration, licence and document compliance per hospital instance'],
+  account: ['My Account', 'Your name, password and signed-in devices'],
 };
 
 /** Browser-tab title per ops view — audit 3.9.2 (the console ran under the
@@ -105,12 +106,3 @@ export function opsDocumentTitleFor(view: OpsView): string {
   const meta = OPS_META[view];
   return `${meta ? meta[0] : 'Operations'} · Medibook Operations`;
 }
-
-/** The signed-in ops identity (design `OPS_USER`). */
-export const OPS_USER = {
-  name: 'Riya Sharma',
-  role: 'Super Admin',
-  // The source bundle's avatar-riya.png is a blank/transparent placeholder, so
-  // fall back to "RS" initials (the design system's photoless-avatar pattern).
-  av: null,
-} as const;

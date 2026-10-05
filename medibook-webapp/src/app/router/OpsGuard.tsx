@@ -1,18 +1,47 @@
+import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 
-import { OpsShell } from '@/app/layouts/OpsShell';
-import { AUTH_LOGIN_PATH, hospitalDashboardPath } from '@/app/router/paths';
+import { isFailure } from '@/core/error/failure';
 
-import { useAuthStore } from '@/features/auth/application/store/auth.store';
+import { OpsShell } from '@/app/layouts/OpsShell';
+import { AUTH_LOGIN_PATH } from '@/app/router/paths';
+import { SessionError } from '@/app/router/SessionError';
+import { SessionLoading } from '@/app/router/SessionLoading';
+import { useSessionExit } from '@/app/router/useSessionExit';
+
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { platformSessionOf, syncAuthStore } from '@/features/auth/application/store/auth.roles';
 
 /**
- * Guard for the `/ops/*` layout: unauthed → login; non-ops roles → their
- * hospital dashboard. Otherwise renders the ops shell.
+ * Guard for the `/ops/*` layout. Validates the stored platform tokens with
+ * `GET /platform/me` before rendering: no tokens or a refused session →
+ * login; still checking → spinner; server unreachable → retry.
  */
 export function OpsGuard() {
-  const authed = useAuthStore((s) => s.authed);
-  const role = useAuthStore((s) => s.role);
-  if (!authed) return <Navigate to={AUTH_LOGIN_PATH} replace />;
-  if (role !== 'ops') return <Navigate to={hospitalDashboardPath(role)} replace />;
-  return <OpsShell />;
+  const session = useSessionQuery('platform');
+  const { logout } = useSessionExit('platform');
+  const data = platformSessionOf(session.data);
+
+  useEffect(() => {
+    if (data) syncAuthStore(data);
+  }, [data]);
+
+  if (!data) {
+    if (session.isError) {
+      if (isFailure(session.error) && session.error.kind === 'unauthorized') {
+        return <Navigate to={AUTH_LOGIN_PATH} replace />;
+      }
+      return (
+        <SessionError
+          message={isFailure(session.error) ? session.error.message : undefined}
+          onRetry={() => void session.refetch()}
+          onLogout={logout}
+        />
+      );
+    }
+    if (session.fetchStatus === 'idle') return <Navigate to={AUTH_LOGIN_PATH} replace />;
+    return <SessionLoading />;
+  }
+
+  return <OpsShell session={data} onLogout={logout} />;
 }

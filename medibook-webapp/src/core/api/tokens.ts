@@ -1,15 +1,18 @@
 import type { ApiSurface } from '@/core/api/surface';
 import { STORAGE_KEY_REFRESH_TOKEN } from '@/core/storage/storage.keys';
-import { readSession, removeSession, writeSession } from '@/core/storage/sessionStore';
+import type { StorageArea } from '@/core/storage/webStorage';
+import { readStorage, removeStorage, writeStorage } from '@/core/storage/webStorage';
 
 /**
  * Token storage, one pair per surface (Prompt A-AUTH, bearer scheme):
  *
  * - the **access** token lives in memory only — gone on reload, never in
  *   storage, never logged;
- * - the **refresh** token lives in `sessionStorage` — it survives a reload of
- *   this tab (the HTTP client mints a fresh access token from it on the first
- *   request) but not a closed tab, and is never shared across tabs.
+ * - the **refresh** token lives in `sessionStorage` by default — it survives a
+ *   reload of this tab (the HTTP client mints a fresh access token from it on
+ *   the first request) but not a closed tab. When the user ticks "Remember me"
+ *   it lives in `localStorage` instead and survives closing the browser.
+ *   Rotation keeps it in whichever area it was first written to.
  *
  * Login (F1) calls `setTokens`; the HTTP client rotates them on refresh;
  * logout calls `clearTokens`.
@@ -35,13 +38,28 @@ const ACCESS_EXPIRY_SKEW_MS = 10_000;
 
 const accessTokens = new Map<ApiSurface, AccessToken>();
 
-/** Store a fresh pair from login or refresh. */
-export function setTokens(surface: ApiSurface, grant: TokenGrant): void {
+const AREAS: readonly StorageArea[] = ['local', 'session'];
+
+/** Where `surface`'s refresh token currently lives, if anywhere. */
+function refreshArea(surface: ApiSurface): StorageArea | null {
+  return (
+    AREAS.find((area) => readStorage(area, STORAGE_KEY_REFRESH_TOKEN[surface]) !== null) ?? null
+  );
+}
+
+/**
+ * Store a fresh pair from login or refresh. `remember` picks the refresh
+ * token's storage on sign-in; when omitted (a refresh) it stays where it is.
+ */
+export function setTokens(surface: ApiSurface, grant: TokenGrant, remember?: boolean): void {
+  const area: StorageArea =
+    remember === undefined ? (refreshArea(surface) ?? 'session') : remember ? 'local' : 'session';
   accessTokens.set(surface, {
     token: grant.access,
     expiresAt: Date.now() + grant.accessExpiresIn * MS_PER_SECOND - ACCESS_EXPIRY_SKEW_MS,
   });
-  writeSession(STORAGE_KEY_REFRESH_TOKEN[surface], grant.refresh);
+  for (const other of AREAS) removeStorage(other, STORAGE_KEY_REFRESH_TOKEN[surface]);
+  writeStorage(area, STORAGE_KEY_REFRESH_TOKEN[surface], grant.refresh);
 }
 
 /** The current access token, or `null` when there is none or it has expired. */
@@ -52,7 +70,8 @@ export function getAccessToken(surface: ApiSurface): string | null {
 }
 
 export function getRefreshToken(surface: ApiSurface): string | null {
-  return readSession(STORAGE_KEY_REFRESH_TOKEN[surface]);
+  const area = refreshArea(surface);
+  return area === null ? null : readStorage(area, STORAGE_KEY_REFRESH_TOKEN[surface]);
 }
 
 /** True when this tab holds a session for `surface` (it may still need a refresh). */
@@ -63,7 +82,7 @@ export function hasSession(surface: ApiSurface): boolean {
 /** Forget both tokens for `surface` (logout, or a refresh the server refused). */
 export function clearTokens(surface: ApiSurface): void {
   accessTokens.delete(surface);
-  removeSession(STORAGE_KEY_REFRESH_TOKEN[surface]);
+  for (const area of AREAS) removeStorage(area, STORAGE_KEY_REFRESH_TOKEN[surface]);
 }
 
 /* ------------------------------------------------------------ expiry events */

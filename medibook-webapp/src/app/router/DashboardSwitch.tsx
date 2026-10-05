@@ -1,7 +1,16 @@
+import { lazy } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { AdminDashboardScreen } from '@/features/dashboard/presentation/screens/AdminDashboardScreen';
-import { ReceptionistDashboardScreen } from '@/features/dashboard/presentation/screens/ReceptionistDashboardScreen';
+const AdminDashboardScreen = lazy(() =>
+  import('@/features/dashboard/presentation/screens/AdminDashboardScreen').then((m) => ({
+    default: m.AdminDashboardScreen,
+  })),
+);
+const ReceptionistDashboardScreen = lazy(() =>
+  import('@/features/dashboard/presentation/screens/ReceptionistDashboardScreen').then((m) => ({
+    default: m.ReceptionistDashboardScreen,
+  })),
+);
 
 /**
  * `/:role/dashboard` renders the role's dashboard (the design's `Screen`

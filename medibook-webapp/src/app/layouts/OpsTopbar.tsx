@@ -11,7 +11,7 @@ import { useInboxStore } from '@/features/ops-dashboard/application/store/inbox.
 import { hospName } from '@/features/ops-hospitals/application/store/hospitals.store';
 import { useOpsSettlementsStore } from '@/features/ops-settlements/application/store/opsSettlements.store';
 
-import { OPS_META, OPS_USER } from './ops-nav';
+import { OPS_META } from './ops-nav';
 
 /** A bell target: a static ops view, or one hospital's profile (`hospital:<id>`). */
 type OpsNotifTarget = OpsStaticView | `hospital:${number}`;
@@ -36,6 +36,11 @@ interface OpsTopbarProps {
   /** `hospital:<id>` bell targets open that hospital's profile (URL param port of `OpsSel.hosp`). */
   onOpenHospital: (id: number) => void;
   onLogout: () => void;
+  onAccount: () => void;
+  /** Signed-in user (from `/platform/me`). */
+  userName: string;
+  userEmail: string;
+  roleName: string;
   onBack: (() => void) | null;
   /**
    * Opens the off-canvas sidebar. Rendered as a hamburger below `lg` only, so
@@ -50,6 +55,10 @@ export function OpsTopbar({
   onNavigate,
   onOpenHospital,
   onLogout,
+  onAccount,
+  userName,
+  userEmail,
+  roleName,
   onBack,
   onMenu,
 }: OpsTopbarProps) {
@@ -187,10 +196,10 @@ export function OpsTopbar({
           onClick={() => setMenu((v) => !v)}
           className="flex cursor-pointer items-center gap-2.5"
         >
-          <Avatar name={OPS_USER.name} src={OPS_USER.av} size={38} />
+          <Avatar name={userName} size={38} />
           <div className="hidden flex-col items-start sm:flex">
-            <span className="text-body text-text-strong font-medium">{OPS_USER.name}</span>
-            <span className="text-caption text-text-muted">{OPS_USER.role}</span>
+            <span className="text-body text-text-strong font-medium">{userName}</span>
+            <span className="text-caption text-text-muted">{roleName}</span>
           </div>
           <Icon name="chevron-down" size={16} className="text-text-muted" />
         </button>
@@ -199,13 +208,23 @@ export function OpsTopbar({
             <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
             <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-60 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
               <div className="flex items-center gap-2.5 px-2.5 py-2.25">
-                <Avatar name={OPS_USER.name} src={OPS_USER.av} size={32} />
+                <Avatar name={userName} size={32} />
                 <div className="min-w-0">
-                  <div className="text-body text-text-strong font-medium">{OPS_USER.name}</div>
-                  <div className="text-caption text-text-muted">riya.sharma@medibook.in</div>
+                  <div className="text-body text-text-strong font-medium">{userName}</div>
+                  <div className="text-caption text-text-muted">{userEmail}</div>
                 </div>
               </div>
               <div className="bg-border-soft mx-1 my-1.5 h-px" />
+              <div
+                onClick={() => {
+                  setMenu(false);
+                  onAccount();
+                }}
+                className="text-text-body hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
+              >
+                <Icon name="user" size={18} />{' '}
+                <span className="text-body font-medium">My Account</span>
+              </div>
               <div
                 onClick={() => {
                   setMenu(false);

@@ -5,14 +5,23 @@ import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Icon } from '@/shared/ui/Icon';
 
-import { AUTH_FORGOT_PATH, hospitalDashboardPath, opsPath } from '@/app/router/paths';
+import { isFailure } from '@/core/error/failure';
+import type { Failure } from '@/core/error/failure';
 
-import { APOLLO_HID } from '@/core/config/demo';
+import {
+  AUTH_FORGOT_PATH,
+  AUTH_SURFACE_OPS,
+  AUTH_SURFACE_PARAM,
+  hospitalDashboardPath,
+  opsPath,
+} from '@/app/router/paths';
 
-import { useAuthStore } from '@/features/auth/application/store/auth.store';
+import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
+import { useLoginMutation } from '@/features/auth/application/queries/useLoginMutation';
+import { useLogoutMutation } from '@/features/auth/application/queries/useLogoutMutation';
+import { hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
-import { useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
 
 type LoginMode = 'hospital' | 'ops';
 
@@ -23,22 +32,35 @@ const MODES: readonly (readonly [LoginMode, string])[] = [
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+const SUSPENDED_MESSAGE =
+  "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate.";
+
+/** Sign-in failures worth wording for this screen; anything else shows the server's message. */
+function loginErrorMessage(failure: Failure, isOps: boolean): string {
+  if (failure.code === 'AUTH_INVALID_CREDENTIALS') return 'Incorrect email or password.';
+  if (failure.code === 'PERMISSION_DENIED') {
+    return isOps
+      ? 'This account does not have access to the operations console.'
+      : 'This account has no active hospital access. Contact your hospital administrator.';
+  }
+  return failure.message;
+}
+
 /**
  * Login screen (design `Auth.jsx` `Login`): the Hospital/Operations segmented
  * toggle, "Welcome Back" heading, email + password fields, the remember-me /
- * ops lock note, forgot-password link, email validation, the Apollo suspension
- * gate, and the login → dashboard navigation.
+ * ops lock note, forgot-password link and email validation — now signing in
+ * against `/<surface>/auth/login`, validating the session with `/me`, refusing
+ * a suspended hospital, and landing on the session role's dashboard.
  */
 export function LoginScreen() {
   const navigate = useNavigate();
-  const login = useAuthStore((s) => s.login);
-  const apolloSuspended = useHospitalsStore(
-    (s) => s.hospitals.find((h) => h.id === APOLLO_HID)?.status === 'Suspended',
-  );
+  const loginMutation = useLoginMutation();
+  const { mutate: logout } = useLogoutMutation();
 
   const [mode, setMode] = useState<LoginMode>('hospital');
-  const [email, setEmail] = useState('s.nair@apollo.med');
-  const [pwd, setPwd] = useState('••••••••');
+  const [email, setEmail] = useState('');
+  const [pwd, setPwd] = useState('');
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [err, setErr] = useState('');
@@ -48,7 +70,20 @@ export function LoginScreen() {
     if (m === mode) return;
     setMode(m);
     setErr('');
-    setEmail(m === 'ops' ? 'a.rao@medibook.com' : 's.nair@apollo.med');
+  };
+
+  const land = (session: StaffSession) => {
+    if (session.surface === 'platform') {
+      navigate(opsPath('dashboard'), { replace: true });
+      return;
+    }
+    if (session.hospital.status === 'suspended') {
+      // Login itself is never cut off (D-30); the app is. Sign straight back out.
+      logout('hospital');
+      setErr(SUSPENDED_MESSAGE);
+      return;
+    }
+    navigate(hospitalDashboardPath(hospitalUrlRole(session.role.code)), { replace: true });
   };
 
   const go = () => {
@@ -61,19 +96,19 @@ export function LoginScreen() {
       return;
     }
     setErr('');
-    if (!isOps && apolloSuspended) {
-      setErr(
-        "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate.",
-      );
-      return;
-    }
-    if (isOps) {
-      login('ops');
-      navigate(opsPath('dashboard'));
-    } else {
-      login('hospital');
-      navigate(hospitalDashboardPath('admin'));
-    }
+    loginMutation.mutate(
+      {
+        surface: isOps ? 'platform' : 'hospital',
+        // Ops sessions are never remembered (the copy below says so).
+        credentials: { email: email.trim(), password: pwd, remember: !isOps && remember },
+      },
+      {
+        onSuccess: land,
+        onError: (error) => {
+          setErr(isFailure(error) ? loginErrorMessage(error, isOps) : 'Something went wrong.');
+        },
+      },
+    );
   };
 
   return (
@@ -151,13 +186,24 @@ export function LoginScreen() {
               )}
               <button
                 type="button"
-                onClick={() => navigate(AUTH_FORGOT_PATH)}
+                onClick={() =>
+                  navigate(
+                    isOps
+                      ? `${AUTH_FORGOT_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+                      : AUTH_FORGOT_PATH,
+                  )
+                }
                 className="text-body text-link shrink-0 cursor-pointer font-medium"
               >
                 Forgot Password?
               </button>
             </div>
-            <Button variant="info" className="h-13.5 w-full rounded-sm" onClick={go}>
+            <Button
+              variant="info"
+              className="h-13.5 w-full rounded-sm"
+              onClick={go}
+              busy={loginMutation.isPending}
+            >
               Login
             </Button>
           </div>

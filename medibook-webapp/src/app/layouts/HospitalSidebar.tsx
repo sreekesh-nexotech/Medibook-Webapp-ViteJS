@@ -34,14 +34,14 @@ export function HospitalSidebar({
   const { canViewModule } = usePermission();
   const isRail = mode ? mode === 'rail' : collapsed;
 
-  // Role gate (the design's per-item `roles`) *and* permission gate — audit
-  // 2.4/X-01: a module the signed-in role cannot view does not appear at all.
+  // Permission gate — audit 2.4/X-01: a module the signed-in user's real
+  // permissions cannot view does not appear at all. Items no module gates
+  // (Help & Support) keep the design's per-item role gate.
   const sections = NAV_MODEL.map((s) => ({
     ...s,
     items: s.items.filter((i) => {
-      if (!i.roles.includes(role)) return false;
       const module = NAV_PERMISSION_MODULE[i.id];
-      return module === undefined || canViewModule(module);
+      return module === undefined ? i.roles.includes(role) : canViewModule(module);
     }),
   })).filter((s) => s.items.length > 0);
 

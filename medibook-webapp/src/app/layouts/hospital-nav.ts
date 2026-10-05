@@ -112,6 +112,16 @@ export const NAV_PARENT: Readonly<Partial<Record<HospitalView, HospitalNavView>>
   'doctor-detail': 'doctors',
 };
 
+/**
+ * The permission module gating a view, following detail views to their parent
+ * (`doctor-detail` → `doctors` → Doctors & Departments). `undefined` for views
+ * no module gates (help, my account).
+ */
+export function moduleForView(view: HospitalView): RbacModule | undefined {
+  const byView: Readonly<Partial<Record<HospitalView, RbacModule>>> = NAV_PERMISSION_MODULE;
+  return byView[NAV_PARENT[view] ?? view];
+}
+
 /** Whether a role may see a view (design `viewAllowed`, incl. the parent mapping). */
 export function viewAllowed(role: HospitalRole, view: HospitalView): boolean {
   const base = NAV_PARENT[view] ?? view;
@@ -122,14 +132,6 @@ export function viewAllowed(role: HospitalRole, view: HospitalView): boolean {
   }
   return true;
 }
-
-/** The demo identity behind each hospital role (design `ROLE_USERS`). */
-export const ROLE_USERS: Readonly<
-  Record<HospitalRole, { readonly name: string; readonly role: string }>
-> = {
-  receptionist: { name: 'Riya Menon', role: 'Receptionist' },
-  admin: { name: 'Dr. S. Nair', role: 'Administrator' },
-};
 
 /** Topbar titles per view (design `VIEW_TITLE`; dashboard is role-dependent). */
 const VIEW_TITLE: Readonly<Partial<Record<HospitalView, string>>> = {
@@ -152,6 +154,7 @@ const VIEW_TITLE: Readonly<Partial<Record<HospitalView, string>>> = {
   messaging: 'Messaging',
   audit: 'Audit Trail',
   billing: 'Plan & Billing',
+  account: 'My Account',
 };
 
 /** Topbar title for a role + view (design `titleFor`). */
@@ -160,10 +163,11 @@ export function titleFor(role: HospitalRole, view: HospitalView): string {
   return VIEW_TITLE[view] ?? 'mbAdmin';
 }
 
-/** Topbar subtitle for a role + view (design `subFor`). */
-export function subFor(role: HospitalRole, view: HospitalView): string | null {
+/** Topbar subtitle for a role + view (design `subFor`), greeting the signed-in user. */
+export function subFor(role: HospitalRole, view: HospitalView, firstName: string): string | null {
   if (view === 'dashboard')
-    return role === 'receptionist' ? 'Welcome back, Riya' : 'Hospital-wide overview';
+    return role === 'receptionist' ? `Welcome back, ${firstName}` : 'Hospital-wide overview';
+  if (view === 'account') return 'Your name, password and signed-in devices';
   if (view === 'create') return 'Book a walk-in or register an online arrival';
   return null;
 }

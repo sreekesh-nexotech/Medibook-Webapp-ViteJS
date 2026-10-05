@@ -6,53 +6,61 @@ import { HospitalGuard } from '@/app/router/HospitalGuard';
 import { OpsGuard } from '@/app/router/OpsGuard';
 import {
   AUTH_FORGOT_PATH,
+  AUTH_INVITE_PATH,
   AUTH_LOGIN_PATH,
+  AUTH_RESET_PATH,
   HOSPITAL_VIEW_SEGMENT,
   OPS_BASE_PATH,
+  OPS_RESET_PATH,
   OPS_VIEW_SEGMENT,
   ROOT_PATH,
 } from '@/app/router/paths';
 import { RequireAdmin } from '@/app/router/RequireAdmin';
 import { RootRedirect } from '@/app/router/RootRedirect';
+import {
+  AppointmentsScreen,
+  AuditTrailScreen,
+  CreateAppointmentScreen,
+  DoctorDetailPageScreen,
+  DoctorsDepartmentsScreen,
+  HelpSupportScreen,
+  HospitalProfileScreen,
+  HospitalSettingsScreen,
+  MessagingScreen,
+  MyAccountScreen,
+  OpsAnalyticsScreen,
+  OpsBillingScreen,
+  OpsComplianceScreen,
+  OpsDashboardScreen,
+  OpsHospitalDetailScreen,
+  OpsHospitalsScreen,
+  OpsInvoiceDetailScreen,
+  OpsLogsScreen,
+  OpsNotificationsScreen,
+  OpsOnboardingScreen,
+  OpsPaymentDetailScreen,
+  OpsPlansScreen,
+  OpsPlatformUserDetailScreen,
+  OpsPlatformUsersScreen,
+  OpsReportsScreen,
+  OpsSettingsScreen,
+  OpsSettlementsScreen,
+  OpsUsersScreen,
+  PatientDetailScreen,
+  PatientsScreen,
+  PaymentsScreen,
+  ReportsScreen,
+  ServicesPricingScreen,
+  SettlementsScreen,
+  SlotsScreen,
+  TokenCountersScreen,
+  UsersRolesScreen,
+} from '@/app/router/lazyScreens';
 
-import { AuditTrailScreen } from '@/features/audit/presentation/screens/AuditTrailScreen';
-import { AppointmentsScreen } from '@/features/appointments/presentation/screens/AppointmentsScreen';
-import { CreateAppointmentScreen } from '@/features/appointments/presentation/screens/CreateAppointmentScreen';
+import { AcceptInvitationScreen } from '@/features/auth/presentation/screens/AcceptInvitationScreen';
 import { ForgotPasswordScreen } from '@/features/auth/presentation/screens/ForgotPasswordScreen';
 import { LoginScreen } from '@/features/auth/presentation/screens/LoginScreen';
-import { DoctorDetailPageScreen } from '@/features/doctors/presentation/screens/DoctorDetailPageScreen';
-import { DoctorsDepartmentsScreen } from '@/features/doctors/presentation/screens/DoctorsDepartmentsScreen';
-import { HelpSupportScreen } from '@/features/help/presentation/screens/HelpSupportScreen';
-import { MessagingScreen } from '@/features/messaging/presentation/screens/MessagingScreen';
-import { OpsAnalyticsScreen } from '@/features/ops-analytics/presentation/screens/OpsAnalyticsScreen';
-import { OpsBillingScreen } from '@/features/ops-billing/presentation/screens/OpsBillingScreen';
-import { OpsInvoiceDetailScreen } from '@/features/ops-billing/presentation/screens/OpsInvoiceDetailScreen';
-import { OpsPaymentDetailScreen } from '@/features/ops-billing/presentation/screens/OpsPaymentDetailScreen';
-import { OpsComplianceScreen } from '@/features/ops-compliance/presentation/screens/OpsComplianceScreen';
-import { OpsDashboardScreen } from '@/features/ops-dashboard/presentation/screens/OpsDashboardScreen';
-import { OpsHospitalDetailScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalDetailScreen';
-import { OpsHospitalsScreen } from '@/features/ops-hospitals/presentation/screens/OpsHospitalsScreen';
-import { OpsOnboardingScreen } from '@/features/ops-hospitals/presentation/screens/OpsOnboardingScreen';
-import { OpsLogsScreen } from '@/features/ops-logs/presentation/screens/OpsLogsScreen';
-import { OpsNotificationsScreen } from '@/features/ops-notifications/presentation/screens/OpsNotificationsScreen';
-import { OpsPlansScreen } from '@/features/ops-plans/presentation/screens/OpsPlansScreen';
-import { OpsPlatformUserDetailScreen } from '@/features/ops-platform-users/presentation/screens/OpsPlatformUserDetailScreen';
-import { OpsPlatformUsersScreen } from '@/features/ops-platform-users/presentation/screens/OpsPlatformUsersScreen';
-import { OpsReportsScreen } from '@/features/ops-reports/presentation/screens/OpsReportsScreen';
-import { OpsSettingsScreen } from '@/features/ops-settings/presentation/screens/OpsSettingsScreen';
-import { OpsSettlementsScreen } from '@/features/ops-settlements/presentation/screens/OpsSettlementsScreen';
-import { OpsUsersScreen } from '@/features/ops-users/presentation/screens/OpsUsersScreen';
-import { PatientDetailScreen } from '@/features/patients/presentation/screens/PatientDetailScreen';
-import { PatientsScreen } from '@/features/patients/presentation/screens/PatientsScreen';
-import { PaymentsScreen } from '@/features/payments/presentation/screens/PaymentsScreen';
-import { ReportsScreen } from '@/features/reports/presentation/screens/ReportsScreen';
-import { HospitalProfileScreen } from '@/features/settings/presentation/screens/HospitalProfileScreen';
-import { HospitalSettingsScreen } from '@/features/settings/presentation/screens/HospitalSettingsScreen';
-import { ServicesPricingScreen } from '@/features/settings/presentation/screens/ServicesPricingScreen';
-import { SlotsScreen } from '@/features/slots/presentation/screens/SlotsScreen';
-import { SettlementsScreen } from '@/features/settlements/presentation/screens/SettlementsScreen';
-import { TokenCountersScreen } from '@/features/token-queue/presentation/screens/TokenCountersScreen';
-import { UsersRolesScreen } from '@/features/users-roles/presentation/screens/UsersRolesScreen';
+import { ResetPasswordScreen } from '@/features/auth/presentation/screens/ResetPasswordScreen';
 
 /** React Router catch-all segment. */
 const CATCH_ALL = '*';
@@ -74,6 +82,10 @@ export const router = createBrowserRouter([
   { path: ROOT_PATH, element: <RootRedirect /> },
   { path: AUTH_LOGIN_PATH, element: <LoginScreen /> },
   { path: AUTH_FORGOT_PATH, element: <ForgotPasswordScreen /> },
+  // Emailed links (public; ranked above `/:role` and `/ops/*` as static paths).
+  { path: AUTH_RESET_PATH, element: <ResetPasswordScreen surface="hospital" /> },
+  { path: OPS_RESET_PATH, element: <ResetPasswordScreen surface="platform" /> },
+  { path: AUTH_INVITE_PATH, element: <AcceptInvitationScreen /> },
   {
     path: '/:role',
     element: <HospitalGuard />,
@@ -87,6 +99,7 @@ export const router = createBrowserRouter([
       { path: HOSPITAL_VIEW_SEGMENT.token, element: <TokenCountersScreen /> },
       { path: HOSPITAL_VIEW_SEGMENT.payments, element: <PaymentsScreen /> },
       { path: HOSPITAL_VIEW_SEGMENT.help, element: <HelpSupportScreen /> },
+      { path: HOSPITAL_VIEW_SEGMENT.account, element: <MyAccountScreen surface="hospital" /> },
       {
         element: <RequireAdmin />,
         children: [
@@ -136,6 +149,7 @@ export const router = createBrowserRouter([
       },
       { path: OPS_VIEW_SEGMENT.notifications, element: <OpsNotificationsScreen /> },
       { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
+      { path: OPS_VIEW_SEGMENT.account, element: <MyAccountScreen surface="platform" /> },
       { path: CATCH_ALL, element: <NotFoundScreen /> },
     ],
   },

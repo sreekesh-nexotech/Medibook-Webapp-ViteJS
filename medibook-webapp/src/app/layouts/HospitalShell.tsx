@@ -1,23 +1,23 @@
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
+import { usePermission } from '@/shared/hooks/usePermission';
 
 import {
-  AUTH_LOGIN_PATH,
-  hospitalDashboardPath,
+  hospitalAccountPath,
   hospitalPath,
   hospitalViewFromPath,
   type HospitalRole,
   type HospitalView,
 } from '@/app/router/paths';
 
-import { useAuthStore } from '@/features/auth/application/store/auth.store';
-import { useSettingsStore } from '@/features/settings/application/store/settings.store';
+import type { HospitalSession } from '@/features/auth/domain/entities/auth.types';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import {
   documentTitleFor,
+  moduleForView,
   NAV_PARENT,
   subFor,
   titleFor,
@@ -27,27 +27,42 @@ import {
 import { HospitalSidebar } from './HospitalSidebar';
 import { HospitalTopbar } from './HospitalTopbar';
 import { ScreenError } from './ScreenError';
+import { ScreenLoading } from './ScreenLoading';
 import { SidebarDrawer } from './SidebarDrawer';
 import { useSidebarMode } from './useSidebarMode';
 import { createViewHistory } from './view-history';
 
 /**
  * Module-level visited-view stack (the prototype's `AppShell` histRef);
- * recorded synchronously during render, cleared on logout.
+ * recorded synchronously during render, cleared when the shell unmounts
+ * (logout or session expiry), so the next user never inherits it.
  */
 const history = createViewHistory<HospitalView>();
 
 interface HospitalShellProps {
   role: HospitalRole;
+  /** The validated session (`GET /hospital/me`) — identity and hospital. */
+  session: HospitalSession;
+  onLogout: () => void;
 }
 
 /** Hospital app frame: sidebar + topbar + per-view error boundary (design `AppShell`). */
-export function HospitalShell({ role }: HospitalShellProps) {
+export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const hospitalName = useSettingsStore((s) => s.settings.name);
-  const logout = useAuthStore((s) => s.logout);
-  const switchRole = useAuthStore((s) => s.switchRole);
+  const { canViewModule } = usePermission();
+  const hospitalName = session.hospital.name;
+  const { user } = session;
+  const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+
+  useEffect(() => () => history.clear(), []);
+
+  // A view is reachable when the user's permissions allow its module; views
+  // no module gates fall back to the design's role rule.
+  const canSee = (target: HospitalView) => {
+    const module = moduleForView(target);
+    return module === undefined ? viewAllowed(role, target) : canViewModule(module);
+  };
 
   const view = hospitalViewFromPath(location.pathname);
   const navActive = NAV_PARENT[view] ?? view;
@@ -67,7 +82,7 @@ export function HospitalShell({ role }: HospitalShellProps) {
       ? () => {
           history.pop();
           let prev = history.pop();
-          while (prev && !viewAllowed(role, prev.view)) prev = history.pop();
+          while (prev && !canSee(prev.view)) prev = history.pop();
           if (prev) navigate(prev.path);
         }
       : null;
@@ -77,20 +92,9 @@ export function HospitalShell({ role }: HospitalShellProps) {
     navigate(hospitalPath(role, target));
   };
 
-  const handleRoleChange = (next: HospitalRole | '__logout') => {
-    if (next === '__logout') {
-      logout();
-      history.clear();
-      navigate(AUTH_LOGIN_PATH);
-      return;
-    }
-    switchRole(next);
-    if (viewAllowed(next, view)) {
-      // Same view under the new role — swap the URL's role segment.
-      navigate(`/${next}${location.pathname.slice(role.length + 1)}`);
-    } else {
-      navigate(hospitalDashboardPath(next));
-    }
+  const handleAccount = () => {
+    setNavOpen(false);
+    navigate(hospitalAccountPath(role));
   };
 
   const sidebar = (mode: 'full' | 'rail') => (
@@ -109,10 +113,13 @@ export function HospitalShell({ role }: HospitalShellProps) {
       <div className="flex min-w-0 flex-1 flex-col">
         <HospitalTopbar
           title={titleFor(role, view)}
-          subtitle={subFor(role, view)}
+          subtitle={subFor(role, view, user.firstName)}
           onBack={onBack}
           role={role}
-          onRoleChange={handleRoleChange}
+          userName={userName}
+          roleName={session.role.name}
+          onAccount={handleAccount}
+          onLogout={onLogout}
           onNavigate={handleNavigate}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
@@ -123,7 +130,9 @@ export function HospitalShell({ role }: HospitalShellProps) {
               <ScreenError onRetry={reset} onHome={() => handleNavigate('dashboard')} />
             )}
           >
-            <Outlet />
+            <Suspense fallback={<ScreenLoading />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </div>
       </div>

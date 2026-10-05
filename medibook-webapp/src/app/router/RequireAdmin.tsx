@@ -1,15 +1,25 @@
+import { useLocation } from 'react-router-dom';
+
+import { moduleForView } from '@/app/layouts/hospital-nav';
+import { hospitalViewFromPath } from '@/app/router/paths';
 import { RequirePermission } from '@/app/router/RequirePermission';
 
 /**
- * Wrapper for admin-only hospital views (`settlements`, `doctors`, `users`,
- * `reports`, `settings`, plus the new `slots` / `profile` / `services` /
- * `messaging` / `audit` / `billing`).
+ * Wrapper for the hospital views that used to be admin-only (`settlements`,
+ * `doctors`, `users`, `reports`, `settings`, `slots`, `profile`, `services`,
+ * `messaging`, `audit`, `billing`).
  *
- * Kept under the original export name so the route tree and anything else
- * importing it are unaffected — it is now a thin call into the
- * permission-aware `RequirePermission`, which renders `ForbiddenScreen`
- * instead of silently bouncing a receptionist to their dashboard (audit 3.7).
+ * Kept under the original export name so the route tree is unaffected. The
+ * gate is now the signed-in user's real permission for the view's module
+ * (e.g. Settlements needs `Billing & Settlements.view`) — the same check the
+ * backend applies — so an accountant reaches Settlements and Reports, and a
+ * role without the permission gets `ForbiddenScreen` naming what is missing.
  */
 export function RequireAdmin() {
-  return <RequirePermission requireAdminRole roleLabel="Administrator" />;
+  const { pathname } = useLocation();
+  const module = moduleForView(hospitalViewFromPath(pathname));
+  if (module === undefined) {
+    return <RequirePermission requireAdminRole roleLabel="Administrator" />;
+  }
+  return <RequirePermission perm={`${module}.view`} />;
 }
