@@ -1,4 +1,5 @@
 # Medibook — Hospital Booking SaaS
+
 # Business Requirements Document derived from the built front ends
 
 **Version 1.0 · 10 September 2026 · Prepared for Nexotech Solutions (service provider) and Navora Cloud Soft Private Limited (client)**
@@ -6,16 +7,19 @@
 ## 0. Document control
 
 ### 0.1 Purpose
+
 1. This document describes, in business language, everything the three Medibook front-end prototypes do today: the Patient Mobile App (Flutter), the Hospital Web App "mbAdmin" (React) and the Operations Console for Medibook Super Admins (React, same code base).
 2. It is intended as the single source of truth for designing the backend: database schema, API and server architecture (Agreement Module 1 "Architectural Deliverables").
 3. It compares what was built against the contract documents and lists every contractual requirement that is missing or only partly represented in the user interfaces, every prototype feature that goes beyond the contract, every conflict between the documents and the screens, and the open questions the client must answer before the Final FRD (Schedule A) is signed.
 
 ### 0.2 Sources and method
+
 1. **Source of truth: the code.** Every statement about behaviour was read from the two repositories (`Medibook-Flutter-Mobile-App`, branch `claude/dazzling-hypatia-jg6r46`, commit 3658546; `Medibook-Webapp-ViteJS`, same branch, commit 4250500). All 121 Dart files and all 209 TypeScript files were read in full; every label, message, rule and constant quoted here was verified against the source. The repositories' own design documents were used only as a cross-check and are flagged where they disagree with the code.
 2. **Contract documents compared:** the Project Estimation (quote), the Preliminary FRD / Functional Scope (Schedule B; the two PDFs supplied are identical), and the Software Development Agreement draft V2.1 dated 23 July 2026.
 3. **What "as built" means here.** Both prototypes are presentation layers on sample data: there is no backend, no persistence beyond the browser, no authentication, payments or messaging. Where a screen merely simulates an outcome, it is marked **[Prototype-only]**; where behaviour looks unintended or unfinished, it is marked **[Observation]**.
 
 ### 0.3 How to read this document
+
 1. **Sections 1–2** give the executive summary, the product, its actors, its business model and the end-to-end journeys.
 2. **Sections 3–5** describe each application screen by screen: what the user sees, what they can do, the rules that apply, and what is not yet built. These sections are exhaustive by design.
 3. **Sections 6–8** consolidate the business rules, the status lifecycles and the data dictionary for the backend team.
@@ -24,19 +28,21 @@
 6. **Appendices** give the screen inventory, the sample data, the audit-event catalogue, every user-facing message, and the requirement traceability matrix.
 
 ### 0.4 Identifier conventions
+
 1. **BR-nnn** business rule · **ST-nn** status lifecycle · **E-nn** data entity · **GAP-nnn** contractual gap · **XTRA-nn** feature beyond the FRD · **CONF-nn** document/UI conflict · **DEF-nn** prototype defect · **DEMO-nn** prototype-only behaviour · **OQ-nn** open question.
 2. Contract requirement IDs: **CM-nn** customer mobile app, **HA-nn** hospital admin web, **SA-nn** super admin web, **X-nn** platform/cross-cutting (all from the Preliminary FRD); **Q-nn** quote; **AGR-nn** agreement.
 3. Quoted text in "double quotes" is verbatim user-interface copy.
 
-
 # 1. Executive Summary
 
 ## 1.1 What exists
+
 1. Three polished, pixel-faithful front-end prototypes exist and are fully interactive on sample data: a 16-screen patient mobile app, a 14-view hospital desk-and-management web app for one sample hospital, and a 16-view operations console for Medibook covering 13 sample hospitals.
 2. Together they demonstrate the intended product: patients book doctor consultations and receive queue tokens; hospital front desks run walk-ins, payments, receipts and a live token queue; hospital administrators manage doctors, departments, staff roles, reports, settings and settlements; Medibook onboards and verifies hospitals, manages subscription plans and billing, records settlement payouts, runs analytics and reports, keeps an audit trail, manages patient accounts and publishes banners and push campaigns.
 3. **Nothing behind the screens exists.** There is no server, database, API, login, payment, messaging, file storage or scheduler. Every figure and record is sample data that resets on restart; several dashboards and reports show fixed numbers; dozens of buttons only display a message. Module 1 of the Agreement (architecture) must design the entire backend from this document.
 
 ## 1.2 Headline findings for the backend design
+
 1. **Master data is not connected.** The hospital app books against a fixed list of six departments and seven doctors that ignores its own Doctors & Departments catalogue; the mobile app uses a different set of four departments and six doctors; tokens follow two different schemes ("T-001" vs "A-25"); appointment statuses differ; patients are identified by name in the app and by MR number in the hospital. One canonical model is required (Section 8, Section 10.4).
 2. **Policies are captured but not enforced.** Hospital Settings holds the FRD's per-tenant rules (slot duration, buffer, capacity, cancellation cut-off, hold timeout, grace period, auto no-show, token generation, fees) and notification preferences, and the Users & Roles screen holds granular permissions — none of them drives any behaviour today. The backend must make them effective (Section 6).
 3. **Time is faked everywhere.** The console runs on a fixed date (13 June 2026), the hospital app stores relative labels such as "Today", and the mobile app stores the literal word "Today". Real timestamps, a server clock and scheduled jobs (reminders, overdue statements, no-show automation, statement generation, scheduled pushes) are required (Section 9).
@@ -44,35 +50,38 @@
 5. **Audit exists in outline.** The console logs 23 kinds of action with a fixed actor, IP and "Just now"; the hospital app logs nothing; booking transitions and message attempts are not logged (Section 5.9, Appendix C).
 
 ## 1.3 Contract position in numbers
-| Area | Count |
-|---|---|
-| Contract requirements checked | 91 (54 mobile, 13 hospital, 6 super admin, 12 platform, 4 quote, 9 agreement clauses) |
-| Requirements absent from all user interfaces | 34 |
-| Requirements only partly represented | 34 |
-| Requirements present in the UI (on sample data) | 8 |
-| Backend-only / not UI-testable / excluded | 15 |
-| Prototype features beyond the Preliminary FRD (Change-Request candidates) | 15 groups |
-| Conflicts between documents and screens | 12 |
-| Prototype defects that must not ship | 14 |
-| Open questions for the client | 32 |
+
+| Area                                                                      | Count                                                                                 |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Contract requirements checked                                             | 91 (54 mobile, 13 hospital, 6 super admin, 12 platform, 4 quote, 9 agreement clauses) |
+| Requirements absent from all user interfaces                              | 34                                                                                    |
+| Requirements only partly represented                                      | 34                                                                                    |
+| Requirements present in the UI (on sample data)                           | 8                                                                                     |
+| Backend-only / not UI-testable / excluded                                 | 15                                                                                    |
+| Prototype features beyond the Preliminary FRD (Change-Request candidates) | 15 groups                                                                             |
+| Conflicts between documents and screens                                   | 12                                                                                    |
+| Prototype defects that must not ship                                      | 14                                                                                    |
+| Open questions for the client                                             | 32                                                                                    |
 
 ## 1.4 The five decisions that shape everything else
+
 1. **Settlements in the application or outside it** (CONF-01). The prototypes build a two-sided settlement ledger the FRD says is out of scope.
 2. **Patient identity and discovery** (CONF-02, CONF-04): mobile-number login with OTP and location-first hospital selection per the FRD, or the prototype's email login and department-first flow.
 3. **Token and slot model** (CONF-05, OQ-07 to OQ-10): per-doctor-per-day sequential tokens on payment success with slot holds, or the prototype's hospital-wide counter issued at booking.
 4. **Payment moment and fee composition** (CONF-06, OQ-12): in-app prepayment with taxes, convenience fee and coupons, versus the mobile prototype's "payment is collected at the hospital desk".
 5. **Scope of the beyond-FRD features** (Section 10.2): custom roles, multi-consultation bookings, queue controls, ratings, help centre, KYC workflow, patient-account management, banners and push campaigns, analytics and console reports — each needs an in/out decision under Agreement Clause 2.4.
 
-
 # 2. Product Overview
 
 ## 2.1 The three applications
+
 1. **Patient Mobile App ("Medibook")** — an Android/iOS app (Flutter) for patients: sign in, find a department or doctor, book an appointment for themselves or a family member, see their queue token, reschedule or cancel, view lab records, and manage their profile. Built as 16 screens on sample data.
 2. **Hospital Web App ("mbAdmin")** — a browser application (React) used inside one hospital by the front desk (Receptionist) and management (Administrator): appointments and walk-ins, the live token queue, desk payments and receipts, patients, doctors and departments, staff logins and roles, reports, settlements from Medibook, and hospital settings. Built as 14 views on sample data for one sample hospital (Apollo Hospital, Bengaluru).
 3. **Operations Console (Medibook Super Admin)** — the same browser application under `/ops`, used by Medibook's own staff: onboard and verify hospitals, manage subscription plans and billing, record settlement payouts, watch usage analytics, generate reports, read the compliance log, manage internal staff, look up patient accounts, publish banners and push notifications, and set platform-wide settings. Built as 16 views on sample data for 13 sample hospitals.
 4. **What does not exist yet:** any backend. There is no server, database, API, authentication, payment gateway, messaging provider, file storage or scheduler. Every screen runs on in-memory sample data that resets when the app restarts or the browser reloads (the only exception is the hospital settings form, which the browser remembers locally). The FRD/Agreement scope for the backend (Django + PostgreSQL) is therefore entirely open and must be designed from this document.
 
 ## 2.2 Actors and roles
+
 1. **Patient (account holder)** — registers and signs in on the mobile app; books for "Self" or for saved family members (sample: a husband and a daughter). The mobile app has no other role.
 2. **Dependent / family member** — a person on the patient's account who can be selected as the patient of a booking; in the prototype they are fixed sample entries with name, age, gender and relationship.
 3. **Hospital Receptionist** — front-desk role in mbAdmin: dashboard, appointments (create walk-ins, register online arrivals, check-in, payments, receipts, cancel, reschedule, no-show), patients, token queue, payments, help.
@@ -83,6 +92,7 @@
 8. **Implied system actors** (needed by the contract but absent from the code): payment gateway (Razorpay), WhatsApp/SMS/push providers, a scheduler for reminders, overdue detection, no-show automation and settlement generation, and file storage for documents and images.
 
 ## 2.3 Business model as expressed by the screens
+
 1. **Subscriptions.** Each hospital is on a monthly plan (sample tiers: Starter ₹9,999 / 1,500 online bookings per month / up to 25 staff accounts / email support; Growth ₹24,999 / 5,000 / 120 staff / priority support; Enterprise ₹49,999 / 8,000 / unlimited staff / dedicated success manager; plus hospital-specific negotiated plans). Prices are treated as GST-inclusive at 18% (9% CGST + 9% SGST). Invoices are issued on the 1st, due after 14 days. Only appointments booked through the patient app consume the monthly quota; walk-ins do not.
 2. **Commission on online bookings.** For appointments booked and prepaid in the patient app, Medibook collects the consultation fee, keeps a platform commission (10% by default; editable in Platform Settings) and pays the rest to the hospital.
 3. **Settlements.** Net amounts are grouped into weekly statements (sample cadence: Wednesday to Tuesday, expected four days after the period ends). Fees become payable only after the appointment is completed. Medibook records each bank transfer (UTR, amount, remark) in the console; the hospital confirms receipt in mbAdmin. Statements can be Pending, Overdue, Released, Received or Payout failed.
@@ -91,53 +101,63 @@
 6. **Tokens.** Every consultation gets a queue token used to call the patient. The hospital app issues hospital-wide tokens T-001, T-002…; the mobile app shows tokens A-25, A-26…; the two schemes are unreconciled prototypes of the same concept.
 
 ## 2.4 End-to-end journeys (how the three applications are meant to work together)
+
 Each journey describes the intended flow and, in italics, where the prototype is disconnected. Because the two front ends share no data, none of these journeys currently crosses from the mobile app to the hospital app.
 
 ### 2.4.1 Online booking through the patient app
+
 1. The patient chooses a department, opens a doctor, picks the patient (self or dependent), a date within the next five days and one of six time slots, reviews the summary (patient, department, date, time, token preview, consultation fee) and confirms.
 2. The app creates the appointment immediately with a token; the Home screen shows "Your Token".
 3. At the hospital, the front desk sees the appointment as an **Online** booking (prepaid) and on arrival presses **Check In**; the patient enters the doctor's queue, is called, and the visit is marked Done.
-4. *Prototype gaps:* no payment is taken despite "Confirm and Pay"; no hospital or location is chosen; the booking never reaches the hospital app; online bookings for today are placed in the doctor's queue at booking time even before check-in.
+4. _Prototype gaps:_ no payment is taken despite "Confirm and Pay"; no hospital or location is chosen; the booking never reaches the hospital app; online bookings for today are placed in the doctor's queue at booking time even before check-in.
 
 ### 2.4.2 Walk-in at the front desk
+
 1. The receptionist opens New Appointment, finds or adds the patient (an MR number is generated), picks Walk-in, date, time and one or more consultations (department + doctor), and saves.
 2. The combined Record Payment dialog captures Cash/UPI/Card; on confirmation each consultation becomes Paid and In Queue with consecutive tokens, and a receipt with token slips can be printed.
 3. The Token Management screen shows the doctor's queue; Call Next, Skip and Done drive the visit.
 
 ### 2.4.3 Cancellation, no-show and reschedule
+
 1. Patient side: an upcoming appointment can be cancelled (moves to Past as Cancelled) or rescheduled to another date/slot; the token is kept.
 2. Desk side: a Scheduled appointment can be cancelled with a reason (and a desk refund for paid walk-ins), marked No-show, edited (department/doctor/date/time/note, with fee re-pricing) or rescheduled (same doctor only). No-shows and cancellations can be reverted.
-3. *Prototype gaps:* no cancellation cut-off, refund slab, reschedule window, notification or audit trail is enforced anywhere.
+3. _Prototype gaps:_ no cancellation cut-off, refund slab, reschedule window, notification or audit trail is enforced anywhere.
 
 ### 2.4.4 Settlement cycle
+
 1. Online fees for completed appointments accumulate into a weekly statement (gross, 10% commission, net, expected date).
 2. The hospital may **Request** release of a pending statement or **Raise a request** on an overdue one; both appear in the console bell.
 3. Medibook records the transfer (single release or a payout run) with UTR and remark; the hospital sees Released and confirms **Mark Received**.
-4. *Prototype gaps:* statements are never generated, overdue is never detected, payout failures are sample-only, partial releases keep no balance, and the FRD says settlements happen outside the application.
+4. _Prototype gaps:_ statements are never generated, overdue is never detected, payout failures are sample-only, partial releases keep no balance, and the FRD says settlements happen outside the application.
 
 ### 2.4.5 Hospital onboarding, verification and access
+
 1. Medibook onboards a hospital (name, admin email, city, plan) → Pending verification with four KYC documents (registration certificate, GST certificate, medical licence, bank account proof).
 2. Once all documents are received, Medibook approves ("goes live") or rejects with a reason; active hospitals can be suspended and reactivated. A suspended hospital cannot log in to mbAdmin.
 3. The hospital administrator completes Hospital Settings (profile, location, bank details, rules, hours, notifications), builds the doctor and department catalogue and adds staff users.
-4. *Prototype gaps:* no admin account or invitation is created, KYC documents cannot be uploaded or verified individually, settings and catalogue do not drive booking.
+4. _Prototype gaps:_ no admin account or invitation is created, KYC documents cannot be uploaded or verified individually, settings and catalogue do not drive booking.
 
 ### 2.4.6 Subscription billing and plan change
+
 1. Medibook issues monthly invoices; payments (UPI/Card/NetBanking) settle them; overdue and failed payments are visible.
 2. A hospital requests a plan change from mbAdmin; Medibook approves or declines; the plan on the hospital record changes.
-3. *Prototype gaps:* invoices and payments are read-only sample data with no generation, reminders, grace period or auto-suspension.
+3. _Prototype gaps:_ invoices and payments are read-only sample data with no generation, reminders, grace period or auto-suspension.
 
 ### 2.4.7 Support and communications
+
 1. A hospital raises a support ticket from Help & Support; it appears in the console bell (and can never be closed).
 2. Medibook publishes home-screen banners (scheduled, prioritised, with a default fallback) and push campaigns (audience, send now or 09:00 on a date).
-3. *Prototype gaps:* the mobile app does not read banners or receive pushes; no WhatsApp, SMS, reminder or booking-event messaging exists in any application.
+3. _Prototype gaps:_ the mobile app does not read banners or receive pushes; no WhatsApp, SMS, reminder or booking-event messaging exists in any application.
 
 ## 2.5 How the requirement documents evolved
+
 1. **Project Estimation (quote).** A single-hospital "Patient Booking App for Hospital" for ₹1,00,000 + GST in 60 days: Super Admin, Admins, Staff and Patients; doctor listing, booking, token generation, payment, SMS/app alerts, visit history; doctor and slot management, walk-ins, patient history with filters, payment reports, role-based access; five modules.
 2. **Preliminary FRD (Schedule B of the Agreement).** A multi-tenant SaaS with three applications (Super Admin web, Hospital Admin web, Customer mobile), Razorpay payments, WhatsApp Cloud API notifications, location-first discovery, dependents, a medical documents library, an insurance locker, an optional ambulance button, tenant-configurable policies, slot holds with anti-double-booking, plans and billing with auto-suspension, audit logs, and explicit MVP exclusions (tele-consultation, EMR/EHR, insurance claims, offline mode). Settlements to hospitals are stated to happen outside the application.
 3. **Software Development Agreement V2.1 (draft, 23 July 2026).** Nexotech Solutions ↔ Navora Cloud Soft Pvt Ltd; ₹6,00,000 + GST; up to six modules over 180 days (+30 contingency) after sign-off of a Final FRD; backend in Python Django with PostgreSQL; Module 1 = architecture (database schema, ER diagrams, API design overview, server architecture); explicit exclusions (tele-consultation, EMR/EHR, insurance claims, offline mode, end-to-end encryption, client-specific WhatsApp Cloud API, data migration, security audits, AMC); and Clause 2.4, under which any design element outside the Final/Preliminary FRD is out of scope unless a Change Request is agreed.
 4. **The prototypes** were built from a separate UI/UX design engagement and go beyond the Preliminary FRD in several areas (Section 10.2) while omitting others (Section 10.1). This document is the bridge between the two.
 
 ## 2.6 Glossary
+
 1. **Appointment / consultation** — one patient with one doctor at one date and time; in mbAdmin one appointment row per consultation.
 2. **Booking source** — Online (booked and prepaid in the patient app) or Walk-in (booked at the desk).
 3. **Token** — the queue number shown to the patient and called by the doctor; "T-001" in mbAdmin, "A-25" in the mobile app.
@@ -152,7 +172,6 @@ Each journey describes the intended flow and, in italics, where the prototype is
 12. **Banner** — a promotional card on the patient app's home screen; **push** — a mobile notification campaign.
 13. **Demo mode / prototype-only** — behaviour that exists only to make the prototype usable and must not ship (pre-filled logins, fixed OTP, fixed "today", simulated delays, fixed KPI numbers).
 
-
 # 3. Patient Mobile App — Functional Specification (as built)
 
 This section describes the Medibook patient app exactly as the Flutter code behaves today. Every label, message and rule below was read from the source code, not from design notes. Where the prototype only pretends to do something (for example shows a message instead of downloading a file), it is marked **[Prototype-only]**. Where a behaviour looks like a defect or an unfinished decision, it is marked **[Observation]** and repeated in Section 11 (Open questions).
@@ -160,18 +179,21 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 ## 3.1 How the app is organised
 
 ### 3.1.1 Users and access
+
 1. The app has exactly one kind of user: the **patient** (the account holder). There are no staff or admin functions in the mobile app.
 2. The app opens on the **Login** screen.
 3. **[Prototype-only]** There is no real sign-in. Any well-formed email plus any non-empty password opens the app, and every screen can also be reached directly without logging in. The backend must introduce real authentication and route protection.
 4. The signed-in identity is always the sample user **Alexandra Johnson** (email `alexandra.johnson@example.com`), regardless of what was typed at login or sign-up.
 
 ### 3.1.2 Navigation model
+
 1. Four main tabs are always available at the bottom of the screen, in this order: **Home**, **Appointments**, **Records**, **Profile**. Tapping the tab you are already on returns that tab to its first screen.
 2. Every other screen opens full-screen on top of the tabs (no bottom bar): Search, Notifications, Book Appointment, Doctor Details, Booking Success, Appointment Details, Reschedule, and the five authentication screens (Login, Create Account, Reset Password, Verify Code, New Password).
 3. Screens can be opened by direct link with parameters (for example the booking step, the department, the doctor, or an appointment ID). The app does not validate these parameters strictly (see §3.6.6).
 4. Screen transitions use a short fade/rise animation (about 0.2 seconds); buttons and cards shrink slightly when pressed.
 
 ### 3.1.3 Behaviours shared by all screens
+
 1. **Toast messages.** Short confirmations appear as a dark pill near the bottom of the screen for 2.3 seconds. Only one toast is visible at a time; a new one replaces the previous one. Toasts cannot be tapped or dismissed.
 2. **Confirmation sheets.** Destructive actions (Logout, Delete account, Cancel appointment) open a bottom sheet with a title, a message, a **Cancel** button and a confirming button. Tapping the dimmed background dismisses the sheet without doing anything.
 3. **Avatars.** Where no photo exists, the app shows the initials of the first two words of the name (for example "AJ" for Alexandra Johnson). **[Observation]** Because doctor names start with "Dr.", every doctor without a photo shows "DR" rather than their initials; only Dr. Anya Sharma has a photo.
@@ -182,6 +204,7 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 ## 3.2 Authentication screens
 
 ### 3.2.1 Login
+
 1. **Purpose.** Entry point of the app.
 2. **What you see.** The Medibook logo mark and name; heading "Hi, Welcome Back!"; sub-text "Hope you're doing fine."; an **Email** field (placeholder "Your Email"); a **Password** field (placeholder "Password", masked); a **Remember me** checkbox (ticked by default); a **Forgot password?** link; a **Log In** button; an "OR" divider; three round social buttons labelled **G**, **f** and **X**; and the footer "Don't have an account yet? Sign up".
 3. **What you can do.**
@@ -194,17 +217,20 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 5. **[Prototype-only]** In demo mode the fields are pre-filled with `alexandra.johnson@example.com` / `medibook123` and a line reads "Demo login is prefilled — just tap Log In." There is no show/hide-password toggle and no loading state on the button.
 
 ### 3.2.2 Create Account (Sign Up)
+
 1. **What you see.** Back arrow; title "Create Account"; sub-text "Book doctors, lab tests and records in one place."; fields **Full Name** ("Your Name"), **Email** ("Your Email"), **Phone Number** ("+91 00000 00000"), **Password** ("Create a password", masked); a checkbox "I agree to the Terms & Conditions, Privacy Policy, and User Guidelines." (unticked by default, plain text with no tappable links); a **Sign Up** button; footer "Already have an account? Log In".
 2. **What you can do.** **Sign Up** validates all fields at once and, if valid, shows the toast "Welcome to Medibook, <first name>!" and opens Home. Back and **Log In** return to Login.
 3. **Validation rules.** Full Name required ("Enter your name"); Email format ("Enter a valid email address"); Password at least 6 characters ("At least 6 characters"); the agreement checkbox must be ticked (the checkbox and its label turn red, without a message). **[Observation]** The phone number is not validated and is discarded.
 4. **[Prototype-only]** No account is created; the app continues to identify the user as Alexandra Johnson. No email or phone verification happens after sign-up.
 
 ### 3.2.3 Reset Password (Forgot Password)
+
 1. **What you see.** Back arrow; title "Reset Password"; text "Enter your Email, we will send you a verification code."; an **Email** field; a **Send Code** button.
 2. **What you can do.** **Send Code** validates the email format, shows the toast "Code sent to <email>" and opens Verify Code with that email. Back returns to Login.
 3. **[Prototype-only]** No code is sent and the app does not check that the email belongs to an account. In demo mode the email is pre-filled.
 
 ### 3.2.4 Verify Code
+
 1. **What you see.** Back arrow; title "Verify Code"; text "We sent a 4-digit code to <email>."; four single-digit boxes; a **Verify** button; footer "Didn't get the code? Resend Code". In demo mode an extra line reads "Demo code: 1234".
 2. **Rules of the code boxes.** Digits only; one digit per box; typing a digit moves the cursor to the next box automatically; there is no automatic submit after the fourth digit, no countdown timer, no expiry and no attempt limit.
 3. **What you can do.**
@@ -214,12 +240,14 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 4. **[Prototype-only]** The accepted code is a fixed constant and the error message discloses it. Production needs real OTP delivery, expiry, rate limiting and attempt lockout.
 
 ### 3.2.5 New Password
+
 1. **What you see.** Back arrow; title "New Password"; text "Create a new password for your account."; fields **New Password** ("At least 6 characters") and **Confirm Password** ("Repeat the password"), both masked; a **Reset Password** button.
 2. **What you can do.** **Reset Password** validates and, if valid, shows the toast "Password reset — please log in" and returns to Login. Back returns to Verify Code (without the email, so it then shows the demo email or nothing).
 3. **Validation rules.** New Password at least 6 characters ("At least 6 characters"); Confirm Password must match exactly ("Passwords do not match"). The two checks are independent.
 4. **[Prototype-only]** The new password is not stored anywhere and has no effect on the next login.
 
 ### 3.2.6 Summary of what authentication does not yet do
+
 1. Create or verify accounts, sessions or tokens; log out server-side; remember the user between launches.
 2. Mobile-number login or mobile OTP (the prototype is email-based, whereas the contract specifies mobile number plus password with OTP to the mobile — see GAP list).
 3. Lockout or throttling after repeated failures.
@@ -277,17 +305,20 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 ## 3.6 Book Appointment (four-step flow)
 
 ### 3.6.1 Entry points and the draft
+
 1. The flow can be entered at different steps with information pre-filled: from Home tiles (step 1 or step 2 with a department), from Search (step 2 with a department), from the Appointments tab's **Book an appointment** button (step 1), from Doctor Details' **Book an appointment** (step 3 with the doctor and department filled), from a past appointment's **Book Again** (step 3 with the same doctor), and from the vaccination notification (step 1).
 2. Every time the flow is entered, the draft resets to: patient = the account holder (Self), date = Today, time = 10:00 AM. Department and doctor come from the entry point if provided.
 3. The screen shows a back arrow, the title "Book Appointment", a four-circle step indicator (completed and current steps in navy), the step content, and a sticky footer button: **Continue** on steps 1–3 (greyed out until the step's requirement is met) and **Confirm and Pay** on step 4.
 4. **Back behaviour.** On steps 2–4 the back arrow (and the phone's back button) goes to the previous step, keeping the selections. On step 1 it leaves the flow and returns to the tab the flow was started from (Home or Appointments) — never to Search or Notifications, even if the flow was started there.
 
 ### 3.6.2 Step 1 — "Please select the department"
+
 1. A two-column grid of department cards: **General** ("Primary healthcare"), **Cardiology** ("Heart specialists"), **Orthopedics** ("Bone & joint care"), **Dermatology** ("Skin specialists"), each with an icon. The selected card gets a navy border.
 2. Tapping a card selects it (single choice; cannot be unselected) and clears any previously chosen doctor.
 3. **Continue** is enabled only when a department is selected.
 
 ### 3.6.3 Step 2 — "Select a doctor"
+
 1. A row of pill tabs, one per department (all four, horizontally scrollable), with the chosen department active. Tapping another tab switches department and clears the chosen doctor.
 2. The list of doctors in that department. Each card shows the avatar, name, "specialty · experience" (for example "Cardiologist · 12 yrs"), a five-star rating with the numeric value (for example 4.8), the fee (for example ₹900) and the caption "per visit". Sample distribution: General — Dr. Anil Kumar, Dr. Meera Nair; Cardiology — Dr. Anya Sharma, Dr. Rohan Kapoor; Orthopedics — Dr. Priya Mehta; Dermatology — Dr. Sara Ali.
 3. A hint under the list: "Tap a doctor to view details and book".
@@ -296,18 +327,21 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 6. If the flow is opened at step 2 without a department, all six doctors are listed with no active tab. If an unknown department is passed, the list is empty with no message.
 
 ### 3.6.4 Step 3 — patient, date and time
+
 1. **"Select patient".** A list of the account's people, each with avatar, name, "age years · gender" and a relation tag: **Alexandra Johnson** (29 years · Female, **Self**), **Michael Johnson** (34 years · Male, **Husband**), **Ava Johnson** (6 years · Female, **Daughter**). Single choice; Self is pre-selected. There is no way to add, edit or remove a family member.
 2. **"Select date".** A horizontal row of exactly five day chips: today (labelled "Today") and the next four days (labelled by weekday, for example "Fri 11"). Rules: no date is ever disabled (weekends included); there is no calendar, no dates beyond five days, no cut-off for slots already in the past today, and no doctor-availability logic. Today is pre-selected.
 3. **"Select time".** A grid of six fixed time chips for every doctor and date: **09:00 AM, 10:00 AM, 11:30 AM, 12:15 PM, 02:00 PM, 04:30 PM**. 10:00 AM is pre-selected. Rules: every slot is always selectable; there is no booked/unavailable state, no capacity, no duplicate check.
 4. **Continue** is always enabled on this step (something is always selected).
 
 ### 3.6.5 Step 4 — "Confirm appointment"
+
 1. A summary card with the doctor's avatar, name and title (for example "Head of Cardiology"), then these rows: **Patient**; **Department**; **Date** ("Today" or "11 Sep 2026"); **Time**; **Token** (highlighted in blue — a preview of the token that will be issued, for example "A-26"); **Consultation Fee** (the doctor's fee, for example ₹900).
 2. Footer note: "Payment is collected at the hospital desk." and "You can reschedule up to 2 hours before your slot."
 3. **Confirm and Pay** immediately creates the appointment and opens Booking Success. There is no confirmation dialog and nothing can fail.
 4. **What is not here.** No taxes/GST, convenience fee, discount or coupon, total amount, payment-method choice, online payment step or terms acceptance. **[Observation]** Despite the button label, no payment is taken; the note says payment happens at the desk. The "2 hours" reschedule rule is copy only and is not enforced anywhere (see §3.11).
 
 ### 3.6.6 Booking rules (as implemented)
+
 1. A confirmed booking creates an appointment with status **Confirmed** in the **Upcoming** list, placed at the top of the list.
 2. **Token numbering.** One app-wide counter starts at 26 and increases by one per booking; the token is "A-" followed by the number (A-26, A-27, …). Tokens are never re-used and cancellation does not free a token. Sample tokens are zero-padded ("A-08") whereas generated ones are not ("A-26"). The counter is not per doctor, per day or per hospital, and it resets to 26 when the app restarts. **[Observation]** The FRD requires sequential tokens per doctor per date issued after payment — the prototype cannot express this; the server must own token issuance.
 3. The appointment's internal ID is "b" plus the same number (b26).
@@ -399,7 +433,6 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 5. **Signing and build.** The release build is signed with the debug key; version 1.0.0 (build 1); minimum iOS 13.0; requires Flutter 3.38 or newer (the repository's stack document says 3.24.5).
 6. **Tests.** 30 automated widget/golden tests and one screenshot-capture rig exist, all UI-level; no tests exist for validation rules or booking logic; there is no CI pipeline or pre-commit hook.
 
-
 # 4. Hospital Web App (mbAdmin) — Functional Specification (as built)
 
 The hospital web application ("mbAdmin") is the desk-and-management tool for one hospital. Everything below was read from the React source code. The prototype is configured for a single sample hospital, **Apollo Hospital** (tenant number 13 in the Operations console), whose name, GSTIN and bank details it also shares with the Operations console.
@@ -407,6 +440,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.1 Access, roles and navigation
 
 ### 4.1.1 Roles
+
 1. Two roles exist inside a hospital: **Receptionist** (front desk) and **Administrator** (full access). They are fixed roles built into the application, not the custom roles created on the Users & Roles screen (those custom roles are stored but do not control anything — see §4.10).
 2. The address of every page carries the role: `/receptionist/…` or `/admin/…`. A user whose role does not match the address is redirected to their own dashboard without any "access denied" message.
 3. The Receptionist can open: Dashboard (Front Desk), Appointments, New Appointment, Patients, Patient Profile, Token Management, Payments, Help & Support.
@@ -414,12 +448,14 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **[Prototype-only]** Logging in on the "Hospital Login" tab always lands on the Administrator role; the Receptionist role can only be reached through the "Switch Role" menu in the top bar, which changes role without re-authentication. The sample identities are "Dr. S. Nair" (Administrator) and "Riya Menon" (Receptionist).
 
 ### 4.1.2 Screen frame
+
 1. **Left sidebar** (fixed width): the hospital logo and name (the name comes from Hospital Settings and updates live), the caption "Medibook · mbAdmin", and menu sections: **Overview** (Dashboard) · **Front Desk** (Appointments, Patients, Token Management) · **Billing** (Payments; Billing & Settlements for admins) · **Management** (Doctors & Departments, Users & Roles, Reports — admins only; the whole section is hidden for receptionists) · **System** (Hospital Settings for admins; Help & Support).
 2. **Top bar:** an in-app back arrow (shown when there is a previous screen in the session's own history of up to 24 screens), the page title and subtitle, a notification bell with an unread count, and the user menu (avatar initials, name, role) containing **Switch Role** (Receptionist / Administrator) and **Log Out**.
 3. The layout is a fixed desktop layout (no tablet or phone breakpoints exist). The browser tab title is always "Medibook · mbAdmin — Hospital Admin Panel", even in the Operations console.
 4. If a screen crashes, a card reads "This screen hit a snag" / "Something didn't load right. You can retry, or head back to the dashboard — your data is safe." with **Retry** and **Back to Dashboard**.
 
 ### 4.1.3 Notification bell (hospital)
+
 1. The bell's content is computed on the fly from data; nothing is stored as a notification and nothing can be marked read (**Mark all read** only shows "All caught up" and changes nothing **[Prototype-only]**).
 2. **Administrator sees:** "n settlement(s) overdue — ₹x due from Medibook" (when any settlement is overdue; unread) · "Settlement released — MB-ST-2404 — ₹ 97,380 sent · mark received once credited" (fixed sample text; unread) · "Plan quota at 62% — 3,120 of 5,000 bookings this month" (fixed sample text) · "n walk-in payment(s) pending — Awaiting collection at the desk" (when any payment is pending).
 3. **Receptionist sees:** "n walk-in payment(s) pending — Collect at the desk to issue tokens" (unread, when any) · "Token queue active — Patients waiting across departments" (fixed text).
@@ -427,12 +463,14 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **Gap:** the FRD expects staff-facing alerts for message delivery and payment-callback failures and a real notification centre; none exists.
 
 ### 4.1.4 Session behaviour
+
 1. **[Prototype-only]** Nothing about the session is remembered: reloading the browser logs the user out and restores all sample data. Bookmarked pages therefore always open the login page, and after login the user lands on the dashboard, not on the bookmarked page.
 2. The only data saved in the browser is Hospital Settings (see §4.12).
 
 ## 4.2 Login and password recovery
 
 ### 4.2.1 Login
+
 1. **Layout.** Left brand panel with the hospital logo, "Medibook", the headline "Hospital operations, in one calm place.", a paragraph describing the panel, and three fixed statistics (288 appointments/day, 12 departments, 99.9% uptime). Right column: a toggle **Hospital Login | Operations Login**; heading "Welcome Back"; sub-text "Sign in to your hospital's mbAdmin panel." or "Sign in to the Medibook operations console."; **Email Address**; **Password** with a show/hide eye; **Remember me** (hospital tab; ticked by default) or the note "Sessions aren't remembered — sign in each time." (operations tab); a **Forgot Password?** link; a **Login** button; footer "Trouble signing in? Contact your hospital administrator." or "Restricted to Medibook operations staff."
 2. **Validation and messages:** empty email or password → "Enter your email and password to continue."; malformed email → "Enter a valid email address."
 3. **Suspension rule:** if the Operations console has suspended this hospital (within the same browser session), hospital login is refused with "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate."
@@ -441,6 +479,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 6. **Gap:** the FRD requires login with mobile number or email plus password, OTP verification and password reset via OTP for hospital admins (see Section 10).
 
 ### 4.2.2 Forgot Password
+
 1. Heading "Forgot Password?"; text "Enter the email linked to your staff account and we'll send a reset link."; **Email Address**; **Send Mail**; link "Back to login".
 2. After **Send Mail** (no validation, nothing sent **[Prototype-only]**): "Check your inbox" / "We've sent a password reset link to <email>. The link expires in 30 minutes." and **Back to Login**.
 3. No OTP entry, reset link handling or new-password screen exists on the web side.
@@ -448,6 +487,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.3 Dashboards
 
 ### 4.3.1 Front Desk dashboard (Receptionist)
+
 1. **Title/subtitle:** "Front Desk" / "Welcome back, Riya" (the greeting is fixed text).
 2. **KPI tiles** (clickable): **Appointments Today** ("Across all departments") → Appointments · **In Queue** ("Currently waiting / serving") → Token Management · **Pending Payment** ("Walk-ins to collect") → Appointments · **Walk-ins Today** ("Booked at the desk") → Appointments. Definitions: appointments dated today; appointments with status In Queue (any date); payments pending (any date); today's walk-ins.
 3. **Quick Actions:** New Appointment · Department Queue · Find Patient.
@@ -457,6 +497,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 7. No date, refresh, loading or empty states.
 
 ### 4.3.2 Hospital Dashboard (Administrator)
+
 1. **Title/subtitle:** "Hospital Dashboard" / "Hospital-wide overview". A period selector **Today · Yesterday · This Week · This Month** (default Today) sits in the "Hospital Overview" header.
 2. **KPI tiles** (not clickable): **Appointments Today / Appointments** · **Active Doctors** ("of 7 on roster": doctors not on break) · **Total Patients** (fixed "12,480" **[Prototype-only]**) · **Revenue Today / Revenue** ("Desk + online prepaid").
 3. **Appointments by Department — <period>**: a bar chart per department. **[Prototype-only]** The bars are fixed sample numbers scaled by the period, not computed from appointments.
@@ -469,11 +510,13 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.4 Appointments (front desk)
 
 ### 4.4.1 Purpose and access
+
 1. The Appointments screen is the front desk's working list of every consultation booked at this hospital, whether booked online through the patient app or walked in. Both hospital roles (Receptionist and Administrator) can use it.
 2. It is reached from the sidebar item **Appointments**, from the receptionist dashboard tiles ("Appointments Today", "Pending Payment", "Walk-ins Today", "View All"), from the admin dashboard alert about pending walk-in payments, and from the notification bell.
 3. **Key modelling fact.** One appointment row equals one patient–doctor consultation. Payment facts (paid/pending/refunded, mode, reference) and queue facts (token, called-at time, queue order) are attributes of the appointment; there is no separate payment, receipt or queue-event record in the prototype.
 
 ### 4.4.2 What you see
+
 1. **Tabs with live counts:** All · Online (n) · Walk-in (n) · Pending Payment (n) · In Queue (n). Counts are hospital-wide totals over all dates and ignore the filters below. A **New Appointment** button sits on the right.
 2. **Search box:** "Search by patient name, MR number or token".
 3. **Filters:** Date (Today · Tomorrow · This Week; default Today) · an exact date picker ("Pick a specific date") · Department (All Departments + the six departments) · Doctor (All Doctors + the seven doctors; not narrowed by department) · Status (All Status · Scheduled · In Queue · Completed · Cancelled · No-show) · a **Clear all** link when anything is non-default · a refresh icon that does nothing **[Prototype-only]**.
@@ -482,6 +525,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 6. **Empty state:** "No appointments match your filters." **Paging:** 8 rows per page with "Showing m–n of T appointments".
 
 ### 4.4.3 Search, filter and sort rules
+
 1. Search matches patient name, MR number and token as a case-insensitive "contains"; it does not search phone or doctor.
 2. Date filter: "Today" and "Tomorrow" match the appointment's date label exactly; **"This Week" applies no date filter at all** (it shows every date). The exact date picker, when set, overrides the dropdown.
 3. Department, Doctor and Status are exact-match filters. Changing a tab or filter returns to page 1.
@@ -489,6 +533,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **[Observation]** Appointment dates are stored as the labels "Today", "Tomorrow" or "14 Jun", not as real dates, and they never roll forward. A booking made for today stays "Today" forever. This is a prototype shortcut; the backend must store real dates and times.
 
 ### 4.4.4 Row action button (what the desk is prompted to do next)
+
 1. Status Cancelled or No-show → no button.
 2. Status Completed → **Receipt** (opens the receipt/token print view).
 3. Status In Queue → no button (the patient is already in the doctor's queue).
@@ -496,6 +541,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. Otherwise (Scheduled and paid, or an online booking) → **Check In** for online bookings or **Issue Token** for walk-ins. Either immediately gives the patient a token (or keeps the one already issued), sets the status to **In Queue**, and shows "<patient> checked in · Token T-0xx". There is no confirmation step.
 
 ### 4.4.5 Appointment drawer (details panel)
+
 1. **Header:** patient name; "MR number · age yrs · gender".
 2. **Badges:** source, status, payment.
 3. **Details:** Doctor · Department · Date & Time · Booking Source ("Medibook App (online)" or "Walk-in (at desk)") · Consultation Fee · Payment · Token (or "—").
@@ -516,12 +562,14 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
    11. A Completed appointment has no actions other than Receipt; it cannot be reopened.
 
 ### 4.4.6 Record Payment dialog (walk-ins)
+
 1. Title "Record Payment". Shows the patient (name, MR number, doctor, department, a "Walk-in" badge), a line "Consultation — <department>" with the fee, "Total Payable", and the note "Payment is collected externally — record the mode here to generate the bill & token."
 2. **Payment Mode:** Cash (default), UPI, Card. For UPI or Card an optional free-text "<mode> Reference No. (optional)" (placeholder "e.g. UPI txn id / last 4 digits") — no validation.
 3. **Mark Paid & Issue Token** → payment becomes Paid, a token is issued (or the existing one kept), status becomes In Queue, mode and reference are stored, message "Payment recorded · Token T-0xx issued". The receipt view then opens automatically.
 4. **Rules and gaps:** the amount cannot be edited; no partial or split payments, discounts, taxes, payer name or payment date/time are captured. Recording a payment for a walk-in dated tomorrow still puts them In Queue today with a token **[Observation]**. The previously chosen mode/reference stays pre-filled for the next patient on the same screen **[Observation]**.
 
 ### 4.4.7 Cancel Appointment dialog
+
 1. Text "Cancel the appointment for <patient> with <doctor>?"; a **Reason (optional)** dropdown: Patient request · Doctor unavailable · Duplicate booking · Scheduling error · Other (no free text).
 2. Information note depends on the case: online → "Prepaid online — Medibook processes any refund to the patient per its slab policy (little or none on the day of the visit, near-full if cancelled well in advance)."; walk-in paid → "Payment was collected at the desk. Handle any refund directly with the patient."; walk-in unpaid → "No payment was collected for this walk-in."
 3. For a paid walk-in only: a switch **Record desk refund of ₹<fee>** (on by default) with the caption "Marks the payment Refunded so desk collections reconcile."
@@ -529,17 +577,20 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **Rules and gaps:** no cancellation cut-off is enforced (the Hospital Settings "cancel before" rule is never read); refunds are always for the full fee with no reference or date; an online cancellation leaves the payment as "Paid" (the refund is assumed to happen on Medibook's side, and no refund slab calculation exists); the token is not released; a cancelled appointment still counts toward the patient's visits.
 
 ### 4.4.8 Edit Appointment dialog (status Scheduled only)
+
 1. Fields: Department (required; changing it clears the doctor) · Doctor (required; list depends on department) · Date (date picker; today or later) · Time (11 fixed slots: 9:00 am, 9:30 am, 10:00 am, 10:30 am, 11:00 am, 11:30 am, 12:00 pm, 2:00 pm, 3:00 pm, 4:00 pm, 5:00 pm) · Note (free text).
 2. Shows "Consultation fee: ₹<fee of the chosen department>" and, if it differs from the fee already charged, "(was ₹<old>)" plus the warning "Fee changed after payment — settle the difference at the desk." when already paid.
 3. **Save Changes** → validation "Select department and doctor"; then the appointment is updated and the fee is re-priced to the new department's fee even if already paid (no adjustment record). Message "Appointment updated". Patient, source, payment, token and status cannot be edited here.
 4. No availability, clash, leave or capacity check is performed.
 
 ### 4.4.9 Reschedule dialog (status Scheduled only)
+
 1. Shows the patient chip, **New Date** (today or later) and **New Time** (the same 11 slots), and the note "Same doctor only. Need a different doctor? Cancel & rebook." where the link opens the Cancel dialog.
 2. **Save Changes** → only date and time change; token, payment and status are untouched. Message "Appointment rescheduled".
 3. **[Observation]** Moving a tokened same-day appointment to another date silently removes it from the live queue while it keeps its token; no reschedule window, limit or availability check exists.
 
 ### 4.4.10 Receipt & Token print view
+
 1. Opened from Receipt buttons and automatically after recording a payment. Buttons: **Print** (opens the browser print dialog; only the receipt and slip print) and **Done**.
 2. **Receipt block:** the hospital logo and the name "Apollo Hospital" (hard-coded, not taken from Hospital Settings **[Prototype-only]**); caption "Payment Receipt · Prepaid via Medibook" (online) or "Payment Receipt · Collected at Desk" (walk-in); a "Paid" badge; fields Receipt No. · Date (the appointment slot, not the payment time) · Patient · MR Number · Payment Mode (online receipts print "Cash" because no mode is recorded for them **[Observation]**) · Reference; one line "Consultation — <doctor> (<department>)" with the amount; "Total Paid"; and a footer sentence about the receipt being computer-generated.
 3. **Receipt number rule (as built):** "RCPT-" + the last five characters of the MR number + "-" + today's day of the month (for example RCPT-47202-10). **[Observation]** It is generated at display time, never stored, and is not unique (the same patient on the 10th of any month, two consultations on one day, or a reprint all give the same number). A real receipt series must be designed server-side.
@@ -547,6 +598,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **Token slip block:** "Apollo Hospital", "Queue Token", the token in large type (blank when no token, for example a future-dated online booking), Patient, Doctor, Dept, Time, and "Please wait for your token to be called." No room number, QR code or issue time.
 
 ### 4.4.11 New Appointment (walk-in booking or registering an online arrival)
+
 1. **Reached from** the Appointments screen, the receptionist dashboard quick action, and from a patient's row/profile (in which case the patient is pre-selected).
 2. **Patient details card** — one of three modes:
    1. **Search** (default): a box "Search by name, phone number or MRN" showing up to six matching patients (name, MR number, phone) from the hospital's patient list; pick one to select. A button **Add new patient** switches to the form.
@@ -571,11 +623,12 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
    6. Walk-in → the combined **Record Payment** dialog opens (Cash/UPI/Card + optional reference; "Mark Paid & Issue Token(s)"); on confirmation each consultation becomes Paid and In Queue with consecutive tokens, and the combined receipt opens (one receipt, one token slip per consultation). Cancelling the payment dialog leaves the appointments as Pending.
    7. Online → message "Online appointment saved" / "n online appointments saved" and return to the list.
 7. **Defects observed in code:**
-   1. **[Observation]** Because of a timezone bug in the date helper, in India the date picker defaults to *yesterday*; an untouched walk-in/online booking is then labelled with yesterday's date, hidden by the default "Today" filter, given no token, and never enters the queue.
-   2. **[Observation]** Booking two or more consultations for a *new* patient creates a separate MR number and patient record per consultation.
+   1. **[Observation]** Because of a timezone bug in the date helper, in India the date picker defaults to _yesterday_; an untouched walk-in/online booking is then labelled with yesterday's date, hidden by the default "Today" filter, given no token, and never enters the queue.
+   2. **[Observation]** Booking two or more consultations for a _new_ patient creates a separate MR number and patient record per consultation.
 8. **Not implemented:** slot generation from doctor or department hours, slot duration/buffer, per-slot capacity, double-booking checks (the same slot can be booked any number of times and several doctors at the same time), doctor leave or inactive checks, opening-hours checks, past-time checks for today, holds/expiry.
 
 ### 4.4.12 Doctor capacity hint
+
 1. Shown under each completed consultation row: "Today's load — <doctor>" with a progress bar.
 2. Rule: bookings counted for that doctor **today** (regardless of the date chosen) excluding cancelled and no-show, against a fixed cap of **16 per doctor per day**. Green up to 75%, amber above 75% (13 or more), red at 16 with the text "Doctor is fully booked for today — consider another slot or doctor."; if the doctor is on a break: "<Name> is on a break today — avoid booking new walk-ins."
 3. The hint is advisory only; booking is never blocked.
@@ -583,10 +636,12 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.5 Patients
 
 ### 4.5.1 Purpose and access
+
 1. The hospital's patient register: identity and contact details only. The screen itself states the principle: "Medibook stores identity & contact only — no clinical data." Both roles.
 2. Reached from the sidebar item **Patients** and from the receptionist quick action "Find Patient".
 
 ### 4.5.2 Patients list
+
 1. **Search** "Search by patient name, MR number or phone" (case-insensitive "contains" over name, MR number and phone).
 2. **Filters:** Department (All Departments + the six fixed booking departments; a patient matches if they have any appointment in that department) · Status (All Status · Active · Inactive) · Sort (Sort: Recent — newest record first · Sort: Name — A to Z) · **Clear all** · refresh icon (does nothing **[Prototype-only]**).
 3. **Columns:** MR Number · Patient Name (avatar + name) · Age ("—" when unknown) · Gender · Phone · Visits · Status · Action (eye "View" → profile; calendar-plus "Book appointment" → New Appointment with this patient pre-selected). The whole row opens the profile. Column headers sort.
@@ -594,6 +649,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **[Observation]** There is no **Add Patient** button anywhere in the app (an add-patient dialog exists in the code but cannot be opened); patients are created only as a side effect of booking an appointment at the desk. There is no delete, merge or export.
 
 ### 4.5.3 Patient Profile
+
 1. **Header:** avatar, name, status badge, "MR: <number>", "<age> yrs · <gender>", phone; buttons **Edit** and **New Appointment** (pre-selects this patient).
 2. **Booking History** table: Date (with time) · Doctor / Dept · Source (Online / Walk-in) · Payment (Paid / Pending / Refunded) · Token · Status; or "No appointments yet for this patient."
 3. **Contact Details:** Phone · Email · Gender · Age · Address.
@@ -601,6 +657,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **[Observation]** Opening an unknown MR number does not show "not found"; it shows the first sample patient's header with an empty history.
 
 ### 4.5.4 Edit Patient dialog
+
 1. Fields: Full Name (required) · Phone Number (required; the "10-digit mobile" hint is not enforced) · Age · Gender (Male / Female / Other) · Email · Status (Active / Inactive) · Address ("Area, City").
 2. **Save Changes:** validation "Name and phone are required"; then "Patient details updated". Editing the register does **not** update the name/age/gender/phone copies stored on that patient's existing appointments **[Observation]**.
 3. **Rules:** an Inactive patient still appears everywhere and can still be booked (no effect). MR numbers are generated as "AP" plus a running number (sample records AP847201–AP847212; new ones from AP800001).
@@ -608,10 +665,12 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.6 Token Management (Live Token Queue)
 
 ### 4.6.1 Purpose and access
+
 1. The front desk's control panel for calling patients to consultation, one card per doctor. Both roles. Reached from the sidebar (**Token Management**; page title "Live Token Queue"), the receptionist dashboard ("In Queue", "Department Queue", "Open Queue", and the per-department rows of the queue snapshot, which pre-select that department) and the bell.
 2. **[Observation]** There is no separate public display board or TV view, and nothing is pushed from a server; the screen simply re-renders every 30 seconds to update elapsed minutes. The FRD's "live token boards by department" and the patient app's live token progress both need a server-driven queue feed.
 
 ### 4.6.2 What you see
+
 1. **Toolbar:** search "Search by doctor" (doctor name only) · Department filter (remembered while you move around the app; changing it resets the doctor filter) · Doctor filter (doctors of the selected department) · a refresh icon that does nothing **[Prototype-only]** · four live figures: **Serving** (doctors currently consulting), **Waiting** (total patients waiting), **On break**, **Longest** (longest current consultation in minutes, red above 20 minutes).
 2. **Doctor cards** (seven fixed doctors; fixed rooms 101, 102, 201, 301, 401, 501, 601):
    1. Name, "department · Room n", and a status pill: **Available** (blue), **Consulting** (green), **Waiting** (amber), **On Break** (grey).
@@ -621,6 +680,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 3. **Empty state:** "No doctors match your search."
 
 ### 4.6.3 Queue rules (as implemented)
+
 1. A patient is in a doctor's waiting list when: the appointment is with that doctor, dated **Today**, has a token, is not Completed/Cancelled/No-show, and is not the token currently being served. Consequently an **online booking for today is waiting from the moment it is booked**, before the patient checks in.
 2. Order: never-skipped patients first in token order; skipped patients go to the back in the order they were skipped. There is no priority or emergency lane and no estimated wait time.
 3. **Call Next:** takes the first waiting patient, sets status In Queue, records the call time, marks the doctor **Consulting** and shows "Now consulting T-0xx · <patient>". **[Observation]** Calling next while someone is still being served neither completes nor skips them: the previous patient silently returns to the waiting list at their original position.
@@ -633,9 +693,11 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.7 Payments
 
 ### 4.7.1 Purpose and access
+
 1. A finance view over the same appointment rows (there is no separate payments ledger). Both roles. Reached from the sidebar item **Payments** (section Billing) and from the receptionist dashboard link "Open Payments".
 
 ### 4.7.2 What you see
+
 1. **Four KPI cards** (always computed over all appointments, ignoring the filters below):
    1. **Collected at Desk** — total of walk-in payments marked Paid for today, with "n walk-in payment(s)".
    2. **Desk Cash** — the part of that total whose mode is Cash (payments with no recorded mode count as Cash).
@@ -649,21 +711,25 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 7. **Paging:** 9 rows per page; the pager also shows "Desk collected: ₹x" (same figure as the first KPI). Empty state: "No payments match your filters."
 
 ### 4.7.3 Rules and gaps
+
 1. Recording a payment here has the same effect as from Appointments: token issued, status In Queue.
 2. There is no refund action on this screen (refunds are only recorded through the Cancel dialog), no partial payment, no void/reversal, no reprint counter, no refunds KPI, no date-range totals, no payment timestamps.
 3. **Gap versus the contract:** "Payment Reports – view payments, refunds, cancellations" exists only as this filtered list plus CSV; the FRD's revenue/refund reporting with date ranges is not built (see Section 10).
 
 ### 4.7.4 Export
+
 1. **Export** downloads a real CSV file named `medibook-payments.csv` containing the currently filtered rows (all pages) with the columns Patient, MR Number, Doctor, Department, Source, Mode, Amount, Status; message "Exported medibook-payments.csv". It contains no date, token, reference number or timestamp.
 
 ## 4.8 Billing & Settlements (Administrator)
 
 ### 4.8.1 Business context
+
 1. Medibook collects the consultation fee for every **online** booking made through the patient app, keeps a **10% platform commission**, and transfers the net amount to the hospital by an expected date. Walk-in payments are collected at the desk and kept 100% by the hospital. The hospital reconciles each transfer here and marks it received.
 2. The screen's own explanation (tooltip): "Medibook collects online booking fees upfront, keeps a 10% commission, and transfers the net amount to the hospital by the expected date. Fees become payable only after the appointment is completed — pre-visit cancellations are refunded to the patient per Medibook's slab policy. Mark a transfer Received once it reaches your account."
 3. **Contract conflict to resolve:** the Preliminary FRD states that settlements from the SaaS owner to hospitals are done **outside** the application, with only helper reports inside it. The prototype instead implements an in-app settlement workflow on both the hospital and operations sides (see Section 10).
 
 ### 4.8.2 Settlements tab
+
 1. **Tabs:** Settlements | Plan & Billing; an **Export CSV** button on the Settlements tab.
 2. **KPI cards** (computed over all statements): **Total Settlement Amount** (sum of net; "n statements") · **Received Amount** (sum of net for Received; "x% of total") · **Overdue Settlements** (sum of net for Overdue; "n settlement(s)") · **Held by Medibook (Upcoming)** — a fixed ₹37,800 with the caption "payable after appointments complete" **[Prototype-only]**.
 3. **Filter:** "Expected between" a date range (inclusive) with a **Clear** link; caption "10% platform commission applies".
@@ -684,6 +750,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 9. **Sample ledger:** 14 statements for Apollo Hospital (MB-ST-2393 to MB-ST-2406), gross ₹13,50,800, commission ₹1,35,080, net ₹12,15,720; one Pending (MB-ST-2406, ₹92,160 net, expected 20 Jun 2026), one Overdue (MB-ST-2405, ₹88,740, expected 13 Jun 2026), one Released (MB-ST-2404, ₹97,380, UTR26-2404K, remark "Released in full after bank re-verification."), eleven Received.
 
 ### 4.8.3 Plan & Billing tab
+
 1. **Plan card:** "<Plan> Plan" with an "Active" pill and "Billed monthly · managed by Medibook"; the monthly price (sample: Growth, ₹24,999/mo). The plan name comes from the Operations console's hospital registry and the price and quota from its plan catalogue.
 2. **Online Bookings This Month:** a progress bar "3,120 used (62%)" of "5,000 / month". Tooltip: "Each appointment booked through the Medibook patient app uses one booking from the monthly plan quota. Walk-ins booked at the desk do not count. The quota resets on the 1st." The bar turns red above 85%. **[Prototype-only]** The used figure is a fixed 3,120; nothing counts real bookings.
 3. **Billing cycle** "Monthly · invoiced on the 1st"; **Next invoice** "01 Jul 2026" (fixed); **Status** Active.
@@ -694,16 +761,19 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.9 Doctors & Departments (Administrator)
 
 ### 4.9.1 Purpose and access
+
 1. The hospital's catalogue of departments and doctors. The screen states: "Doctors and departments you add here become searchable and bookable in the Medibook patient app."
 2. **Critical observation for the backend:** in the prototype this catalogue is **not** the source used for booking. The Appointments, New Appointment and Token Management screens use a separate fixed list of six departments, seven doctors, rooms and fees. Adding, renaming, deactivating or putting a doctor on leave in this catalogue changes nothing in booking or the queue. The only consumer of the catalogue is the Operations console's read-only roster for this hospital. The backend must have one source of truth.
 
 ### 4.9.2 Doctors tab
+
 1. **Search** "Search doctors by name or specialization"; **filters** Department (All Departments + every catalogue department, including inactive ones) · Status (All Status · Active · On Leave · Inactive) · Clear all. Button **Add Doctor**.
 2. **Columns:** Doctor (photo or initials + name) · Department(s) · Fee · Working Hours (a summary such as "Mon–Fri · 9:00 am–5:00 pm" built from the first and last enabled weekday and the first day's times) · Rating ("4.9 (128)") · Status badge (Active green, On Leave amber, Inactive grey) · Action (pencil "Edit" → profile; red trash "Remove").
 3. **Remove** → confirmation "Remove Doctor" / "Are you sure you want to remove <name>? This can't be undone." / **Delete** → the doctor is deleted ("Doctor removed"); existing appointments referencing the doctor are untouched. No paging on this table.
 4. **Sample doctors:** Dr. Thomas K. (Cardiology, ₹800, 4.9, 128 reviews, leave 18–20 Jun "Conference"); Dr. Anil R. (Cardiology, ₹800); Dr. Geetha R. (Orthopedics, ₹700, leave 25 Jun "Personal"); Dr. Kumar V. (Pediatrics, ₹600, **On Leave**, 10–16 Jun "Medical leave"); Dr. Maya S. (Neurology, ₹1,000); Dr. Arun B. (ENT, ₹500); Dr. Leela P. (Dermatology, ₹650).
 
 ### 4.9.3 Doctor Profile (create and edit)
+
 1. **Header:** photo/initials, name (or "New Doctor Profile"), status badge, "specialty · departments · ★ rating (reviews)"; a **Profile status** toggle Active | On Leave | Inactive with captions "Live & bookable in the app" / "Visible, booking paused" / "Disabled — hidden from the patient app" (captions only; nothing enforces them **[Observation]**).
 2. **Profile tab fields:** Photo (Upload/Change Photo — works, kept in memory) · Full Name (required) · Specialization · Room Number · Phone Number · Email · Qualification ("MBBS, MD") · Experience (years) · Registration No. ("KMC/…") · Status · Consultation Fee ("Overrides the department's base fee. This is what patients pay & see in the app.") · Departments (required; multi-select chips; "A doctor can belong to more than one department.") · About ("Short bio shown in the patient app"). Rating and review count are not editable.
 3. **Availability tab:**
@@ -716,6 +786,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 6. **Gap versus contract:** the FRD requires session time ranges, slot size (10/15/20 min), buffer times, leaves and exceptions per date, and slot generation with open/block/bulk actions that reflect instantly in the app. Only the visual shells of these exist.
 
 ### 4.9.4 Departments tab
+
 1. A grid of department cards: image or colour band with a stethoscope icon, status badge, name, description, "n doctors", base fee, and hours summary (a stored text such as "Mon–Sat · 9am–6pm"). Button **Add Department**.
 2. **Sample departments:** Cardiology ₹800; Orthopedics ₹700; Pediatrics ₹600; Neurology ₹1,000 (Tue–Sat); ENT ₹500 (Mon–Fri); Dermatology ₹650 (**Inactive**).
 3. Clicking a card opens a side panel with the department's image, status, hours, description ("No description yet." when empty), the list of its doctors with status, and buttons **Delete**, **Close**, **Edit**.
@@ -726,31 +797,37 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.10 Users & Roles (Administrator)
 
 ### 4.10.1 Purpose and access
+
 1. Management of the hospital's staff logins and of custom roles with module-level permissions.
 2. **Critical observation:** the roles and permission grids are **data only**. Nothing in the application reads them; what a user can see is decided solely by the two built-in roles (Receptionist / Administrator) in the page address. The footnote "Users see only the modules they can at least view" is not implemented. The FRD requires role-based access control on every screen and action, so the backend must enforce these permissions.
 
 ### 4.10.2 Users tab
+
 1. **KPI cards:** Total Users · Active · Roles · Pending Invites (sample: 7, 6, 4, 1).
 2. **Search** "Search users by name, email or username"; **filters** Role (All Roles + role names) · Status (All Status · Active · Inactive) · Clear all. Button **Add User**.
 3. **Columns:** User (avatar, name, email) · Username · Role (coloured dot + name; blank if the role was deleted) · Last Active (fixed text such as "5 min ago" **[Prototype-only]**) · Status (Active / Inactive) · Action (eye "View" → user panel; key "Reset password"). No paging. Empty state "No users match your filters."
 4. **Sample users:** Dr. S. Nair (Administrator); Riya Menon and Karthik Rao (Reception / Billing); Sunita Joseph (Department Front Desk); Mahesh Pillai (Department Front Desk, invite **Pending**); Anand Pillai (Accountant); Fatima Sheikh (Department Front Desk, **Inactive**). Emails use the hospital's domain (`@apollo.med`).
 
 ### 4.10.3 Add User dialog
+
 1. Fields: Full Name (required) · Role (required; pick from the roles) · Email (required) · Phone · Username ("Auto from email if blank") · Password ("Set a password" / "Sent via invite").
 2. Once a role is picked, a card shows the role's description and an access summary (Full access / Limited (some actions) / View only / No access to n other modules).
 3. **How should they get access?** Email invite (default) · Mobile OTP · Set password now.
 4. **Add User:** validation "Name, email and role are required" (no email-format, uniqueness or password-strength checks); the user is created Active with invite status **Pending** (email/OTP) or **Accepted** (set password now); username defaults to the part of the email before "@"; messages "Email invite sent" / "OTP sent for confirmation" / "User created with password". **[Prototype-only]** Nothing is sent and the password is discarded.
 
 ### 4.10.4 User panel (drawer)
+
 1. Shows avatar, name, status, role and description, access summary, Username, Email, Phone, Role, Invite status (Accepted / Pending), Last active.
 2. Buttons: **Edit Details** → "Edit user — demo" **[Prototype-only]**; **Resend Invite** (Pending only) → "Invite resent" with no state change **[Prototype-only]**; **Reset Password** → reset dialog; **Deactivate** / **Activate** → status toggles with "User deactivated" / "User activated".
 3. **[Observation]** No user can be deleted; a user's role, name or contact cannot be changed after creation; there is no protection against deactivating oneself or the last administrator; invites never move from Pending to Accepted.
 
 ### 4.10.5 Reset Password dialog
+
 1. "Reset the password for <name>. Choose how:" — Email reset link · Mobile OTP · Set temporary password (with a Temporary Password field that cannot be typed into **[Observation]**).
 2. **Send / Set Password** → messages "Reset link sent to <email>" / "OTP sent to <phone>" / "Temporary password set". **[Prototype-only]** Nothing happens.
 
 ### 4.10.6 Roles & Permissions tab and Role editor
+
 1. Role cards: colour, name, "System" lock (Administrator) or pencil, description, "n users", "n/10 modules". A dashed **Create Role** card.
 2. **Role editor (side panel):** Role Name (required) · Description · a **Module Permissions** grid of ten modules (Dashboard, Appointments, Patients, Token Management, Payments, Billing & Settlements, Doctors & Departments, Reports, Hospital Settings, Users & Roles) × four actions (View, Add, Edit, Delete). Clicking a module name toggles its whole row. Each box is independent: enabling Add/Edit/Delete does not automatically enable View. A live "What this role can do" summary; when nothing is granted: "Nothing yet — grant at least View on one module."
 3. **Administrator** is locked: "The Administrator role always has full access and can't be edited."
@@ -783,11 +860,13 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 4.12 Hospital Settings (Administrator)
 
 ### 4.12.1 Structure and behaviour
+
 1. Five sections in a left menu: **General · Management · System Rules · Working Hours · Notifications**. One draft holds all sections; whichever Save button is pressed saves everything. Only General has a **Cancel** (which reverts all sections). There is no validation of any field, no dirty tracking and no unsaved-changes warning.
 2. **[Prototype-only]** Settings are saved in the browser's local storage (key `mb_settings`), so they survive a reload on that browser but are shared by every user of that browser and are not tied to a hospital account. Message on save: "Settings saved".
 3. **Which settings actually do anything today:** only the hospital **name** (sidebar and support-ticket subject), **GSTIN** (invoice caption), **email** (plan-change request) and **bank details** (shown masked to operations and used as the payout guard). Every other field, all System Rules, Working Hours and Notification toggles are stored and displayed but read by nothing **[Observation]**. The backend must make these rules effective.
 
 ### 4.12.2 General
+
 1. **Hospital Profile** ("Your logo, name and details appear on the hospital's profile in the Medibook patient app."): Logo (Change Logo; "PNG or JPG, up to 1MB" — not enforced; logos over about 400,000 characters are not persisted) · Hospital Name · Registration No. · GSTIN · Phone · Email · About. Sample: Apollo Hospital, KA-HOSP-20194, 29AAACA4033H1Z5, 080 4567 8900, contact@apollo.med.
 2. **Photo Gallery** ("These photos show in your hospital's gallery when patients browse in the Medibook app."): Cover photo (1280×720), Reception, Add photo. **[Prototype-only]** Uploads only show messages and nothing is stored.
 3. **Location** ("Patients see your location and get directions in the Medibook app. Click the map to drop the pin."): Address, Latitude, Longitude, and a decorative map where clicking drops a pin and derives coordinates from the click position (a formula covering south Bengaluru only) **[Prototype-only]**. Sample: 154 Bannerghatta Road, Bengaluru 560076; 12.9088, 77.5975.
@@ -795,9 +874,11 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. Buttons **Cancel** / **Save Changes**.
 
 ### 4.12.3 Management
+
 1. Link rows: **Manage Doctors** ("Add doctors, schedules, availability") and **Manage Departments** → Doctors & Departments · **User Management** ("Manage admin, receptionist, accountant access") and **Role Management** → Users & Roles · **Subscription & Plan** ("Manage subscription plan and payments") → Billing & Settlements.
 
 ### 4.12.4 System Rules ("Hospital-wide defaults. A doctor's custom availability or fee settings override these.")
+
 1. **Appointment Rules** ("Applies to all new appointments"): Default consultation duration (10 / 15 / 20 / 30 mins; default 15) · Online appointment booking (on) · Max appointments per slot (5 / 10 / 15 / 20 slots; default 15) · Buffer time between appointments (0 / 5 / 10 / 15 mins; default 15).
 2. **Cancellation & No-show Rules:** Allow patient cancellation (on) · Cancellation allowed before (1 hour / 2 hours / 4 hours / 24 hours; default 2 hours) · Auto mark No-show after (30 mins / 1 hour / 2 hours; default 1 hour).
 3. **Token Queue Behaviour** ("Applies to all departments"): Token generation (Auto / Manual; default Auto) · Show token number to patient (on) · Allow hold token (on) · Hold timeout (15 / 30 / 45 mins; default 30) · Grace period (15 / 30 / 45 mins; default 30) · After grace (Auto Mark No-show / Keep waiting; default Auto Mark No-show).
@@ -805,25 +886,28 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. Button **Save Rules**. These rules map directly onto the FRD's per-tenant policies (slot size, buffer, cancellation cut-off, hold duration, token logic); none is enforced yet.
 
 ### 4.12.5 Working Hours ("Hospital-level hours. Department and doctor schedules override these — the app uses the most specific (Doctor → Department → Hospital).")
+
 1. Default open (7:00 am / 8:00 am / 9:00 am; default 8:00 am) to close (6:00 pm / 8:00 pm / 10:00 pm; default 8:00 pm); Monday to Sunday switches (default Sunday closed). Per-day custom times are not supported; no holidays. Button **Save Hours**.
 2. **Gap versus contract:** holidays and branches (FRD) do not exist.
 
 ### 4.12.6 Notifications
+
 1. **Patient Communications** ("Messages the hospital sends to patients via the Medibook app."): Appointment Confirmation ("Notify the patient when a booking is confirmed") · Visit Reminder ("Remind patients before their appointment").
 2. **Admin Alerts** ("Alerts for the hospital admin about billing & settlements."): Settlement Received · Settlement Overdue · Plan Quota Low ("When online-appointment credits are running out"). All default on. Button **Save Preferences**.
 3. **Gap versus contract:** message templates with placeholders, WhatsApp/push triggering, and announcement banners published by the hospital (FRD) do not exist in the hospital app.
 
 ## 4.13 Help & Support (both roles)
+
 1. **Hero:** "How can we help?" / "Search our help center or browse common topics." with a search box that does nothing **[Prototype-only]**.
 2. **Category tiles** (no action **[Prototype-only]**): Getting Started · Appointments · Billing · Settlements.
 3. **Frequently Asked Questions** (accordion, first open): how to add a walk-in appointment; how the token queue is updated ("Token numbers are issued as a hospital-wide running sequence."); how settlements work ("Medibook collects the fee, keeps a 10% commission, and transfers the net to the hospital by the expected date… Walk-in payments are collected at the desk and kept 100% by the hospital."); can I export reports ("Yes — every report supports CSV and PDF export" — **[Observation]** PDF export is only a message in the code).
 4. **Still need help?** Email Support `support@medibook.app` · Call Us `1800 200 4567` · Live Chat "Mon–Sat, 9am–7pm" (plain text, not links; note the login screen uses `support@medibook.in`).
 5. **Raise a Ticket** → dialog "Raise a Support Ticket": **Topic** (Billing & settlements · Appointments & queue · Plan & subscription · Technical issue · Other) and **Describe the issue** (free text, optional), caption "Tickets go straight to the Medibook operations team — they appear in their console notifications.", buttons Cancel / **Send to Medibook**. Sending creates an open **Support** request in the Operations console inbox with the subject "<Topic> — <hospital name>" and shows "Ticket raised with Medibook support". No ticket number is shown and there is no list of the hospital's own tickets.
 
-
 # 5. Operations Console (Medibook Super Admin) — Functional Specification (as built)
 
 ## 5.1 Access and navigation
+
 1. Reached from the **Operations Login** tab. One identity exists: **Riya Sharma, Super Admin** (`riya.sharma@medibook.in`). **[Prototype-only]** Any valid email plus a non-blank password signs in. There is no per-screen permission check inside the console: the internal roles defined on its Users & Roles screen are descriptive only (§5.10).
 2. **Sidebar** ("Medibook · Operations Console"): **Overview** (Dashboard) · **Network** (Hospitals, Subscription Plans) · **Finance** (Billing, Hospital Settlements) · **Insights** (Usage Analytics, Reports, Compliance Logs) · **Platform** (Users & Roles, Platform Users, Notifications) · **System** (Platform Settings).
 3. **Top bar:** back arrow (session history), page title and subtitle, notification bell, account menu (Platform Settings, Log Out).
@@ -844,6 +928,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 5.3 Hospitals (tenant management)
 
 ### 5.3.1 Hospital list
+
 1. **KPI tiles:** Total Hospitals · Active Instances ("Live and serving bookings") · Pending Verification ("Awaiting document review") · Suspended ("Access paused by platform"). Sample: 13 hospitals — 7 active, 3 pending, 2 suspended, 1 rejected.
 2. **Tabs:** All Hospitals | Pending verification (n). Button **Onboard Hospital**.
 3. **Search** "Search hospital or city" (name or city); **filters** Plan (all plans in the catalogue, including hospital-specific ones) · Status (Active · Pending verification · Suspended · Rejected) · Clear all · a refresh icon that does nothing.
@@ -851,12 +936,14 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. Opening the Plans screen's "View Hospitals" pre-filters this list by plan.
 
 ### 5.3.2 Onboard Hospital dialog
+
 1. Fields: **Hospital Name** (required — "Hospital name is required.") · **Admin Email** (required, format checked — "Enter a valid email address.") · **City** (required — "City is required.") · **Subscription Plan** (default Starter).
 2. Note: "The hospital lands in Pending verification. KYC documents (registration, GST, licence, bank proof) are requested from the admin email and must all be submitted before approval."
 3. **Onboard Hospital** → after the simulated delay: a new hospital record with status **Pending verification**, the four KYC documents marked Missing, a placeholder phone (+91 90000 00000), no state, zero bookings, onboarded today; message "<name> onboarded. KYC verification pending."; audit log "Hospital onboarded — <name>".
 4. **[Observation]** No admin user or invitation is created, no email or KYC request is sent, no duplicate check exists, and no state/GSTIN/phone is captured. The FRD requires provisioning an initial Admin user and default settings at onboarding (see Section 10).
 
 ### 5.3.3 Hospital Profile (hub)
+
 1. **Header:** name, status badge, "admin email · phone · city, state"; action buttons by status: Pending → **Reject** and **Approve & Go Live**; Rejected → **Re-review & Approve**; Active/Suspended → **Suspend Instance** / **Reactivate Instance** and **Manage Plan** (opens the plan catalogue; it does not change the hospital's plan directly).
 2. **Tabs:** Overview · Departments · Doctors · Billing & Settlements · Activity.
 3. **Overview tab:**
@@ -898,10 +985,12 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 5.6 Hospital Settlements (payouts to hospitals)
 
 ### 5.6.1 Business context as stated on screen
+
 1. Tooltip: "Online booking fees are collected by Medibook at booking time and become payable to the hospital only after the appointment is completed. Pre-visit cancellations are refunded per the slab policy — Medibook keeps the cancellation fee. Statements are net of the 10% platform commission (set in Platform Settings). Transfers themselves happen outside Medibook — releases here are the shared record of them."
 2. So the console does not move money; it **records** bank transfers made outside the system, and that record is visible to the hospital immediately. This is consistent with the FRD statement that settlements happen outside the application, but the recording workflow itself goes beyond "helper reports" (see Section 10).
 
 ### 5.6.2 What you see
+
 1. **KPI tiles:** **Payable Now** (sum of net for every Pending or Overdue statement; "n statements pending release") · **Held in Advance** (₹4.2L, fixed; "upcoming bookings · payable after completion") · **Released This Month** (₹9.8L, fixed) · **Platform Earnings** (₹1.1L, fixed; "10% commission + cancellation fees") **[Prototype-only for the three fixed values]**.
 2. **Toolbar:** view toggle **By Payout Run | Flat List**; Hospital filter (all hospitals with statements); Status filter (Pending · Released · Received · Overdue · Payout failed); Expected-from / Expected-to dates; Clear all; caption "<Weekly> payout runs · next: 20 Jun 2026" (the cadence word comes from Platform Settings; the date is fixed).
 3. **Settlement Queue** with "n statements match".
@@ -911,6 +1000,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 7. **Sample queue:** 22 statements across nine hospitals (the 14 Apollo statements plus 8 others), for example Meridian City Hospital MB-ST-2408 gross ₹1,86,000 net ₹1,67,400 Pending; Sunrise Multispeciality MB-ST-2410 Released with a partial release of ₹80,000 and the remark "Part release — balance held pending dispute #418."; Charak Institute MB-ST-2413 Payout failed; Kaveri General MB-ST-2415 Pending with no payout account.
 
 ### 5.6.3 Rules (as implemented)
+
 1. A statement can be released when its status is Pending or Overdue **and** the hospital has a payout account on file; otherwise the message "No payout account on file for <hospital> — the hospital adds it under Hospital Settings." (The Retry path for failed payouts skips this check **[Observation]**.)
 2. Commission for non-Apollo statements is computed live from the **Platform Commission (%)** setting (default 10); Apollo's statements keep the 10% stored in the hospital ledger, so changing the platform rate re-prices some rows and not others **[Observation]**. The rate must be snapshotted per statement in the backend.
 3. Payout runs are buckets by expected date, not by statement period; a run is "due" when its date is on or before the demo date 13 June 2026.
@@ -919,6 +1009,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 6. **Not implemented:** creation of statements, the Pending → Overdue transition, the Payout failed state (seed only), payout-gateway integration, statement PDF/export on the console side, a settlement-request list (requests are visible only in the bell and as a "Requested by hospital" caption).
 
 ## 5.7 Usage Analytics
+
 1. **KPI tiles (fixed sample values [Prototype-only]):** Total Bookings 48,240 · Avg Daily Bookings 1,608 · Booking Success Rate 94.2% ("Completed vs total bookings") · Cancellation Rate 3.1%.
 2. **Bookings by Month** ("Last 12 months"): twelve bars with hover tooltips; fixed values.
 3. **Department Split:** seven percentage bars — Cardiology 24%, General Medicine 19%, Orthopaedics 16%, Paediatrics 12%, Gynaecology 9%, ENT 7%, Others 13%; fixed values.
@@ -926,6 +1017,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. There are no period filters, hospital filters or refresh. **Gap versus contract:** the FRD asks for tenant, active-user, booking, revenue, provider-usage and error-rate dashboards; all analytics must be computed server-side.
 
 ## 5.8 Reports (console)
+
 1. Six report cards, each with a description, "Last generated <date>" and a **Download CSV** button:
    1. **Revenue Report** — "Platform revenue by hospital, plan and period."
    2. **Bookings Report** — "All bookings with department and outcome detail."
@@ -936,6 +1028,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 2. **Download CSV** shows "Preparing…" for a moment, stamps "Last generated just now" and shows "<Report> ready." — **no file is produced**, no parameters are collected and no audit entry is written **[Prototype-only]**. The FRD's "settlement helper reports built to the UI/UX template" and "data export on request" therefore have no working implementation.
 
 ## 5.9 Compliance Logs (audit trail)
+
 1. **Toolbar:** search "Search action or user" (action text or actor); Severity filter (Info · Warning · Critical); Module filter (Hospitals · Settlements · Billing · Subscription Plans · Users & Roles · Platform Users · Reports · Settings · Auth · Media — note "Notifications" is missing although notification actions are logged **[Observation]**); From/To dates; Clear all; caption "Retention: 365 days" (text only); inert refresh icon.
 2. **Columns:** Action (with the actor beneath) · Module · IP Address · Timestamp · Severity (Info blue, Warning amber, Critical red). Sortable except Action; 7 per page ("log entries"); empty state "No results match your filters."; no hospital column, no detail view, no export.
 3. **Sample entries** illustrate intended event types: "Hospital suspended — Nirmal Ortho & Spine" (Critical), "Settlement released — ₹ 1,28,250", "Role permissions changed — Finance Admin" (Critical), "Failed login attempt (3x)" (Auth, Warning), "Invoice regenerated — INV-2026-0234", "Platform user deleted — dev.trivedi@gmail.com" (Critical), "Data export — bookings FY 2025-26" (Warning), "Media purged — 214 orphaned files" (system), "API key rotated — payments gateway", "Settings updated — payout schedule".
@@ -972,6 +1065,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 5.12 Notifications (patient-app banners and push)
 
 ### 5.12.1 App Banners tab
+
 1. **Showing now:** "Showing in the app right now: “<title>”" (the first Live banner in order) or "…default banner — “<title>”"; caption "Live banners rotate on the patient app home screen in the order below. When none is live, the default banner shows."
 2. **Default Banner:** a single always-on banner ("Always on — shown whenever no campaign banner is live. Cannot be deleted."; sample "Book trusted doctors near you — Medibook") with **Edit**.
 3. **Campaign Banners** ("Order sets rotation priority in the app — use the arrows. Pause takes a banner out of rotation without losing its schedule. Expired banners stay here for reference until deleted."; "n live · n total"): each row has move up/down arrows, a rank, a thumbnail, the title and date range, a state badge — **Live** (green), **Scheduled** (blue), **Paused** (grey), **Expired** (grey) — a **Pause/Resume** button (hidden when expired), edit and delete.
@@ -982,6 +1076,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 8. **[Observation]** The mobile app has its own two fixed banners and no connection to this manager (see §3.3); the contract's "configurable banners" require an API and image hosting.
 
 ### 5.12.2 Push Notifications tab
+
 1. **Compose Push Notification** ("Delivered to the Medibook patient app on the chosen devices. Booking and queue updates are sent automatically by the system — this composer is for offers and announcements only."): Title (required, maximum 40 characters — "Add a title.") · Message (required, maximum 120 characters — "Add a message.") · Audience (All users ~2,41,300 · Android only ~1,48,200 · iOS only ~93,100 · Inactive 30+ days ~38,400; reach figures fixed **[Prototype-only]**) · Timing (Send now | Schedule; scheduled sends always go at 09:00 on the chosen date — "Pick a date." when missing; no past-date check).
 2. **Confirmation:** "Send this notification now?" / "Schedule this notification?" — "“<title>” goes to <audience> (~n users)[ on <date> at 09:00]. Push notifications can't be recalled after delivery." → **Send Now** / **Schedule**. Outcome: a **Queued** or **Scheduled** entry; messages "Notification queued for delivery." / "Notification scheduled."; audit "Push notification sent/scheduled — “<title>” to <audience>" (Warning).
 3. **Sent & Scheduled table:** Notification (title, message) · Audience · When · Delivered · Open Rate · Status (Sent green / Scheduled blue / Queued blue / Cancelled red) · **Cancel** (Scheduled entries only; immediate; "Scheduled notification cancelled."; audit Info).
@@ -997,13 +1092,13 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **Footer:** "Unsaved changes" / "All changes saved" status; **Discard**; **Save Changes** → "Settings saved."; audit "Settings updated — platform preferences".
 6. **Which settings have an effect today:** the commission rate is used to compute commission and net for non-Apollo statements on the Hospital Settlements and Hospital Profile screens; the payout schedule only changes a caption; the GSTIN prints on invoices. Organisation fields, notification toggles, 2FA requirement and session timeout are stored but never read **[Observation]**.
 
-
 # 6. Business Rules Catalogue (consolidated)
 
 Every rule below was read from the code. **Status** tells the backend team how far the rule is real today: **Implemented** (the prototype enforces it), **Copy only** (stated on screen but not enforced), **Setting only** (configurable in a settings screen but read by nothing), **Sample only** (visible in sample data but no logic produces it), **Absent** (required by the contract, nothing in the UI). Rules marked Copy/Setting/Sample/Absent must be implemented server-side.
 
 ## 6.1 Identity, access and sessions
-1. **BR-001** Patient login is by email and password; sign-up captures full name, email, phone, password and acceptance of terms. — Implemented (format checks only). *Contract asks for mobile number + password with OTP activation.*
+
+1. **BR-001** Patient login is by email and password; sign-up captures full name, email, phone, password and acceptance of terms. — Implemented (format checks only). _Contract asks for mobile number + password with OTP activation._
 2. **BR-002** Passwords must be at least 6 characters; confirmation must match exactly. — Implemented (client only).
 3. **BR-003** OTP is 4 digits, entered one per box. — Implemented; expiry, resend cooldown, attempt limit and lockout — Absent.
 4. **BR-004** Hospital staff log in with email and password; a suspended hospital cannot log in ("This hospital's Medibook instance is suspended by operations…"). — Implemented (suspension gate only; no credential check).
@@ -1016,6 +1111,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 11. **BR-011** Every screen of every application must be tenant-scoped (hospital records join on the tenant id, never on the display name). — Design intent (constant tenant 13); Absent.
 
 ## 6.2 Catalogue: hospitals, departments, doctors
+
 1. **BR-020** Hospital profile fields: name, registration number, GSTIN, phone, email, about, logo, gallery photos, address, latitude/longitude with a map pin, bank/payout details (account holder, bank, account number, IFSC, UPI). — Implemented as a form; validation Absent.
 2. **BR-021** Hospital working hours: default open/close times (7–9 am / 6–10 pm options) and open days Monday–Sunday. Department and doctor hours override hospital hours ("the app uses the most specific: Doctor → Department → Hospital"). — Setting only.
 3. **BR-022** Departments have a name (required), base consultation fee, description, image, weekly hours grid, Active/Inactive status. — Implemented (hours grid edits are discarded).
@@ -1025,6 +1121,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 7. **BR-026** Deleting or deactivating a department has no effect on its doctors; deleting a doctor leaves past appointments intact. — Implemented (as a gap: cascade rules Absent).
 
 ## 6.3 Slots, availability and booking
+
 1. **BR-030** Patient app booking window: today plus the next four days; six fixed slots (09:00 AM, 10:00 AM, 11:30 AM, 12:15 PM, 02:00 PM, 04:30 PM); no slot is ever unavailable. — Implemented (as a placeholder).
 2. **BR-031** Desk booking slots: 10 fixed half-hour slots 9:00 am–12:00 pm plus 2:00, 3:00, 4:00 pm (Edit/Reschedule also offer 5:00 pm); date today or later, no upper limit. — Implemented (as a placeholder).
 3. **BR-032** Slot generation from doctor/department/hospital hours, consultation duration (10/15/20/30 min), buffer (0–15 min), max appointments per slot (5–20), online booking on/off. — Setting only.
@@ -1036,6 +1133,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 9. **BR-038** A new desk patient receives a generated MR number ("AP" + running number); patients are created only through booking. — Implemented.
 
 ## 6.4 Tokens and queue
+
 1. **BR-040** mbAdmin tokens are hospital-wide, sequential, three-digit ("T-001"), never reset and never reused; issued when an online booking for today is created, when a walk-in payment is recorded, or at check-in. — Implemented.
 2. **BR-041** Mobile tokens are app-wide, sequential ("A-26" onwards), issued at confirmation, never reused. — Implemented (placeholder).
 3. **BR-042** Contract rule: sequential token per doctor per date, assigned on payment success. — Absent (a per-department prefix scheme C/O/P/N/E/D exists unused).
@@ -1045,6 +1143,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 7. **BR-046** Patient-facing live queue: current token, last called number, estimated wait, refresh indicator. — Absent (the mobile card shows only the patient's own token).
 
 ## 6.5 Payments, fees, receipts and refunds
+
 1. **BR-050** Fee = the department's fee at creation; re-priced when the department is edited even if already paid (with the warning "Fee changed after payment — settle the difference at the desk."). — Implemented.
 2. **BR-051** Online bookings are created Paid (prepaid in the app); walk-ins are created Pending and become Paid only when the desk records Cash/UPI/Card with an optional reference. — Implemented.
 3. **BR-052** Payments with no recorded mode are treated as Cash in every total. — Implemented.
@@ -1057,6 +1156,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 10. **BR-059** Reinstating a cancelled walk-in whose payment was refunded offers a token without re-collecting payment. — Implemented (defect; rule Absent).
 
 ## 6.6 Commission, settlements and payouts
+
 1. **BR-060** Platform commission = 10% of gross online fees (Platform Settings, 0–100%); commission = round(gross × rate); net = gross − commission. — Implemented for non-Apollo statements; Apollo statements carry a stored 10%.
 2. **BR-061** Statements are weekly (sample: Wednesday–Tuesday), numbered platform-wide "MB-ST-####", with an expected date four days after the period ends; fees become payable only after the appointment is completed. — Sample only / Copy only.
 3. **BR-062** A statement whose expected date has passed without release is Overdue; a failed bank transfer is Payout failed and "Medibook is retrying". — Sample only.
@@ -1068,6 +1168,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 9. **BR-068** Contract: settlements are performed outside the application; the app provides helper reports. — Conflicts with BR-063/064 (Section 10.3).
 
 ## 6.7 Subscription plans and billing
+
 1. **BR-070** Plan attributes: name (unique), monthly price (>0), bookings per month (>0), staff-account tier, support tier, extra feature line, Most Popular (at most one), hospital-specific flag. — Implemented.
 2. **BR-071** A plan used by any hospital cannot be deleted; renaming a plan renames it on every hospital. — Implemented.
 3. **BR-072** Quota = online bookings in the calendar month; walk-ins excluded; resets on the 1st; warning colour above 85% (hospital) / 90% (console); "Plan quota low" alerts. — Copy only / fixed values.
@@ -1077,12 +1178,14 @@ Every rule below was read from the code. **Status** tells the backend team how f
 7. **BR-076** Contract plan limits: doctors, branches, storage, message credits; monthly or yearly billing. — Absent.
 
 ## 6.8 Hospital lifecycle and verification
+
 1. **BR-080** New hospitals start Pending verification with four KYC documents Missing; approval requires none Missing; approval verifies all documents; rejection needs a reason (Incomplete KYC documents / Invalid GST or licence details / Failed physical verification / Duplicate registration); active hospitals can be suspended and reactivated; a rejected hospital can be re-reviewed and approved. — Implemented.
 2. **BR-081** Suspension: staff lose access immediately, existing bookings kept, no new bookings. — Implemented for login only; the rest Copy only.
 3. **BR-082** Onboarding provisions an initial Admin user and default settings, and requests KYC documents by email. — Copy only / Absent.
 4. **BR-083** Hospital instance ID "MB-HOSP-01nn" is derived from the record number. — Implemented (placeholder).
 
 ## 6.9 Notifications and communications
+
 1. **BR-090** Booking confirmation, reminders (day before and day of), reschedule and cancellation notices over in-app, push and WhatsApp with hospital, department, doctor, date/time, token and location link; retry on failure; unread messages stay in the notification centre. — Absent (four fixed sample notifications in the app; toggles in hospital settings are Setting only).
 2. **BR-091** Banners: a default always-on banner plus scheduled campaign banners (title, image, live-from, live-until ≥ from), state Paused → Expired → Scheduled → Live, ordered by priority, paused banners leave rotation. — Implemented in the console; not consumed by the app.
 3. **BR-092** Push campaigns: title ≤ 40 characters, message ≤ 120, audience (All users / Android only / iOS only / Inactive 30+ days), send now or scheduled at 09:00 on a date; scheduled pushes can be cancelled; "can't be recalled after delivery". — Implemented in the console; delivery Absent.
@@ -1090,6 +1193,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 5. **BR-094** Support tickets from hospitals carry a topic and description and appear in the console; ticket lifecycle. — Implemented (creation only); closure Absent.
 
 ## 6.10 Data, privacy and audit
+
 1. **BR-100** Hospital patient records hold identity and contact only — no clinical data ("Medibook stores identity & contact only — no clinical data"; "Read-only · no clinical data"). — Implemented principle.
 2. **BR-101** Every view of a patient account by Medibook staff is written to the compliance log; blocks/unblocks are Critical events. — Implemented (client-side).
 3. **BR-102** The compliance log records actor, module, IP, timestamp and severity (Info / Warning / Critical) with 365-day retention. — Partially implemented (fixed actor/IP/time; retention text only).
@@ -1098,6 +1202,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 6. **BR-105** Files (documents, receipts, token cards, images) are served from secure storage with expiring links. — Absent.
 
 ## 6.11 Prototype behaviours that must not ship (DEMO)
+
 1. **DEMO-01** Pre-filled credentials on all logins; any valid email plus any password signs in; fixed OTP 1234 disclosed in the error message.
 2. **DEMO-02** The operations console's "today" is 13 June 2026; the hospital app stores relative date labels; the mobile app stores the word "Today".
 3. **DEMO-03** Simulated latency (0.7 s) and loading skeletons (0.45 s) in the console; always-green success messages.
@@ -1108,136 +1213,158 @@ Every rule below was read from the code. **Status** tells the backend team how f
 8. **DEMO-08** Token counter seeds (A-26, T-008), MR/appointment/plan ids minted in the browser, unknown ids falling back to the first record instead of "not found".
 9. **DEMO-09** Mobile platform identity (`com.example.my_app`, "My App"), debug signing, missing release internet permission.
 
-
 # 7. Status and Lifecycle Reference
 
 Each list gives the statuses (with the badge colour used on screen), the transitions the prototype actually performs, and the transitions the contract expects but the prototype does not perform.
 
 ## ST-01 Appointment — hospital app
+
 1. **Statuses:** Scheduled (blue) · In Queue (amber) · Completed (green) · Cancelled (red) · No-show (orange).
 2. **Implemented transitions:** create → Scheduled; Scheduled → In Queue (Check In / Issue Token, Mark Payment, or Call Next of a tokened online booking); In Queue → Completed (Done); In Queue → In Queue (Skip, Call Next); In Queue → Scheduled (Undo check-in); Scheduled → Cancelled (Cancel, optional desk refund); Scheduled → No-show (No-show); Cancelled → Scheduled (Reinstate); No-show → Scheduled (Undo no-show). Completed is terminal.
 3. **Not possible in the UI:** cancelling or no-showing an appointment that is already In Queue; approving an appointment (FRD "approve"); automatic no-show after the grace period; marking "visited" separately from Completed.
 
 ## ST-02 Appointment — patient app
+
 1. **Statuses:** Confirmed (navy) · Completed (green) · Cancelled (red), in two lists Upcoming / Past.
 2. **Implemented:** book → Confirmed/Upcoming; Confirmed → Cancelled/Past (Cancel); Confirmed → Confirmed with new date/time (Reschedule). Completed exists only in sample data.
 3. **Expected but absent:** payment pending/paid/refund states, check-in, no-show, hold/expiry, automatic move to Past by date.
 
 ## ST-03 Payment state of an appointment (hospital app)
+
 1. **Statuses:** Paid (green) · Pending (amber) · Refunded (red).
 2. **Implemented:** Online → Paid at creation; Walk-in → Pending at creation; Pending → Paid (Record Payment, single or combined); Paid → Refunded (Cancel with desk-refund switch, walk-ins only). Online cancellations stay Paid.
 3. **Absent:** partial refund, refund reference/date, online refund status visible to the patient (FRD), payment failure/retry.
 
 ## ST-04 Token
+
 1. None → "T-nnn" (online booking for today at creation; walk-in payment; check-in) → kept through Completed/Cancelled/No-show → removed only by Undo check-in on a walk-in.
 
 ## ST-05 Doctor live queue status (hospital app)
+
 1. **Statuses:** Available (blue) · Consulting (green) · Waiting (amber) · On Break (grey).
 2. **Implemented:** any → Consulting (Call Next); Consulting → Waiting (others waiting) or Available (Done / Skip); Available ↔ On Break (pause/resume).
 3. **Note:** independent from the catalogue status Active / On Leave / Inactive (ST-13).
 
 ## ST-06 Settlement statement
+
 1. **Statuses:** Pending (amber) · Overdue (red) · Released (green) · Received (green) · Payout failed (red); plus a "requested" flag.
 2. **Implemented:** Pending/Overdue → Released (console Release or payout run); Payout failed → Released (Retry); Released → Received (hospital Mark Received); requested false → true (hospital Request / Raise) → false (any release).
 3. **Absent:** creation of statements; Pending → Overdue by date; any → Payout failed; Received is terminal with no reversal; partial-release balance.
 
 ## ST-07 Hospital request (support / plan / settlement)
+
 1. **Statuses:** Open · Closed.
 2. **Implemented:** Plan requests close when any plan change for that hospital is approved or declined; Settlement requests close when the referenced statement is released; Support requests never close.
 
 ## ST-08 Plan change request
+
 1. **Statuses:** Pending (amber) · Completed (green) · Cancelled (red).
 2. **Implemented:** hospital request → Pending; Approve → Completed (hospital's plan updated when the target plan exists); Decline → Cancelled. Terminal thereafter.
 
 ## ST-09 Hospital (tenant)
+
 1. **Statuses:** Pending verification (amber) · Active (green) · Suspended (grey) · Rejected (red).
 2. **Implemented:** onboard → Pending verification; Pending → Active (Approve, requires no KYC document Missing); Pending → Rejected (Reject with reason); Rejected → Active (Re-review & Approve); Active → Suspended; Suspended → Active.
 3. **Absent:** deletion/archival; Rejected → Pending; auto-suspension for non-payment.
 
 ## ST-10 KYC document (per document, four per hospital)
+
 1. **Statuses:** Missing (red) · Submitted (amber) · Verified (green).
 2. **Implemented:** onboarding → Missing; approval → all Verified. **Absent:** Missing → Submitted (upload) and per-document verification/rejection.
 
 ## ST-11 Subscription invoice and payment (console)
+
 1. **Invoice statuses:** Completed · Pending · Overdue · Payment failed. **Payment statuses:** Success · Pending · Payment failed. **Methods:** UPI · Card · NetBanking.
 2. **Implemented:** none (read-only sample data). **Absent:** issue, pay, fail, retry, overdue detection, void, grace period, auto-suspension.
 
 ## ST-12 Patient (hospital register) · Department · Hospital staff user
+
 1. **Patient:** Active ↔ Inactive (Edit Patient); no effect on booking.
 2. **Department:** Active ↔ Inactive (Edit Department); no effect on doctors or booking.
 3. **Hospital staff user:** Active → Inactive (Deactivate) and back (Activate); invite Pending/Accepted set at creation, never changes; no deletion.
 
 ## ST-13 Doctor (catalogue)
+
 1. **Statuses:** Active (green) · On Leave (amber) · Inactive (grey); set manually on the profile; never derived from leave dates; no effect on booking or queue.
 
 ## ST-14 Internal Medibook user
+
 1. **Statuses:** Pending (amber) · Active (green) · Suspended (grey); 2FA Enabled / Pending.
 2. **Implemented:** Add → Pending; any → deleted. **Absent:** Pending → Active (invite acceptance), suspend/reactivate, 2FA enrolment.
 
 ## ST-15 Patient account (platform user)
+
 1. Active (green) ↔ Blocked (grey) via Block / Unblock with a Critical audit entry; no deletion or anonymisation.
 
 ## ST-16 Banner
+
 1. **Derived states:** Paused (switched off) → Expired (end date before today) → Scheduled (start after today) → Live; plus position (priority).
 2. **Implemented:** create (active) → date-driven state; Pause/Resume; Move up/down; delete.
 
 ## ST-17 Push notification
+
 1. **Statuses:** Queued (blue) · Scheduled (blue) · Sent (green) · Cancelled (red).
 2. **Implemented:** Send now → Queued; Schedule → Scheduled; Scheduled → Cancelled. **Absent:** Queued/Scheduled → Sent (delivery), edit, resend.
 
 ## ST-18 Dashboard alert (console)
+
 1. Exists → deleted by Resolve Now; no creation path.
 
 ## ST-19 Health record (patient app)
-1. Completed (green) · Pending (red); read-only sample data; no transitions.
 
+1. Completed (green) · Pending (red); read-only sample data; no transitions.
 
 # 8. Data Dictionary (what the screens imply for the schema)
 
 This section lists every business entity the three front ends display or edit, with the fields the screens actually use, their observed formats and sample values, and the fields the backend must add (identifiers, timestamps, foreign keys) because the prototypes join on names or store display strings. Formats in quotes are what the prototype shows today; they are inputs to the schema decision, not the decision itself.
 
 ## 8.1 Tenancy and platform
-1. **E-01 Hospital (tenant).** Fields seen: id (console number; Apollo = 13), name, admin email, phone, GSTIN, plan (by plan name), city, state (2-letter), bookings this month, onboarded date ("April 12, 2025"), status (Active / Pending verification / Suspended / Rejected), KYC record (registration certificate, GST certificate, medical licence, bank account proof — each Missing / Submitted / Verified), payout bank (bank, account number, IFSC, UPI), rejection reason, derived instance ID ("MB-HOSP-0113"). From Hospital Settings the same tenant also owns: registration number, about, logo, gallery photos, address, latitude, longitude, map pin, working hours (open, close, open days), account holder name, rules and notification preferences (see E-04). *Backend must add:* branch support (FRD), holidays, creation/verification timestamps, verified-by, KYC document files and per-document review history, subscription history.
-2. **E-02 Subscription plan.** id, name (unique), monthly price (₹, GST-inclusive as displayed), bookings per month, staff-account tier ("Up to 25 staff accounts" / "Up to 120 staff accounts" / "Unlimited staff accounts"), support tier ("Email support" / "Priority support" / "Dedicated success manager"), extra feature line, most-popular flag (exclusive), hospital-specific flag. *Backend must add:* yearly billing option, limits for doctors/branches/storage/message credits (FRD), effective dates, price history.
-3. **E-03 Plan-change request.** id, hospital, hospital email, change text ("Growth → Enterprise"), requested date, status (Pending / Completed / Cancelled). *Add:* from-plan and to-plan ids, decided by/at, effective date.
-4. **E-04 Hospital settings (per tenant).** Booking rules: default consultation duration (10/15/20/30 mins), online booking on/off, max appointments per slot (5/10/15/20), buffer (0/5/10/15 mins), allow patient cancellation, cancellation cut-off (1/2/4/24 hours), auto no-show after (30 mins/1 hour/2 hours), token generation (Auto/Manual), show token to patient, allow hold token, hold timeout (15/30/45 mins), grace period (15/30/45 mins), after grace (Auto Mark No-show / Keep waiting), OP consultation fee, fee validity days, apply to all departments. Notification preferences: appointment confirmation, visit reminder, settlement received, settlement overdue, plan quota low. *Add:* reschedule window, cancellation fee/refund slab, token numbering scheme, message templates, banner placements (all FRD policies).
-5. **E-05 Platform settings (singleton).** Platform name, support email, helpline number, payout schedule (Weekly / Fortnightly / Monthly), platform commission % (0–100), platform GSTIN (15 characters), settlement alerts, compliance alerts, weekly digest, require 2FA, session timeout (15/30/60 min), API key (masked). *Add:* GST rate, next payout date logic.
-6. **E-06 Internal Medibook user.** id, name, work email, role (Super Admin / Finance Admin / Support / Auditor), 2FA state (Enabled / Pending), last active, status (Active / Pending / Suspended), avatar. *Add:* password/credentials, invite token and acceptance, real last-active timestamp.
+
+1. **E-01 Hospital (tenant).** Fields seen: id (console number; Apollo = 13), name, admin email, phone, GSTIN, plan (by plan name), city, state (2-letter), bookings this month, onboarded date ("April 12, 2025"), status (Active / Pending verification / Suspended / Rejected), KYC record (registration certificate, GST certificate, medical licence, bank account proof — each Missing / Submitted / Verified), payout bank (bank, account number, IFSC, UPI), rejection reason, derived instance ID ("MB-HOSP-0113"). From Hospital Settings the same tenant also owns: registration number, about, logo, gallery photos, address, latitude, longitude, map pin, working hours (open, close, open days), account holder name, rules and notification preferences (see E-04). _Backend must add:_ branch support (FRD), holidays, creation/verification timestamps, verified-by, KYC document files and per-document review history, subscription history.
+2. **E-02 Subscription plan.** id, name (unique), monthly price (₹, GST-inclusive as displayed), bookings per month, staff-account tier ("Up to 25 staff accounts" / "Up to 120 staff accounts" / "Unlimited staff accounts"), support tier ("Email support" / "Priority support" / "Dedicated success manager"), extra feature line, most-popular flag (exclusive), hospital-specific flag. _Backend must add:_ yearly billing option, limits for doctors/branches/storage/message credits (FRD), effective dates, price history.
+3. **E-03 Plan-change request.** id, hospital, hospital email, change text ("Growth → Enterprise"), requested date, status (Pending / Completed / Cancelled). _Add:_ from-plan and to-plan ids, decided by/at, effective date.
+4. **E-04 Hospital settings (per tenant).** Booking rules: default consultation duration (10/15/20/30 mins), online booking on/off, max appointments per slot (5/10/15/20), buffer (0/5/10/15 mins), allow patient cancellation, cancellation cut-off (1/2/4/24 hours), auto no-show after (30 mins/1 hour/2 hours), token generation (Auto/Manual), show token to patient, allow hold token, hold timeout (15/30/45 mins), grace period (15/30/45 mins), after grace (Auto Mark No-show / Keep waiting), OP consultation fee, fee validity days, apply to all departments. Notification preferences: appointment confirmation, visit reminder, settlement received, settlement overdue, plan quota low. _Add:_ reschedule window, cancellation fee/refund slab, token numbering scheme, message templates, banner placements (all FRD policies).
+5. **E-05 Platform settings (singleton).** Platform name, support email, helpline number, payout schedule (Weekly / Fortnightly / Monthly), platform commission % (0–100), platform GSTIN (15 characters), settlement alerts, compliance alerts, weekly digest, require 2FA, session timeout (15/30/60 min), API key (masked). _Add:_ GST rate, next payout date logic.
+6. **E-06 Internal Medibook user.** id, name, work email, role (Super Admin / Finance Admin / Support / Auditor), 2FA state (Enabled / Pending), last active, status (Active / Pending / Suspended), avatar. _Add:_ password/credentials, invite token and acceptance, real last-active timestamp.
 
 ## 8.2 Hospital operations
-1. **E-10 Department.** id ("dp0"), name (used as the join key today), about, base fee (₹ integer), hours text ("Mon–Sat · 9am–6pm"), status (Active / Inactive), colour, weekly grid (7 × {day, on, from, to} with times from "8:00 am" to "8:00 pm"), image. *Add:* hospital id, tax/coupon settings if the FRD's "services" concept is adopted.
-2. **E-11 Doctor.** id ("dc0"), name, departments (names, one or more), specialisation, room, fee, rating (one decimal), review count, status (Active / On Leave / Inactive), weekly grid, leave list ({from, to, reason} as free text "18 Jun"), reviews ({author, rating 1–5, relative date, text}), phone, email, qualification, experience, registration number, photo, about. *Add:* hospital id, department ids, real leave dates, session/shift definitions, slot size/buffer/capacity per doctor, online-booking flag.
+
+1. **E-10 Department.** id ("dp0"), name (used as the join key today), about, base fee (₹ integer), hours text ("Mon–Sat · 9am–6pm"), status (Active / Inactive), colour, weekly grid (7 × {day, on, from, to} with times from "8:00 am" to "8:00 pm"), image. _Add:_ hospital id, tax/coupon settings if the FRD's "services" concept is adopted.
+2. **E-11 Doctor.** id ("dc0"), name, departments (names, one or more), specialisation, room, fee, rating (one decimal), review count, status (Active / On Leave / Inactive), weekly grid, leave list ({from, to, reason} as free text "18 Jun"), reviews ({author, rating 1–5, relative date, text}), phone, email, qualification, experience, registration number, photo, about. _Add:_ hospital id, department ids, real leave dates, session/shift definitions, slot size/buffer/capacity per doctor, online-booking flag.
 3. **E-12 Slot (implied, not modelled).** The FRD requires generated slots per doctor per date with open/blocked state, capacity, hold and booking references. Nothing in the prototypes stores slots; both apps use fixed time labels.
-4. **E-13 Patient (hospital register).** MR number ("AP847201"; generated "AP800001"), name, age (integer; 0 = unknown), gender (Male / Female / Other), phone, email, address, status (Active / Inactive). Principle: identity and contact only, no clinical data. *Add:* hospital id, date of birth, created/updated timestamps, link to the platform patient account when the patient came from the app.
-5. **E-14 Appointment / consultation (hospital).** id ("AP1000"), MR number, denormalised patient name/age/gender/phone, department, doctor (name), source (Online / Walk-in), date (label: "Today" / "Tomorrow" / "14 Jun"), time (slot label "8:30 am"), amount (₹), payment state (Paid / Pending / Refunded), token ("T-001" or none), status (Scheduled / In Queue / Completed / Cancelled / No-show), remark, payment mode (Cash / UPI / Card), payment reference, called-at time, queue order, cancellation reason (Patient request / Doctor unavailable / Duplicate booking / Scheduling error / Other), refund via (Desk). *Add:* hospital id, real date/time and timezone, slot id, created/updated/checked-in/called/completed timestamps, created-by user, booking id shown to the patient, link to the mobile booking, refund amount/reference/date, receipt id, visit outcome.
-6. **E-15 Payment / receipt (implied).** Today embedded in the appointment; the receipt number is derived ("RCPT-47202-10"). *Backend must create:* a payment record (amount, mode, reference, timestamp, cashier, appointment(s) covered, status) and a receipt series with tax lines (consultation fee, taxes, convenience fee), hospital GSTIN and the patient's GST details where applicable.
-7. **E-16 Live queue state.** Per doctor: currently serving token, live status (Available / Consulting / Waiting / On Break); hospital-wide token counter; the department filter last used by the desk. *Add:* per-day/per-doctor sequences (FRD), queue events for audit and for the patient-facing "last called" and estimated wait.
-8. **E-17 Hospital staff user.** id ("u1"), name, email, phone, username, role id, status (Active / Inactive), last active label, invite status (Accepted / Pending). *Add:* credentials, hospital id, invite tokens, real timestamps.
-9. **E-18 Hospital role.** id ("r-admin", "r-new-1"), name, colour, description, system flag, permission grid (ten modules × view/add/edit/delete). *Add:* hospital id; enforcement mapping to API endpoints.
-10. **E-19 Settlement statement (hospital view).** Statement number ("MB-ST-2406"), period text ("10 – 16 Jun 2026"), gross, commission, net, expected date (ISO), status (Pending / Overdue / Released / Received / Payout failed), UTR, remark, received-on date, released amount, requested flag and date. *Add:* hospital id, period start/end dates, commission rate snapshot, the list of appointments/payments the statement covers, release history, outstanding balance for partial releases.
-11. **E-20 Support ticket / hospital request.** id, type (Support / Plan / Settlement), hospital, subject ("Technical issue — Apollo Hospital", "Plan change requested — Enterprise", "Settlement release requested — MB-ST-2406"), detail (message or statement number), date, status (Open / Closed). *Add:* raised-by user, replies, assignment, resolution timestamps, closure of support tickets.
-12. **E-21 Report definition (hospital).** id, name, brief, category (Operations / Finance / People), applicable filters (date, department, doctor, status, mode, source, user), four KPI tiles. *Backend must define* the dataset and columns of each of the 14 reports (Section 10.1).
+4. **E-13 Patient (hospital register).** MR number ("AP847201"; generated "AP800001"), name, age (integer; 0 = unknown), gender (Male / Female / Other), phone, email, address, status (Active / Inactive). Principle: identity and contact only, no clinical data. _Add:_ hospital id, date of birth, created/updated timestamps, link to the platform patient account when the patient came from the app.
+5. **E-14 Appointment / consultation (hospital).** id ("AP1000"), MR number, denormalised patient name/age/gender/phone, department, doctor (name), source (Online / Walk-in), date (label: "Today" / "Tomorrow" / "14 Jun"), time (slot label "8:30 am"), amount (₹), payment state (Paid / Pending / Refunded), token ("T-001" or none), status (Scheduled / In Queue / Completed / Cancelled / No-show), remark, payment mode (Cash / UPI / Card), payment reference, called-at time, queue order, cancellation reason (Patient request / Doctor unavailable / Duplicate booking / Scheduling error / Other), refund via (Desk). _Add:_ hospital id, real date/time and timezone, slot id, created/updated/checked-in/called/completed timestamps, created-by user, booking id shown to the patient, link to the mobile booking, refund amount/reference/date, receipt id, visit outcome.
+6. **E-15 Payment / receipt (implied).** Today embedded in the appointment; the receipt number is derived ("RCPT-47202-10"). _Backend must create:_ a payment record (amount, mode, reference, timestamp, cashier, appointment(s) covered, status) and a receipt series with tax lines (consultation fee, taxes, convenience fee), hospital GSTIN and the patient's GST details where applicable.
+7. **E-16 Live queue state.** Per doctor: currently serving token, live status (Available / Consulting / Waiting / On Break); hospital-wide token counter; the department filter last used by the desk. _Add:_ per-day/per-doctor sequences (FRD), queue events for audit and for the patient-facing "last called" and estimated wait.
+8. **E-17 Hospital staff user.** id ("u1"), name, email, phone, username, role id, status (Active / Inactive), last active label, invite status (Accepted / Pending). _Add:_ credentials, hospital id, invite tokens, real timestamps.
+9. **E-18 Hospital role.** id ("r-admin", "r-new-1"), name, colour, description, system flag, permission grid (ten modules × view/add/edit/delete). _Add:_ hospital id; enforcement mapping to API endpoints.
+10. **E-19 Settlement statement (hospital view).** Statement number ("MB-ST-2406"), period text ("10 – 16 Jun 2026"), gross, commission, net, expected date (ISO), status (Pending / Overdue / Released / Received / Payout failed), UTR, remark, received-on date, released amount, requested flag and date. _Add:_ hospital id, period start/end dates, commission rate snapshot, the list of appointments/payments the statement covers, release history, outstanding balance for partial releases.
+11. **E-20 Support ticket / hospital request.** id, type (Support / Plan / Settlement), hospital, subject ("Technical issue — Apollo Hospital", "Plan change requested — Enterprise", "Settlement release requested — MB-ST-2406"), detail (message or statement number), date, status (Open / Closed). _Add:_ raised-by user, replies, assignment, resolution timestamps, closure of support tickets.
+12. **E-21 Report definition (hospital).** id, name, brief, category (Operations / Finance / People), applicable filters (date, department, doctor, status, mode, source, user), four KPI tiles. _Backend must define_ the dataset and columns of each of the 14 reports (Section 10.1).
 
 ## 8.3 Patient side
-1. **E-30 Patient account.** From the mobile app: name, email, phone ("+91 98456 58525"), date of birth ("15/05/1997"), gender, blood group, blood-donation consent, password. From the console: id, name, email, phone, city, bookings count, joined date, status (Active / Blocked), avatar. *Add:* mobile-number verification state, address (FRD), emergency contacts (FRD), push registration tokens, terms acceptance, deletion/retention state.
-2. **E-31 Dependent / family member.** name, relationship (Self / Husband / Daughter in the app; Spouse / Son / Daughter / Father / Mother in the console), age (or date of birth), gender. *Add:* optional blood group and allergies (FRD), id, link to the account.
-3. **E-32 Appointment (mobile view).** id ("1", "b26"), doctor id, patient name, date ("Today" / "12 Aug 2026"), time ("10:30 AM"), token ("A-25"), status (Confirmed / Completed / Cancelled), list bucket (Upcoming / Past). *Add:* hospital, booking id, payment status and receipt (FRD), fee breakdown, documents, cancellation/refund status, real timestamps.
-4. **E-33 Doctor (mobile view).** id slug ("anya"), name, department, specialty, title, experience ("12 yrs"), patients treated ("6,000+"), rating, fee ("₹900"), hospital name, about, photo. *Backend:* these are the hospital catalogue doctors (E-11) exposed to patients with numeric fields.
-5. **E-34 Department (mobile view).** name, descriptor, icon. *Backend:* E-10 with an icon/illustration asset.
-6. **E-35 Health record (mobile).** title, date, status (Completed / Pending), patient name, hospital name, doctor name. *Backend:* the FRD's document library — title, type (prescription / lab report / imaging / discharge summary / other), patient (self or dependent), date, notes, file, optional appointment link, sharing links with expiry.
-7. **E-36 Notification (mobile).** title, body, relative time, up to two actions. *Add:* id, type, read state, timestamp, target (appointment/record id), channel delivery records.
-8. **E-37 Banner (console) / promo banner (mobile).** Console: id, title, image, live-from, live-until, active flag, priority position, plus one default banner (title, image). Mobile: title, body, gradient, has-image. *Backend:* one banner model with image URL, schedule, priority, hospital or platform scope, optional link.
-9. **E-38 Push notification campaign.** id, title (≤ 40), body (≤ 120), audience (All users / Android only / iOS only / Inactive 30+ days), when, status (Sent / Scheduled / Queued / Cancelled), delivered count, open rate. *Add:* creator, provider message ids, per-device delivery results.
+
+1. **E-30 Patient account.** From the mobile app: name, email, phone ("+91 98456 58525"), date of birth ("15/05/1997"), gender, blood group, blood-donation consent, password. From the console: id, name, email, phone, city, bookings count, joined date, status (Active / Blocked), avatar. _Add:_ mobile-number verification state, address (FRD), emergency contacts (FRD), push registration tokens, terms acceptance, deletion/retention state.
+2. **E-31 Dependent / family member.** name, relationship (Self / Husband / Daughter in the app; Spouse / Son / Daughter / Father / Mother in the console), age (or date of birth), gender. _Add:_ optional blood group and allergies (FRD), id, link to the account.
+3. **E-32 Appointment (mobile view).** id ("1", "b26"), doctor id, patient name, date ("Today" / "12 Aug 2026"), time ("10:30 AM"), token ("A-25"), status (Confirmed / Completed / Cancelled), list bucket (Upcoming / Past). _Add:_ hospital, booking id, payment status and receipt (FRD), fee breakdown, documents, cancellation/refund status, real timestamps.
+4. **E-33 Doctor (mobile view).** id slug ("anya"), name, department, specialty, title, experience ("12 yrs"), patients treated ("6,000+"), rating, fee ("₹900"), hospital name, about, photo. _Backend:_ these are the hospital catalogue doctors (E-11) exposed to patients with numeric fields.
+5. **E-34 Department (mobile view).** name, descriptor, icon. _Backend:_ E-10 with an icon/illustration asset.
+6. **E-35 Health record (mobile).** title, date, status (Completed / Pending), patient name, hospital name, doctor name. _Backend:_ the FRD's document library — title, type (prescription / lab report / imaging / discharge summary / other), patient (self or dependent), date, notes, file, optional appointment link, sharing links with expiry.
+7. **E-36 Notification (mobile).** title, body, relative time, up to two actions. _Add:_ id, type, read state, timestamp, target (appointment/record id), channel delivery records.
+8. **E-37 Banner (console) / promo banner (mobile).** Console: id, title, image, live-from, live-until, active flag, priority position, plus one default banner (title, image). Mobile: title, body, gradient, has-image. _Backend:_ one banner model with image URL, schedule, priority, hospital or platform scope, optional link.
+9. **E-38 Push notification campaign.** id, title (≤ 40), body (≤ 120), audience (All users / Android only / iOS only / Inactive 30+ days), when, status (Sent / Scheduled / Queued / Cancelled), delivered count, open rate. _Add:_ creator, provider message ids, per-device delivery results.
 
 ## 8.4 Finance (console)
-1. **E-40 Invoice.** id, number ("INV-2026-0231"), hospital, amount (GST-inclusive), issued date, due date, status (Completed / Pending / Overdue / Payment failed); displayed but not stored: billing period, plan, subtotal, CGST 9%, SGST 9%. *Add:* line items, tax breakdown stored at issue time, plan snapshot, PDF.
-2. **E-41 Subscription payment.** id, transaction id ("TXN-88412"), invoice number, hospital, method (UPI / Card / NetBanking), amount, date, status (Success / Pending / Payment failed); displayed but derived: gateway reference, status timeline. *Add:* gateway payload, attempts, refunds.
+
+1. **E-40 Invoice.** id, number ("INV-2026-0231"), hospital, amount (GST-inclusive), issued date, due date, status (Completed / Pending / Overdue / Payment failed); displayed but not stored: billing period, plan, subtotal, CGST 9%, SGST 9%. _Add:_ line items, tax breakdown stored at issue time, plan snapshot, PDF.
+2. **E-41 Subscription payment.** id, transaction id ("TXN-88412"), invoice number, hospital, method (UPI / Card / NetBanking), amount, date, status (Success / Pending / Payment failed); displayed but derived: gateway reference, status timeline. _Add:_ gateway payload, attempts, refunds.
 3. **E-42 Settlement statement (console view).** Same as E-19 plus hospital id and, for non-Apollo rows, commission/net computed from the platform rate.
-4. **E-43 Payout run.** Derived grouping of statements by expected date with totals; recorded run remark. *Add:* run id, executed-by/at, bank batch reference.
-5. **E-44 Compliance log entry.** id, hospital id (optional), action text, actor, module (Hospitals / Settlements / Billing / Subscription Plans / Users & Roles / Platform Users / Reports / Settings / Auth / Media / Notifications), IP address, timestamp, severity (Info / Warning / Critical). *Add:* structured event type (Appendix C), target entity id, before/after values for configuration changes.
-6. **E-45 Dashboard alert.** id, severity (danger / warning), title, sub-text, target (settlements / logs / hospital:id). *Add:* generation rules (payout failure, quota, log gap, message-delivery failures, payment-callback failures).
+4. **E-43 Payout run.** Derived grouping of statements by expected date with totals; recorded run remark. _Add:_ run id, executed-by/at, bank batch reference.
+5. **E-44 Compliance log entry.** id, hospital id (optional), action text, actor, module (Hospitals / Settlements / Billing / Subscription Plans / Users & Roles / Platform Users / Reports / Settings / Auth / Media / Notifications), IP address, timestamp, severity (Info / Warning / Critical). _Add:_ structured event type (Appendix C), target entity id, before/after values for configuration changes.
+6. **E-45 Dashboard alert.** id, severity (danger / warning), title, sub-text, target (settlements / logs / hospital:id). _Add:_ generation rules (payout failure, quota, log gap, message-delivery failures, payment-callback failures).
 
 ## 8.5 Relationships the backend must make explicit
+
 1. Hospital 1—n Departments, Doctors, Patients, Appointments, Staff users, Roles, Settlements, Invoices, Payments, Requests, Log entries; Hospital n—1 Plan.
 2. Doctor n—n Department (by id, not name); Doctor 1—n Slots (generated); Slot 1—n Appointments (capacity); Appointment n—1 Patient; Appointment 1—1 Token; Appointment 1—n Payments/Refunds; Appointment n—1 Settlement statement (for online, completed bookings).
 3. Patient account 1—n Dependents; Patient account 1—n Bookings (mobile) which map 1—1 to hospital Appointments; Patient account 1—n Documents; Patient account 1—n Notifications and device registrations.
@@ -1245,10 +1372,10 @@ This section lists every business entity the three front ends display or edit, w
 5. Banner / Push campaign — platform-scoped in the console (no hospital link); the FRD also expects hospital-published banners.
 6. Every identifier in the prototypes that is minted in the browser (MR number, appointment id, token, statement number, invoice number, receipt number, plan id, user id) must be issued by the server.
 
-
 # 9. Integrations and Non-Functional Needs Implied by the Screens
 
 ## 9.1 External services the screens assume
+
 1. **Payment gateway (Razorpay per the FRD and Agreement).** Required for online consultation fees (mobile) and subscription invoice payments (console). No SDK, order creation, webhook handling, hold/expiry or refund call exists in either code base; the mobile app's "Confirm and Pay" takes no payment.
 2. **WhatsApp Cloud API, SMS and push (Firebase).** Required for booking confirmations, reminders, reschedule/cancel notices and campaign pushes. No provider integration exists; the mobile app has no push registration; the console's push composer only records campaigns.
 3. **File storage with expiring links.** Required for KYC documents, patient documents, lab reports, token cards, receipts, hospital logos/gallery, department images, doctor photos and banner images. Today images are kept as browser data (base64) and documents do not exist.
@@ -1258,30 +1385,35 @@ This section lists every business entity the three front ends display or edit, w
 7. **Telephony.** The optional ambulance call and support "Call Us" links need dialler integration; none exists.
 
 ## 9.2 Time, locale and money
+
 1. All three apps assume India: rupees with Indian digit grouping ("₹ 1,02,400"), +91 phone numbers, GSTIN, 18% GST split 9%/9%, IFSC/UPI bank details.
 2. The backend must own the clock: the console runs on a fixed demo date, the hospital app on relative labels evaluated by the browser, the mobile app on the device date. All dates must be stored as timestamps in Asia/Kolkata.
 3. Time slots, tokens, reminders, overdue detection, banner windows and scheduled pushes are all time-driven and need a server scheduler.
 
 ## 9.3 Multi-tenancy and data isolation
+
 1. One hospital app instance corresponds to one tenant; the console reads live data of one tenant (Apollo, id 13) and sample data for the rest. The backend must scope every hospital record by tenant id and expose only the tenant's own data to its staff, while the console reads across tenants with per-role limits.
 2. Patient accounts are platform-wide (a patient books across hospitals); their appointments, documents and notifications must be linked to both the patient and the hospital.
 
 ## 9.4 Security expectations from the contract (none implemented in the UI)
+
 1. Mobile number/email plus password login with OTP verification; short-lived JWT access tokens with rotating refresh tokens; OTP time limits and rate limits; lockout after repeated failures; password hashing; encryption at rest for sensitive fields; HTTPS only.
 2. Role-based access control on every screen and action for hospital roles (including the custom permission grids) and console roles (four-role matrix).
 3. Audit trail for administrative actions, configuration changes, booking state transitions and outbound message attempts, with real actor, IP and timestamp.
 4. Account deletion gated by OTP and governed by a retention policy; notification opt-ins; consent capture (the blood-donation consent defaults to on today).
 
 ## 9.5 Performance and volume expectations from the contract
+
 1. Login under 1 second on warm paths; OTP verification under 2 seconds; search and slot fetches under 2 seconds; 100+ concurrent bookings without double booking (slot hold plus optimistic locking and unique constraints), contingent on the recommended server.
 2. The screens imply pagination sizes of 6–9 rows and client-side search; production lists (patients, appointments, logs, invoices) need server-side search, filtering, sorting and paging.
 
 ## 9.6 Reporting and exports
+
 1. Real CSV downloads exist for payments and settlements (hospital); every other export is a stub. The FRD requires CSV/PDF exports of bookings, cancellations, no-shows, revenue and slot utilisation filtered by date, department and doctor, and console exports for audit/BI.
 
 ## 9.7 Mobile release readiness
-1. Application identifiers, display name, icons, splash screens, signing keys, release internet permission, iOS usage descriptions (camera/photos for document upload, calendar, location if used), deep-link schemes and store listings are all still template defaults and must be produced before any store submission (client prerequisites in Agreement 7.4: Play Store, Apple Developer, Razorpay, Firebase, CDN, WhatsApp provider).
 
+1. Application identifiers, display name, icons, splash screens, signing keys, release internet permission, iOS usage descriptions (camera/photos for document upload, calendar, location if used), deep-link schemes and store listings are all still template defaults and must be produced before any store submission (client prerequisites in Agreement 7.4: Play Store, Apple Developer, Razorpay, Firebase, CDN, WhatsApp provider).
 
 # 10. Gap Analysis Against the Contract Documents
 
@@ -1290,6 +1422,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 ## 10.1 Contract requirements missing or partial in the user interfaces (mandatory list)
 
 ### 10.1.1 Patient mobile app — registration and access
+
 1. **GAP-001 (CM-01, Partial).** Sign-up captures one "Full Name" field, email, an unvalidated phone number and a password. The FRD requires first name, last name, address, email, mobile number, password and confirm password.
 2. **GAP-002 (CM-02, Partial).** The policy checkbox exists but the Terms & Conditions, Privacy Policy and User Guidelines are not tappable documents.
 3. **GAP-003 (CM-03, Absent).** No OTP is sent to the mobile number at sign-up; accounts are never "activated".
@@ -1301,6 +1434,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 9. **GAP-009 (CM-54, Partial).** Account deletion shows a confirmation sheet and a "stubbed" message; no OTP gate, retention handling or impact notice.
 
 ### 10.1.2 Patient mobile app — home, discovery and booking
+
 10. **GAP-010 (CM-07, Partial).** Banners are two fixed slides with no link and no remote configuration; the console's banner manager is not connected.
 11. **GAP-011 (CM-08, Partial).** Navigation is Home / Appointments / Records / Profile; there is no "Services" tab (services appear as home tiles that all lead to the same booking flow).
 12. **GAP-012 (CM-09, CM-24, Partial).** The token widget shows only the patient's own token; current token being served, last called number, estimated wait and a refresh indicator are absent.
@@ -1320,6 +1454,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 26. **GAP-026 (CM-30, Absent).** Appointments cannot be searched by doctor name, hospital name or booking ID (search covers departments and doctors only).
 
 ### 10.1.3 Patient mobile app — documents, insurance, notifications, emergency, support
+
 27. **GAP-027 (CM-32 to CM-36, Absent).** The Documents Library (upload PDF/JPG/PNG/DOC/PPT, title, type, patient, date, notes, appointment link, filters, secure expiring links, external sharing) does not exist; the Records tab lists three fixed lab records with stub View/Download buttons.
 28. **GAP-028 (CM-37 to CM-39, Absent).** The Insurance Locker does not exist.
 29. **GAP-029 (CM-40 to CM-43, Absent).** No WhatsApp, push or in-app confirmations, reminders, reschedule/cancel notices, retries or read state; the notification screen is four fixed cards.
@@ -1328,6 +1463,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 32. **GAP-032 (CM-52, Absent).** Privacy Policy, Terms, FAQs and Support (call/email/chat) are not reachable from the app.
 
 ### 10.1.4 Hospital web app
+
 33. **GAP-033 (HA-01, Partial).** Login is simulated; password reset has no OTP step; mobile-number login is absent.
 34. **GAP-034 (HA-02, Partial).** Dashboards lack cancellation and slot-utilisation KPIs; department token boards exist only as the Front Desk snapshot; admin revenue and charts are fixed sample values.
 35. **GAP-035 (HA-03, Partial).** Hospital profile and working hours exist as forms; branches and holidays do not exist; hospital-published banners/ads for the patient app do not exist.
@@ -1342,6 +1478,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 44. **GAP-044 (X-01, Absent).** Custom role permissions are captured but enforced nowhere; the FRD requires RBAC on every screen and action.
 
 ### 10.1.5 Operations console
+
 45. **GAP-045 (SA-01, Partial).** Onboarding does not provision the initial Admin user or default settings; no invitation or KYC request is sent; documents cannot be uploaded or verified individually.
 46. **GAP-046 (SA-02, Partial).** Plans are monthly only, limited by bookings, staff accounts and support tier; the FRD's monthly/yearly plans with doctor, branch, storage and message-credit limits are absent.
 47. **GAP-047 (SA-03, Partial).** Invoices and payments are read-only; no reminders, mark-as-paid, retry, grace period or auto-suspension for non-payment.
@@ -1350,6 +1487,7 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 50. **GAP-050 (SA-06, Partial).** Compliance logs exist for a subset of console actions with a fixed actor/IP/time; access logs for staff logins, configuration-change details and data export on request do not exist.
 
 ### 10.1.6 Platform and cross-cutting
+
 51. **GAP-051 (X-02, Absent).** Slot hold during payment, hold expiry, optimistic locking and unique constraints — nothing in any UI.
 52. **GAP-052 (X-03, Absent).** Tokens are not sequential per doctor per date and are not tied to payment success (hospital-wide T-nnn at booking/payment/check-in; app-wide A-nn at confirmation).
 53. **GAP-053 (X-04, Absent).** Payment orders, gateway webhooks, stored receipts and refund audit trails do not exist.
@@ -1360,7 +1498,9 @@ Legend: **Present** — the user interface implements the requirement (possibly 
 58. **GAP-058 (AGR-01 backend, Absent).** No Django/PostgreSQL backend, API or deployment exists; both repositories contain empty placeholder files where networking, storage and authentication code would go.
 
 ## 10.2 User-interface features beyond the Preliminary FRD (Change-Request candidates under Agreement Clause 2.4)
+
 The Agreement states that design elements outside the Final/Preliminary FRD are not covered unless a Change Request is agreed. The following exist in the prototypes and are not in the FRD; each needs an explicit "in / out" decision before the Final FRD.
+
 1. **XTRA-01** In-app settlement workflow on both sides: weekly statements, hospital request/raise, Medibook release with UTR/amount/remark, payout runs, partial releases, hospital "Mark Received", overdue and payout-failed states. (The FRD says settlements are handled outside the application.)
 2. **XTRA-02** Hospital-defined custom roles with a ten-module × four-action permission grid, invite methods (email / mobile OTP / set password), reset-password options.
 3. **XTRA-03** Two built-in hospital roles (Receptionist and Administrator) with different menus; the FRD names only "Hospital Admin" (the Quote names Admins and Staff).
@@ -1378,6 +1518,7 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 15. **XTRA-15** Hospital-side subscription page (quota bar, invoices list, request plan change) and platform commission configurable per platform.
 
 ## 10.3 Conflicts between the documents and the user interfaces
+
 1. **CONF-01 Settlements.** FRD: outside the application, helper reports only. UI: full two-sided workflow (10.2 XTRA-01). Decide which governs.
 2. **CONF-02 Patient login identity.** FRD: mobile number + password with mobile OTP. UI: email + password with email OTP.
 3. **CONF-03 Mobile navigation.** FRD: Home, Services, Profile. UI: Home, Appointments, Records, Profile.
@@ -1392,6 +1533,7 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 12. **CONF-12 Repository documentation vs code.** The mobile repository's technical stack (Flutter 3.24.5, Hive cache, Dio, Razorpay, secure storage) and linting/pre-commit guides describe a build that does not exist; the code targets Flutter ≥ 3.38 with none of those packages.
 
 ## 10.4 Cross-application inconsistencies the backend must reconcile
+
 1. **Departments.** Mobile: General, Cardiology, Orthopedics, Dermatology. Hospital app: Cardiology, Orthopedics, Pediatrics, Neurology, ENT, Dermatology (Dermatology inactive in the catalogue but bookable). Console sample pools add General Medicine, Gynaecology, Ophthalmology.
 2. **Doctors and fees.** Mobile: six doctors across two hospitals with per-doctor fees (₹450–₹900). Hospital app: seven doctors with per-department fees (₹500–₹1,000) in booking and per-doctor fees in the catalogue.
 3. **Hospitals.** Mobile: "Apollo Hospital" and "City Care Clinic" as labels. Hospital app: Apollo Hospital only. Console: 13 hospitals, Apollo = 13.
@@ -1403,6 +1545,7 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 9. **Commission rate.** Hospital app fixed at 10%; console editable; Apollo statements keep a stored 10% while others follow the setting.
 
 ## 10.5 Defects observed in the prototypes (must not be carried into production)
+
 1. **DEF-01** New Appointment date defaults to yesterday in Indian time (UTC conversion bug); such bookings are hidden by the default filter, get no token and never enter the queue.
 2. **DEF-02** Booking two or more consultations for a new patient creates a separate MR number and patient record per consultation.
 3. **DEF-03** Undo check-in keeps an online patient's token, so they remain in the waiting queue contrary to the dialog text.
@@ -1418,10 +1561,10 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 13. **DEF-13** Hospital settings are saved per browser, not per hospital account; the sidebar logo ignores the uploaded logo.
 14. **DEF-14** The mobile release build declares no internet permission and uses template application identifiers.
 
-
 # 11. Open Questions for the Client (to be settled in the Final FRD)
 
 ## 11.1 Scope decisions
+
 1. **OQ-01** Settlements: keep the in-app settlement workflow built in the prototypes (statements, release recording with UTR, payout runs, hospital confirmation) or follow the Preliminary FRD (outside the application, helper reports only)? If kept, is it a Change Request?
 2. **OQ-02** Which of the "beyond FRD" features in Section 10.2 (XTRA-01 to XTRA-15) are in scope for the Final FRD, and which are deferred?
 3. **OQ-03** Which of the absent FRD features (documents library, insurance locker, ambulance button, emergency contacts, WhatsApp notifications, add-to-calendar, token card download, coupons/convenience fee) remain in scope for the first release?
@@ -1429,6 +1572,7 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 5. **OQ-05** Console roles: confirm the four internal roles and that the permission matrix must be enforced per endpoint; who may manage internal users.
 
 ## 11.2 Booking, slots and tokens
+
 6. **OQ-06** Discovery: is location → hospital → department → doctor mandatory (FRD), or is the prototype's department-first flow acceptable? Is a hospital selector required in the app?
 7. **OQ-07** Slot model: slot size, buffer, capacity per slot, doctor sessions/shifts, leave and per-date exceptions, hospital/department/doctor hour precedence, booking horizon (the app shows five days), cut-off for same-day past slots, and open/block/bulk operations for staff.
 8. **OQ-08** Slot hold: hold duration during payment, behaviour on failure/timeout, and whether "Pay at Hospital" bookings are held until counter confirmation and for how long.
@@ -1437,6 +1581,7 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 11. **OQ-11** Multi-consultation bookings (several doctors in one visit, one payment): required or not?
 
 ## 11.3 Money
+
 12. **OQ-12** Fee composition for online bookings: consultation fee, taxes/GST, convenience fee, coupons; who bears GST; receipt content and numbering; GST details on patient receipts.
 13. **OQ-13** Refund slab policy for online cancellations (amounts by cut-off), desk refund rules, partial refunds, refund references, and visibility of refund status to the patient.
 14. **OQ-14** Commission: rate (10% default?), whether it is snapshotted per statement, cancellation fees kept by Medibook, and treatment of walk-ins (excluded).
@@ -1445,18 +1590,21 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 17. **OQ-17** Quota: which bookings consume it, reset date, thresholds for warnings and alerts, behaviour when exhausted.
 
 ## 11.4 Identity, security and privacy
+
 18. **OQ-18** Patient identity: mobile number vs email as the login id; OTP length and expiry; social sign-in providers (Google/Facebook/X buttons exist); remember-me policy; biometric login.
 19. **OQ-19** Patient account deletion policy, data retention for bookings/documents, consent defaults (blood-donation consent is on by default), notification opt-ins.
 20. **OQ-20** Staff onboarding: invite flows (email link / mobile OTP / temporary password), password policy, 2FA for hospital admins, session timeout, "cannot deactivate self / last admin" rules.
 21. **OQ-21** Console access to patient data: PII masking for Support/Auditor roles, reason capture on block/unblock, export and anonymisation requests.
 
 ## 11.5 Content and communications
+
 22. **OQ-22** Notifications: channels (in-app, push, WhatsApp, SMS), events (confirmation, reminders day-before/day-of, reschedule, cancel, queue calls, settlement and quota alerts), templates with placeholders, who can trigger them, retry policy.
 23. **OQ-23** Banners: platform-managed only (console) or also hospital-published (FRD); rotation rules; image constraints and hosting; links/deep links; hospital-specific targeting.
 24. **OQ-24** Push campaigns: provider, audience definitions ("Inactive 30+ days"), send time (fixed 09:00?), editing/cancelling queued sends, metrics.
 25. **OQ-25** Support tickets: lifecycle (open → in progress → resolved), replies visible to the hospital, SLA.
 
 ## 11.6 Data and reporting
+
 26. **OQ-26** Report definitions: for each of the 14 hospital reports and 6 console reports, the dataset, columns, filters, date presets, formats (CSV/PDF/XLSX), scheduling and retention; which reports are settlement "helper reports".
 27. **OQ-27** Patient records: source of lab records/prescriptions (hospital upload? lab integration?), file types and sizes, linking to appointments, sharing links, and the hospital-side "no clinical data" principle.
 28. **OQ-28** Master data reconciliation: single department and doctor catalogue per hospital exposed to the app; numeric fee/experience fields; doctor status semantics (hidden/paused/live); department deactivation effects.
@@ -1464,84 +1612,87 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 30. **OQ-30** Locale: single timezone (Asia/Kolkata), English only or multilingual, accessibility requirements (the mobile app disables system font scaling).
 
 ## 11.7 Delivery
+
 31. **OQ-31** Confirm the client prerequisites in Agreement 7.4 (Play Store, Apple Developer, Razorpay, Firebase, CDN, WhatsApp provider) and the target application identifiers, names, icons and store listings.
 32. **OQ-32** Confirm the recommended server specification tied to the performance benchmarks in Agreement 10.3.
-
 
 # Appendix A. Screen and Route Inventory
 
 ## A.1 Patient Mobile App (16 screens, 2 overlays)
-| # | Screen | Route | Reached from | Notes |
-|---|---|---|---|---|
-| 1 | Login | `/login` | app start; logout; sign-up "Log In"; reset done | initial screen |
-| 2 | Create Account | `/signup` | Login "Sign up" | |
-| 3 | Reset Password (forgot) | `/forgot` | Login "Forgot password?" | |
-| 4 | Verify Code | `/verify?email=` | Send Code | fixed OTP 1234 |
-| 5 | New Password | `/reset` | Verify | |
-| 6 | Home | `/home` (tab 1) | login; tabs | banner, token card, quick actions |
-| 7 | Appointments | `/appointments` (tab 2) | tabs; cancel; booking back | Upcoming / Past |
-| 8 | Records | `/records` (tab 3) | tabs; notification | 3 sample records |
-| 9 | Profile | `/profile` (tab 4) | tabs; home avatar | logout / delete |
-| 10 | Search | `/search` | home search pill | departments + doctors |
-| 11 | Notifications | `/notifications` | bell on Home/Appointments/Records | 4 sample cards |
-| 12 | Book Appointment (steps 1–4) | `/booking?step&dept&doctor&origin` | home tiles, search, appointments, doctor detail, book again | |
-| 13 | Doctor Details | `/doctor/:id?return=` | booking step 2; search | |
-| 14 | Booking Success | `/success?appt=` | Confirm and Pay | |
-| 15 | Appointment Details | `/appointment/:id` | cards; token card; success; reschedule; notification | |
-| 16 | Reschedule | `/reschedule/:id` | appointment details; notification | |
-| — | Confirmation sheet | overlay | Logout, Delete account, Cancel appointment | |
-| — | Toast | overlay | many actions | 2.3 s |
+
+| #   | Screen                       | Route                              | Reached from                                                | Notes                             |
+| --- | ---------------------------- | ---------------------------------- | ----------------------------------------------------------- | --------------------------------- |
+| 1   | Login                        | `/login`                           | app start; logout; sign-up "Log In"; reset done             | initial screen                    |
+| 2   | Create Account               | `/signup`                          | Login "Sign up"                                             |                                   |
+| 3   | Reset Password (forgot)      | `/forgot`                          | Login "Forgot password?"                                    |                                   |
+| 4   | Verify Code                  | `/verify?email=`                   | Send Code                                                   | fixed OTP 1234                    |
+| 5   | New Password                 | `/reset`                           | Verify                                                      |                                   |
+| 6   | Home                         | `/home` (tab 1)                    | login; tabs                                                 | banner, token card, quick actions |
+| 7   | Appointments                 | `/appointments` (tab 2)            | tabs; cancel; booking back                                  | Upcoming / Past                   |
+| 8   | Records                      | `/records` (tab 3)                 | tabs; notification                                          | 3 sample records                  |
+| 9   | Profile                      | `/profile` (tab 4)                 | tabs; home avatar                                           | logout / delete                   |
+| 10  | Search                       | `/search`                          | home search pill                                            | departments + doctors             |
+| 11  | Notifications                | `/notifications`                   | bell on Home/Appointments/Records                           | 4 sample cards                    |
+| 12  | Book Appointment (steps 1–4) | `/booking?step&dept&doctor&origin` | home tiles, search, appointments, doctor detail, book again |                                   |
+| 13  | Doctor Details               | `/doctor/:id?return=`              | booking step 2; search                                      |                                   |
+| 14  | Booking Success              | `/success?appt=`                   | Confirm and Pay                                             |                                   |
+| 15  | Appointment Details          | `/appointment/:id`                 | cards; token card; success; reschedule; notification        |                                   |
+| 16  | Reschedule                   | `/reschedule/:id`                  | appointment details; notification                           |                                   |
+| —   | Confirmation sheet           | overlay                            | Logout, Delete account, Cancel appointment                  |                                   |
+| —   | Toast                        | overlay                            | many actions                                                | 2.3 s                             |
 
 ## A.2 Hospital Web App "mbAdmin" (14 views + 2 auth screens)
-| # | View | URL | Receptionist | Administrator |
-|---|---|---|---|---|
-| 1 | Login | `/auth/login` | public | public |
-| 2 | Forgot Password | `/auth/forgot` | public | public |
-| 3 | Dashboard (Front Desk / Hospital Dashboard) | `/:role/dashboard` | ✔ | ✔ |
-| 4 | Appointments | `/:role/appointments` | ✔ | ✔ |
-| 5 | New Appointment | `/:role/appointments/new` | ✔ | ✔ |
-| 6 | Patients | `/:role/patients` | ✔ | ✔ |
-| 7 | Patient Profile | `/:role/patients/:mrn` | ✔ | ✔ |
-| 8 | Token Management (Live Token Queue) | `/:role/token` | ✔ | ✔ |
-| 9 | Payments | `/:role/payments` | ✔ | ✔ |
-| 10 | Billing & Settlements (Settlements · Plan & Billing) | `/admin/settlements` | ✗ | ✔ |
-| 11 | Doctors & Departments | `/admin/doctors` | ✗ | ✔ |
-| 12 | Doctor Profile (view/create/edit) | `/admin/doctors/:id` | ✗ | ✔ |
-| 13 | Users & Roles | `/admin/users` | ✗ | ✔ |
-| 14 | Reports & Analytics | `/admin/reports` | ✗ | ✔ |
-| 15 | Hospital Settings | `/admin/settings` | ✗ | ✔ |
-| 16 | Help & Support | `/:role/help` | ✔ | ✔ |
+
+| #   | View                                                 | URL                       | Receptionist | Administrator |
+| --- | ---------------------------------------------------- | ------------------------- | ------------ | ------------- |
+| 1   | Login                                                | `/auth/login`             | public       | public        |
+| 2   | Forgot Password                                      | `/auth/forgot`            | public       | public        |
+| 3   | Dashboard (Front Desk / Hospital Dashboard)          | `/:role/dashboard`        | ✔            | ✔             |
+| 4   | Appointments                                         | `/:role/appointments`     | ✔            | ✔             |
+| 5   | New Appointment                                      | `/:role/appointments/new` | ✔            | ✔             |
+| 6   | Patients                                             | `/:role/patients`         | ✔            | ✔             |
+| 7   | Patient Profile                                      | `/:role/patients/:mrn`    | ✔            | ✔             |
+| 8   | Token Management (Live Token Queue)                  | `/:role/token`            | ✔            | ✔             |
+| 9   | Payments                                             | `/:role/payments`         | ✔            | ✔             |
+| 10  | Billing & Settlements (Settlements · Plan & Billing) | `/admin/settlements`      | ✗            | ✔             |
+| 11  | Doctors & Departments                                | `/admin/doctors`          | ✗            | ✔             |
+| 12  | Doctor Profile (view/create/edit)                    | `/admin/doctors/:id`      | ✗            | ✔             |
+| 13  | Users & Roles                                        | `/admin/users`            | ✗            | ✔             |
+| 14  | Reports & Analytics                                  | `/admin/reports`          | ✗            | ✔             |
+| 15  | Hospital Settings                                    | `/admin/settings`         | ✗            | ✔             |
+| 16  | Help & Support                                       | `/:role/help`             | ✔            | ✔             |
 
 Dialogs and panels: Appointment drawer; Record Payment; Record Payment (multiple); Receipt & Token; Receipt & Tokens; Cancel Appointment; Edit Appointment; Reschedule Appointment; Mark as No-show; Undo Check-in; Edit Patient; Add/Edit Department; Department panel; Remove Doctor / Delete Department / Delete Doctor Profile; Add User; User panel; Reset Password; Role editor; Confirm Transfer Received; Request Settlement; Raise Settlement Request; Request Plan Change; Raise a Support Ticket; notification bell; Switch Role menu.
 
 ## A.3 Operations Console (16 views)
-| # | View | URL |
-|---|---|---|
-| 1 | Operations Dashboard | `/ops/dashboard` |
-| 2 | Hospital Management | `/ops/hospitals` |
-| 3 | Hospital Profile (Overview · Departments · Doctors · Billing & Settlements · Activity) | `/ops/hospitals/:id` |
-| 4 | Subscription Plans | `/ops/plans` |
-| 5 | Billing (Invoices · Payments) | `/ops/billing?tab=` |
-| 6 | Invoice Detail | `/ops/billing/invoices/:id` |
-| 7 | Payment Detail | `/ops/billing/payments/:id` |
-| 8 | Hospital Settlements (By Payout Run · Flat List) | `/ops/settlements` |
-| 9 | Usage Analytics | `/ops/analytics` |
-| 10 | Reports | `/ops/reports` |
-| 11 | Compliance Logs | `/ops/logs` |
-| 12 | Users & Roles (internal) | `/ops/users` |
-| 13 | Platform Users | `/ops/platform-users` |
-| 14 | Patient Account | `/ops/platform-users/:id` |
-| 15 | Notifications (App Banners · Push Notifications) | `/ops/notifications` |
-| 16 | Platform Settings | `/ops/settings` |
+
+| #   | View                                                                                   | URL                         |
+| --- | -------------------------------------------------------------------------------------- | --------------------------- |
+| 1   | Operations Dashboard                                                                   | `/ops/dashboard`            |
+| 2   | Hospital Management                                                                    | `/ops/hospitals`            |
+| 3   | Hospital Profile (Overview · Departments · Doctors · Billing & Settlements · Activity) | `/ops/hospitals/:id`        |
+| 4   | Subscription Plans                                                                     | `/ops/plans`                |
+| 5   | Billing (Invoices · Payments)                                                          | `/ops/billing?tab=`         |
+| 6   | Invoice Detail                                                                         | `/ops/billing/invoices/:id` |
+| 7   | Payment Detail                                                                         | `/ops/billing/payments/:id` |
+| 8   | Hospital Settlements (By Payout Run · Flat List)                                       | `/ops/settlements`          |
+| 9   | Usage Analytics                                                                        | `/ops/analytics`            |
+| 10  | Reports                                                                                | `/ops/reports`              |
+| 11  | Compliance Logs                                                                        | `/ops/logs`                 |
+| 12  | Users & Roles (internal)                                                               | `/ops/users`                |
+| 13  | Platform Users                                                                         | `/ops/platform-users`       |
+| 14  | Patient Account                                                                        | `/ops/platform-users/:id`   |
+| 15  | Notifications (App Banners · Push Notifications)                                       | `/ops/notifications`        |
+| 16  | Platform Settings                                                                      | `/ops/settings`             |
 
 Dialogs: Onboard Hospital; Approve this hospital?; Suspend/Reactivate this hospital?; Reject this hospital?; Create/Edit Plan; Delete this plan?; Record Settlement Release; Record Run Release; Add User (internal); Delete this user?; Block/Unblock this account?; Add/Edit Banner; Edit Default Banner; Delete this banner?; Send/Schedule this notification?; notification bell; account menu.
-
 
 # Appendix B. Sample Data Reference (what the prototypes are seeded with)
 
 The sample data defines the vocabulary the client has already seen in demos. It is listed here so that test data, migrations and acceptance scenarios can reuse it, and so that seed-only states (statuses no code produces) are recognisable.
 
 ## B.1 Patient mobile app
+
 1. **Account holder:** Alexandra Johnson · alexandra.johnson@example.com · +91 98456 58525 · born 15/05/1997 · Female · blood group O+ · donation consent on.
 2. **Family:** Alexandra Johnson (29 years · Female · Self), Michael Johnson (34 years · Male · Husband), Ava Johnson (6 years · Female · Daughter).
 3. **Departments:** General ("Primary healthcare"), Cardiology ("Heart specialists"), Orthopedics ("Bone & joint care"), Dermatology ("Skin specialists").
@@ -1553,6 +1704,7 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 9. **Banners:** "Want to see a doctor today?" / "Schedule your appointment in just a tap."; "Lab tests at home" / "Book a sample collection slot now."
 
 ## B.2 Hospital web app (Apollo Hospital, Bengaluru; tenant 13)
+
 1. **Hospital:** Apollo Hospital · KA-HOSP-20194 · GSTIN 29AAACA4033H1Z5 · 080 4567 8900 · contact@apollo.med · 154 Bannerghatta Road, Bengaluru 560076 (12.9088, 77.5975) · HDFC Bank 50200048112233 / HDFC0001234 / apollohospital@hdfcbank · open 8:00 am–8:00 pm Mon–Sat · plan Growth.
 2. **Booking roster (fixed):** Cardiology ₹800 — Dr. Thomas K. (room 101), Dr. Anil R. (102); Orthopedics ₹700 — Dr. Geetha R. (201); Pediatrics ₹600 — Dr. Kumar V. (301); Neurology ₹1,000 — Dr. Maya S. (401); ENT ₹500 — Dr. Arun B. (501); Dermatology ₹650 — Dr. Leela P. (601).
 3. **Catalogue departments:** the same six, with Dermatology Inactive; hours "Mon–Sat · 9am–6pm" style texts.
@@ -1564,6 +1716,7 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 9. **Plan page:** Growth ₹24,999/month, 3,120 of 5,000 bookings used, invoices INV-2026-0244/0219/0198.
 
 ## B.3 Operations console
+
 1. **Hospitals (13):** 1 Sunrise Multispeciality (Pune, Growth, 4,280 bookings, Active); 2 Lotus Heart Institute (Chennai, Enterprise, 6,120, Pending verification); 3 Kaveri General Hospital (Mysuru, Starter, 1,240, Active, no bank); 4 Nirmal Ortho & Spine (Indore, Growth, 2,860, Suspended); 5 Ashwini Children's Care (Kochi, Starter, 980, Pending verification, GST certificate missing); 6 Meridian City Hospital (Mumbai, Enterprise, 7,450, Active); 7 Vasudha Medical Centre (Hyderabad, Growth, 3,320, Active); 8 Trinity Care & Research (Bengaluru, Custom — Trinity Care, 5,210, Active); 9 Girnar Multispeciality (Rajkot, Starter, 860, Suspended); 10 Padma Eye Foundation (Vijayawada, Starter, 640, Rejected — "Incomplete KYC documents"); 11 Himgiri Wellness Hospital (Dehradun, Growth, 1,980, Active); 12 Charak Institute of Medicine (Lucknow, Enterprise, 4,890, Pending verification); 13 Apollo Hospital (Bengaluru, Growth, 3,120, Active, onboarded April 12, 2025).
 2. **Plans (4):** Starter ₹9,999 / 1,500; Growth ₹24,999 / 5,000 (Most Popular); Enterprise ₹49,999 / 8,000; Custom — Trinity Care ₹59,999 / 10,000.
 3. **Plan changes (4):** Vasudha Starter → Growth (Completed); Charak Growth → Enterprise (Pending); Padma Growth → Starter (Completed); Girnar Starter → Growth (Cancelled).
@@ -1575,37 +1728,38 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 9. **Banners:** default "Book trusted doctors near you — Medibook"; Monsoon Health Camp (Live); Free tele-consult week (Scheduled); World Yoga Day (Paused); Summer vaccination drive (Expired). **Pushes:** "20% off health checkups" (Sent); "Live queue updates are here" (Sent, Android); "Father's Day heart camp" (Scheduled 21 Jun 2026).
 10. **Compliance log (10 seed entries):** see Appendix C.2. **Platform settings:** Medibook · support@medibook.in · 1800 220 440 · Weekly payouts · 10% commission · GSTIN 27AABCM9407L1ZK · 2FA required · 30-minute session.
 
-
 # Appendix C. Audit-Event Catalogue
 
 ## C.1 Events the console writes today (fixed actor riya.sharma@medibook.in, IP 10.42.8.11, time "Just now")
-| # | Module | Severity | Event text (template) | Trigger |
-|---|---|---|---|---|
-| 1 | Hospitals | Info | Hospital onboarded — <name> | Onboard Hospital |
-| 2 | Hospitals | Info | Hospital approved — <name> | Approve & Go Live / Re-review & Approve |
-| 3 | Hospitals | Critical | Hospital rejected — <name> | Reject with reason |
-| 4 | Hospitals | Critical | Hospital suspended — <name> | Suspend Instance |
-| 5 | Hospitals | Critical | Hospital reactivated — <name> | Reactivate Instance |
-| 6 | Subscription Plans | Info | Plan created — <name> | Create Plan |
-| 7 | Subscription Plans | Info | Plan updated — <name> | Save Plan |
-| 8 | Subscription Plans | Critical | Plan deleted — <name> | Delete Plan |
-| 9 | Subscription Plans | Info | Plan change applied — <hospital>: <from → to> | Approve plan change |
-| 10 | Subscription Plans | Info | Plan change declined — <hospital>: <from → to> | Decline plan change |
-| 11 | Settings | Info | Settings updated — platform preferences | Save Changes (Platform Settings) |
-| 12 | Notifications | Info | Default app banner updated | Save default banner |
-| 13 | Notifications | Info | App banner updated — <title> | Save banner (edit) |
-| 14 | Notifications | Info | App banner added — <title> | Add Banner |
-| 15 | Notifications | Warning | App banner deleted — <title> | Delete Banner |
-| 16 | Notifications | Info | App banner paused — <title> / App banner resumed — <title> | Pause / Resume |
-| 17 | Notifications | Warning | Push notification sent — “<title>” to <audience> | Send Now |
-| 18 | Notifications | Warning | Push notification scheduled — “<title>” to <audience> | Schedule |
-| 19 | Notifications | Info | Scheduled push cancelled — “<title>” | Cancel scheduled push |
-| 20 | Platform Users | Critical | Patient account blocked — <email> / unblocked — <email> | Block / Unblock |
-| 21 | Platform Users | Info | Patient account viewed — <email> | Open a patient account from the list |
-| 22 | Settlements | Info | Settlement release recorded — <statement> · ₹<amount> to <hospital> | Record Release |
-| 23 | Settlements | Info | Payout run recorded — <date> · <n> statements · ₹<total> | Record Run Release |
+
+| #   | Module             | Severity | Event text (template)                                               | Trigger                                 |
+| --- | ------------------ | -------- | ------------------------------------------------------------------- | --------------------------------------- |
+| 1   | Hospitals          | Info     | Hospital onboarded — <name>                                         | Onboard Hospital                        |
+| 2   | Hospitals          | Info     | Hospital approved — <name>                                          | Approve & Go Live / Re-review & Approve |
+| 3   | Hospitals          | Critical | Hospital rejected — <name>                                          | Reject with reason                      |
+| 4   | Hospitals          | Critical | Hospital suspended — <name>                                         | Suspend Instance                        |
+| 5   | Hospitals          | Critical | Hospital reactivated — <name>                                       | Reactivate Instance                     |
+| 6   | Subscription Plans | Info     | Plan created — <name>                                               | Create Plan                             |
+| 7   | Subscription Plans | Info     | Plan updated — <name>                                               | Save Plan                               |
+| 8   | Subscription Plans | Critical | Plan deleted — <name>                                               | Delete Plan                             |
+| 9   | Subscription Plans | Info     | Plan change applied — <hospital>: <from → to>                       | Approve plan change                     |
+| 10  | Subscription Plans | Info     | Plan change declined — <hospital>: <from → to>                      | Decline plan change                     |
+| 11  | Settings           | Info     | Settings updated — platform preferences                             | Save Changes (Platform Settings)        |
+| 12  | Notifications      | Info     | Default app banner updated                                          | Save default banner                     |
+| 13  | Notifications      | Info     | App banner updated — <title>                                        | Save banner (edit)                      |
+| 14  | Notifications      | Info     | App banner added — <title>                                          | Add Banner                              |
+| 15  | Notifications      | Warning  | App banner deleted — <title>                                        | Delete Banner                           |
+| 16  | Notifications      | Info     | App banner paused — <title> / App banner resumed — <title>          | Pause / Resume                          |
+| 17  | Notifications      | Warning  | Push notification sent — “<title>” to <audience>                    | Send Now                                |
+| 18  | Notifications      | Warning  | Push notification scheduled — “<title>” to <audience>               | Schedule                                |
+| 19  | Notifications      | Info     | Scheduled push cancelled — “<title>”                                | Cancel scheduled push                   |
+| 20  | Platform Users     | Critical | Patient account blocked — <email> / unblocked — <email>             | Block / Unblock                         |
+| 21  | Platform Users     | Info     | Patient account viewed — <email>                                    | Open a patient account from the list    |
+| 22  | Settlements        | Info     | Settlement release recorded — <statement> · ₹<amount> to <hospital> | Record Release                          |
+| 23  | Settlements        | Info     | Payout run recorded — <date> · <n> statements · ₹<total>            | Record Run Release                      |
 
 ## C.2 Event types present only in sample data (no code writes them)
+
 1. Users & Roles — "Role permissions changed — Finance Admin" (Critical).
 2. Auth — "Failed login attempt (3x)" (Warning, actor "unknown@23.94.61.2").
 3. Billing — "Invoice regenerated — INV-2026-0234" (Info).
@@ -1616,186 +1770,213 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 8. Settlements — "Settlement released — ₹ 1,28,250" (Info).
 
 ## C.3 Events the contract requires that nobody writes
+
 1. Staff login/logout and failed attempts (hospital and console); password resets; invite acceptance; 2FA changes.
 2. Hospital-side configuration changes (settings, bank details, working hours, rules, notification preferences), catalogue changes (departments, doctors, leave), role and user changes.
 3. Booking state transitions (created, checked in, called, skipped, completed, no-show, cancelled, reinstated, edited, rescheduled), payments, refunds, receipt prints.
 4. Outbound message attempts and delivery results (push, WhatsApp, SMS); payment-gateway callbacks and failures.
 5. Console actions currently unlogged: internal user add/delete, API-key rotation, report and invoice downloads, alert resolution, settlement request handling, hospital "Mark Received".
 
-
 # Appendix D. User-Facing Message Catalogue
 
 Messages are quoted verbatim. Toasts are transient confirmations; validation messages appear under fields or as red toasts; confirmations are dialog titles and bodies.
 
 ## D.1 Patient mobile app
+
 ### Validation
+
 1. "Enter a valid email address" · "Enter your password" · "At least 6 characters" · "Enter your name" · "Passwords do not match" · "Incorrect code — the demo code is 1234".
+
 ### Toasts
+
 2. "Welcome to Medibook, <first name>!" · "Code sent to <email>" · "Code re-sent to <email>" · "Password reset — please log in".
 3. "All notifications marked as read" · "That appointment was cancelled" · "Downloading prescription…" · "We'll remind you tomorrow".
 4. "Appointment cancelled" · "Appointment rescheduled".
 5. "<record title> — preview stubbed in this demo" · "Downloading <record title>…".
 6. "Profile editing is stubbed in this demo" · "You are now available for donation" · "Donation availability turned off" · "Account deletion is stubbed in this demo".
+
 ### Confirmation sheets
+
 7. "Logout" — "Are you sure you want to log out?" — Cancel / Yes, Logout.
 8. "Delete Account" — "This will permanently remove your records and appointments." — Cancel / Yes, Delete.
 9. "Cancel Appointment" — "Are you sure you want to cancel your appointment with <doctor>?" — Cancel / Yes, Cancel.
+
 ### Static notes
+
 10. "Payment is collected at the hospital desk." · "You can reschedule up to 2 hours before your slot." · "Please arrive 15 minutes early and carry any previous reports." · "Tap a doctor to view details and book" · "No matches for “<query>”" · "No upcoming appointments" / "No past appointments" · "Appointment not found." · "Demo login is prefilled — just tap Log In." · "Demo code: 1234".
 
 ## D.2 Hospital web app
+
 ### Login and recovery
+
 1. "Enter your email and password to continue." · "Enter a valid email address." · "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate." · "Check your inbox" / "We've sent a password reset link to <email>. The link expires in 30 minutes."
+
 ### Appointments, queue and payments
+
 2. "<patient> checked in · Token <token>" · "Payment recorded · Token <token> issued" · "Payment recorded · <n> token(s) issued" · "Token <token> issued for <patient>" · "Appointment cancelled · desk refund recorded" · "Appointment cancelled" · "Marked as no-show" · "Appointment rescheduled" · "Appointment updated" · "Check-in undone · back to Scheduled" · "Reverted to Scheduled" · "Now consulting <token> · <patient>" · "<token> completed" · "<token> skipped · moved to the end of the queue" · "No one waiting for <doctor>" · "No active patient for <doctor>" · "No patient is being seen".
 3. "Select department and doctor" · "Select a patient and at least one department + doctor" · "Online appointment saved" · "<n> online appointments saved" · "Exported medibook-payments.csv".
 4. Confirmations: "Mark as No-show" — "Mark <patient> as a no-show? You can undo this afterwards."; "Undo Check-in" — "Send <patient> back to Scheduled and remove their token from the queue?"; Cancel dialog — "Cancel the appointment for <patient> with <doctor>?" with the online/desk refund notes quoted in §4.4.7.
+
 ### Patients, doctors, users
+
 5. "Name and phone are required" · "Patient added" · "Patient details updated" · "Department name is required" · "Department added" · "Department updated" · "Doctor name is required" · "Assign at least one department" · "Doctor added" · "Doctor profile saved" · "Doctor profile deleted" · "Doctor removed" · "Department deleted" · "Add shift — demo" · "Shift removed" · "Add leave — demo" · "Leave removed" · "Image upload — demo" · "Photo added".
 6. "Name, email and role are required" · "Email invite sent" · "OTP sent for confirmation" · "User created with password" · "User deactivated" · "User activated" · "Edit user — demo" · "Invite resent" · "Reset link sent to <email>" · "OTP sent to <phone>" · "Temporary password set" · "Give the role a name" · "Role "<name>" created" · "Role updated" · "Role deleted".
 7. Confirmations: "Remove Doctor" / "Delete Department" — "Are you sure you want to remove/delete <name>? This can't be undone."; "Delete Doctor Profile" — "Delete <name>'s profile? This removes them from the patient app and can't be undone."
+
 ### Settlements, plan, reports, settings, help
+
 8. "Marked as received" · "Follow-up raised with Medibook for the overdue transfer" · "Settlement requested from Medibook" · "Exported medibook-settlements.csv" · "Pick the plan you want" · "Plan change request sent to Medibook" · "Exported <report>-report.csv" · "Preparing PDF…" · "Settings saved" · "Ticket raised with Medibook support" · "All caught up".
 9. Confirmations: "Confirm Transfer Received" — "Confirm the hospital has received the bank transfer for <statement>."; "Raise Settlement Request" — "This settlement is overdue. Raise a follow-up request with Medibook for <statement>."; "Request Settlement" — "Request Medibook to release the settlement for <statement>."
+
 ### Error card
+
 10. "This screen hit a snag" — "Something didn't load right. You can retry, or head back to the dashboard — your data is safe."
 
 ## D.3 Operations console
+
 ### Hospitals and plans
+
 1. "Hospital name is required." · "Enter a valid email address." · "City is required." · "<name> onboarded. KYC verification pending." · "Cannot approve — <documents> not received." · "<name> approved and live." · "<name> suspended." · "<name> reactivated." · "<name> rejected. The hospital has been notified."
 2. "Plan name is required." · "A plan with this name already exists." · "Enter a monthly price." · "Enter a monthly booking quota." · "Plan "<name>" created." · "Plan "<name>" updated." · "Plan deleted." · "<n> hospital(s) is/are on this plan — move them to another plan first." · "Plan change applied — <hospital> moved to <plan>." · "Plan change declined for <hospital>."
 3. Confirmations: "Approve this hospital?" — "<name> goes live immediately and can start taking bookings on Medibook."; "Suspend this hospital?" — "<name> staff lose access immediately. Existing bookings are kept, but no new bookings can be made until reactivation."; "Reactivate this hospital?" — "<name> regains access immediately and can take new bookings right away."; "Reject this hospital?" — "<name> is notified by email and cannot take bookings. This decision is final."; "Delete this plan?" — ""<name>" is removed from the catalog. No hospitals are on it, so nothing else changes."
+
 ### Billing, settlements, reports, alerts
+
 4. "Invoice <no> downloaded." · "No payout account on file for <hospital> — the hospital adds it under Hospital Settings." · "Enter the released amount." · "Enter the bank transfer reference." · "Release recorded — visible to <hospital>." · "Payout run recorded — <n> settlement(s) released." · "<Report> ready." · "Alert resolved".
+
 ### Users, patient accounts, notifications, settings
+
 5. "Full name is required." · "<name> added." · "User deleted." · "Edit user — demo" · "<name> blocked." · "<name> unblocked." · "Give the banner a title." · "Set a start date." · "Set an end date on or after the start." · "Banner added — it goes live on its start date." · "Banner updated." · "Default banner saved." · "Banner deleted." · "Add a title." · "Add a message." · "Pick a date." · "Notification queued for delivery." · "Notification scheduled." · "Scheduled notification cancelled." · "Enter a value between 0 and 100." · "GST number must be 15 characters." · "Settings saved." · "API key rotated. Update your gateway config."
 6. Confirmations: "Delete this user?" — "This permanently removes <name> and their access. You won't be able to recover it later."; "Block this account?" — "Existing upcoming bookings are unaffected. <name> cannot make new bookings until unblocked."; "Unblock this account?" — "<name> can make new bookings again immediately."; "Delete this banner?" — "“<title>” is removed from the app immediately. This cannot be undone."; "Send this notification now?" / "Schedule this notification?" — "“<title>” goes to <audience> (~<n> users) [on <date> at 09:00]. Push notifications can't be recalled after delivery."
-
 
 # Appendix E. Requirement Traceability Matrix
 
 Status: **Present** · **Partial** · **Absent** · **Backend** (no UI expectation) · **Excluded** (Agreement 2.5) · **n/a** (commercial clause).
 
 ## E.1 Preliminary FRD — Customer Mobile App
-| ID | Requirement (short) | Status | Where in this document |
-|---|---|---|---|
-| CM-01 | Registration fields | Partial | 3.2.2, GAP-001 |
-| CM-02 | Accept policies | Partial | 3.2.2, GAP-002 |
-| CM-03 | Mobile OTP activation | Absent | GAP-003 |
-| CM-04 | Login by mobile + password | Absent | 3.2.1, GAP-004 |
-| CM-05 | Lockout / throttling | Absent | GAP-005 |
-| CM-06 | Forgot password via mobile OTP | Partial | 3.2.3–3.2.5, GAP-006 |
-| CM-07 | Home brand, configurable banners, notifications | Partial | 3.3, 3.5, GAP-010 |
-| CM-08 | Home / Services / Profile navigation | Partial | 3.1.2, GAP-011 |
-| CM-09 | Live token widget | Partial | 3.3, GAP-012 |
-| CM-10 | Location → hospital list | Absent | GAP-013 |
-| CM-11 | Hospital → departments → doctors | Partial | 3.6.2–3.6.3, GAP-014 |
-| CM-12 | Calendar and bookable slots | Partial | 3.6.4, GAP-015 |
-| CM-13 | Booking summary with fee components | Partial | 3.6.5, GAP-016 |
-| CM-14 | Booking ID + token on payment | Partial | 3.6.6, GAP-017 |
-| CM-15 | Token card download, add to calendar | Absent | 3.8, GAP-018 |
-| CM-16 | Dependents with health flags | Partial | 3.6.4, GAP-019 |
-| CM-17 | In-app payment methods | Absent | GAP-020 |
-| CM-18 | Pay at Hospital option | Partial | GAP-021 |
-| CM-19 | Amount breakdown before payment | Partial | GAP-016 |
-| CM-20 | Payment order / hold / retry | Absent | GAP-020 |
-| CM-21 | Digital receipts with GST | Absent | GAP-022 |
-| CM-22 | Refund status | Absent | GAP-022 |
-| CM-23 | Razorpay | Absent | GAP-020 |
-| CM-24 | Live token progress | Absent | GAP-012 |
-| CM-25 | Cancel within cut-off | Partial | 3.10, GAP-023 |
-| CM-26 | Reschedule per policy | Partial | 3.11, GAP-023 |
-| CM-27 | Token card view/download | Absent | GAP-018 |
-| CM-28 | Appointment filters | Partial | 3.9, GAP-024 |
-| CM-29 | Details with payment status, receipt, documents | Partial | 3.10, GAP-025 |
-| CM-30 | Search appointments | Absent | 3.4, GAP-026 |
-| CM-31 | Book again | Present | 3.10 |
-| CM-32 | Documents library | Absent | 3.12, GAP-027 |
-| CM-33 | Add files from device | Absent | GAP-027 |
-| CM-34 | Document fields | Absent | GAP-027 |
-| CM-35 | Filter / view documents | Absent | GAP-027 |
-| CM-36 | Secure links and sharing | Absent | GAP-027 |
-| CM-37 | Insurance locker | Absent | GAP-028 |
-| CM-38 | Renewal reminders, default policy | Absent | GAP-028 |
-| CM-39 | Reference-only insurance | Absent | GAP-028 |
-| CM-40 | WhatsApp + in-app + push confirmation | Absent | GAP-029 |
-| CM-41 | Reminders | Absent | GAP-029 |
-| CM-42 | Reschedule/cancel notices | Absent | GAP-029 |
-| CM-43 | Retry, unread persistence | Absent | GAP-029 |
-| CM-44 | Call Ambulance | Absent | GAP-030 |
-| CM-45 | Location in emergency message | Absent | GAP-030 |
-| CM-46 | Ambulance from home/details | Absent | GAP-030 |
-| CM-47 | Edit profile, phone re-verify | Absent | 3.13, GAP-007 |
-| CM-48 | Manage dependents | Absent | GAP-019 |
-| CM-49 | Emergency contacts | Absent | GAP-031 |
-| CM-50 | Update address | Absent | GAP-031 |
-| CM-51 | Change password after OTP | Absent | GAP-007 |
-| CM-52 | Privacy, Terms, FAQs, Support | Absent | GAP-032 |
-| CM-53 | Logout clears tokens/push | Partial | GAP-008 |
-| CM-54 | OTP-gated deletion | Partial | GAP-009 |
+
+| ID    | Requirement (short)                             | Status  | Where in this document |
+| ----- | ----------------------------------------------- | ------- | ---------------------- |
+| CM-01 | Registration fields                             | Partial | 3.2.2, GAP-001         |
+| CM-02 | Accept policies                                 | Partial | 3.2.2, GAP-002         |
+| CM-03 | Mobile OTP activation                           | Absent  | GAP-003                |
+| CM-04 | Login by mobile + password                      | Absent  | 3.2.1, GAP-004         |
+| CM-05 | Lockout / throttling                            | Absent  | GAP-005                |
+| CM-06 | Forgot password via mobile OTP                  | Partial | 3.2.3–3.2.5, GAP-006   |
+| CM-07 | Home brand, configurable banners, notifications | Partial | 3.3, 3.5, GAP-010      |
+| CM-08 | Home / Services / Profile navigation            | Partial | 3.1.2, GAP-011         |
+| CM-09 | Live token widget                               | Partial | 3.3, GAP-012           |
+| CM-10 | Location → hospital list                        | Absent  | GAP-013                |
+| CM-11 | Hospital → departments → doctors                | Partial | 3.6.2–3.6.3, GAP-014   |
+| CM-12 | Calendar and bookable slots                     | Partial | 3.6.4, GAP-015         |
+| CM-13 | Booking summary with fee components             | Partial | 3.6.5, GAP-016         |
+| CM-14 | Booking ID + token on payment                   | Partial | 3.6.6, GAP-017         |
+| CM-15 | Token card download, add to calendar            | Absent  | 3.8, GAP-018           |
+| CM-16 | Dependents with health flags                    | Partial | 3.6.4, GAP-019         |
+| CM-17 | In-app payment methods                          | Absent  | GAP-020                |
+| CM-18 | Pay at Hospital option                          | Partial | GAP-021                |
+| CM-19 | Amount breakdown before payment                 | Partial | GAP-016                |
+| CM-20 | Payment order / hold / retry                    | Absent  | GAP-020                |
+| CM-21 | Digital receipts with GST                       | Absent  | GAP-022                |
+| CM-22 | Refund status                                   | Absent  | GAP-022                |
+| CM-23 | Razorpay                                        | Absent  | GAP-020                |
+| CM-24 | Live token progress                             | Absent  | GAP-012                |
+| CM-25 | Cancel within cut-off                           | Partial | 3.10, GAP-023          |
+| CM-26 | Reschedule per policy                           | Partial | 3.11, GAP-023          |
+| CM-27 | Token card view/download                        | Absent  | GAP-018                |
+| CM-28 | Appointment filters                             | Partial | 3.9, GAP-024           |
+| CM-29 | Details with payment status, receipt, documents | Partial | 3.10, GAP-025          |
+| CM-30 | Search appointments                             | Absent  | 3.4, GAP-026           |
+| CM-31 | Book again                                      | Present | 3.10                   |
+| CM-32 | Documents library                               | Absent  | 3.12, GAP-027          |
+| CM-33 | Add files from device                           | Absent  | GAP-027                |
+| CM-34 | Document fields                                 | Absent  | GAP-027                |
+| CM-35 | Filter / view documents                         | Absent  | GAP-027                |
+| CM-36 | Secure links and sharing                        | Absent  | GAP-027                |
+| CM-37 | Insurance locker                                | Absent  | GAP-028                |
+| CM-38 | Renewal reminders, default policy               | Absent  | GAP-028                |
+| CM-39 | Reference-only insurance                        | Absent  | GAP-028                |
+| CM-40 | WhatsApp + in-app + push confirmation           | Absent  | GAP-029                |
+| CM-41 | Reminders                                       | Absent  | GAP-029                |
+| CM-42 | Reschedule/cancel notices                       | Absent  | GAP-029                |
+| CM-43 | Retry, unread persistence                       | Absent  | GAP-029                |
+| CM-44 | Call Ambulance                                  | Absent  | GAP-030                |
+| CM-45 | Location in emergency message                   | Absent  | GAP-030                |
+| CM-46 | Ambulance from home/details                     | Absent  | GAP-030                |
+| CM-47 | Edit profile, phone re-verify                   | Absent  | 3.13, GAP-007          |
+| CM-48 | Manage dependents                               | Absent  | GAP-019                |
+| CM-49 | Emergency contacts                              | Absent  | GAP-031                |
+| CM-50 | Update address                                  | Absent  | GAP-031                |
+| CM-51 | Change password after OTP                       | Absent  | GAP-007                |
+| CM-52 | Privacy, Terms, FAQs, Support                   | Absent  | GAP-032                |
+| CM-53 | Logout clears tokens/push                       | Partial | GAP-008                |
+| CM-54 | OTP-gated deletion                              | Partial | GAP-009                |
 
 ## E.2 Preliminary FRD — Hospital Admin Web
-| ID | Requirement | Status | Where |
-|---|---|---|---|
-| HA-01 | Login + OTP reset | Partial | 4.2, GAP-033 |
-| HA-02 | Dashboard KPIs and token boards | Partial | 4.3, GAP-034 |
-| HA-03 | Profile, branches, hours, holidays, banners | Partial | 4.12, GAP-035 |
-| HA-04 | Departments and services with pricing/taxes/coupons | Partial | 4.9.4, GAP-036 |
-| HA-05 | Doctor profiles | Present | 4.9.3 |
-| HA-06 | Days, sessions, slot size, buffer | Partial | 4.9.3, GAP-037 |
-| HA-07 | Leaves and exceptions | Partial | 4.9.3, GAP-037 |
-| HA-08 | Slot generation and control | Absent | GAP-038 |
-| HA-09 | Appointments desk actions | Partial | 4.4, GAP-039 |
-| HA-10 | Print/download token cards and receipts | Partial | 4.4.10, GAP-040 |
-| HA-11 | Trigger confirmations/reminders, banners | Absent | GAP-041 |
-| HA-12 | Message templates | Absent | GAP-041 |
-| HA-13 | Reports with exports | Partial | 4.11, GAP-042 |
+
+| ID    | Requirement                                         | Status  | Where           |
+| ----- | --------------------------------------------------- | ------- | --------------- |
+| HA-01 | Login + OTP reset                                   | Partial | 4.2, GAP-033    |
+| HA-02 | Dashboard KPIs and token boards                     | Partial | 4.3, GAP-034    |
+| HA-03 | Profile, branches, hours, holidays, banners         | Partial | 4.12, GAP-035   |
+| HA-04 | Departments and services with pricing/taxes/coupons | Partial | 4.9.4, GAP-036  |
+| HA-05 | Doctor profiles                                     | Present | 4.9.3           |
+| HA-06 | Days, sessions, slot size, buffer                   | Partial | 4.9.3, GAP-037  |
+| HA-07 | Leaves and exceptions                               | Partial | 4.9.3, GAP-037  |
+| HA-08 | Slot generation and control                         | Absent  | GAP-038         |
+| HA-09 | Appointments desk actions                           | Partial | 4.4, GAP-039    |
+| HA-10 | Print/download token cards and receipts             | Partial | 4.4.10, GAP-040 |
+| HA-11 | Trigger confirmations/reminders, banners            | Absent  | GAP-041         |
+| HA-12 | Message templates                                   | Absent  | GAP-041         |
+| HA-13 | Reports with exports                                | Partial | 4.11, GAP-042   |
 
 ## E.3 Preliminary FRD — Super Admin Web
-| ID | Requirement | Status | Where |
-|---|---|---|---|
-| SA-01 | Onboard/activate/suspend; provision admin; defaults | Partial | 5.3, GAP-045 |
-| SA-02 | Plans with feature limits | Partial | 5.4, GAP-046 |
-| SA-03 | Invoices, payments, grace, auto-suspend | Partial | 5.5, GAP-047 |
-| SA-04 | Settlement helper reports (outside app) | Partial / conflict | 5.6, 5.8, GAP-048, CONF-01 |
-| SA-05 | Platform dashboards | Partial | 5.2, 5.7, GAP-049 |
-| SA-06 | Access/config logs, export | Partial | 5.9, GAP-050 |
+
+| ID    | Requirement                                         | Status             | Where                      |
+| ----- | --------------------------------------------------- | ------------------ | -------------------------- |
+| SA-01 | Onboard/activate/suspend; provision admin; defaults | Partial            | 5.3, GAP-045               |
+| SA-02 | Plans with feature limits                           | Partial            | 5.4, GAP-046               |
+| SA-03 | Invoices, payments, grace, auto-suspend             | Partial            | 5.5, GAP-047               |
+| SA-04 | Settlement helper reports (outside app)             | Partial / conflict | 5.6, 5.8, GAP-048, CONF-01 |
+| SA-05 | Platform dashboards                                 | Partial            | 5.2, 5.7, GAP-049          |
+| SA-06 | Access/config logs, export                          | Partial            | 5.9, GAP-050               |
 
 ## E.4 Preliminary FRD — Platform
-| ID | Requirement | Status | Where |
-|---|---|---|---|
-| X-01 | Users, auth, JWT, RBAC | Absent (UI data only) | 4.10, 5.10, GAP-044 |
-| X-02 | Slot hold, anti-double-booking | Absent | GAP-051 |
-| X-03 | Sequential token per doctor/date | Absent | GAP-052 |
-| X-04 | Payment orders, webhooks, receipts, refund audit | Absent | GAP-053 |
-| X-05 | Notification content | Absent | GAP-054 |
-| X-06 | Performance | Backend | 9.5 |
-| X-07 | Security | Backend | 9.4 |
-| X-08 | Per-tenant policies | Partial | 4.12.4, GAP-055 |
-| X-09 | Content and downloads | Partial | 5.12, GAP-056 |
-| X-10 | Audit and supportability | Partial | 5.9, GAP-057 |
-| X-11 | MVP exclusions | Excluded | 10.3 CONF-11 |
-| X-12 | Deliverables | n/a | — |
+
+| ID   | Requirement                                      | Status                | Where               |
+| ---- | ------------------------------------------------ | --------------------- | ------------------- |
+| X-01 | Users, auth, JWT, RBAC                           | Absent (UI data only) | 4.10, 5.10, GAP-044 |
+| X-02 | Slot hold, anti-double-booking                   | Absent                | GAP-051             |
+| X-03 | Sequential token per doctor/date                 | Absent                | GAP-052             |
+| X-04 | Payment orders, webhooks, receipts, refund audit | Absent                | GAP-053             |
+| X-05 | Notification content                             | Absent                | GAP-054             |
+| X-06 | Performance                                      | Backend               | 9.5                 |
+| X-07 | Security                                         | Backend               | 9.4                 |
+| X-08 | Per-tenant policies                              | Partial               | 4.12.4, GAP-055     |
+| X-09 | Content and downloads                            | Partial               | 5.12, GAP-056       |
+| X-10 | Audit and supportability                         | Partial               | 5.9, GAP-057        |
+| X-11 | MVP exclusions                                   | Excluded              | 10.3 CONF-11        |
+| X-12 | Deliverables                                     | n/a                   | —                   |
 
 ## E.5 Quote
-| ID | Requirement | Status | Where |
-|---|---|---|---|
-| Q-01 | Super Admin, Admins, Staff, Patients | Partial (Staff = Receptionist) | 2.2, OQ-04 |
-| Q-02 | Patient functions | Partial | Section 3 |
-| Q-03 | Staff/admin functions incl. filtered patient history | Partial | 4.5.3, 4.7, GAP-043 |
-| Q-04 | Five modules | n/a | 2.5 |
+
+| ID   | Requirement                                          | Status                         | Where               |
+| ---- | ---------------------------------------------------- | ------------------------------ | ------------------- |
+| Q-01 | Super Admin, Admins, Staff, Patients                 | Partial (Staff = Receptionist) | 2.2, OQ-04          |
+| Q-02 | Patient functions                                    | Partial                        | Section 3           |
+| Q-03 | Staff/admin functions incl. filtered patient history | Partial                        | 4.5.3, 4.7, GAP-043 |
+| Q-04 | Five modules                                         | n/a                            | 2.5                 |
 
 ## E.6 Agreement
-| ID | Clause | Status | Where |
-|---|---|---|---|
-| AGR-01 | Components incl. Django/PostgreSQL backend | Absent (backend) | GAP-058 |
-| AGR-02 | Final FRD binding | n/a | 0.1 |
-| AGR-03 | UI/UX boundary → Change Requests | applies | 10.2 |
-| AGR-04 | Exclusions | Excluded | 10.3 |
-| AGR-05 | Module 1 architecture deliverables | this document is the input | 0.1 |
-| AGR-06 | Timeline | n/a | — |
-| AGR-07 | Client prerequisites | open | 9.7, OQ-31 |
-| AGR-08 | Performance contingent on server | Backend | OQ-32 |
-| AGR-09 | Unit testing only by provider | note: 30 UI tests exist in the mobile repo, none in the web repo | 3.14 |
 
-
+| ID     | Clause                                     | Status                                                           | Where      |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------- | ---------- |
+| AGR-01 | Components incl. Django/PostgreSQL backend | Absent (backend)                                                 | GAP-058    |
+| AGR-02 | Final FRD binding                          | n/a                                                              | 0.1        |
+| AGR-03 | UI/UX boundary → Change Requests           | applies                                                          | 10.2       |
+| AGR-04 | Exclusions                                 | Excluded                                                         | 10.3       |
+| AGR-05 | Module 1 architecture deliverables         | this document is the input                                       | 0.1        |
+| AGR-06 | Timeline                                   | n/a                                                              | —          |
+| AGR-07 | Client prerequisites                       | open                                                             | 9.7, OQ-31 |
+| AGR-08 | Performance contingent on server           | Backend                                                          | OQ-32      |
+| AGR-09 | Unit testing only by provider              | note: 30 UI tests exist in the mobile repo, none in the web repo | 3.14       |
