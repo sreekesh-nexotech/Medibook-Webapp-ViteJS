@@ -1,3 +1,7 @@
+import { useState } from 'react';
+
+import type { FieldErrors } from '@/core/error/failure';
+import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
 import { minLen, required } from '@/shared/lib/validate';
@@ -5,17 +9,34 @@ import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
+import type { SupportTicketCategory } from '@/features/help/domain/entities/help.types';
+import {
+  SUPPORT_TICKET_CATEGORIES,
+  TICKET_DESCRIPTION_MAX,
+} from '@/features/help/domain/entities/help.types';
+import { useRaiseSupportTicketMutation } from '@/features/help/application/queries/useRaiseSupportTicketMutation';
 
-/** Topic options offered on the ticket form (design `Select` options). */
-const TOPIC_OPTIONS = [
-  'Billing & settlements',
-  'Appointments & queue',
-  'Plan & subscription',
-  'Technical issue',
-  'Other',
-] as const;
+/** Readable label for each backend ticket category, in the backend's order. */
+const CATEGORY_LABELS: Readonly<Record<SupportTicketCategory, string>> = {
+  billing: 'Billing & settlements',
+  technical: 'Technical issue',
+  onboarding: 'Onboarding & setup',
+  feature_request: 'Feature request',
+  complaint: 'Complaint',
+  other: 'Other',
+};
+
+/** Topic options offered on the ticket form — the backend's categories. */
+const TOPIC_OPTIONS = SUPPORT_TICKET_CATEGORIES.map((c) => CATEGORY_LABELS[c]);
+
+/** The category a picked topic label stands for (`undefined` until one is picked). */
+function categoryFor(label: string): SupportTicketCategory | undefined {
+  return SUPPORT_TICKET_CATEGORIES.find((c) => CATEGORY_LABELS[c] === label);
+}
+
+const SEND_FAILED = 'Could not send your ticket. Please try again.';
 
 /** Enough characters to be a useful subject / a diagnosable description. */
 const SUBJECT_MIN = 6;
@@ -48,25 +69,45 @@ interface RaiseTicketModalProps {
  * subject and description have minimum lengths and the category must be
  * chosen, each error shown under its own control rather than as a toast.
  *
- * Sending calls the settlements store's `raiseTicket`, which puts the ticket in
- * the ops inbox — a real cross-app effect, so the success toast it raises is
- * earned.
+ * Sending raises a real ticket (`POST /hospital/support/tickets`); the success
+ * toast carries its ticket number. Field errors the server returns show under
+ * their own control; anything else is a toast and the modal stays open.
  */
 export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
-  const raiseTicket = useSettlementsStore((s) => s.raiseTicket);
+  const raise = useRaiseSupportTicketMutation();
+  const [serverErrors, setServerErrors] = useState<FieldErrors>({});
 
   const form = useForm<TicketForm>({
     initial: { subject: '', category: '', description: '' },
     validate: TICKET_VALIDATORS,
     onSubmit: ({ subject, category, description }) => {
-      raiseTicket(`${category} — ${subject.trim()}`, description.trim());
-      form.reset({ subject: '', category: '', description: '' });
-      onClose();
+      const picked = categoryFor(category);
+      if (!picked) return;
+      setServerErrors({});
+      raise.mutate(
+        { category: picked, subject, description },
+        {
+          onSuccess: (ticket) => {
+            toast(`Ticket ${ticket.ticketNo} sent to Medibook`);
+            form.reset({ subject: '', category: '', description: '' });
+            onClose();
+          },
+          onError: (failure) => {
+            setServerErrors(isFailure(failure) ? failure.fieldErrors : {});
+            toast(isFailure(failure) ? failure.message : SEND_FAILED, 'error');
+          },
+        },
+      );
     },
   });
 
+  /** The client-side error first, else what the server said about this field. */
+  const errorFor = (key: keyof TicketForm): string | undefined =>
+    form.errorFor(key) ?? serverErrors[key]?.join(' ');
+
   const close = (): void => {
     form.reset({ subject: '', category: '', description: '' });
+    setServerErrors({});
     onClose();
   };
 
@@ -77,11 +118,11 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
       title="Raise a Support Ticket"
       width={520}
       submitLabel="Send to Medibook"
-      busy={form.submitting}
+      busy={raise.isPending}
       onSubmit={form.handleSubmit}
     >
       <div className="flex flex-col gap-4">
-        <Field label="Subject" required error={form.errorFor('subject')}>
+        <Field label="Subject" required error={errorFor('subject')}>
           <TextInput
             value={form.values.subject}
             onChange={(v) => form.setField('subject', v)}
@@ -90,7 +131,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
             maxLength={120}
           />
         </Field>
-        <Field label="Topic" required error={form.errorFor('category')}>
+        <Field label="Topic" required error={errorFor('category')}>
           <Select
             value={form.values.category}
             placeholder="Pick the closest topic"
@@ -102,7 +143,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
         <Field
           label="Describe the issue"
           required
-          error={form.errorFor('description')}
+          error={errorFor('description')}
           hint={`At least ${DESCRIPTION_MIN} characters — dates, IDs and what you expected help most`}
         >
           {({ id, describedById, invalid }) => (
@@ -113,6 +154,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
               value={form.values.description}
               onChange={(e) => form.setField('description', e.target.value)}
               onBlur={() => form.blurField('description')}
+              maxLength={TICKET_DESCRIPTION_MAX}
               placeholder="What's happening?"
               className={cn(
                 'rounded-input text-body-lg text-text-strong h-24 w-full resize-none border p-3',
@@ -122,8 +164,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
           )}
         </Field>
         <div className="text-caption text-text-muted">
-          Tickets go straight to the Medibook operations team — they appear in their console
-          notifications.
+          Tickets go straight to the Medibook operations team — they reply to you by email.
         </div>
       </div>
     </FormModal>

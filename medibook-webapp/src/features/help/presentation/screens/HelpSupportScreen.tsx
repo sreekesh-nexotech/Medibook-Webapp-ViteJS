@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useAppConfigQuery } from '@/shared/hooks/useAppConfigQuery';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -69,12 +70,23 @@ const FAQS: readonly Faq[] = [
   },
 ];
 
-/** Contact channels as `[icon, title, subtitle, href]` tuples. */
-const CONTACTS: readonly (readonly [IconName, string, string, string | null])[] = [
-  ['mail', 'Email Support', 'support@medibook.app', 'mailto:support@medibook.app'],
-  ['phone', 'Call Us', '1800 200 4567', 'tel:+918002004567'],
-  ['message-circle', 'Live Chat', 'Mon–Sat, 9am–7pm', null],
-];
+/** A contact channel as an `[icon, title, subtitle, href]` tuple. */
+type Contact = readonly [IconName, string, string, string | null];
+
+/**
+ * The design's support line — shown until (or unless) the platform configures
+ * its own in app-config's `support_contacts`.
+ */
+const DEFAULT_PHONE: Contact = ['phone', 'Call Us', '1800 200 4567', 'tel:+918002004567'];
+
+/** Contact channels; the phone comes from the platform when it has one configured. */
+function contactsFor(phoneE164: string | null): readonly Contact[] {
+  return [
+    ['mail', 'Email Support', 'support@medibook.app', 'mailto:support@medibook.app'],
+    phoneE164 ? ['phone', 'Call Us', phoneE164, `tel:${phoneE164}`] : DEFAULT_PHONE,
+    ['message-circle', 'Live Chat', 'Mon–Sat, 9am–7pm', null],
+  ];
+}
 
 /**
  * Help & Support screen (design `Admin.jsx` `HelpSupport`): the navy hero with
@@ -85,12 +97,19 @@ const CONTACTS: readonly (readonly [IconName, string, string, string | null])[] 
  * sit above — they were decorative controls before (audit 3.1: a control that
  * looks live and does nothing) — and a search that matches nothing gets an
  * empty state offering a way out.
+ *
+ * The FAQs are in-app copy: the hospital API has no FAQ endpoint (FAQs exist
+ * only on the patient and platform surfaces). The support phone is the
+ * platform's `support_contacts` from app-config; while that loads, fails, or
+ * is unset, the design's number stands in, so the card never blanks out.
  */
 export function HelpSupportScreen() {
   const [open, setOpen] = useState(0);
   const [ticket, setTicket] = useState(false);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<HelpCategoryKey | null>(null);
+  const appConfig = useAppConfigQuery();
+  const contacts = contactsFor(appConfig.data?.supportPhoneE164 ?? null);
 
   const needle = q.trim().toLowerCase();
   const shown = FAQS.filter((f) => {
@@ -222,7 +241,7 @@ export function HelpSupportScreen() {
             Still need help?
           </SectionTitle>
           <div className="flex flex-col gap-3.5">
-            {CONTACTS.map(([ic, t, s, href]) => {
+            {contacts.map(([ic, t, s, href]) => {
               const body = (
                 <>
                   <div className="bg-blue-soft-bg text-blue flex size-10 flex-none items-center justify-center rounded-md">
