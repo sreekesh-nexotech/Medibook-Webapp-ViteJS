@@ -1,12 +1,14 @@
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole } from '@/app/router/paths';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import {
   addIsoDays,
   daysBetweenIso,
   formatIsoDayLabel,
+  isoWeekdayIndex,
   isoWeekdayLabel,
   todayIso,
 } from '@/features/doctors/domain/calendar';
@@ -18,9 +20,16 @@ import {
   durationCopy,
   parseDurationMinutes,
 } from '@/features/settings/application/store/settings.rules';
-import { useSlotGrid } from '@/features/slots/application/store/slots.selectors';
-import { useSlotsStore } from '@/features/slots/application/store/slots.store';
-import type { DoctorSlotRow, Slot } from '@/features/slots/domain/slot';
+import { useLatestGenerationRunQuery } from '@/features/slots/application/queries/useLatestGenerationRunQuery';
+import { useRegenerateSlotsMutation } from '@/features/slots/application/queries/useRegenerateSlotsMutation';
+import { useSlotGridQuery } from '@/features/slots/application/queries/useSlotGridQuery';
+import { useToggleSlotMutation } from '@/features/slots/application/queries/useToggleSlotMutation';
+import {
+  toSlotGridView,
+  type SlotCellView,
+  type SlotRowView,
+} from '@/features/slots/presentation/components/slotsGridView';
+import { isFailure } from '@/core/error/failure';
 import { useCan } from '@/shared/hooks/usePermission';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -44,16 +53,32 @@ import { SlotLegend } from '../components/SlotLegend';
 const ALL_DEPTS = 'All Departments';
 const ALL_DOCTORS = 'All Doctors';
 
+const TOGGLE_FAILED = 'The slot could not be changed. Please try again.';
+const REGENERATE_FAILED = 'Slots could not be regenerated. Please try again.';
+
+function errorText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
+function runTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 /** Slots & Availability — the hospital's slot grid, open/block and bulk update (HA-08). */
 export function SlotsScreen() {
   const { role: roleParam } = useParams();
   const navigate = useNavigate();
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
-  const docs = useCatalogStore((s) => s.docs);
-  const depts = useCatalogStore((s) => s.depts);
+  const doctorsQuery = useDoctorsQuery();
+  const departmentsQuery = useDepartmentsQuery();
+  // Hospital Settings (H2) has no query hooks yet: slot length, buffer, hours,
+  // open weekdays and the booking horizon still come from the legacy store.
   const settings = useSettingsStore((s) => s.settings);
-  const blockSlot = useSlotsStore((s) => s.blockSlot);
-  const openSlot = useSlotsStore((s) => s.openSlot);
   const canEdit = useCan('Doctors & Departments.edit');
 
   const [date, setDate] = useState(todayIso);
@@ -61,56 +86,79 @@ export function SlotsScreen() {
   const [doctorF, setDoctorF] = useState(ALL_DOCTORS);
   const [bulk, setBulk] = useState<{ doctorId: string | null } | null>(null);
 
-  /**
-   * Regenerating the grid is real work (every doctor × every slot of the day),
-   * so date changes and refreshes run in a transition: `isPending` is React's
-   * own report that the new grid is not on screen yet, which is what the
-   * skeleton stands for — no artificial delay anywhere.
-   */
-  const [nonce, setNonce] = useState(0);
-  const [isPending, startTransition] = useTransition();
-  const goToDate = (next: string): void => {
-    startTransition(() => setDate(next));
-  };
-  const refresh = (): void => {
-    startTransition(() => setNonce((n) => n + 1));
-  };
-
-  const dept = deptF === ALL_DEPTS ? null : deptF;
-  // The filter shows doctor names; the grid is keyed on canonical doctor ids.
-  const doctorId =
-    doctorF === ALL_DOCTORS ? null : (docs.find((d) => d.name === doctorF)?.id ?? null);
-  const result = useSlotGrid({ date, dept, doctorId, nonce });
-
+  const docs = useMemo(() => doctorsQuery.data ?? [], [doctorsQuery.data]);
+  const depts = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
+  const departmentId = depts.find((d) => d.name === deptF)?.id ?? null;
   const doctorOptions = useMemo(
     () =>
-      docs.filter((d) => d.status !== 'Inactive').filter((d) => !dept || d.depts.includes(dept)),
-    [docs, dept],
+      docs
+        .filter((d) => d.status !== 'inactive')
+        .filter((d) => !departmentId || d.departmentId === departmentId),
+    [docs, departmentId],
   );
+  const doctorId = doctorOptions.find((d) => d.name === doctorF)?.id ?? null;
+
+  const gridQuery = useSlotGridQuery({ date, departmentId, doctorId });
+  const latestRun = useLatestGenerationRunQuery();
+  const toggle = useToggleSlotMutation();
+  const regenerate = useRegenerateSlotsMutation();
+
+  const grid = useMemo(() => {
+    if (!gridQuery.data) return null;
+    const deptNames = new Map(depts.map((d) => [d.id, d.name]));
+    const rooms = new Map(docs.map((d) => [d.id, d.room]));
+    return toSlotGridView(date, gridQuery.data.days, deptNames, rooms);
+  }, [gridQuery.data, depts, docs, date]);
+
   // Booking is open `horizonDays` calendar days ahead, counting today, so the
   // last bookable date is today + (horizon - 1).
   const horizonDays = selectSchedulingHorizonDays({ settings });
   const lastBookableIso = addIsoDays(todayIso(), Math.max(0, horizonDays - 1));
   const atHorizon = daysBetweenIso(date, lastBookableIso) <= 0;
+  const beyondHorizon = daysBetweenIso(date, lastBookableIso) < 0;
+  const hospitalClosed = settings.hoursDays[isoWeekdayIndex(date)] === false;
   const slotMinutes = parseDurationMinutes(settings.rules.duration, 0);
   const bufferMinutes = parseDurationMinutes(settings.rules.buffer, 0);
   const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== todayIso();
   const clearFilters = (): void => {
     setDeptF(ALL_DEPTS);
     setDoctorF(ALL_DOCTORS);
-    goToDate(todayIso());
+    setDate(todayIso());
+  };
+  const refresh = async (): Promise<void> => {
+    await Promise.all([gridQuery.refetch(), latestRun.refetch()]);
   };
 
-  const toggleSlot = (row: DoctorSlotRow, slot: Slot): void => {
-    const ref = { doctorId: row.doctorId, date, startMinutes: slot.startMinutes };
-    if (slot.state === 'blocked') {
-      openSlot(ref);
-      toast(`${row.doctorName} · ${slot.label} opened`, 'success');
-    } else {
-      blockSlot(ref);
-      toast(`${row.doctorName} · ${slot.label} blocked`, 'info');
-    }
+  const toggleSlot = (row: SlotRowView, slot: SlotCellView): void => {
+    const action = slot.state === 'blocked' ? 'open' : 'block';
+    toggle.mutate(
+      { slotId: slot.id, action },
+      {
+        onSuccess: () =>
+          toast(
+            `${row.doctorName} · ${slot.label} ${action === 'open' ? 'opened' : 'blocked'}`,
+            action === 'open' ? 'success' : 'info',
+          ),
+        onError: (error) => toast(errorText(error, TOGGLE_FAILED), 'error'),
+      },
+    );
   };
+
+  const handleRegenerate = (): void => {
+    regenerate.mutate(doctorId, {
+      onSuccess: (res) =>
+        toast(
+          `Slots regenerated — ${res.createdCount} created, ${res.updatedCount} updated`,
+          'success',
+        ),
+      onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error'),
+    });
+  };
+
+  const isCatalogLoading = doctorsQuery.isPending || departmentsQuery.isPending;
+  const catalogError = doctorsQuery.error ?? departmentsQuery.error;
+  const doctorsPage = gridQuery.data;
+  const isTruncated = doctorsPage ? doctorsPage.total > doctorsPage.days.length : false;
 
   return (
     <div className="flex flex-col gap-5">
@@ -121,7 +169,7 @@ export function SlotsScreen() {
             label="Previous day"
             box={40}
             size={18}
-            onClick={() => goToDate(addIsoDays(date, -1))}
+            onClick={() => setDate(addIsoDays(date, -1))}
           />
           <div className="w-44">
             <TextInput
@@ -130,7 +178,7 @@ export function SlotsScreen() {
               type="date"
               height={40}
               aria-label="Slot grid date"
-              onChange={(v) => goToDate(v || todayIso())}
+              onChange={(v) => setDate(v || todayIso())}
             />
           </div>
           <IconBtn
@@ -139,15 +187,15 @@ export function SlotsScreen() {
             box={40}
             size={18}
             disabled={atHorizon}
-            onClick={() => goToDate(addIsoDays(date, 1))}
+            onClick={() => setDate(addIsoDays(date, 1))}
           />
-          <Button size="sm" variant="secondary" onClick={() => goToDate(todayIso())}>
+          <Button size="sm" variant="secondary" onClick={() => setDate(todayIso())}>
             Today
           </Button>
         </div>
         <FilterSelect
           value={deptF}
-          options={[ALL_DEPTS, ...depts.map((d) => d.name)]}
+          options={[ALL_DEPTS, ...depts.filter((d) => d.isActive).map((d) => d.name)]}
           onChange={(v) => {
             setDeptF(v);
             setDoctorF(ALL_DOCTORS);
@@ -162,7 +210,7 @@ export function SlotsScreen() {
         />
         {hasFilters && <ClearChip onClick={clearFilters} label="Reset to today" />}
         <span className="flex-1" />
-        <RefreshBtn onRefresh={refresh} title="Regenerate the slot grid" />
+        <RefreshBtn onRefresh={refresh} title="Refresh the slot grid" />
         <Can perm={'Doctors & Departments.edit'} disableInstead>
           <Button icon="sliders-horizontal" onClick={() => setBulk({ doctorId: null })}>
             Bulk Update
@@ -180,9 +228,35 @@ export function SlotsScreen() {
               : ' back-to-back'} · {settings.hoursOpen}–{settings.hoursClose}
             <InfoDot text="Slot length, buffer and opening hours come from Hospital Settings. Each doctor's own hours, shift patterns, leave and date exceptions narrow them." />
           </div>
+          <div className="text-caption text-text-muted mt-1 flex flex-wrap items-center gap-1.5">
+            <Icon name="refresh-cw" size={13} />
+            {latestRun.isPending
+              ? 'Checking when slots were last generated…'
+              : latestRun.isError
+                ? 'Could not read the last generation run.'
+                : latestRun.data
+                  ? `Slots last generated ${runTime(latestRun.data.startedAt)}${
+                      latestRun.data.error ? ' — that run failed' : ''
+                    }`
+                  : 'Slots have not been generated yet.'}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={regenerate.isPending}
+                className="text-caption text-blue cursor-pointer underline disabled:cursor-default disabled:opacity-60"
+              >
+                {regenerate.isPending
+                  ? 'Regenerating…'
+                  : doctorId
+                    ? `Regenerate ${doctorF}`
+                    : 'Regenerate all slots'}
+              </button>
+            )}
+          </div>
         </div>
         <span className="flex-1" />
-        {result?.ok && <SlotLegend counts={result.grid.counts} />}
+        {grid && <SlotLegend counts={grid.counts} />}
       </Card>
 
       {!settings.rules.onlineBooking && (
@@ -204,23 +278,7 @@ export function SlotsScreen() {
         </Card>
       )}
 
-      {isPending || !result ? (
-        <SkeletonTable rows={7} cols={8} />
-      ) : !result.ok ? (
-        <ErrorState
-          title="The slot grid could not be generated"
-          message={result.reason}
-          onRetry={refresh}
-        >
-          <Button
-            variant="ghost"
-            icon="settings"
-            onClick={() => navigate(hospitalPath(role, 'settings'))}
-          >
-            Open Hospital Settings
-          </Button>
-        </ErrorState>
-      ) : result.grid.beyondHorizon ? (
+      {beyondHorizon ? (
         <Card>
           <EmptyState
             icon="calendar-clock"
@@ -228,10 +286,10 @@ export function SlotsScreen() {
             message={`The hospital takes bookings ${horizonDays} days ahead, to ${formatIsoDayLabel(lastBookableIso)}. No slots are generated past that, so none can be opened or blocked here. Change the scheduling horizon in Hospital Settings, or pick an earlier date.`}
             actionLabel="Go to the last bookable date"
             actionIcon="calendar-check"
-            onAction={() => goToDate(lastBookableIso)}
+            onAction={() => setDate(lastBookableIso)}
           />
         </Card>
-      ) : result.grid.hospitalClosed ? (
+      ) : hospitalClosed ? (
         <Card>
           <EmptyState
             icon="calendar-x"
@@ -242,7 +300,24 @@ export function SlotsScreen() {
             onAction={() => navigate(hospitalPath(role, 'settings'))}
           />
         </Card>
-      ) : result.grid.rows.length === 0 ? (
+      ) : catalogError ? (
+        <ErrorState
+          title="Doctors and departments could not be loaded"
+          message={errorText(catalogError, 'Please try again.')}
+          onRetry={() => {
+            void doctorsQuery.refetch();
+            void departmentsQuery.refetch();
+          }}
+        />
+      ) : gridQuery.isError && !grid ? (
+        <ErrorState
+          title="The slot grid could not be loaded"
+          message={errorText(gridQuery.error, 'Please try again.')}
+          onRetry={() => void gridQuery.refetch()}
+        />
+      ) : isCatalogLoading || !grid ? (
+        <SkeletonTable rows={7} cols={8} />
+      ) : grid.rows.length === 0 ? (
         <Card>
           <EmptyState
             icon="stethoscope"
@@ -260,18 +335,27 @@ export function SlotsScreen() {
           />
         </Card>
       ) : (
-        <SlotGrid
-          grid={result.grid}
-          onToggleSlot={canEdit ? toggleSlot : undefined}
-          onBulkForDoctor={canEdit ? (id) => setBulk({ doctorId: id }) : undefined}
-          onOpenDoctor={(id) => navigate(`${hospitalPath(role, 'doctors')}/${id}`)}
-        />
+        <>
+          <SlotGrid
+            grid={grid}
+            busySlotId={toggle.isPending ? (toggle.variables?.slotId ?? null) : null}
+            onToggleSlot={canEdit ? toggleSlot : undefined}
+            onBulkForDoctor={canEdit ? (id) => setBulk({ doctorId: id }) : undefined}
+            onOpenDoctor={(id) => navigate(`${hospitalPath(role, 'doctors')}/${id}`)}
+          />
+          {isTruncated && doctorsPage && (
+            <div className="text-caption text-text-muted">
+              Showing the first {doctorsPage.days.length} of {doctorsPage.total} doctors. Filter by
+              department or doctor to see the rest.
+            </div>
+          )}
+        </>
       )}
 
       {bulk && (
         <BulkSlotModal
           date={date}
-          dept={dept}
+          departmentId={departmentId}
           initialDoctorId={bulk.doctorId}
           doctors={doctorOptions.map((d) => ({ id: d.id, name: d.name }))}
           onClose={() => setBulk(null)}

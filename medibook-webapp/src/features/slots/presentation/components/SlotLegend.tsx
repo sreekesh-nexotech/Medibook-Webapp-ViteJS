@@ -1,17 +1,20 @@
-import type { SlotCounts, SlotState } from '@/features/slots/domain/slot';
+import type {
+  SlotCellState,
+  SlotCounts,
+} from '@/features/slots/presentation/components/slotsGridView';
 import { cn } from '@/shared/lib/cn';
 import { Icon } from '@/shared/ui/Icon';
 
 import { SLOT_STATE_STYLE } from './slotStateStyle';
 
-/** Legend order, worst-to-best is not useful here — this is reading order. */
-const LEGEND_ORDER: readonly SlotState[] = ['available', 'booked', 'blocked', 'past'];
+/** Legend in reading order. */
+const LEGEND_ORDER: readonly SlotCellState[] = ['available', 'held', 'booked', 'blocked', 'past'];
 
 interface SlotLegendProps {
   counts: SlotCounts;
 }
 
-/** What the four slot colours mean, with today's tally beside each. */
+/** What the slot colours mean, with the day's tally beside each. */
 export function SlotLegend({ counts }: SlotLegendProps) {
   return (
     <div className="flex flex-wrap items-center gap-2.5">
