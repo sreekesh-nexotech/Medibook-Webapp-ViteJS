@@ -1,4 +1,7 @@
-import { type ChangeEvent, useRef } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
+
+import { acceptFor } from '@/core/api/files.rules';
+import { isFailure } from '@/core/error/failure';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { dateRange, minLen, required } from '@/shared/lib/validate';
@@ -7,13 +10,21 @@ import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import type { PatientBannerDraft } from '@/features/settings/application/store/profile.store';
+import type {
+  BannerInput,
+  HospitalBanner,
+} from '@/features/settings/domain/entities/profile.entities';
+import { useUploadBannerImageMutation } from '@/features/settings/application/queries/useUploadBannerImageMutation';
 import {
-  BANNER_AUDIENCES,
-  type BannerAudience,
-  type PatientBanner,
-} from '@/features/settings/application/store/profile.types';
+  BANNER_AUDIENCE_LABEL,
+  BANNER_AUDIENCE_OPTIONS,
+  audienceForLabel,
+  bannerWindow,
+  dayEndIso,
+  dayStartIso,
+} from '@/features/settings/application/store/profile.form';
 
 /** Banner copy the patient app can render without clipping. */
 const MAX_BODY_CHARS = 220;
@@ -25,11 +36,10 @@ const DATE_INPUT_CLASS =
 interface BannerForm {
   title: string;
   body: string;
-  img: string | null;
+  imageFileId: string | null;
   from: string;
   to: string;
-  audience: BannerAudience;
-  audienceDept: string;
+  audience: string;
 }
 
 const VALIDATORS: FormValidators<BannerForm> = {
@@ -37,19 +47,17 @@ const VALIDATORS: FormValidators<BannerForm> = {
   body: (v) => required(v, 'Banner message'),
   from: (v) => required(v, 'Live-from date'),
   to: (v, values) => dateRange(values.from, v),
-  audienceDept: (v, values) =>
-    values.audience === 'Patients of a department' && v.trim() === ''
-      ? 'Pick the department this banner is for.'
-      : undefined,
 };
 
 interface PatientBannerModalProps {
   open: boolean;
   /** The banner being edited, or null to publish a new one. */
-  banner: PatientBanner | null;
-  departments: readonly string[];
+  banner: HospitalBanner | null;
+  /** Displayable URL of the banner's current image, when it has one. */
+  imageUrl: string | null;
   onClose: () => void;
-  onSave: (draft: PatientBannerDraft) => void;
+  /** Save the banner. Resolves `true` on success (the modal closes). */
+  onSave: (input: BannerInput) => Promise<boolean>;
 }
 
 /**
@@ -57,39 +65,40 @@ interface PatientBannerModalProps {
  * HA-03). Same authoring pattern as the operations console's `BannerModal` —
  * title, creative upload with preview, live-from/until window — on the shared
  * `FormModal` so Enter submits and every error is an inline `Field` message.
+ * The image uploads as soon as it is picked; the banner points at it on save.
  */
 export function PatientBannerModal({
   open,
   banner,
-  departments,
+  imageUrl,
   onClose,
   onSave,
 }: PatientBannerModalProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const upload = useUploadBannerImageMutation();
+  const [preview, setPreview] = useState<string | null>(imageUrl);
+  const span = banner ? bannerWindow(banner) : { from: '', to: '' };
 
   const form = useForm<BannerForm>({
     initial: {
       title: banner?.title ?? '',
       body: banner?.body ?? '',
-      img: banner?.img ?? null,
-      from: banner?.from ?? '',
-      to: banner?.to ?? '',
-      audience: banner?.audience ?? 'All patients',
-      audienceDept: banner?.audienceDept ?? '',
+      imageFileId: banner?.imageFileId ?? null,
+      from: span.from,
+      to: span.to,
+      audience: BANNER_AUDIENCE_LABEL[banner?.audience ?? 'hospital_patients'],
     },
     validate: VALIDATORS,
-    onSubmit: (v) => {
-      onSave({
-        ...(banner ? { id: banner.id } : {}),
+    onSubmit: async (v) => {
+      const done = await onSave({
         title: v.title.trim(),
         body: v.body.trim(),
-        img: v.img,
-        from: v.from,
-        to: v.to,
-        audience: v.audience,
-        audienceDept: v.audience === 'Patients of a department' ? v.audienceDept : '',
+        imageFileId: v.imageFileId,
+        audience: audienceForLabel(v.audience),
+        startsAt: dayStartIso(v.from),
+        endsAt: v.to ? dayEndIso(v.to) : null,
       });
-      onClose();
+      if (done) onClose();
     },
   });
 
@@ -97,13 +106,27 @@ export function PatientBannerModal({
 
   const onFile = (e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') form.setField('img', reader.result);
+      const dataUrl = typeof reader.result === 'string' ? reader.result : null;
+      upload.mutate(file, {
+        onSuccess: (fileId) => {
+          form.setField('imageFileId', fileId);
+          setPreview(dataUrl);
+        },
+        onError: (error) => {
+          toast(isFailure(error) ? error.message : 'The image could not be uploaded.', 'error');
+        },
+      });
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
+  };
+
+  const removeImage = (): void => {
+    form.setField('imageFileId', null);
+    setPreview(null);
   };
 
   return (
@@ -114,7 +137,7 @@ export function PatientBannerModal({
       width={620}
       onSubmit={form.handleSubmit}
       submitLabel={banner ? 'Save Banner' : 'Publish Banner'}
-      busy={form.submitting}
+      busy={form.submitting || upload.isPending}
     >
       <div className="flex flex-col gap-4">
         <Field label="Banner Title" required error={form.errorFor('title')}>
@@ -144,25 +167,39 @@ export function PatientBannerModal({
         </Field>
 
         <Field label="Banner Image">
-          <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
-          {form.values.img ? (
+          <input
+            ref={fileRef}
+            type="file"
+            accept={acceptFor('banner')}
+            onChange={onFile}
+            className="hidden"
+          />
+          {form.values.imageFileId ? (
             <div className="flex flex-col gap-2">
-              <img
-                src={form.values.img}
-                alt="Banner preview"
-                className="border-border-soft h-37.5 w-full rounded-md border object-cover"
-              />
+              {preview ? (
+                <img
+                  src={preview}
+                  alt="Banner preview"
+                  className="border-border-soft h-37.5 w-full rounded-md border object-cover"
+                />
+              ) : (
+                <div className="border-border-soft text-caption text-text-muted bg-bg-subtle flex h-37.5 w-full items-center justify-center rounded-md border">
+                  Image attached — preview unavailable
+                </div>
+              )}
               <div className="flex gap-3.5">
                 <button
                   type="button"
                   onClick={pickFile}
+                  disabled={upload.isPending}
                   className="text-caption text-blue cursor-pointer"
                 >
                   Replace image
                 </button>
                 <button
                   type="button"
-                  onClick={() => form.setField('img', null)}
+                  onClick={removeImage}
+                  disabled={upload.isPending}
                   className="text-caption text-d-500 cursor-pointer"
                 >
                   Remove
@@ -173,13 +210,16 @@ export function PatientBannerModal({
             <button
               type="button"
               onClick={pickFile}
+              disabled={upload.isPending}
               className="border-border text-text-muted bg-bg-subtle flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-md border-[1.5px] border-dashed px-3 py-5.5"
             >
               <Icon name="upload" size={20} />
-              <span className="text-body">Click to upload an image</span>
+              <span className="text-body">
+                {upload.isPending ? 'Uploading…' : 'Click to upload an image'}
+              </span>
               <span className="text-caption text-text-muted">
-                PNG or JPG · 1200×600 (2:1) recommended · the title shows as overlay text if no
-                image
+                PNG, JPG or WebP · 1200×600 (2:1) recommended · the title shows as overlay text if
+                no image
               </span>
             </button>
           )}
@@ -208,31 +248,17 @@ export function PatientBannerModal({
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Audience">
-            <Select
-              value={form.values.audience}
-              options={BANNER_AUDIENCES}
-              onChange={(v) => {
-                form.setField('audience', v as BannerAudience);
-                if (v !== 'Patients of a department') form.setField('audienceDept', '');
-              }}
-              height={48}
-            />
-          </Field>
-          {form.values.audience === 'Patients of a department' && (
-            <Field label="Department" required error={form.errorFor('audienceDept')}>
-              <Select
-                value={form.values.audienceDept}
-                options={departments}
-                onChange={(v) => form.setField('audienceDept', v)}
-                onBlur={() => form.blurField('audienceDept')}
-                placeholder="Select a department"
-                height={48}
-              />
-            </Field>
-          )}
-        </div>
+        <Field
+          label="Audience"
+          hint="Patients of this hospital, or every patient browsing hospitals in your city."
+        >
+          <Select
+            value={form.values.audience}
+            options={BANNER_AUDIENCE_OPTIONS}
+            onChange={(v) => form.setField('audience', v)}
+            height={48}
+          />
+        </Field>
       </div>
     </FormModal>
   );
