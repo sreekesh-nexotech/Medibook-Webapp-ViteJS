@@ -51,6 +51,7 @@ export function getPeriods(filter: PeriodFilter): Promise<PeriodResponse[]> {
   const params: Record<string, string> = { status: filter.statuses.join(',') };
   if (filter.dateFrom) params.date_from = filter.dateFrom;
   if (filter.dateTo) params.date_to = filter.dateTo;
+  if (filter.hospitalId) params.hospital_id = filter.hospitalId;
   return getAllPages('/settlements/periods', periodPageResponseSchema, params);
 }
 

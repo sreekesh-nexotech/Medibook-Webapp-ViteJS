@@ -2,6 +2,7 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  HospitalCreateInput,
   HospitalListQuery,
   HospitalStatusCounts,
   HospitalSuspendReason,
@@ -14,6 +15,7 @@ export interface HospitalsRepository {
   listHospitals(query: HospitalListQuery): Promise<Result<Page<PlatformHospital>>>;
   statusCounts(): Promise<Result<HospitalStatusCounts>>;
   getHospital(id: string): Promise<Result<PlatformHospitalDetail>>;
+  createHospital(input: HospitalCreateInput): Promise<Result<PlatformHospital>>;
   suspendHospital(
     id: string,
     reason: HospitalSuspendReason,

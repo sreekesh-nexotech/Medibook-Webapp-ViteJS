@@ -1,14 +1,9 @@
 /**
  * Pure helpers for plan ceilings and yearly pricing (audit SA-02). No React,
- * no stores — the catalog screen, the plan modal and the store all read the
+ * no stores — the catalog screen and the plan modal read the
  * same rules from here, so "unlimited" can never drift into meaning zero.
  */
-import type {
-  Plan,
-  PlanLimit,
-  PlanLimitKey,
-  PlanLimits,
-} from '@/features/ops-plans/application/store/plans.types';
+import type { PlanLimit, PlanLimitKey } from '@/features/ops-plans/application/store/plans.types';
 
 /** The value that means "no ceiling". Spelled once so nothing else invents it. */
 export const UNLIMITED: PlanLimit = null;
@@ -30,11 +25,6 @@ export const PLAN_LIMIT_META: Readonly<
   storageGb: { label: 'Storage', unit: 'GB', placeholder: 'e.g. 100' },
   messageCredits: { label: 'Message credits', unit: 'credits', placeholder: 'e.g. 10000' },
 };
-
-/** True when the dimension has no ceiling. */
-export function isUnlimited(limit: PlanLimit): boolean {
-  return limit === null;
-}
 
 /** "Unlimited", "0 doctors", "5,000 / period" — never a bare 0 for unlimited. */
 export function formatLimit(limit: PlanLimit, unit?: string): string {
@@ -74,20 +64,4 @@ export function yearlyDiscountPct(monthly: number, yearly: number): number {
 /** What 12 months of monthly billing costs — the yearly price's reference point. */
 export function yearlyListPrice(monthly: number): number {
   return monthly * MONTHS_PER_YEAR;
-}
-
-/** The cadences a plan can actually be billed on. */
-export function billingPeriodsOf(
-  plan: Plan,
-): readonly ['Monthly'] | readonly ['Monthly', 'Yearly'] {
-  return plan.yearlyPrice === null ? (['Monthly'] as const) : (['Monthly', 'Yearly'] as const);
-}
-
-/**
- * The legacy numeric booking quota other features still read. Unlimited
- * bookings become `Infinity` so a percentage bar degrades to 0% rather than
- * dividing by zero — see `Plan.quota`.
- */
-export function bookingQuotaMirror(limits: PlanLimits): number {
-  return limits.bookings ?? Number.POSITIVE_INFINITY;
 }

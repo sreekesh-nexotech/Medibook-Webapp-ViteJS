@@ -15,10 +15,13 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import { HOSPITAL_VIEW_SEGMENT, hospitalPath, isHospitalRole } from '@/app/router/paths';
+import {
+  HOSPITAL_VIEW_SEGMENT,
+  hospitalBookForPatientPath,
+  isHospitalRole,
+} from '@/app/router/paths';
 
 import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import { usePatientVisitCountsQuery } from '@/features/patients/application/queries/usePatientVisitCountsQuery';
 import type {
@@ -75,7 +78,6 @@ export function PatientsScreen() {
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
 
   // Booking still runs on the appointments store until H7 lands.
-  const startBooking = useAppointmentsStore((s) => s.startBooking);
 
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState(ALL_SOURCES);
@@ -102,8 +104,7 @@ export function PatientsScreen() {
   const open = (mrn: string) =>
     navigate(`/${hospitalRole}/${HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(':mrn', mrn)}`);
   const book = (mrn: string) => {
-    startBooking(mrn);
-    navigate(hospitalPath(hospitalRole, 'create'));
+    navigate(hospitalBookForPatientPath(hospitalRole, mrn));
   };
 
   const reset = (fn: (v: string) => void) => (v: string) => {

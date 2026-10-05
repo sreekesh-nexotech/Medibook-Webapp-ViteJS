@@ -7,106 +7,21 @@ import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
-import type { IconName } from '@/shared/ui/icon-registry';
 
-import { opsOnboardingPath, opsPath } from '@/app/router/paths';
+import { opsPath } from '@/app/router/paths';
 
 import type {
   OpsAlertHospital,
   OpsDashboardAlert,
 } from '@/features/ops-dashboard/domain/entities/opsDashboard.entities';
 import {
+  ALERT_SEV_TINT,
   hospitalHref,
+  MAX_ALERT_HOSPITAL_LINKS,
   plural,
   shortId,
+  toAlertView,
 } from '@/features/ops-dashboard/presentation/components/opsDashboardFormat';
-
-type AlertSeverity = 'danger' | 'warning';
-
-/** Severity tint: [icon-box bg, icon-box fg, glyph] (design `sevTint`). */
-const SEV_TINT: Record<AlertSeverity, readonly [string, string, IconName]> = {
-  danger: ['bg-d-100', 'text-d-500', 'circle-x'],
-  warning: ['bg-y-100', 'text-y-600', 'triangle-alert'],
-};
-
-/** Hospitals an alert links to directly before the rest collapse into "+N more". */
-const MAX_HOSPITAL_LINKS = 3;
-
-interface AlertView {
-  readonly key: string;
-  readonly sev: AlertSeverity;
-  readonly title: string;
-  readonly sub: string;
-  /** Hospitals to open, one button each. */
-  readonly hospitals: readonly OpsAlertHospital[];
-  /** A single screen to open instead. */
-  readonly action?: { readonly label: string; readonly to: string };
-}
-
-function namesOf(hospitals: readonly OpsAlertHospital[]): string {
-  const named = hospitals.map((h) => h.name ?? shortId(h.id));
-  const shown = named.slice(0, MAX_HOSPITAL_LINKS).join(', ');
-  const rest = named.length - MAX_HOSPITAL_LINKS;
-  return rest > 0 ? `${shown} +${rest} more` : shown;
-}
-
-/** What each computed alert says and where it leads. */
-function toView(alert: OpsDashboardAlert): AlertView {
-  switch (alert.code) {
-    case 'hospitals_in_grace':
-      return {
-        key: alert.code,
-        sev: 'warning',
-        title: `${plural(alert.count, 'hospital')} past due or in grace`,
-        sub: namesOf(alert.hospitals),
-        hospitals: alert.hospitals,
-      };
-    case 'hospitals_read_only':
-      return {
-        key: alert.code,
-        sev: 'danger',
-        title: `${plural(alert.count, 'hospital')} in read-only mode`,
-        sub: `Unpaid subscription · ${namesOf(alert.hospitals)}`,
-        hospitals: alert.hospitals,
-      };
-    case 'unreconciled_cash_sessions':
-      return {
-        key: alert.code,
-        sev: 'warning',
-        title: `${plural(alert.count, 'cash session')} unreconciled for over a day`,
-        sub: `Across ${plural(alert.hospitals.length, 'hospital')}`,
-        hospitals: alert.hospitals,
-      };
-    case 'dead_outbox_rows':
-      return {
-        key: alert.code,
-        sev: 'danger',
-        title: `${plural(alert.count, 'notification')} failed permanently`,
-        sub: 'Messages the outbox stopped retrying. Check the messaging provider configuration.',
-        hospitals: [],
-      };
-    case 'pending_onboarding':
-      return {
-        key: alert.code,
-        sev: 'warning',
-        title: `${plural(alert.count, 'onboarding case')} in progress`,
-        sub:
-          alert.olderThan7Days > 0
-            ? `${plural(alert.olderThan7Days, 'case')} open for more than 7 days`
-            : 'All opened within the last 7 days',
-        hospitals: [],
-        action: { label: 'Open onboarding', to: opsOnboardingPath() },
-      };
-    case 'unknown':
-      return {
-        key: alert.rawCode,
-        sev: 'warning',
-        title: `${alert.rawCode.replaceAll('_', ' ')} (${alert.count})`,
-        sub: 'Reported by the platform',
-        hospitals: [],
-      };
-  }
-}
 
 /** Button label for one hospital an alert names. */
 function hospitalLabel(h: OpsAlertHospital): string {
@@ -126,7 +41,7 @@ interface CriticalAlertsCardProps {
  */
 export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
   const navigate = useNavigate();
-  const views = alerts.map(toView);
+  const views = alerts.map(toAlertView);
 
   return (
     <Card>
@@ -136,9 +51,9 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
       </div>
       <div className="flex flex-col gap-3.5">
         {views.map((a, ai) => {
-          const t = SEV_TINT[a.sev];
+          const t = ALERT_SEV_TINT[a.sev];
           const notLast = ai < views.length - 1;
-          const links = a.hospitals.slice(0, MAX_HOSPITAL_LINKS);
+          const links = a.hospitals.slice(0, MAX_ALERT_HOSPITAL_LINKS);
           return (
             <div
               key={a.key}

@@ -22,7 +22,7 @@ import { useDoctorPhotoQuery } from '@/features/doctors/application/queries/useD
 import { useDoctorQuery } from '@/features/doctors/application/queries/useDoctorQuery';
 import { useDoctorScheduleQuery } from '@/features/doctors/application/queries/useDoctorScheduleQuery';
 import { useReplaceWeeklySessionsMutation } from '@/features/doctors/application/queries/useScheduleMutations';
-import { useSettingsStore } from '@/features/settings/application/store/settings.store';
+import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useFileUploadMutation } from '@/shared/hooks/useFileUploadMutation';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { positiveAmount, required } from '@/shared/lib/validate';
@@ -194,7 +194,8 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
   const upload = useFileUploadMutation();
   const scheduleConfirm = useScheduleConfirm();
   const { data: session } = useSessionQuery('hospital');
-  const rules = useSettingsStore((s) => s.settings.rules);
+  const profileQuery = useHospitalProfileQuery();
+  const onlineBooking = profileQuery.data?.onlineBookingEnabled;
   const [tab, setTab] = useState('Profile');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -513,7 +514,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
               <div>
                 <div className="text-body text-text-strong mb-2.5 flex flex-wrap items-center gap-2 font-medium">
                   Consultation Settings
-                  <InfoDot text="These are hospital-wide rules. They are set once in Hospital Settings and every doctor's slots are generated from them." />
+                  <InfoDot text="Slot length is this doctor's own, set per session in the weekly hours below. Online booking is a hospital-wide switch in Hospital Settings." />
                   <span className="flex-1" />
                   <Button
                     size="sm"
@@ -528,24 +529,20 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                   <div className="border-border-soft flex items-center justify-between border-b py-2.5">
                     <span className="text-body text-text-body">Consultation duration</span>
                     <span className="text-body text-text-strong font-medium">
-                      {schedule ? `${schedule.slotLengthMin} min` : rules.duration}
+                      {schedule ? `${schedule.slotLengthMin} min` : 'Set when the doctor is added'}
                     </span>
-                  </div>
-                  <div className="border-border-soft flex items-center justify-between border-b py-2.5">
-                    <span className="text-body text-text-body">Max appointments per slot</span>
-                    <span className="text-body text-text-strong font-medium">
-                      {rules.maxPerSlot}
-                    </span>
-                  </div>
-                  <div className="border-border-soft flex items-center justify-between border-b py-2.5">
-                    <span className="text-body text-text-body">Buffer between appointments</span>
-                    <span className="text-body text-text-strong font-medium">{rules.buffer}</span>
                   </div>
                   <div className="flex items-center justify-between py-2.5">
                     <span className="text-body text-text-body">Online appointment booking</span>
-                    <Badge status={rules.onlineBooking ? 'Enabled' : 'Blocked'}>
-                      {rules.onlineBooking ? 'Enabled' : 'Off'}
-                    </Badge>
+                    {onlineBooking === undefined ? (
+                      <span className="text-body text-text-muted">
+                        {profileQuery.isError ? 'Unavailable' : 'Loading…'}
+                      </span>
+                    ) : (
+                      <Badge status={onlineBooking ? 'Enabled' : 'Blocked'}>
+                        {onlineBooking ? 'Enabled' : 'Off'}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>

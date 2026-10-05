@@ -3,7 +3,7 @@ import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { SegTabs } from '@/shared/ui/SegTabs';
 
-import { ANALYTICS_PERIODS } from '@/features/ops-analytics/application/store/analytics.fixtures';
+import { ANALYTICS_PERIODS } from '@/features/ops-analytics/application/store/analytics.store';
 import type {
   AnalyticsPeriod,
   AnalyticsTab,

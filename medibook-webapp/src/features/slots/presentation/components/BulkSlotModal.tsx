@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { TIME_OPTS } from '@/features/doctors/application/store/catalog.fixtures';
+import { TIME_OPTS } from '@/features/doctors/domain/calendar';
 import {
   formatIsoDayLabel,
   isoWeekdayIndex,

@@ -4,7 +4,6 @@ import { unwrap } from '@/core/error/failure';
 
 import type { InvitationAcceptance } from '@/features/auth/domain/entities/auth.types';
 import { authKeys } from '@/features/auth/application/queries/auth.keys';
-import { syncAuthStore } from '@/features/auth/application/store/auth.roles';
 import { acceptInvitation } from '@/features/auth/application/usecases/acceptInvitation';
 
 interface AcceptInvitationInput {
@@ -21,7 +20,6 @@ export function useAcceptInvitationMutation() {
     onSuccess: (session) => {
       queryClient.clear();
       queryClient.setQueryData(authKeys.session(session.surface), session);
-      syncAuthStore(session);
     },
   });
 }

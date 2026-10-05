@@ -44,3 +44,6 @@ export const APPLIES_TO_OPTIONS: readonly TaxAppliesTo[] = [
 export function timeoutLabel(minutes: number): string {
   return `${minutes} min`;
 }
+
+/** The Session Timeout select's standard choices (a stored value off this list is added). */
+export const SESSION_TIMEOUT_OPTIONS: readonly string[] = ['15 min', '30 min', '60 min'];

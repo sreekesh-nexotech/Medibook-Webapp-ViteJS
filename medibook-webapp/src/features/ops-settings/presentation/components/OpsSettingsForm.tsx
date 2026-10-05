@@ -15,12 +15,14 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import { useSaveOpsSettingsMutation } from '@/features/ops-settings/application/queries/useSaveOpsSettingsMutation';
-import { SESSION_TIMEOUT_OPTIONS } from '@/features/ops-settings/application/store/opsSettings.fixtures';
 import type {
   PlatformSettings,
   PlatformSettingsValues,
 } from '@/features/ops-settings/domain/entities/opsSettings.entity';
-import { timeoutLabel } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
+import {
+  SESSION_TIMEOUT_OPTIONS,
+  timeoutLabel,
+} from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 
 /** The fields of the settings record this form edits. */
 interface SettingsForm {
@@ -127,9 +129,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
   // edits being thrown away by a navigation.
   const { blocked, discard, keepEditing } = useUnsavedChanges({ dirty: dirty && !saving });
 
-  const timeoutOptions = SESSION_TIMEOUT_OPTIONS.includes(
-    initial.sessTimeout as (typeof SESSION_TIMEOUT_OPTIONS)[number],
-  )
+  const timeoutOptions = SESSION_TIMEOUT_OPTIONS.includes(initial.sessTimeout)
     ? SESSION_TIMEOUT_OPTIONS
     : [initial.sessTimeout, ...SESSION_TIMEOUT_OPTIONS];
 

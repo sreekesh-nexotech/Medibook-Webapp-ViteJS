@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
@@ -15,11 +14,7 @@ import { SessionLoading } from '@/app/router/SessionLoading';
 import { useSessionExit } from '@/app/router/useSessionExit';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
-import {
-  hospitalSessionOf,
-  hospitalUrlRole,
-  syncAuthStore,
-} from '@/features/auth/application/store/auth.roles';
+import { hospitalSessionOf, hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
 
 /** Shown when the backend has suspended the hospital (login still works, D-30). */
 const SUSPENDED_MESSAGE =
@@ -38,10 +33,6 @@ export function HospitalGuard() {
   const session = useSessionQuery('hospital');
   const { logout } = useSessionExit('hospital');
   const data = hospitalSessionOf(session.data);
-
-  useEffect(() => {
-    if (data) syncAuthStore(data);
-  }, [data]);
 
   if (!isHospitalRole(roleParam)) return <Navigate to={ROOT_PATH} replace />;
 

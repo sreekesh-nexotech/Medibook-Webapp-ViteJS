@@ -19,8 +19,6 @@ import { TableShell } from '@/shared/ui/TableShell';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { hospitalDetailHref } from '@/features/ops-hospitals/presentation/components/hospitals.view';
-import { useOpsSettingsStore } from '@/features/ops-settings/application/store/opsSettings.store';
-
 import { useApprovePayoutRunMutation } from '@/features/ops-settlements/application/queries/useApprovePayoutRunMutation';
 import { usePayoutRunDetailsQueries } from '@/features/ops-settlements/application/queries/usePayoutRunDetailsQueries';
 import { usePayoutRunsQuery } from '@/features/ops-settlements/application/queries/usePayoutRunsQuery';
@@ -64,8 +62,6 @@ const MONTH_PREFIX_LENGTH = 7;
  */
 export function OpsSettlementsScreen() {
   const navigate = useNavigate();
-  // Deferred to Z: the payout cadence is a P13 setting with no reach from P5.
-  const payoutSched = useOpsSettingsStore((s) => s.settings.payoutSched);
   const today = todayISO();
 
   const [viewMode, setViewMode] = useState('By Payout Run');
@@ -282,7 +278,7 @@ export function OpsSettlementsScreen() {
         )}
         <div className="flex-1"></div>
         <span className="text-caption text-text-muted">
-          {payoutSched} payout runs · next: {nextRun ? fmtDate(nextRun) : 'none scheduled'}
+          Next payout run: {nextRun ? fmtDate(nextRun) : 'none scheduled'}
         </span>
       </Card>
       <div className="mx-0.5 flex items-center gap-2">

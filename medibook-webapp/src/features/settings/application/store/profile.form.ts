@@ -3,9 +3,6 @@
  * entities: closure scope and span, banner audience labels, the date ↔
  * date-time mapping the banner window needs, and a banner's publication
  * state. No React, no store, no I/O.
- *
- * The legacy `profile.types.ts` / `profile.logic.ts` describe the fixture
- * model (branch scope, four audiences) and stay as they are for Z to remove.
  */
 
 import { toLocalISO } from '@/shared/lib/format';

@@ -1,15 +1,18 @@
 import { platformApi } from '@/core/api/http';
 
 import type {
+  HospitalCreateInput,
   HospitalLifecycle,
   HospitalListQuery,
   HospitalSuspendReason,
 } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
+import { toHospitalCreateRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import type {
   HospitalDetailResponse,
   HospitalResponse,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.response';
 import {
+  hospitalCreatedResponseSchema,
   hospitalDetailResponseSchema,
   hospitalPageResponseSchema,
   hospitalResponseSchema,
@@ -50,6 +53,16 @@ export async function countHospitals(statuses: readonly HospitalLifecycle[]): Pr
 export async function getHospital(id: string): Promise<HospitalDetailResponse> {
   const response = await platformApi.get(`/hospitals/${encodeURIComponent(id)}`);
   return hospitalDetailResponseSchema.parse(response.data);
+}
+
+/**
+ * `POST /platform/hospitals` — provisions the hospital, its settings, roles,
+ * numbering series, subscription and onboarding case, and invites the first
+ * administrator.
+ */
+export async function postHospital(input: HospitalCreateInput): Promise<HospitalResponse> {
+  const response = await platformApi.post('/hospitals', toHospitalCreateRequest(input));
+  return hospitalCreatedResponseSchema.parse(response.data).hospital;
 }
 
 /** `POST /platform/hospitals/{id}/suspend {reason, note}`. */

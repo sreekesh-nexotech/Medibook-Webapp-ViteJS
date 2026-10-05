@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import { isFailure } from '@/core/error/failure';
@@ -35,6 +35,7 @@ import {
   methodTint,
   shortId,
 } from '@/features/audit/presentation/components/auditFormat';
+import { useStaffMembersQuery } from '@/features/users-roles/application/queries/useStaffMembersQuery';
 
 /** Rows per page — the backend's default page size. */
 const AUDIT_PAGE_SIZE = DEFAULT_PAGE_SIZE;
@@ -102,6 +103,18 @@ export function AuditTrailScreen() {
   const mayView = can('Hospital Settings.view');
   const { data: session } = useSessionQuery('hospital');
   const myUserId = session?.user.id ?? null;
+  // Staff directory (H12) to name actors; rows fall back to a short id without it.
+  const staff = useStaffMembersQuery();
+  const staffNames = useMemo(
+    () =>
+      new Map(
+        (staff.data ?? []).map((m) => [
+          m.userId,
+          [m.firstName, m.lastName].filter(Boolean).join(' '),
+        ]),
+      ),
+    [staff.data],
+  );
 
   const [qDraft, setQDraft] = useState('');
   const [q, setQ] = useState('');
@@ -291,7 +304,7 @@ export function AuditTrailScreen() {
           scrollLabel="Audit trail"
         >
           {rows.map((e) => {
-            const who = actorLabel(e, myUserId);
+            const who = actorLabel(e, myUserId, staffNames);
             const stamp = localStamp(e.occurredAt);
             return (
               <tr key={e.id}>

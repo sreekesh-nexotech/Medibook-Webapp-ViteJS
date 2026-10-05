@@ -22,8 +22,13 @@ import { isFailure } from '@/core/error/failure';
 
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
-import { usePatientsStore } from '@/features/patients/application/store/patients.store';
-import { useSettlementsStore } from '@/features/settlements/application/store/settlements.store';
+import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
+import type { PatientListParams } from '@/features/patients/domain/entities/patients.entities';
+import { useSettlementPeriodsQuery } from '@/features/settlements/application/queries/useSettlementPeriodsQuery';
+import type {
+  SettlementPeriod,
+  SettlementPeriodFilters,
+} from '@/features/settlements/domain/entities/settlements.entities';
 
 import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
 import {
@@ -72,14 +77,34 @@ function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
+/** Only the patient total is read, so one row per page is enough. */
+const PATIENT_COUNT_PARAMS: PatientListParams = {
+  page: 1,
+  pageSize: 1,
+  q: '',
+  source: null,
+  sortField: 'created_at',
+  sortDirection: 'desc',
+};
+
+/** The latest settlement periods, unfiltered by date. */
+const ALL_PERIODS: SettlementPeriodFilters = {};
+
+const PAISE_PER_RUPEE = 100;
+
+/** Sum of the periods' net payable, in rupees. */
+function netRupees(periods: readonly SettlementPeriod[]): number {
+  return periods.reduce((sum, p) => sum + p.netPayablePaise, 0) / PAISE_PER_RUPEE;
+}
+
 /**
  * Admin (hospital) dashboard — design `Dashboard.jsx` `AdminDashboard`.
  *
  * Figures come from `GET /hospital/dashboard/admin?period=…` (appointments,
  * revenue, department load, the five busiest doctors and the alert counts);
  * the doctor roster (H1) supplies active-doctor count, department, rating and
- * status. Two reads stay on legacy stores until their modules land, as module
- * Z tracks: the patient register count (H6) and the settlement alerts (H11).
+ * status. The patient register count comes from the patients list (H6) and
+ * the settlement alerts from the latest settlement periods (H11).
  */
 export function AdminDashboardScreen() {
   const navigate = useNavigate();
@@ -93,9 +118,11 @@ export function AdminDashboardScreen() {
   const dashboard = useAdminDashboardQuery(PERIOD_CODE[period]);
   const doctors = useDoctorsQuery();
   const departments = useDepartmentsQuery();
-  // Deferred to Z: no patients (H6) or settlements (H11) API in H10's reach yet.
-  const patients = usePatientsStore((s) => s.patients);
-  const settlements = useSettlementsStore((s) => s.settlements);
+  // Patient total from H6's list (one row is enough — only `total` is read);
+  // settlement alerts from H11's latest periods.
+  const patientsQuery = usePatientsQuery(PATIENT_COUNT_PARAMS);
+  const periodsQuery = useSettlementPeriodsQuery(ALL_PERIODS);
+  const periods = periodsQuery.data?.items ?? [];
 
   const refresh = async (): Promise<void> => {
     await Promise.all([dashboard.refetch(), doctors.refetch(), departments.refetch()]);
@@ -149,8 +176,8 @@ export function AdminDashboardScreen() {
     {
       icon: 'users',
       label: 'Total Patients',
-      value: patients.length.toLocaleString('en-IN'),
-      sub: 'Registered patient records',
+      value: patientsQuery.data ? patientsQuery.data.total.toLocaleString('en-IN') : '—',
+      sub: patientsQuery.isError ? 'Patient records unavailable' : 'Registered patient records',
       iconClass: 'bg-p-100 text-p-500',
       valueClass: 'text-p-500',
     },
@@ -168,8 +195,8 @@ export function AdminDashboardScreen() {
   ];
 
   const alerts = data?.alerts;
-  const overdue = settlements.filter((r) => r.status === 'Overdue');
-  const pendingSettle = settlements.filter((r) => r.status !== 'Received');
+  const onHold = periods.filter((p) => p.status === 'on_hold');
+  const awaitingPayout = periods.filter((p) => p.status === 'closed');
   const ALERTS: Alert[] = [];
   if (alerts && alerts.unpaidWalkInsToday > 0) {
     ALERTS.push({
@@ -207,21 +234,21 @@ export function AdminDashboardScreen() {
       go: 'payments',
     });
   }
-  if (overdue.length) {
+  if (onHold.length) {
     ALERTS.push({
       icon: 'triangle-alert',
       iconClass: 'bg-y-100 text-y-600',
-      t: `${plural(overdue.length, 'settlement')} overdue`,
-      s: `${money(overdue.reduce((s, r) => s + r.net, 0))} due from Medibook`,
+      t: `${plural(onHold.length, 'settlement')} on hold`,
+      s: `${money(netRupees(onHold))} held by Medibook`,
       go: 'settlements',
     });
   }
-  if (pendingSettle.length) {
+  if (awaitingPayout.length) {
     ALERTS.push({
       icon: 'scale',
       iconClass: 'bg-blue-soft-bg text-blue',
-      t: `${pendingSettle.length} settlements awaiting transfer`,
-      s: `${money(pendingSettle.reduce((s, r) => s + r.net, 0))} expected from Medibook`,
+      t: `${plural(awaitingPayout.length, 'settlement')} awaiting payout`,
+      s: `${money(netRupees(awaitingPayout))} expected from Medibook`,
       go: 'settlements',
     });
   }

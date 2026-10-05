@@ -30,28 +30,9 @@ export function todayIso(): string {
   return localDateIso();
 }
 
-/**
- * `iso` shifted by `days` (negative = earlier), staying on the local
- * calendar: the Date is built at local noon so a DST jump cannot move the
- * result onto the neighbouring day.
- */
-export function shiftIsoDays(iso: string, days: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const at = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
-  at.setDate(at.getDate() + days);
-  return localDateIso(at);
-}
-
 /** Weekday index of an ISO date, 0 = Monday … 6 = Sunday. */
 export function isoWeekdayIndex(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
   const at = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
   return (at.getDay() + 6) % 7;
-}
-
-/** `true` when `iso` falls inside `[from, to]`; blank bounds are open ends. */
-export function isoWithin(iso: string, from: string, to: string): boolean {
-  if (from && iso < from) return false;
-  if (to && iso > to) return false;
-  return true;
 }

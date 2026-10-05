@@ -70,6 +70,8 @@ export interface PeriodFilter {
   readonly statuses: readonly SettlementPeriodStatus[];
   readonly dateFrom: string | null;
   readonly dateTo: string | null;
+  /** One hospital's periods only (its profile); omitted = every hospital. */
+  readonly hospitalId?: string;
 }
 
 /** A new payout run gathers every closed, unpaid period inside the window. */

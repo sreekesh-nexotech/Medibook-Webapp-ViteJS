@@ -6,6 +6,7 @@ import {
   countHospitals,
   getHospital,
   getHospitals,
+  postHospital,
   postReinstateHospital,
   postSuspendHospital,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.api';
@@ -30,6 +31,8 @@ export const hospitalsRepository: HospitalsRepository = {
     }),
 
   getHospital: (id) => attempt(async () => toPlatformHospitalDetail(await getHospital(id))),
+
+  createHospital: (input) => attempt(async () => toPlatformHospital(await postHospital(input))),
 
   suspendHospital: (id, reason, note) =>
     attempt(async () => toPlatformHospital(await postSuspendHospital(id, reason, note))),

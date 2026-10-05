@@ -120,7 +120,7 @@ function holidayOpSuccessCopy(op: HolidayOp): string {
  * Every closure write is checked with a dry run first: if it would cancel
  * booked appointments, nothing is applied until the user confirms the list.
  * Branches have no backend yet, so that tab says so instead of showing
- * fixture rows.
+ * rows that are not real.
  */
 export function HospitalProfileScreen() {
   const { can } = usePermission();

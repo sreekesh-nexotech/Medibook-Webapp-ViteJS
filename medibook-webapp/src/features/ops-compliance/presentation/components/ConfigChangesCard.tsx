@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
@@ -36,6 +36,7 @@ import {
   fmtConfigValue,
   principalLabel,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
+import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
 
 const PAGE_SIZE = 8;
 
@@ -60,11 +61,17 @@ const SORT_KEYS: Readonly<Record<string, string>> = { Setting: 'setting', When: 
  * its **before → after** values.
  *
  * Scope, area (setting-key prefix), date filters, sort and paging run on the
- * server. The record carries the actor's account id but not their name, so
- * the Actor column says which kind of staff made the change. The search box
+ * server. The record carries the actor's account id: platform staff are named
+ * from the ops staff directory (P10); anyone else shows which kind of staff
+ * made the change. The search box
  * narrows the rows on this page by setting or value.
  */
 export function ConfigChangesCard() {
+  const staff = useOpsStaffQuery();
+  const staffNames = useMemo(
+    () => new Map((staff.data?.items ?? []).map((m) => [m.userId, m.name])),
+    [staff.data],
+  );
   const [q, setQ] = useState('');
   const [scopeF, setScopeF] = useState(ALL_SCOPES);
   const [areaF, setAreaF] = useState(ALL_AREAS);
@@ -141,7 +148,7 @@ export function ConfigChangesCard() {
           ...all.map((c) => [
             c.occurredAt,
             c.actorUserId,
-            principalLabel(c.scope),
+            staffNames.get(c.actorUserId) ?? principalLabel(c.scope),
             configAreaOf(c.settingKey),
             c.settingKey,
             fmtConfigValue(c.beforeValue),
@@ -260,7 +267,8 @@ export function ConfigChangesCard() {
               />
             </td>
             <td className={tdClass} title={c.actorUserId}>
-              {principalLabel(c.scope === 'platform' ? 'platform' : 'hospital')}
+              {staffNames.get(c.actorUserId) ??
+                principalLabel(c.scope === 'platform' ? 'platform' : 'hospital')}
             </td>
             <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
               {fmtComplianceWhen(c.occurredAt)}

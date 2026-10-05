@@ -2,8 +2,7 @@
  * Onboarding-pipeline entities (module P3), as `/platform/onboarding/*`
  * serves them. Plain readonly types. Documents are collected physically and
  * ops ticks a checklist (backend Q66) — there is no hospital-side upload and
- * no per-document "rejected" state. (The fixture-era view models in
- * `application/store/onboarding.types.ts` stay for Z to remove.)
+ * no per-document "rejected" state.
  */
 
 /** Where a case sits in the pipeline (backend `OnboardingCase.Stage`). */

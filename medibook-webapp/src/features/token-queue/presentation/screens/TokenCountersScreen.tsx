@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useNow } from '@/shared/hooks/useNow';
 import { cn } from '@/shared/lib/cn';
@@ -11,6 +12,8 @@ import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 
 import { isFailure } from '@/core/error/failure';
+
+import { TOKEN_DEPT_PARAM } from '@/app/router/paths';
 
 import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
 import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
@@ -58,7 +61,9 @@ export function TokenCountersScreen() {
   const now = useNow(TICK_MS);
 
   const [q, setQ] = useState('');
-  const [deptF, setDeptF] = useState(ALL_DEPTS);
+  // Opened from the front desk's department list with `?dept=`.
+  const [searchParams] = useSearchParams();
+  const [deptF, setDeptF] = useState(searchParams.get(TOKEN_DEPT_PARAM) ?? ALL_DEPTS);
   const [docF, setDocF] = useState(ALL_DOCTORS);
 
   const doctorsById = useMemo(

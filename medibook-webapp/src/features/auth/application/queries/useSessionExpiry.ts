@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { onSessionExpired } from '@/core/api/tokens';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
-import { clearAuthStore } from '@/features/auth/application/store/auth.roles';
 
 /**
  * Run `onExpired` when the server refuses `surface`'s refresh token (revoked,
@@ -18,7 +17,6 @@ export function useSessionExpiry(surface: AuthSurface, onExpired: () => void) {
       onSessionExpired((expired) => {
         if (expired !== surface) return;
         queryClient.clear();
-        clearAuthStore();
         onExpired();
       }),
     [surface, onExpired, queryClient],

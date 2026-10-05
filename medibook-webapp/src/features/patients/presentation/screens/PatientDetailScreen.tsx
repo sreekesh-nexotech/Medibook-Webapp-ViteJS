@@ -18,9 +18,8 @@ import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import { hospitalPath, isHospitalRole } from '@/app/router/paths';
+import { hospitalBookForPatientPath, hospitalPath, isHospitalRole } from '@/app/router/paths';
 
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
 import type {
@@ -66,7 +65,6 @@ export function PatientDetailScreen() {
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
 
   // Booking still runs on the appointments store until H7 lands.
-  const startBooking = useAppointmentsStore((s) => s.startBooking);
 
   const patientQuery = usePatientByMrnQuery(mrn);
   const rec = patientQuery.data;
@@ -139,8 +137,7 @@ export function PatientDetailScreen() {
   );
 
   const book = () => {
-    startBooking(p.mrn);
-    navigate(hospitalPath(hospitalRole, 'create'));
+    navigate(hospitalBookForPatientPath(hospitalRole, p.mrn));
   };
 
   const historyState: TableStateSpec | undefined = historyQuery.isPending

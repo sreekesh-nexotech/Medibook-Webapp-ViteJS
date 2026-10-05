@@ -17,6 +17,7 @@ interface LogsParams {
   readonly date_to?: string;
   readonly q?: string;
   readonly sort?: string;
+  readonly hospital_id?: string;
 }
 
 function toParams(query: AuditLogQuery): LogsParams {
@@ -26,6 +27,7 @@ function toParams(query: AuditLogQuery): LogsParams {
     ...(query.dateFrom ? { date_from: query.dateFrom } : {}),
     ...(query.dateTo ? { date_to: query.dateTo } : {}),
     ...(query.q ? { q: query.q } : {}),
+    ...(query.hospitalId ? { hospital_id: query.hospitalId } : {}),
     ...(query.sortDir ? { sort: query.sortDir === 'asc' ? SORT_COLUMN : `-${SORT_COLUMN}` } : {}),
   };
 }

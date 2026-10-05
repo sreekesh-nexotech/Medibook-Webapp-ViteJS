@@ -40,4 +40,6 @@ export interface AuditLogQuery {
   readonly q?: string;
   /** Omitted → newest first (the backend default). */
   readonly sortDir?: AuditLogSortDir;
+  /** One hospital's entries only (its profile); omitted = the whole platform. */
+  readonly hospitalId?: string;
 }

@@ -1,14 +1,23 @@
 import { create } from 'zustand';
 
-import { DEFAULT_ANALYTICS_PERIOD } from './analytics.fixtures';
 import type { AnalyticsPeriod, AnalyticsTab } from './analytics.types';
+
+/** The reporting windows the period select offers. */
+export const ANALYTICS_PERIODS: readonly AnalyticsPeriod[] = [
+  'Last 7 days',
+  'Last 30 days',
+  'Last 90 days',
+  'Last 12 months',
+];
+
+/** The window the screen opens on. */
+const DEFAULT_ANALYTICS_PERIOD: AnalyticsPeriod = 'Last 30 days';
 
 /**
  * Usage-analytics UI state — the selected reporting window and section.
  *
  * Client state only, per the standards' Query/Zustand split: the figures
- * themselves are derived from the seeds by `analytics.derive.ts`, never
- * copied into here. It lives in a store rather than `useState` so the period
+ * themselves come from the analytics query hooks, never copied into here. It lives in a store rather than `useState` so the period
  * survives navigating to a hospital and back, and so the screen and its cards
  * read one source of truth (audit 2.5: a period control that changes nothing
  * is the same defect as a filter that changes nothing).

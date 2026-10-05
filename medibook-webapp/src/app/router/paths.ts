@@ -143,6 +143,22 @@ export function hospitalPath(role: HospitalRole, view: HospitalStaticView): stri
   return `/${role}/${HOSPITAL_VIEW_SEGMENT[view]}`;
 }
 
+/** Query param carrying the patient MRN from the patients screens to New Appointment. */
+export const BOOK_FOR_MRN_PARAM = 'mrn';
+
+/** Query param carrying a department name from the front desk to Token Management. */
+export const TOKEN_DEPT_PARAM = 'dept';
+
+/** New Appointment, pre-selecting the patient with this MRN. */
+export function hospitalBookForPatientPath(role: HospitalRole, mrn: string): string {
+  return `${hospitalPath(role, 'create')}?${new URLSearchParams({ [BOOK_FOR_MRN_PARAM]: mrn })}`;
+}
+
+/** Token Management, filtered to one department. */
+export function hospitalTokenForDeptPath(role: HospitalRole, dept: string): string {
+  return `${hospitalPath(role, 'token')}?${new URLSearchParams({ [TOKEN_DEPT_PARAM]: dept })}`;
+}
+
 export function hospitalDashboardPath(role: HospitalRole): string {
   return hospitalPath(role, 'dashboard');
 }
@@ -275,8 +291,18 @@ export function opsPath(view: OpsStaticView): string {
 }
 
 /** Absolute path for one hospital's ops profile (bell/alert `hospital:<id>` targets). */
-export function opsHospitalDetailPath(id: number): string {
-  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.hospitals}/${id}`;
+/** One subscription invoice in the ops billing screen. */
+export function opsInvoiceDetailPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['invoice-detail'].replace(':id', encodeURIComponent(id))}`;
+}
+
+/** One subscription payment in the ops billing screen. */
+export function opsPaymentDetailPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['payment-detail'].replace(':id', encodeURIComponent(id))}`;
+}
+
+export function opsHospitalDetailPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.hospitals}/${encodeURIComponent(id)}`;
 }
 
 /* Named helpers for the ops views added this round. */

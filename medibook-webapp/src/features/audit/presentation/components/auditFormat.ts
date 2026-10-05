@@ -59,14 +59,20 @@ export interface AuditActorLabel {
 }
 
 /**
- * Who acted. The log carries only `actor_user_id`, so the signed-in user's own
- * rows read "You" and everyone else shows a short id — naming them needs the
- * staff directory (H12), deferred to module Z.
+ * Who acted. The log carries only `actor_user_id`: the signed-in user's own
+ * rows read "You", staff are named from the staff directory (`names`, user id
+ * → name), and anyone else (a patient, a removed account) shows a short id.
  */
-export function actorLabel(entry: AuditLogEntry, myUserId: string | null): AuditActorLabel {
+export function actorLabel(
+  entry: AuditLogEntry,
+  myUserId: string | null,
+  names: ReadonlyMap<string, string>,
+): AuditActorLabel {
   const kind = PRINCIPAL_LABELS[entry.principal] ?? entry.principal;
   if (entry.actorUserId === null) return { name: kind, sub: '—' };
   if (entry.actorUserId === myUserId) return { name: 'You', sub: kind };
+  const name = names.get(entry.actorUserId);
+  if (name) return { name, sub: kind };
   return { name: kind, sub: shortId(entry.actorUserId) };
 }
 

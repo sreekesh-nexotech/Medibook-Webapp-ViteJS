@@ -10,11 +10,12 @@ import { fetchSettlementPeriods } from '@/features/settlements/application/useca
 const PERIODS_STALE_TIME_MS = 60_000;
 
 /** The latest (up to 100) settlement periods in the date range; the old rows stay while a new range loads. */
-export function useSettlementPeriodsQuery(filters: SettlementPeriodFilters) {
+export function useSettlementPeriodsQuery(filters: SettlementPeriodFilters, enabled = true) {
   return useQuery({
     queryKey: settlementsKeys.periods(filters),
     queryFn: async () => unwrap(await fetchSettlementPeriods(filters)),
     placeholderData: keepPreviousData,
     staleTime: PERIODS_STALE_TIME_MS,
+    enabled,
   });
 }

@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
@@ -10,7 +9,7 @@ import { SessionLoading } from '@/app/router/SessionLoading';
 import { useSessionExit } from '@/app/router/useSessionExit';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
-import { platformSessionOf, syncAuthStore } from '@/features/auth/application/store/auth.roles';
+import { platformSessionOf } from '@/features/auth/application/store/auth.roles';
 
 /**
  * Guard for the `/ops/*` layout. Validates the stored platform tokens with
@@ -21,10 +20,6 @@ export function OpsGuard() {
   const session = useSessionQuery('platform');
   const { logout } = useSessionExit('platform');
   const data = platformSessionOf(session.data);
-
-  useEffect(() => {
-    if (data) syncAuthStore(data);
-  }, [data]);
 
   if (!data) {
     if (session.isError) {

@@ -152,6 +152,8 @@ export interface InvoiceListParams {
   readonly overdue: boolean | null;
   readonly sortField: InvoiceSortField;
   readonly sortDirection: SortDirection;
+  /** One hospital's invoices only (its profile); omitted = every hospital. */
+  readonly hospitalId?: string;
 }
 
 export type PaymentSortField = 'attempted_at' | 'amount_paise';
@@ -164,6 +166,8 @@ export interface PaymentListParams {
   readonly invoiceId: string | null;
   readonly sortField: PaymentSortField;
   readonly sortDirection: SortDirection;
+  /** One hospital's payments only (its profile); omitted = every hospital. */
+  readonly hospitalId?: string;
 }
 
 export interface PlanChangeListParams {

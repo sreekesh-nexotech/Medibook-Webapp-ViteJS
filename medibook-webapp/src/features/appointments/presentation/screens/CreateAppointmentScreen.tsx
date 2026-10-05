@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useDeferredValue, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { money } from '@/shared/lib/format';
@@ -19,14 +19,18 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
-import { hospitalPath, isHospitalRole, type HospitalRole } from '@/app/router/paths';
+import {
+  BOOK_FOR_MRN_PARAM,
+  hospitalPath,
+  isHospitalRole,
+  type HospitalRole,
+} from '@/app/router/paths';
 
 import type {
   DeskAppointment,
   NewWalkInPatient,
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { useBookWalkInMutation } from '@/features/appointments/application/queries/appointments.mutations';
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { AppointmentBookedModal } from '@/features/appointments/presentation/components/AppointmentBookedModal';
 import { AppointmentSlotSelect } from '@/features/appointments/presentation/components/AppointmentSlotSelect';
 import {
@@ -131,17 +135,10 @@ export function CreateAppointmentScreen() {
   const doctorsQuery = useDoctorsQuery();
   const book = useBookWalkInMutation();
 
-  /**
-   * The MRN handed over by "Book Appointment" on the patients screens (client
-   * state in the legacy store), captured once at mount and cleared below.
-   */
-  const bookMrn = useAppointmentsStore((s) => s.bookMrn);
-  const consumeBooking = useAppointmentsStore((s) => s.consumeBooking);
-  const [handoffMrn] = useState<string | null>(bookMrn);
+  /** The MRN handed over by "Book Appointment" on the patients screens (`?mrn=`). */
+  const [searchParams] = useSearchParams();
+  const handoffMrn = searchParams.get(BOOK_FOR_MRN_PARAM);
   const handoff = usePatientByMrnQuery(handoffMrn ?? undefined);
-  useEffect(() => {
-    if (bookMrn) consumeBooking();
-  }, [bookMrn, consumeBooking]);
 
   /** `undefined` = "use the hand-off patient, if any"; `null` = none picked. */
   const [selection, setSelection] = useState<PatientRecord | null | undefined>(undefined);

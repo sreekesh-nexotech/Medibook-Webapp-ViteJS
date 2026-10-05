@@ -9,7 +9,6 @@ import { OpsSkeleton } from '@/shared/ui/OpsSkeleton';
 
 import {
   opsAccountPath,
-  opsHospitalDetailPath,
   opsPath,
   opsViewFromPath,
   type OpsStaticView,
@@ -17,7 +16,7 @@ import {
 } from '@/app/router/paths';
 
 import type { PlatformSession } from '@/features/auth/domain/entities/auth.types';
-import { useOpsSettingsStore } from '@/features/ops-settings/application/store/opsSettings.store';
+import { useOpsSettingsQuery } from '@/features/ops-settings/application/queries/useOpsSettingsQuery';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { OPS_DETAIL_PARENT, opsDocumentTitleFor } from './ops-nav';
@@ -56,7 +55,7 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
   const navigate = useNavigate();
   const { user } = session;
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-  const sessTimeout = useOpsSettingsStore((s) => s.settings.sessTimeout);
+  const settings = useOpsSettingsQuery();
 
   const view = opsViewFromPath(location.pathname);
   const navActive = OPS_DETAIL_PARENT[view] ?? view;
@@ -103,9 +102,11 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
 
   const handleLogout = onLogout;
 
-  // Audit 3.7.5 — the Session Timeout setting now has a timer behind it:
-  // "30 min" means 30 idle minutes, with a warning at T-60s.
-  const idleMinutes = Number.parseInt(sessTimeout, 10);
+  // Audit 3.7.5 — the platform's Session Timeout setting has a timer behind
+  // it, with a warning at T-60s. Until the setting has loaded (or if this
+  // staff member cannot read it) the client timer is off; the server's own
+  // token expiry still applies.
+  const idleMinutes = settings.data?.sessionTimeoutMin ?? 0;
   const { warning, secondsLeft, stayActive } = useIdleTimeout({
     minutes: idleMinutes,
     onTimeout: handleLogout,
@@ -122,7 +123,6 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
         <OpsTopbar
           view={view}
           onNavigate={handleNavigate}
-          onOpenHospital={(id) => navigate(opsHospitalDetailPath(id))}
           onLogout={handleLogout}
           onAccount={() => {
             setNavOpen(false);
@@ -177,7 +177,7 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
         <p className="text-body-lg text-text-body m-0 leading-[1.6]">
           You have been idle for a while. For security, this session signs out in{' '}
           <span className="text-text-strong font-semibold tabular-nums">{secondsLeft}s</span>. The
-          session timeout is {sessTimeout}, set under Platform Settings.
+          session timeout is {idleMinutes} min, set under Platform Settings.
         </p>
       </Modal>
     </div>
