@@ -1,5 +1,6 @@
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { email as emailRule, phoneIN, positiveAmount, required } from '@/shared/lib/validate';
+import { todayISO } from '@/shared/lib/format';
+import { email as emailRule, notFutureDate, phoneIN, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
@@ -7,117 +8,140 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { usePatientsStore } from '@/features/patients/application/store/patients.store';
-import type { Gender, PatientStatus } from '@/features/patients/application/store/patients.types';
-
-/**
- * Loose view of the record being edited — the Patient Detail screen may pass a
- * real patient record OR (for patients that exist only as appointment history)
- * an appointment-derived object, exactly like the prototype's `rec || p`.
- */
-export interface PatientModalPatient {
-  readonly mrn: string;
-  readonly name?: string;
-  readonly phone?: string;
-  readonly age?: number;
-  readonly gender?: Gender;
-  readonly email?: string;
-  readonly address?: string;
-  readonly status?: string;
-}
+import { useCreatePatientMutation } from '@/features/patients/application/queries/useCreatePatientMutation';
+import { useUpdatePatientMutation } from '@/features/patients/application/queries/useUpdatePatientMutation';
+import type {
+  PatientDemographics,
+  PatientRecord,
+} from '@/features/patients/domain/entities/patients.entities';
+import {
+  GENDER_LABELS,
+  GENDER_OPTIONS,
+  diffDemographics,
+  displayPhone,
+  genderFromLabel,
+  genderLabel,
+  saveErrorMessage,
+  splitFullName,
+  toE164,
+} from '@/features/patients/presentation/components/patientsFormat';
 
 interface PatientModalProps {
   open: boolean;
   /** Absent = "Add Patient" (new); present = "Edit Patient". */
-  patient?: PatientModalPatient;
+  patient?: PatientRecord;
   onClose: () => void;
+  /** Called with the MRN of the saved (or already-registered) record. */
   onSaved?: (mrn: string) => void;
 }
 
 interface PatientForm {
   name: string;
   phone: string;
-  age: string;
-  gender: Gender;
+  dob: string;
+  gender: string;
   email: string;
   address: string;
-  status: PatientStatus;
 }
 
 const BLANK: PatientForm = {
   name: '',
   phone: '',
-  age: '',
-  gender: 'Male',
+  dob: '',
+  gender: GENDER_LABELS.male,
   email: '',
   address: '',
-  status: 'Active',
 };
 
-/** Oldest age the desk can type before it is obviously a typo. */
-const MAX_AGE = 120;
+const SAVE_FAILED = 'The patient could not be saved. Please try again.';
 
 /**
- * Inline field errors instead of the old "Name and phone are required" toast
- * (audit 3.5.1/3.5.4) — and the phone is now checked against `phoneIN`, so a
- * 7-digit number no longer reaches the record.
+ * Inline field errors (audit 3.5.1/3.5.4); the phone is checked against
+ * `phoneIN`. Date of birth is optional, but never in the future.
  */
 const VALIDATORS: FormValidators<PatientForm> = {
   name: (value) => required(value, 'Patient name'),
   phone: (value) => phoneIN(value),
-  age: (value) => {
-    if (value.trim() === '') return undefined;
-    const invalid = positiveAmount(value, 'Age');
-    if (invalid) return invalid;
-    return Number(value) <= MAX_AGE ? undefined : `Age must be ${MAX_AGE} or less.`;
-  },
+  dob: (value) => (value.trim() === '' ? undefined : notFutureDate(value, 'Date of birth')),
   email: (value) => (value.trim() === '' ? undefined : emailRule(value)),
 };
 
+function toForm(p: PatientRecord): PatientForm {
+  return {
+    name: p.fullName,
+    phone: displayPhone(p.phone),
+    dob: p.dateOfBirth ?? '',
+    gender: genderLabel(p.gender) || GENDER_LABELS.male,
+    email: p.email ?? '',
+    // The single field edits the first address line; city, state and
+    // pincode are kept as they are.
+    address: p.addressLine1 ?? '',
+  };
+}
+
+function toDemographics(v: PatientForm): PatientDemographics {
+  const blankToNull = (s: string): string | null => (s.trim() === '' ? null : s.trim());
+  return {
+    ...splitFullName(v.name),
+    phone: toE164(v.phone),
+    email: blankToNull(v.email),
+    dateOfBirth: blankToNull(v.dob),
+    gender: genderFromLabel(v.gender),
+    addressLine1: blankToNull(v.address),
+  };
+}
+
 /**
  * Add / Edit patient modal — identity + contact only (Medibook stores no
- * clinical data). Ported 1:1 from the design prototype's `PatientModal`, on
- * `FormModal` so Enter submits.
+ * clinical data), on `FormModal` so Enter submits. Saves through the
+ * hospital API: a new record gets its MRN from the server, and an edit may
+ * become a change request when the hospital requires admin approval.
  */
 function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps, 'open'>) {
   const isNew = !patient;
-  const patAdd = usePatientsStore((s) => s.patAdd);
-  const patUpdate = usePatientsStore((s) => s.patUpdate);
+  const createMutation = useCreatePatientMutation();
+  const updateMutation = useUpdatePatientMutation();
+
+  const save = async (v: PatientForm): Promise<void> => {
+    const demographics = toDemographics(v);
+    try {
+      if (!patient) {
+        const { patient: saved, isExisting } = await createMutation.mutateAsync(demographics);
+        toast(
+          isExisting ? `Already registered as ${saved.mrn} — opened that record` : 'Patient added',
+          isExisting ? 'info' : 'success',
+        );
+        onSaved?.(saved.mrn);
+        onClose();
+        return;
+      }
+      const changes = diffDemographics(patient, demographics);
+      if (Object.keys(changes).length === 0) {
+        onClose();
+        return;
+      }
+      const outcome = await updateMutation.mutateAsync({
+        id: patient.id,
+        changes,
+        version: patient.version,
+      });
+      toast(
+        outcome.status === 'applied'
+          ? 'Patient details updated'
+          : 'Changes sent to an admin for approval',
+        outcome.status === 'applied' ? 'success' : 'info',
+      );
+      onSaved?.(patient.mrn);
+      onClose();
+    } catch (error) {
+      toast(saveErrorMessage(error, SAVE_FAILED), 'error');
+    }
+  };
 
   const form = useForm<PatientForm>({
-    initial: patient
-      ? {
-          name: patient.name || '',
-          phone: patient.phone || '',
-          age: patient.age ? String(patient.age) : '',
-          gender: patient.gender || 'Male',
-          email: patient.email || '',
-          address: patient.address || '',
-          status: patient.status === 'Inactive' ? 'Inactive' : 'Active',
-        }
-      : BLANK,
+    initial: patient ? toForm(patient) : BLANK,
     validate: VALIDATORS,
-    onSubmit: (v) => {
-      const payload = {
-        name: v.name.trim(),
-        phone: v.phone.trim(),
-        age: Number(v.age) || 0,
-        gender: v.gender,
-        email: v.email.trim(),
-        address: v.address.trim(),
-        status: v.status,
-      };
-      if (!patient) {
-        const mrn = patAdd(payload);
-        toast('Patient added', 'success');
-        onSaved?.(mrn);
-      } else {
-        patUpdate(patient.mrn, payload);
-        toast('Patient details updated', 'success');
-        onSaved?.(patient.mrn);
-      }
-      onClose();
-    },
+    onSubmit: save,
   });
 
   return (
@@ -151,23 +175,24 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             placeholder="10-digit mobile"
           />
         </Field>
-        <Field label="Age" error={form.errorFor('age')}>
+        <Field label="Date of Birth" error={form.errorFor('dob')}>
           <TextInput
-            value={form.values.age}
-            onChange={(v) => form.setField('age', v)}
-            onBlur={() => form.blurField('age')}
-            inputMode="numeric"
-            placeholder="Age"
+            type="date"
+            value={form.values.dob}
+            onChange={(v) => form.setField('dob', v)}
+            onBlur={() => form.blurField('dob')}
+            autoComplete="bday"
+            max={todayISO()}
           />
         </Field>
         <Field label="Gender">
           <Select
             value={form.values.gender}
-            options={['Male', 'Female', 'Other']}
-            onChange={(v) => form.setField('gender', v as Gender)}
+            options={GENDER_OPTIONS}
+            onChange={(v) => form.setField('gender', v)}
           />
         </Field>
-        <Field label="Email" error={form.errorFor('email')}>
+        <Field label="Email" error={form.errorFor('email')} className="col-span-full">
           <TextInput
             value={form.values.email}
             onChange={(v) => form.setField('email', v)}
@@ -178,19 +203,12 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             placeholder="name@mail.com"
           />
         </Field>
-        <Field label="Status">
-          <Select
-            value={form.values.status}
-            options={['Active', 'Inactive']}
-            onChange={(v) => form.setField('status', v as PatientStatus)}
-          />
-        </Field>
         <Field label="Address" className="col-span-full">
           <TextInput
             value={form.values.address}
             onChange={(v) => form.setField('address', v)}
             autoComplete="street-address"
-            placeholder="Area, City"
+            placeholder="House, street, area"
           />
         </Field>
       </div>
@@ -209,7 +227,7 @@ export function PatientModal({ open, patient, onClose, onSaved }: PatientModalPr
   if (!open) return null;
   return (
     <PatientRecordForm
-      key={patient?.mrn ?? 'new'}
+      key={patient ? `${patient.id}:${patient.version}` : 'new'}
       patient={patient}
       onClose={onClose}
       onSaved={onSaved}
