@@ -85,3 +85,21 @@ export function opsStampNow(): string {
   const mm = String(now.getMinutes()).padStart(2, '0');
   return `${longDateFromIso(opsTodayIso())} · ${hh}:${mm}`;
 }
+
+/**
+ * A real moment in the console's stamp format, e.g. "October 05, 2026 · 14:32"
+ * — for server-backed screens (the registry's "Updated …" line).
+ */
+export function opsStampFrom(ms: number): string {
+  const d = new Date(ms);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${longDateFromIso(isoFromDate(d))} · ${hh}:${mm}`;
+}
+
+/** A backend ISO timestamp as a long local date ("June 13, 2026"); `null` gives an em dash. */
+export function longDateFromTimestamp(ts: string | null | undefined): string {
+  if (!ts) return '—';
+  const ms = Date.parse(ts);
+  return Number.isNaN(ms) ? '—' : longDateFromIso(isoFromDate(new Date(ms)));
+}
