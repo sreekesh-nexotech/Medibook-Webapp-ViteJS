@@ -1,0 +1,242 @@
+import { z } from 'zod';
+
+import type {
+  AppointmentEvent,
+  DeskAppointment,
+  DeskReceipt,
+  TokenSlipData,
+} from '@/features/appointments/domain/entities/appointments.entities';
+
+/** Paise per rupee — money crosses the API boundary in paise. */
+export const PAISE_PER_RUPEE = 100;
+
+const BP_PER_PERCENT = 100;
+
+function rupees(paise: number): number {
+  return paise / PAISE_PER_RUPEE;
+}
+
+/** `HospitalAppointmentSerializer` (`appointments/serializers/hospital_appointment_serializer.py`). */
+export const appointmentResponseSchema = z.object({
+  id: z.string(),
+  booking_ref: z.string(),
+  status: z.enum([
+    'pending_payment',
+    'pending_approval',
+    'scheduled',
+    'checked_in',
+    'in_consultation',
+    'completed',
+    'cancelled',
+    'no_show',
+  ]),
+  status_reason: z.string().nullable(),
+  source: z.enum(['online', 'walk_in']),
+  patient: z
+    .object({
+      id: z.string(),
+      mrn: z.string(),
+      full_name: z.string(),
+      phone_e164: z.string().nullable(),
+      gender: z.string().nullable(),
+      date_of_birth: z.string().nullable(),
+    })
+    .nullable(),
+  doctor: z.object({ id: z.string(), name: z.string(), room: z.string().nullable() }),
+  department: z.object({ id: z.string(), name: z.string() }),
+  session: z.object({ label: z.string() }),
+  visit_id: z.string().nullable(),
+  scheduled_date: z.string(),
+  scheduled_start_at: z.string(),
+  scheduled_end_at: z.string(),
+  token_label: z.string().nullable(),
+  is_follow_up: z.boolean(),
+  patient_notes: z.string().nullable(),
+  remark: z.string().nullable(),
+  payment_status: z.enum(['unpaid', 'pending', 'paid', 'refunded', 'failed']),
+  consultation_fee_paise: z.number().int(),
+  service_fee_paise: z.number().int(),
+  discount_paise: z.number().int(),
+  convenience_fee_paise: z.number().int(),
+  tax_paise: z.number().int(),
+  total_paise: z.number().int(),
+  approved_at: z.string().nullable(),
+  checked_in_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  cancelled_at: z.string().nullable(),
+  cancellation_reason: z.string().nullable(),
+  no_show_at: z.string().nullable(),
+  created_at: z.string(),
+  version: z.number().int(),
+});
+
+export const appointmentEventSchema = z.object({
+  id: z.string(),
+  event_type: z.string(),
+  actor_kind: z.string(),
+  from_status: z.string().nullable(),
+  to_status: z.string().nullable(),
+  occurred_at: z.string(),
+});
+
+/** `HospitalReceiptSerializer`; `lines` / `payment_lines` per `payments/services/receipts.py`. */
+export const receiptResponseSchema = z.object({
+  id: z.string(),
+  receipt_no: z.string(),
+  issued_at: z.string(),
+  issued_by_name: z.string().nullable(),
+  counter_code: z.string().nullable(),
+  subtotal_paise: z.number().int(),
+  tax_paise: z.number().int(),
+  total_paise: z.number().int(),
+  has_pdf: z.boolean(),
+  lines: z.array(
+    z.object({
+      description: z.string(),
+      booking_ref: z.string(),
+      amount_paise: z.number().int(),
+      tax_paise: z.number().int(),
+      tax_rate_bp: z.number().int(),
+      tax_inclusive: z.boolean(),
+    }),
+  ),
+  payment_lines: z.array(
+    z.object({
+      method: z.string(),
+      amount_paise: z.number().int(),
+      reference: z.string().nullable(),
+    }),
+  ),
+  hospital_snapshot: z.object({ name: z.string(), gstin: z.string().nullable() }),
+});
+
+export const tokenSlipResponseSchema = z.object({
+  hospital_name: z.string(),
+  token_label: z.string(),
+  booking_ref: z.string(),
+  mrn: z.string(),
+  patient_name: z.string(),
+  doctor_name: z.string(),
+  doctor_room: z.string().nullable(),
+  department_name: z.string(),
+  session_label: z.string(),
+  scheduled_start_at: z.string(),
+});
+
+/** Cancel / reject answer `{appointment, refunds}`. */
+export const cancellationResponseSchema = z.object({ appointment: appointmentResponseSchema });
+
+/** Walk-in create answers `{visit, appointments}`. */
+export const walkInResponseSchema = z.object({
+  visit: z.object({ id: z.string() }),
+  appointments: z.array(appointmentResponseSchema),
+});
+
+/** Desk payment answers `{order_id, amount_paise, status, receipt}`. */
+export const paymentResponseSchema = z.object({ receipt: receiptResponseSchema });
+
+export const receiptPdfResponseSchema = z.object({ url: z.string().min(1) });
+
+export type AppointmentResponse = z.infer<typeof appointmentResponseSchema>;
+export type ReceiptResponse = z.infer<typeof receiptResponseSchema>;
+
+export function toAppointment(dto: AppointmentResponse): DeskAppointment {
+  return {
+    id: dto.id,
+    bookingRef: dto.booking_ref,
+    status: dto.status,
+    statusReason: dto.status_reason,
+    source: dto.source,
+    patient: dto.patient
+      ? {
+          id: dto.patient.id,
+          mrn: dto.patient.mrn,
+          fullName: dto.patient.full_name,
+          phone: dto.patient.phone_e164,
+          gender: dto.patient.gender,
+          dateOfBirth: dto.patient.date_of_birth,
+        }
+      : null,
+    doctor: dto.doctor,
+    department: dto.department,
+    sessionLabel: dto.session.label,
+    visitId: dto.visit_id,
+    scheduledDate: dto.scheduled_date,
+    scheduledStartAt: dto.scheduled_start_at,
+    scheduledEndAt: dto.scheduled_end_at,
+    tokenLabel: dto.token_label,
+    isFollowUp: dto.is_follow_up,
+    patientNotes: dto.patient_notes ?? '',
+    remark: dto.remark ?? '',
+    paymentStatus: dto.payment_status,
+    consultationRupees: rupees(dto.consultation_fee_paise),
+    serviceRupees: rupees(dto.service_fee_paise),
+    discountRupees: rupees(dto.discount_paise),
+    convenienceRupees: rupees(dto.convenience_fee_paise),
+    taxRupees: rupees(dto.tax_paise),
+    totalRupees: rupees(dto.total_paise),
+    approvedAt: dto.approved_at,
+    checkedInAt: dto.checked_in_at,
+    completedAt: dto.completed_at,
+    cancelledAt: dto.cancelled_at,
+    cancellationReason: dto.cancellation_reason,
+    noShowAt: dto.no_show_at,
+    createdAt: dto.created_at,
+    version: dto.version,
+  };
+}
+
+export function toEvent(dto: z.infer<typeof appointmentEventSchema>): AppointmentEvent {
+  return {
+    id: dto.id,
+    eventType: dto.event_type,
+    actorKind: dto.actor_kind,
+    fromStatus: dto.from_status,
+    toStatus: dto.to_status,
+    occurredAt: dto.occurred_at,
+  };
+}
+
+export function toReceipt(dto: ReceiptResponse): DeskReceipt {
+  return {
+    id: dto.id,
+    receiptNo: dto.receipt_no,
+    issuedAt: dto.issued_at,
+    issuedByName: dto.issued_by_name,
+    counterCode: dto.counter_code,
+    hospitalName: dto.hospital_snapshot.name,
+    hospitalGstin: dto.hospital_snapshot.gstin,
+    lines: dto.lines.map((l) => ({
+      description: l.description,
+      bookingRef: l.booking_ref,
+      amountRupees: rupees(l.amount_paise),
+      taxRupees: rupees(l.tax_paise),
+      taxRatePercent: l.tax_rate_bp / BP_PER_PERCENT,
+      taxInclusive: l.tax_inclusive,
+    })),
+    payments: dto.payment_lines.map((p) => ({
+      method: p.method,
+      amountRupees: rupees(p.amount_paise),
+      reference: p.reference,
+    })),
+    subtotalRupees: rupees(dto.subtotal_paise),
+    taxRupees: rupees(dto.tax_paise),
+    totalRupees: rupees(dto.total_paise),
+    hasPdf: dto.has_pdf,
+  };
+}
+
+export function toTokenSlip(dto: z.infer<typeof tokenSlipResponseSchema>): TokenSlipData {
+  return {
+    hospitalName: dto.hospital_name,
+    tokenLabel: dto.token_label,
+    bookingRef: dto.booking_ref,
+    mrn: dto.mrn,
+    patientName: dto.patient_name,
+    doctorName: dto.doctor_name,
+    doctorRoom: dto.doctor_room,
+    departmentName: dto.department_name,
+    sessionLabel: dto.session_label,
+    scheduledStartAt: dto.scheduled_start_at,
+  };
+}

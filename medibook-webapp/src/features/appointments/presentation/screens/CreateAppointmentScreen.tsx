@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { money } from '@/shared/lib/format';
-import { phoneIN, positiveAmount, required } from '@/shared/lib/validate';
+import { phoneIN, required } from '@/shared/lib/validate';
 import { Avatar } from '@/shared/ui/Avatar';
-import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Field } from '@/shared/ui/Field';
@@ -14,48 +13,40 @@ import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { Select } from '@/shared/ui/Select';
+import { Spinner } from '@/shared/ui/Spinner';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
+
+import { isFailure } from '@/core/error/failure';
 
 import { hospitalPath, isHospitalRole, type HospitalRole } from '@/app/router/paths';
 
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import {
-  GST_LABEL,
-  isoToRelLocal,
-  isPastISO,
-  taxBreakdown,
-  todayISO,
-} from '@/features/appointments/application/store/appointments.logic';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import {
-  selectDoctorNames,
-  selectFee,
-  useCatalogDepartments,
-} from '@/features/doctors/application/store/catalog.selectors';
 import type {
-  Appointment,
-  Gender,
-} from '@/features/appointments/application/store/appointments.types';
-import { DoctorCapacityHint } from '@/features/appointments/presentation/components/DoctorCapacityHint';
-import { MultiPaymentModal } from '@/features/appointments/presentation/components/MultiPaymentModal';
-import { MultiReceiptModal } from '@/features/appointments/presentation/components/MultiReceiptModal';
-import { usePatientsStore } from '@/features/patients/application/store/patients.store';
-import type { Patient } from '@/features/patients/application/store/patients.types';
+  DeskAppointment,
+  NewWalkInPatient,
+} from '@/features/appointments/domain/entities/appointments.entities';
+import { useBookWalkInMutation } from '@/features/appointments/application/queries/appointments.mutations';
+import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
+import { AppointmentBookedModal } from '@/features/appointments/presentation/components/AppointmentBookedModal';
+import { AppointmentSlotSelect } from '@/features/appointments/presentation/components/AppointmentSlotSelect';
+import {
+  localIso,
+  toE164,
+} from '@/features/appointments/presentation/components/appointments.view';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
+import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
+import type { PatientRecord } from '@/features/patients/domain/entities/patients.entities';
 
-const TIME_SLOTS = [
-  '9:00 am',
-  '9:30 am',
-  '10:00 am',
-  '10:30 am',
-  '11:00 am',
-  '11:30 am',
-  '12:00 pm',
-  '2:00 pm',
-  '3:00 pm',
-  '4:00 pm',
-];
+const GENDERS = ['Male', 'Female', 'Other'] as const;
+type GenderLabel = (typeof GENDERS)[number];
 
-const GENDERS: readonly Gender[] = ['Male', 'Female', 'Other'];
+const GENDER_VALUE: Readonly<Record<GenderLabel, NewWalkInPatient['gender']>> = {
+  Male: 'male',
+  Female: 'female',
+  Other: 'other',
+};
 
 /** Native date-input styling — the design's `dateField`. */
 const dateInputClass =
@@ -63,10 +54,14 @@ const dateInputClass =
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Oldest age the desk can type before it is obviously a typo. */
-const MAX_AGE = 120;
+/** Patient search shows this many matches and starts at this many characters. */
+const SEARCH_RESULTS = 6;
+const SEARCH_MIN_CHARS = 2;
 
-/** Consultation-row id counter — replaces the design's `Date.now()` id mint. */
+/** Error code when a slot was taken between picking and booking. */
+const SLOT_UNAVAILABLE = 'SLOT_UNAVAILABLE';
+
+/** Consultation-row id counter. */
 let consultSeq = 1;
 function nextConsultId(): number {
   consultSeq += 1;
@@ -74,228 +69,209 @@ function nextConsultId(): number {
 }
 
 interface Consult {
-  id: number;
-  dept: string;
-  doctor: string;
-}
-
-interface MultiTarget {
-  patient: string;
-  appts: Appointment[];
+  readonly id: number;
+  readonly departmentId: string;
+  readonly doctorId: string;
+  readonly slotId: string;
 }
 
 /**
  * The flat fields of the booking. `hasPicked` rides along so the new-patient
- * validators can stand down when an existing record is selected, which keeps
- * the validator map at module level (and therefore the error memo stable).
+ * validators stand down when an existing record is selected, keeping the
+ * validator map at module level (and the error memo stable).
  */
 interface BookingForm {
-  apptType: string;
   iso: string;
-  time: string;
   remark: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
-  age: string;
-  gender: Gender;
-  mrn: string;
+  dob: string;
+  gender: GenderLabel;
   hasPicked: boolean;
 }
 
 const VALIDATORS: FormValidators<BookingForm> = {
   iso: (value) => {
     const raw = value.trim();
-    if (raw === '') return 'Pick a date for the appointment.';
-    if (!ISO_DATE_PATTERN.test(raw)) return 'Enter a valid date.';
-    if (Number.isNaN(new Date(`${raw}T00:00:00`).getTime())) return 'Enter a valid date.';
-    if (isPastISO(raw)) return 'The appointment date cannot be in the past.';
+    if (raw === '' || !ISO_DATE_PATTERN.test(raw)) return 'Pick a date for the appointment.';
+    if (raw < localIso(new Date())) return 'The appointment date cannot be in the past.';
     return undefined;
   },
-  time: (value) =>
-    TIME_SLOTS.includes(value) ? undefined : 'Pick an appointment time from the list.',
-  name: (value, values) => (values.hasPicked ? undefined : required(value, 'Patient name')),
+  firstName: (value, values) => (values.hasPicked ? undefined : required(value, 'First name')),
   phone: (value, values) => (values.hasPicked ? undefined : phoneIN(value)),
-  age: (value, values) => {
-    if (values.hasPicked || value.trim() === '') return undefined;
-    const invalid = positiveAmount(value, 'Age');
-    if (invalid) return invalid;
-    return Number(value) <= MAX_AGE ? undefined : `Age must be ${MAX_AGE} or less.`;
-  },
+  dob: (value, values) =>
+    values.hasPicked || value === '' || value <= localIso(new Date())
+      ? undefined
+      : 'Date of birth cannot be in the future.',
 };
 
-const APPT_TYPE_HINT =
-  'Walk-in = booked at the desk (collect payment & issue token now, even for a future date). Online = booked & prepaid via the Medibook app.';
 const CONSULT_HINT =
-  'One consultation = one doctor, one fee, one token. Add more to book several doctors for the same patient in a single visit — you collect one combined payment.';
+  'One consultation = one doctor, one slot, one token. Add more to book several doctors for the same patient in one visit — you collect for them together.';
 
-/** Create Appointment — patient search/add, multi-consultation, walk-in vs online (design `Screens.jsx` `CreateAppointment`). */
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
+/**
+ * New walk-in appointment (design `Screens.jsx` `CreateAppointment`), booked
+ * on the hospital API: pick or add the patient (H6), choose a date, and for
+ * each consultation a department, a doctor and one of that doctor's open
+ * slots (H5) — every walk-in consultation needs a slot (Q74). Online
+ * bookings come from the Medibook app, not the desk. After booking, the fee
+ * is collected and the receipts and token slips are issued.
+ */
 export function CreateAppointmentScreen() {
   const navigate = useNavigate();
   const roleParam = useParams().role;
   const role: HospitalRole = isHospitalRole(roleParam) ? roleParam : 'receptionist';
   const onDone = () => navigate(hospitalPath(role, 'appointments'));
-  // Departments offered for booking come from the hospital's own catalogue.
-  const departments = useCatalogDepartments();
 
-  const create = useAppointmentsStore((s) => s.create);
-  const consumeBooking = useAppointmentsStore((s) => s.consumeBooking);
-  const storePatients = usePatientsStore((s) => s.patients);
+  const departmentsQuery = useDepartmentsQuery();
+  const doctorsQuery = useDoctorsQuery();
+  const book = useBookWalkInMutation();
 
   /**
-   * The MRN handed over by "Book Appointment" on the patients screens. Read
-   * during render (a pure store read) so it can seed the form, captured once at
-   * mount, and cleared in the effect below so returning here later starts
-   * blank. No prop-to-state effect, so nothing to synchronise.
+   * The MRN handed over by "Book Appointment" on the patients screens (client
+   * state in the legacy store), captured once at mount and cleared below.
    */
   const bookMrn = useAppointmentsStore((s) => s.bookMrn);
-  const [bookedPatient] = useState<Patient | null>(() =>
-    bookMrn ? (usePatientsStore.getState().patients.find((p) => p.mrn === bookMrn) ?? null) : null,
-  );
-
-  const [picked, setPicked] = useState<Patient | null>(bookedPatient);
-  const [adding, setAdding] = useState(false);
-  const [q, setQ] = useState('');
-  const [consults, setConsults] = useState<Consult[]>([{ id: 1, dept: '', doctor: '' }]);
-  const [consultsTouched, setConsultsTouched] = useState(false);
-  const [multiPay, setMultiPay] = useState<MultiTarget | null>(null);
-  const [multiReceipt, setMultiReceipt] = useState<MultiTarget | null>(null);
-
-  /**
-   * The date defect (audit 4.5): this used to seed `relToISO('Today')`, which
-   * converts LOCAL midnight to UTC and so returns **yesterday** in IST — the
-   * form opened on a past date, the appointment was saved as "10 Sep" instead
-   * of "Today", and a walk-in's token was issued into a queue nobody could
-   * see. `todayISO()` builds the string from local date parts instead.
-   */
-  const form = useForm<BookingForm>({
-    initial: {
-      apptType: 'Walk-in',
-      iso: todayISO(),
-      time: '10:00 am',
-      remark: '',
-      name: bookedPatient?.name ?? '',
-      phone: bookedPatient?.phone ?? '',
-      age: bookedPatient ? String(bookedPatient.age) : '',
-      gender: bookedPatient?.gender ?? 'Male',
-      mrn: bookedPatient?.mrn ?? '',
-      hasPicked: bookedPatient != null,
-    },
-    validate: VALIDATORS,
-    onSubmit: (v) => {
-      // The consultation rows are a list, not a field, so they sit outside
-      // `useForm`. Their inline error is rendered next to them and the save
-      // stops here — never save a booking with nothing booked.
-      if (ready.length === 0) return;
-      const base = picked
-        ? {
-            mrn: picked.mrn,
-            name: picked.name,
-            age: picked.age,
-            gender: picked.gender,
-            phone: picked.phone,
-            email: picked.email,
-            address: picked.address,
-          }
-        : {
-            mrn: v.mrn,
-            name: v.name,
-            age: Number(v.age) || 0,
-            gender: v.gender,
-            phone: v.phone,
-          };
-      const dateLabel = isoToRelLocal(v.iso);
-      const created: Appointment[] = [];
-      ready.forEach((c) => {
-        // Validate against the hospital's live catalogue, not a frozen list.
-        if (!departments.includes(c.dept)) return;
-        created.push(
-          create({
-            ...base,
-            dept: c.dept,
-            doctor: c.doctor,
-            date: dateLabel,
-            time: v.time,
-            remark: v.remark,
-            source,
-          }),
-        );
-      });
-      if (source === 'Walk-in') setMultiPay({ patient: patientName, appts: created });
-      else onDone();
-    },
-  });
-
-  // Clear the hand-off now that this screen has read it. A store write, not a
-  // setState, so there is no cascading render to synchronise.
+  const consumeBooking = useAppointmentsStore((s) => s.consumeBooking);
+  const [handoffMrn] = useState<string | null>(bookMrn);
+  const handoff = usePatientByMrnQuery(handoffMrn ?? undefined);
   useEffect(() => {
     if (bookMrn) consumeBooking();
   }, [bookMrn, consumeBooking]);
 
-  const source = form.values.apptType === 'Online' ? 'Online' : 'Walk-in';
+  /** `undefined` = "use the hand-off patient, if any"; `null` = none picked. */
+  const [selection, setSelection] = useState<PatientRecord | null | undefined>(undefined);
+  const picked = selection === undefined ? (handoff.data ?? null) : selection;
+  const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+  const deferredQ = useDeferredValue(q.trim());
+  const search = usePatientsQuery({
+    page: 1,
+    pageSize: SEARCH_RESULTS,
+    q: deferredQ,
+    source: null,
+    sortField: 'full_name',
+    sortDirection: 'asc',
+  });
+  const matches = deferredQ.length >= SEARCH_MIN_CHARS ? (search.data?.items ?? []) : [];
 
-  const choosePatient = (p: Patient): void => {
-    setPicked(p);
-    form.setValues({
-      hasPicked: true,
-      name: p.name,
-      phone: p.phone,
-      age: String(p.age),
-      gender: p.gender,
-      mrn: p.mrn,
-    });
+  const [consults, setConsults] = useState<readonly Consult[]>([
+    { id: 1, departmentId: '', doctorId: '', slotId: '' },
+  ]);
+  const [consultsTouched, setConsultsTouched] = useState(false);
+  const [booked, setBooked] = useState<readonly DeskAppointment[] | null>(null);
+
+  const form = useForm<BookingForm>({
+    initial: {
+      iso: localIso(new Date()),
+      remark: '',
+      firstName: '',
+      lastName: '',
+      phone: '',
+      dob: '',
+      gender: 'Male',
+      hasPicked: false,
+    },
+    validate: VALIDATORS,
+    onSubmit: async (v) => {
+      if (ready.length === 0) return;
+      try {
+        const result = await book.mutateAsync({
+          patient: picked
+            ? { kind: 'existing', hospitalPatientId: picked.id }
+            : {
+                kind: 'new',
+                patient: {
+                  firstName: v.firstName.trim(),
+                  lastName: v.lastName.trim(),
+                  phone: toE164(v.phone),
+                  gender: GENDER_VALUE[v.gender],
+                  dateOfBirth: v.dob || null,
+                },
+              },
+          consultations: ready.map((c) => ({
+            departmentId: c.departmentId,
+            doctorId: c.doctorId,
+            slotId: c.slotId,
+          })),
+          remark: v.remark.trim(),
+        });
+        toast(
+          `${result.appointments.length} appointment${result.appointments.length === 1 ? '' : 's'} booked`,
+          'success',
+        );
+        setBooked(result.appointments);
+      } catch (error) {
+        toast(
+          isFailure(error) && error.code === SLOT_UNAVAILABLE
+            ? 'That slot was just taken — pick another time.'
+            : failureText(error, 'Could not book the appointment.'),
+          'error',
+        );
+      }
+    },
+  });
+
+  // Keep the hidden validator flag in step with the patient choice.
+  const hasPicked = picked !== null;
+  if (form.values.hasPicked !== hasPicked) form.setField('hasPicked', hasPicked);
+
+  const choosePatient = (p: PatientRecord): void => {
+    setSelection(p);
     setQ('');
   };
-  const clearPatient = (): void => {
-    setPicked(null);
-    // Clear the identity fields too, so an unfinished "Change" cannot book the
-    // previous patient's details under their MRN.
-    form.setValues({ hasPicked: false, name: '', phone: '', age: '', mrn: '' });
-  };
+  const clearPatient = (): void => setSelection(null);
 
-  const setConsultDept = (id: number, dept: string) =>
-    setConsults((xs) => xs.map((c) => (c.id === id ? { ...c, dept, doctor: '' } : c)));
-  const setConsultDoctor = (id: number, doctor: string) =>
-    setConsults((xs) => xs.map((c) => (c.id === id ? { ...c, doctor } : c)));
+  const departments = departmentsQuery.data ?? [];
+  const doctors = doctorsQuery.data ?? [];
+  const doctorsFor = (departmentId: string) =>
+    doctors.filter((d) => d.departmentId === departmentId && d.status === 'active');
+
+  const patch = (id: number, next: Partial<Consult>) =>
+    setConsults((xs) => xs.map((c) => (c.id === id ? { ...c, ...next } : c)));
   const addConsult = () =>
-    setConsults((xs) => [...xs, { id: nextConsultId(), dept: '', doctor: '' }]);
+    setConsults((xs) => [
+      ...xs,
+      { id: nextConsultId(), departmentId: '', doctorId: '', slotId: '' },
+    ]);
   const removeConsult = (id: number) =>
     setConsults((xs) => (xs.length > 1 ? xs.filter((c) => c.id !== id) : xs));
+  const setDate = (iso: string) => {
+    form.setField('iso', iso);
+    // Slots belong to a date; a new date needs new slots.
+    setConsults((xs) => xs.map((c) => ({ ...c, slotId: '' })));
+  };
 
-  // Both read the hospital's own catalogue at call time, so a department or
-  // doctor added through Doctors & Departments is bookable immediately, and a
-  // doctor's own fee wins over the department default (audit 2.6.3).
-  const doctorsFor = (dept: string): readonly string[] =>
-    selectDoctorNames(useCatalogStore.getState(), dept);
-  const feeOf = (deptOrDoctor: string): number =>
-    selectFee(useCatalogStore.getState(), deptOrDoctor);
-
-  const matches = q
-    ? storePatients
-        .filter((p) =>
-          ((p.name || '') + ' ' + (p.phone || '') + ' ' + p.mrn)
-            .toLowerCase()
-            .includes(q.toLowerCase()),
-        )
-        .slice(0, 6)
-    : [];
-  const ready = consults.filter((c) => c.dept && c.doctor);
+  const ready = consults.filter((c) => c.departmentId && c.doctorId && c.slotId);
+  const incomplete = consults.some((c) => (c.departmentId || c.doctorId) && !c.slotId);
   const consultsError =
     ready.length === 0
-      ? 'Choose a department and a doctor for at least one consultation.'
-      : undefined;
+      ? 'Choose a department, a doctor and an open slot for at least one consultation.'
+      : incomplete
+        ? 'Finish or remove the consultation without a slot.'
+        : undefined;
   const showConsultsError = consultsTouched ? consultsError : undefined;
-  const tax = taxBreakdown(ready.reduce((s, c) => s + feeOf(c.dept), 0));
-  const patientName = picked ? picked.name : form.values.name;
+  const feeTotal = ready.reduce(
+    (sum, c) => sum + (doctors.find((d) => d.id === c.doctorId)?.feeRupees ?? 0),
+    0,
+  );
+  const patientName = picked
+    ? picked.fullName
+    : `${form.values.firstName} ${form.values.lastName}`.trim();
 
-  /**
-   * One submit path for Enter and for the footer button. Every failure is an
-   * inline message on the field that is wrong (audit 3.5.1/3.5.2) — there is
-   * no toast to miss.
-   */
   const submit = (): void => {
     setConsultsTouched(true);
+    if (!picked && !adding) return; // the patient field says what is missing
+    if (consultsError) return;
     form.handleSubmit();
   };
+
+  const isCatalogueLoading = departmentsQuery.isPending || doctorsQuery.isPending;
+  const catalogueError = departmentsQuery.error ?? doctorsQuery.error;
 
   return (
     <Form onSubmit={submit} className="flex max-w-250 flex-col gap-5">
@@ -303,13 +279,17 @@ export function CreateAppointmentScreen() {
         <div className="border-border-soft mb-4.5 border-b pb-3">
           <h3 className="text-h3 text-text-navy m-0">Patient details</h3>
         </div>
-        {picked ? (
+        {handoffMrn && selection === undefined && handoff.isPending ? (
+          <div className="text-text-muted flex justify-center py-4">
+            <Spinner size={22} label="Loading the patient" />
+          </div>
+        ) : picked ? (
           <div className="bg-blue-soft-bg flex items-center gap-3.5 rounded-md px-4 py-3.5">
-            <Avatar name={picked.name} size={40} />
+            <Avatar name={picked.fullName} size={40} />
             <div className="flex-1">
-              <div className="text-body text-text-strong font-medium">{picked.name}</div>
+              <div className="text-body text-text-strong font-medium">{picked.fullName}</div>
               <div className="text-caption text-text-muted">
-                {picked.mrn} · {picked.age} yrs · {picked.gender} · {picked.phone}
+                {[picked.mrn, picked.gender, picked.phone].filter(Boolean).join(' · ')}
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={clearPatient}>
@@ -319,12 +299,19 @@ export function CreateAppointmentScreen() {
         ) : adding ? (
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
-              <Field label="Full Name" required error={form.errorFor('name')}>
+              <Field label="First Name" required error={form.errorFor('firstName')}>
                 <TextInput
-                  value={form.values.name}
-                  onChange={(v) => form.setField('name', v)}
-                  onBlur={() => form.blurField('name')}
-                  placeholder="Patient name"
+                  value={form.values.firstName}
+                  onChange={(v) => form.setField('firstName', v)}
+                  onBlur={() => form.blurField('firstName')}
+                  placeholder="First name"
+                />
+              </Field>
+              <Field label="Last Name">
+                <TextInput
+                  value={form.values.lastName}
+                  onChange={(v) => form.setField('lastName', v)}
+                  placeholder="Last name"
                 />
               </Field>
               <Field label="Phone Number" required error={form.errorFor('phone')}>
@@ -338,14 +325,18 @@ export function CreateAppointmentScreen() {
                   placeholder="10-digit mobile"
                 />
               </Field>
-              <Field label="Age" error={form.errorFor('age')}>
-                <TextInput
-                  value={form.values.age}
-                  onChange={(v) => form.setField('age', v)}
-                  onBlur={() => form.blurField('age')}
-                  inputMode="numeric"
-                  placeholder="Age"
-                />
+              <Field label="Date of Birth" error={form.errorFor('dob')}>
+                {(field) => (
+                  <input
+                    type="date"
+                    id={field.id}
+                    value={form.values.dob}
+                    max={localIso(new Date())}
+                    onChange={(e) => form.setField('dob', e.target.value)}
+                    onBlur={() => form.blurField('dob')}
+                    className={dateInputClass}
+                  />
+                )}
               </Field>
               <Field label="Gender">
                 <Select
@@ -358,6 +349,10 @@ export function CreateAppointmentScreen() {
                 />
               </Field>
             </div>
+            <p className="text-caption text-text-muted mt-3">
+              If this phone number already has a record here, the booking uses that record — no
+              duplicate MRN is created.
+            </p>
             <Button
               variant="ghost"
               size="sm"
@@ -370,7 +365,11 @@ export function CreateAppointmentScreen() {
           </>
         ) : (
           <>
-            <Field label="Patient" required error={form.errorFor('name')}>
+            <Field
+              label="Patient"
+              required
+              error={consultsTouched && !picked ? 'Pick a patient or add a new one.' : undefined}
+            >
               <div className="relative">
                 <TextInput
                   value={q}
@@ -378,24 +377,38 @@ export function CreateAppointmentScreen() {
                   placeholder="Search by name, phone number or MRN"
                   icon="search"
                 />
-                {matches.length > 0 && (
+                {deferredQ.length >= SEARCH_MIN_CHARS && (
                   <div className="border-border shadow-pop absolute top-14.5 right-0 left-0 z-20 overflow-hidden rounded-md border bg-white">
-                    {matches.map((p) => (
-                      <button
-                        key={p.mrn}
-                        type="button"
-                        onClick={() => choosePatient(p)}
-                        className="hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 px-3.5 py-2.75 text-left"
-                      >
-                        <Avatar name={p.name} size={30} />
-                        <div className="flex-1">
-                          <div className="text-body text-text-strong font-medium">{p.name}</div>
-                          <div className="text-caption text-text-muted">
-                            {p.mrn} · {p.phone}
+                    {search.isPending ? (
+                      <div className="text-caption text-text-muted px-3.5 py-3">Searching…</div>
+                    ) : search.isError ? (
+                      <div className="text-caption text-danger px-3.5 py-3">
+                        {failureText(search.error, 'Search failed.')}
+                      </div>
+                    ) : matches.length === 0 ? (
+                      <div className="text-caption text-text-muted px-3.5 py-3">
+                        No patient matches — add them as a new patient.
+                      </div>
+                    ) : (
+                      matches.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => choosePatient(p)}
+                          className="hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 px-3.5 py-2.75 text-left"
+                        >
+                          <Avatar name={p.fullName} size={30} />
+                          <div className="flex-1">
+                            <div className="text-body text-text-strong font-medium">
+                              {p.fullName}
+                            </div>
+                            <div className="text-caption text-text-muted">
+                              {[p.mrn, p.phone].filter(Boolean).join(' · ')}
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -416,40 +429,20 @@ export function CreateAppointmentScreen() {
           <h3 className="text-h3 text-text-navy m-0">Appointment Information</h3>
         </div>
         <div className="grid grid-cols-3 gap-x-6 gap-y-5">
-          <Field label="Appointment type">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <Select
-                  value={form.values.apptType}
-                  options={['Walk-in', 'Online']}
-                  onChange={(v) => form.setField('apptType', v)}
-                />
-              </div>
-              <InfoDot text={APPT_TYPE_HINT} />
-            </div>
-          </Field>
           <Field label="Date" required error={form.errorFor('iso')}>
             {(field) => (
               <input
                 type="date"
                 id={field.id}
                 value={form.values.iso}
-                min={todayISO()}
+                min={localIso(new Date())}
                 aria-describedby={field.describedById}
                 aria-invalid={field.invalid || undefined}
-                onChange={(e) => form.setField('iso', e.target.value)}
+                onChange={(e) => setDate(e.target.value)}
                 onBlur={() => form.blurField('iso')}
                 className={dateInputClass}
               />
             )}
-          </Field>
-          <Field label="Appointment time" required error={form.errorFor('time')}>
-            <Select
-              value={form.values.time}
-              options={TIME_SLOTS}
-              onChange={(v) => form.setField('time', v)}
-              onBlur={() => form.blurField('time')}
-            />
           </Field>
         </div>
         <div className="mt-5.5">
@@ -460,37 +453,92 @@ export function CreateAppointmentScreen() {
             </span>
             <InfoDot text={CONSULT_HINT} />
           </div>
-          <div className="flex flex-col gap-3">
-            {consults.map((c, i) => (
-              <div key={c.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-3">
-                <Select
-                  value={c.dept}
-                  placeholder="Select Department"
-                  options={departments}
-                  onChange={(v) => setConsultDept(c.id, v)}
-                  aria-label={`Department for consultation ${i + 1}`}
-                />
-                <Select
-                  value={c.doctor}
-                  placeholder={c.dept ? 'Select Doctor' : 'Select department first'}
-                  options={doctorsFor(c.dept)}
-                  onChange={(v) => setConsultDoctor(c.id, v)}
-                  aria-label={`Doctor for consultation ${i + 1}`}
-                />
-                {consults.length > 1 ? (
-                  <IconBtn
-                    name="trash-2"
-                    label="Remove consultation"
-                    box={54}
-                    color="var(--color-d-500)"
-                    onClick={() => removeConsult(c.id)}
-                  />
-                ) : (
-                  <span className="w-13.5"></span>
-                )}
-              </div>
-            ))}
-          </div>
+          {isCatalogueLoading ? (
+            <Spinner size={22} label="Loading departments and doctors" />
+          ) : catalogueError ? (
+            <span className="text-caption text-d-700 flex items-center gap-1.5">
+              <Icon name="triangle-alert" size={13} />
+              {failureText(catalogueError, 'Could not load departments and doctors.')}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void departmentsQuery.refetch();
+                  void doctorsQuery.refetch();
+                }}
+              >
+                Retry
+              </Button>
+            </span>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {consults.map((c, i) => (
+                <div key={c.id} className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Select
+                      value={departments.find((d) => d.id === c.departmentId)?.name ?? ''}
+                      placeholder="Select Department"
+                      options={departments.filter((d) => d.isActive).map((d) => d.name)}
+                      onChange={(name) =>
+                        patch(c.id, {
+                          departmentId: departments.find((d) => d.name === name)?.id ?? '',
+                          doctorId: '',
+                          slotId: '',
+                        })
+                      }
+                      aria-label={`Department for consultation ${i + 1}`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Select
+                      value={doctors.find((d) => d.id === c.doctorId)?.name ?? ''}
+                      placeholder={c.departmentId ? 'Select Doctor' : 'Select department first'}
+                      options={doctorsFor(c.departmentId).map((d) => d.name)}
+                      onChange={(name) =>
+                        patch(c.id, {
+                          doctorId:
+                            doctorsFor(c.departmentId).find((d) => d.name === name)?.id ?? '',
+                          slotId: '',
+                        })
+                      }
+                      aria-label={`Doctor for consultation ${i + 1}`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    {c.doctorId ? (
+                      <AppointmentSlotSelect
+                        date={form.values.iso}
+                        doctorId={c.doctorId}
+                        value={c.slotId}
+                        onChange={(slotId) => patch(c.id, { slotId })}
+                        excluded={consults.filter((x) => x.id !== c.id).map((x) => x.slotId)}
+                        ariaLabel={`Time for consultation ${i + 1}`}
+                      />
+                    ) : (
+                      <Select
+                        value=""
+                        placeholder="Select doctor first"
+                        options={[]}
+                        onChange={() => undefined}
+                        aria-label={`Time for consultation ${i + 1}`}
+                      />
+                    )}
+                  </div>
+                  {consults.length > 1 ? (
+                    <IconBtn
+                      name="trash-2"
+                      label="Remove consultation"
+                      box={54}
+                      color="var(--color-d-500)"
+                      onClick={() => removeConsult(c.id)}
+                    />
+                  ) : (
+                    <span className="w-13.5"></span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {showConsultsError && (
             <span className="text-caption text-d-700 mt-2 flex items-center gap-1.5">
               <Icon name="triangle-alert" size={13} /> {showConsultsError}
@@ -515,68 +563,30 @@ export function CreateAppointmentScreen() {
         </div>
         {ready.length > 0 && (
           <div className="border-border-soft text-body mt-4 overflow-hidden rounded-md border">
-            <div className="text-text-body flex items-center justify-between px-3.5 py-2.5">
-              <span className="flex items-center gap-2">
-                <Icon name="indian-rupee" size={16} className="text-text-muted" />
-                {ready.length > 1 ? `${ready.length} consultations` : 'Consultation fee'}
-              </span>
-              <span className="tabular-nums">{money(tax.subtotal)}</span>
-            </div>
-            <div className="text-text-body border-border-soft flex items-center justify-between border-t px-3.5 py-2.5">
-              <span>{GST_LABEL}</span>
-              <span className="tabular-nums">{money(tax.gst)}</span>
-            </div>
             <div className="bg-bg-tint text-text-navy flex items-center justify-between px-3.5 py-2.5 font-medium">
               <span className="flex items-center gap-2">
-                Total payable
-                {source === 'Online' && <Badge status="Paid">Prepaid online</Badge>}
+                <Icon name="indian-rupee" size={16} className="text-text-muted" />
+                {ready.length > 1 ? `${ready.length} consultations` : 'Consultation fee'} (before
+                tax)
               </span>
-              <span className="tabular-nums">{money(tax.total)}</span>
+              <span className="tabular-nums">{money(feeTotal)}</span>
+            </div>
+            <div className="text-caption text-text-muted px-3.5 py-2">
+              Tax, any follow-up pricing and the final total are worked out by the booking and shown
+              before you collect.
             </div>
           </div>
         )}
-        {ready.map((c) => (
-          <DoctorCapacityHint key={c.id} doctor={c.doctor} />
-        ))}
       </Card>
       <div className="flex justify-end gap-3.5">
         <Button variant="secondary" onClick={onDone} disabled={form.submitting}>
           Cancel
         </Button>
-        <Button
-          type="submit"
-          icon={source === 'Walk-in' ? 'indian-rupee' : 'check'}
-          busy={form.submitting}
-        >
-          {source === 'Walk-in'
-            ? 'Save & Record Payment'
-            : ready.length > 1
-              ? 'Create Appointments'
-              : 'Create Appointment'}
+        <Button type="submit" icon="indian-rupee" busy={form.submitting}>
+          Book & Collect Payment
         </Button>
       </div>
-      <MultiPaymentModal
-        open={!!multiPay}
-        patient={multiPay?.patient}
-        appts={multiPay?.appts ?? null}
-        onClose={() => {
-          setMultiPay(null);
-          onDone();
-        }}
-        onPaid={(updated) => {
-          setMultiPay(null);
-          setMultiReceipt({ patient: patientName, appts: updated });
-        }}
-      />
-      <MultiReceiptModal
-        open={!!multiReceipt}
-        patient={multiReceipt?.patient}
-        appts={multiReceipt?.appts ?? null}
-        onClose={() => {
-          setMultiReceipt(null);
-          onDone();
-        }}
-      />
+      <AppointmentBookedModal appointments={booked} patientName={patientName} onDone={onDone} />
     </Form>
   );
 }
