@@ -6,12 +6,12 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import {
   ERROR_PCT_CRITICAL,
   ERROR_PCT_WARNING,
-} from '@/features/ops-analytics/application/store/analytics.fixtures';
-import type { ErrorRateRow } from '@/features/ops-analytics/application/store/analytics.types';
+} from '@/features/ops-analytics/domain/entities/analytics.entities';
+import type { ErrorRow } from '@/features/ops-analytics/presentation/components/analytics.view';
 
 interface ErrorsBySurfaceCardProps {
   /** Error rows to plot — one bar each. */
-  rows: readonly ErrorRateRow[];
+  rows: readonly ErrorRow[];
   title: string;
   period: string;
 }
@@ -44,7 +44,7 @@ export function ErrorsBySurfaceCard({ rows, title, period }: ErrorsBySurfaceCard
         <BarChart
           data={rows.map((r) => ({
             v: r.errors,
-            l: r.name.split(' · ')[0],
+            l: r.name,
             color: barColor(r.errorPct),
           }))}
         />

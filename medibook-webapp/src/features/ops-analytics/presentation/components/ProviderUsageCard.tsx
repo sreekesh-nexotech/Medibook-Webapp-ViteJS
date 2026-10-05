@@ -7,46 +7,43 @@ import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 
-import { rupeesFromPaise } from '@/features/ops-analytics/application/store/analytics.derive';
 import {
-  USAGE_CRITICAL_PCT,
-  USAGE_WARNING_PCT,
-} from '@/features/ops-analytics/application/store/analytics.fixtures';
+  ERROR_PCT_CRITICAL,
+  ERROR_PCT_WARNING,
+} from '@/features/ops-analytics/domain/entities/analytics.entities';
 import type {
-  ProviderUsage,
-  UsageHealth,
-} from '@/features/ops-analytics/application/store/analytics.types';
-import { HEALTH_BAR, HEALTH_STATUS } from '@/features/ops-analytics/presentation/components/health';
+  Health,
+  ProviderRow,
+} from '@/features/ops-analytics/presentation/components/analytics.view';
+import { HEALTH_STATUS } from '@/features/ops-analytics/presentation/components/health';
 
 const COLUMNS = [
   'Provider',
-  'Used',
-  'Plan allowance',
-  'Credits left',
-  'Usage vs plan',
+  'Requests',
+  'Messages',
+  'Errors',
+  'Error %',
   'Cost',
   'Status',
 ] as const;
 
-/** Widest a meter fill is drawn, so an over-plan bar still reads as full. */
-const METER_CAP_PCT = 100;
-
-const HEALTH_LABEL: Readonly<Record<UsageHealth, string>> = {
+const HEALTH_LABEL: Readonly<Record<Health, string>> = {
   healthy: 'Healthy',
-  warning: 'Near limit',
-  critical: 'Over plan',
+  warning: 'Elevated errors',
+  critical: 'Failing',
 };
 
 interface ProviderUsageCardProps {
-  providers: readonly ProviderUsage[];
+  providers: readonly ProviderRow[];
   /** The selected reporting window — every figure in the table is for it. */
   period: string;
 }
 
 /**
- * "Provider Usage" — per third-party provider: units consumed, the plan
- * allowance for this window, credits left, consumption against the allowance,
- * and spend (audit 2.5 / SA-05: provider usage had no screen at all).
+ * "Provider Usage" — per metered third-party provider: requests made,
+ * messages sent, failures and spend for the window (audit 2.5 / SA-05:
+ * provider usage had no screen at all). Plan allowances are not tracked by
+ * the backend, so a provider is flagged on its error share.
  */
 export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps) {
   return (
@@ -54,7 +51,7 @@ export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps)
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SectionTitle>Provider Usage</SectionTitle>
         <InfoDot
-          text={`Consumption and spend per third-party provider for ${period.toLowerCase()}. The plan allowance is pro-rated from the monthly entitlement, and a provider is flagged at ${USAGE_WARNING_PCT}% of it and again once it is fully spent (${USAGE_CRITICAL_PCT}%), where every further unit is billed as overage.`}
+          text={`Metered calls and spend per third-party provider for ${period.toLowerCase()}, from the nightly rollup. A provider is flagged at ${ERROR_PCT_WARNING}% failed requests and critical at ${ERROR_PCT_CRITICAL}%.`}
         />
         <div className="flex-1"></div>
         <span className="text-caption text-text-muted">{period.toLowerCase()}</span>
@@ -62,14 +59,15 @@ export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps)
       <TableShell
         columns={COLUMNS}
         scrollLabel="Third-party provider usage"
-        rightCols={['Used', 'Plan allowance', 'Credits left', 'Cost']}
+        rightCols={['Requests', 'Messages', 'Errors', 'Error %', 'Cost']}
         state={
           providers.length === 0
             ? {
                 kind: 'empty',
                 icon: 'sliders-horizontal',
-                title: 'No providers connected.',
-                message: 'Connect an SMS, email, push or payment provider to see usage here.',
+                title: 'No provider usage in this window.',
+                message:
+                  'SMS, email, push, payment and storage calls appear here after the nightly rollup.',
               }
             : undefined
         }
@@ -82,38 +80,33 @@ export function ProviderUsageCard({ providers, period }: ProviderUsageCardProps)
                 tint={
                   p.health === 'critical' ? 'danger' : p.health === 'warning' ? 'warning' : 'info'
                 }
-                title={p.name}
-                sub={`${p.channel} · billed per ${p.unit.replace(/s$/, '')}`}
+                title={p.label}
+                sub={p.id}
               />
             </td>
             <td className={cn(tdClass, 'text-right tabular-nums')}>
-              {p.used.toLocaleString('en-IN')}
-              <span className="text-caption text-text-muted"> {p.unit}</span>
+              {p.requests.toLocaleString('en-IN')}
             </td>
             <td className={cn(tdClass, 'text-right tabular-nums')}>
-              {p.allowance.toLocaleString('en-IN')}
+              {p.messages.toLocaleString('en-IN')}
             </td>
             <td className={cn(tdClass, 'text-right tabular-nums')}>
-              {p.overage > 0 ? (
-                <span className="text-d-700">0 · {p.overage.toLocaleString('en-IN')} over</span>
-              ) : (
-                p.creditsLeft.toLocaleString('en-IN')
+              {p.errors.toLocaleString('en-IN')}
+            </td>
+            <td
+              className={cn(
+                tdClass,
+                'text-right font-medium tabular-nums',
+                p.health === 'critical'
+                  ? 'text-d-700'
+                  : p.health === 'warning'
+                    ? 'text-y-800'
+                    : 'text-text-body',
               )}
+            >
+              {p.errorPct}%
             </td>
-            <td className={cn(tdClass, 'min-w-45')}>
-              <div className="flex flex-col gap-1.25">
-                <span className="text-caption text-text-body tabular-nums">{p.usagePct}%</span>
-                <div className="bg-grey-300 h-1.5 overflow-hidden rounded-full">
-                  <div
-                    className={cn('h-full rounded-full', HEALTH_BAR[p.health])}
-                    style={{ width: `${Math.min(METER_CAP_PCT, p.usagePct)}%` }}
-                  />
-                </div>
-              </div>
-            </td>
-            <td className={cn(tdClass, 'text-right tabular-nums')}>
-              {money(rupeesFromPaise(p.costPaise))}
-            </td>
+            <td className={cn(tdClass, 'text-right tabular-nums')}>{money(p.costRupees)}</td>
             <td className={tdClass}>
               <Badge status={HEALTH_STATUS[p.health]}>{HEALTH_LABEL[p.health]}</Badge>
             </td>
