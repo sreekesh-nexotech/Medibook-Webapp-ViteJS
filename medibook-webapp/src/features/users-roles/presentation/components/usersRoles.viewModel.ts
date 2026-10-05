@@ -1,0 +1,277 @@
+import { isFailure } from '@/core/error/failure';
+
+import { fmtDate } from '@/shared/lib/format';
+
+import {
+  PERM_ACTIONS,
+  RBAC_MODULES,
+  type ModulePerms,
+  type PermsGrid,
+  type RbacModule,
+  type Role,
+} from '@/features/users-roles/application/store/rbac.types';
+import type {
+  RolePreviewModule,
+  StaffInvitation,
+  StaffMember,
+  StaffRole,
+  StaffRoleCode,
+} from '@/features/users-roles/domain/entities/usersRoles.types';
+
+/**
+ * Adapters between the Users & Roles API entities and the view shapes the
+ * screen's components already render (`Role` + its module × action
+ * `PermsGrid`, and one table row per person). Pure functions — no fetching.
+ */
+
+/* ------------------------------------------------------------------ roles */
+
+/**
+ * The backend has no role colour or description (`Role` is id, code, name,
+ * flags and permissions), so the screen's dot colour and one-line summary are
+ * presentation copy keyed by the four fixed role codes. Colours are `@theme`
+ * tokens, applied through `style` because they are chosen per row.
+ */
+const ROLE_PRESENTATION: Readonly<Record<StaffRoleCode, { color: string; desc: string }>> = {
+  admin: {
+    color: 'var(--color-y-600)',
+    desc: 'Full access to every module, settings and finance.',
+  },
+  receptionist: {
+    color: 'var(--color-blue)',
+    desc: 'Front desk — books walk-ins, records payments, issues tokens.',
+  },
+  accountant: { color: 'var(--color-g-600)', desc: 'Payments, settlements and financial reports.' },
+  dept_front_desk: {
+    color: 'var(--color-p-500)',
+    desc: "Manages a department's live token queue and its appointments.",
+  },
+};
+
+/**
+ * Backend module code behind each grid row (`core/seeds/v1.py`
+ * `HOSPITAL_MODULES`). Mirrors the private map in `usePermission`.
+ */
+const GRID_MODULE_CODE: Readonly<Record<RbacModule, string>> = {
+  Dashboard: 'dashboard',
+  Appointments: 'appointments',
+  Patients: 'patients',
+  'Token Management': 'token_management',
+  Payments: 'payments',
+  'Billing & Settlements': 'billing_settlements',
+  'Doctors & Departments': 'doctors_departments',
+  Reports: 'reports',
+  'Hospital Settings': 'hospital_settings',
+  'Users & Roles': 'users_roles',
+};
+
+const GRID_MODULE_CODES: ReadonlySet<string> = new Set(Object.values(GRID_MODULE_CODE));
+
+/** A role as the screen renders it, plus what saving its grid needs. */
+export interface RoleView extends Role {
+  readonly code: StaffRoleCode;
+  readonly editable: boolean;
+  /** The role's full permission set as the server holds it, grid or not. */
+  readonly permissionCodes: readonly string[];
+}
+
+function moduleOf(code: string): string {
+  const at = code.lastIndexOf('.');
+  return at < 0 ? code : code.slice(0, at);
+}
+
+function gridFrom(has: (moduleCode: string, action: string) => boolean): PermsGrid {
+  const row = (module: RbacModule): ModulePerms => ({
+    view: has(GRID_MODULE_CODE[module], 'view'),
+    add: has(GRID_MODULE_CODE[module], 'add'),
+    edit: has(GRID_MODULE_CODE[module], 'edit'),
+    del: has(GRID_MODULE_CODE[module], 'del'),
+  });
+  return {
+    Dashboard: row('Dashboard'),
+    Appointments: row('Appointments'),
+    Patients: row('Patients'),
+    'Token Management': row('Token Management'),
+    Payments: row('Payments'),
+    'Billing & Settlements': row('Billing & Settlements'),
+    'Doctors & Departments': row('Doctors & Departments'),
+    Reports: row('Reports'),
+    'Hospital Settings': row('Hospital Settings'),
+    'Users & Roles': row('Users & Roles'),
+  };
+}
+
+/** Short permission codes (`appointments.view`) → the ten-module grid. */
+export function toPermsGrid(codes: readonly string[]): PermsGrid {
+  const held = new Set(codes);
+  return gridFrom((m, a) => held.has(`${m}.${a}`));
+}
+
+/** `GET /roles/{code}/preview` modules → the ten-module grid. */
+export function previewToPermsGrid(modules: readonly RolePreviewModule[]): PermsGrid {
+  const byModule = new Map(modules.map((m) => [m.module, new Set(m.actions)] as const));
+  return gridFrom((m, a) => byModule.get(m)?.has(a) ?? false);
+}
+
+/**
+ * The permission set to send when a role's grid is saved. `PATCH
+ * /roles/{code}/permissions` **replaces** the whole set, and the backend
+ * catalogue has modules the ten-row grid does not show (`patient_approvals`,
+ * `cash_desk`, `display_devices`). Codes for those are carried over from the
+ * role's current set unchanged, so saving the grid never silently strips them.
+ */
+export function gridToPermissionCodes(grid: PermsGrid, current: readonly string[]): string[] {
+  const kept = current.filter((c) => !GRID_MODULE_CODES.has(moduleOf(c)));
+  const granted = RBAC_MODULES.flatMap((module) =>
+    PERM_ACTIONS.filter((a) => grid[module][a]).map((a) => `${GRID_MODULE_CODE[module]}.${a}`),
+  );
+  return [...kept, ...granted].sort();
+}
+
+export function toRoleView(role: StaffRole): RoleView {
+  const look = ROLE_PRESENTATION[role.code];
+  return {
+    id: role.code,
+    code: role.code,
+    name: role.name,
+    color: look.color,
+    desc: look.desc,
+    system: !role.editable,
+    editable: role.editable,
+    perms: toPermsGrid(role.permissions),
+    permissionCodes: role.permissions,
+  };
+}
+
+/* ------------------------------------------------------------------- users */
+
+export type UserRowStatus = 'Active' | 'Inactive' | 'Pending';
+
+/** One row of the Users table — a staff member, or an invitation not yet accepted. */
+export interface UserRow {
+  /** Unique across both kinds (a staff id and an invitation id never share a key). */
+  readonly key: string;
+  readonly kind: 'staff' | 'invitation';
+  /** Staff id or invitation id, per `kind`. */
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string;
+  /** The backend has no usernames; shown as a dash. */
+  readonly username: string;
+  /** The role code — `RoleView.id`. */
+  readonly roleId: string;
+  readonly status: UserRowStatus;
+  /** ISO date-time of the last sign-in, `null` for never. */
+  readonly lastLoginAt: string | null;
+  readonly invite: 'Accepted' | 'Pending';
+  /** ISO date-time the sign-in lockout ends, `null` when not locked. */
+  readonly lockedUntil: string | null;
+  /** Row version for the role-change `If-Match` (0 for invitations, which have none). */
+  readonly version: number;
+}
+
+/** Shown where the backend has no value (username, phone). */
+export const NO_VALUE = '—';
+
+const STAFF_STATUS: Readonly<Record<StaffMember['status'], UserRowStatus>> = {
+  active: 'Active',
+  deactivated: 'Inactive',
+  invited: 'Pending',
+};
+
+function fullName(first: string, last: string | null): string {
+  return [first, last ?? ''].join(' ').trim();
+}
+
+export function staffToRow(s: StaffMember): UserRow {
+  return {
+    key: `staff:${s.id}`,
+    kind: 'staff',
+    id: s.id,
+    name: fullName(s.firstName, s.lastName),
+    email: s.email ?? NO_VALUE,
+    phone: s.phone ?? NO_VALUE,
+    username: NO_VALUE,
+    roleId: s.roleCode,
+    status: STAFF_STATUS[s.status],
+    lastLoginAt: s.lastLoginAt,
+    invite: s.status === 'invited' ? 'Pending' : 'Accepted',
+    lockedUntil: s.lockedUntil,
+    version: s.version,
+  };
+}
+
+export function invitationToRow(i: StaffInvitation): UserRow {
+  return {
+    key: `invitation:${i.id}`,
+    kind: 'invitation',
+    id: i.id,
+    name: fullName(i.firstName, i.lastName),
+    email: i.email,
+    phone: i.phone ?? NO_VALUE,
+    username: NO_VALUE,
+    roleId: i.roleCode,
+    status: 'Pending',
+    lastLoginAt: null,
+    invite: 'Pending',
+    lockedUntil: null,
+    version: 0,
+  };
+}
+
+/** True while a sign-in lockout is still running at `now` (epoch ms). */
+export function isLockedOut(row: UserRow, now: number): boolean {
+  return row.lockedUntil !== null && Date.parse(row.lockedUntil) > now;
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+/** Past this, an exact date reads better than "N days ago". */
+const RELATIVE_DAYS_MAX = 30;
+const ISO_DATE_LENGTH = 10;
+
+/** "Never", "Just now", "5 min ago", "3 h ago", "2 days ago", or the date. */
+export function lastActiveLabel(iso: string | null, now: number): string {
+  if (iso === null) return 'Never';
+  const diff = now - Date.parse(iso);
+  if (Number.isNaN(diff)) return NO_VALUE;
+  if (diff < MINUTE_MS) return 'Just now';
+  if (diff < HOUR_MS) return `${Math.floor(diff / MINUTE_MS)} min ago`;
+  if (diff < DAY_MS) return `${Math.floor(diff / HOUR_MS)} h ago`;
+  const days = Math.floor(diff / DAY_MS);
+  if (days <= RELATIVE_DAYS_MAX) return days === 1 ? '1 day ago' : `${days} days ago`;
+  return fmtDate(iso.slice(0, ISO_DATE_LENGTH));
+}
+
+/* ------------------------------------------------------------- invite form */
+
+/** Country code for the 10-digit Indian mobile numbers the form accepts. */
+const INDIA_DIAL_CODE = '+91';
+
+/** A validated 10-digit Indian mobile → E.164; blank → `null`. */
+export function toE164IN(phone: string): string | null {
+  const digits = phone.replace(/\D/g, '');
+  return digits === '' ? null : `${INDIA_DIAL_CODE}${digits}`;
+}
+
+/** "Asha Verma" → first "Asha", last "Verma"; a single word has no last name. */
+export function splitFullName(name: string): { firstName: string; lastName: string | null } {
+  const [first = '', ...rest] = name.trim().split(/\s+/);
+  const last = rest.join(' ');
+  return { firstName: first, lastName: last === '' ? null : last };
+}
+
+/* ----------------------------------------------------------------- errors */
+
+/**
+ * The user-safe sentence for a failed request: the first field message of a
+ * 400 (e.g. "An invitation to this email is already pending."), else the
+ * failure's own message, else `fallback`.
+ */
+export function failureText(error: unknown, fallback: string): string {
+  if (!isFailure(error)) return fallback;
+  const firstField = Object.values(error.fieldErrors)[0]?.[0];
+  return firstField ?? error.message;
+}

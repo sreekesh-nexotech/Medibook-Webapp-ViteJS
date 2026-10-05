@@ -1,8 +1,6 @@
 import { useState } from 'react';
 
-import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
-import { minLen } from '@/shared/lib/validate';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -13,8 +11,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { HospitalRole } from '@/app/router/paths';
 
-import { blankPerms, ROLE_COLORS } from '@/features/users-roles/application/store/rbac.fixtures';
-import { useRbacStore } from '@/features/users-roles/application/store/rbac.store';
+import { useUpdateRolePermissionsMutation } from '@/features/users-roles/application/queries/useUpdateRolePermissionsMutation';
 import {
   PERM_ACTIONS,
   RBAC_MODULES,
@@ -22,7 +19,6 @@ import {
   type PermsGrid,
   type PermAction,
   type RbacModule,
-  type Role,
 } from '@/features/users-roles/application/store/rbac.types';
 import { accessBuckets } from '@/features/users-roles/presentation/components/access-buckets';
 import {
@@ -31,92 +27,57 @@ import {
 } from '@/features/users-roles/presentation/components/access-preview';
 import { PermCheck } from '@/features/users-roles/presentation/components/PermCheck';
 import { RoleAccessPreview } from '@/features/users-roles/presentation/components/RoleAccessPreview';
+import {
+  failureText,
+  gridToPermissionCodes,
+  type RoleView,
+} from '@/features/users-roles/presentation/components/usersRoles.viewModel';
 
 const PERM_COLS: readonly (readonly [PermAction, string])[] = PERM_ACTIONS.map((a) => [
   a,
   ACTION_LABEL[a],
 ]);
 
-/** Monotonic counter for new role ids (replaces the prototype's `Date.now()`). */
-let roleIdSeq = 0;
-
-/** Shortest role name that still reads as a name. */
-const ROLE_NAME_MIN = 3;
-
-interface RoleForm {
-  name: string;
-  desc: string;
-}
-
-/** Module-level so `useForm`'s error memo stays stable across renders. */
-const ROLE_VALIDATORS: FormValidators<RoleForm> = {
-  name: (v) => minLen(v, ROLE_NAME_MIN, 'Role name'),
-};
-
 interface RoleEditorProps {
-  /** `null` creates a new role. */
-  role: Role | null;
+  role: RoleView;
   onClose: () => void;
-  /**
-   * Ask the screen for the delete confirmation. The screen owns that dialog so
-   * the drawer can close first — two overlapping dialogs would fight over the
-   * focus trap.
-   */
-  onRequestDelete: (role: Role) => void;
 }
 
 /**
- * Role editor drawer (design `Rbac.jsx` `RoleEditor`): name + description, the
+ * Role editor drawer (design `Rbac.jsx` `RoleEditor`): the role's name, the
  * full module x action permission grid (row-toggle by clicking the module
- * name), the locked system-role notice, and the live access preview.
+ * name), the locked notice for the admin role, and the live access preview.
  *
- * Three audit fixes ride along:
- *   - 3.5.1/3.5.4 — the name is validated inline through `useForm`, not by a
- *     toast that vanishes;
- *   - 3.4.1 — the permission grid sits in a labelled, focusable scroll region
- *     instead of crushing below desktop width;
- *   - 3.6.3 — Delete no longer deletes: it hands the role to
- *     `onRequestDelete`, and `RoleDeleteModal` confirms it and reassigns the
- *     holders (`rbacDeleteRole` refuses to orphan them either way).
+ * A hospital has exactly four system roles (backend Q60) — there is no
+ * create, rename or delete — so name and description are read-only and only
+ * the grid is saved (`PATCH /roles/{code}/permissions`). That call replaces
+ * the whole set, so `gridToPermissionCodes` carries over the codes of the
+ * modules this grid does not show. Audit 3.4.1 rides along: the grid sits in a
+ * labelled, focusable scroll region instead of crushing below desktop width.
  *
  * The drawer is mounted only while open (the screen renders it conditionally),
- * so its form starts from the role it was opened with — no prop-into-state
+ * so its grid starts from the role it was opened with — no prop-into-state
  * effect, and none of the cascading renders that pattern causes.
  */
-export function RoleEditor({ role, onClose, onRequestDelete }: RoleEditorProps) {
-  const roles = useRbacStore((s) => s.roles);
-  const rbacAddRole = useRbacStore((s) => s.rbacAddRole);
-  const rbacUpdateRole = useRbacStore((s) => s.rbacUpdateRole);
+export function RoleEditor({ role, onClose }: RoleEditorProps) {
+  const savePermissions = useUpdateRolePermissionsMutation();
 
-  const isNew = !role;
-  const locked = Boolean(role?.system);
+  const locked = !role.editable;
 
-  const [perms, setPerms] = useState<PermsGrid>(role ? role.perms : blankPerms());
-  const [signInAs, setSignInAs] = useState<HospitalRole>(
-    role ? defaultSignInAs(role) : 'receptionist',
-  );
+  const [perms, setPerms] = useState<PermsGrid>(role.perms);
+  const [signInAs, setSignInAs] = useState<HospitalRole>(defaultSignInAs(role));
 
-  const form = useForm<RoleForm>({
-    initial: { name: role ? role.name : '', desc: role ? role.desc : '' },
-    validate: ROLE_VALIDATORS,
-    onSubmit: ({ name, desc }) => {
-      if (!role) {
-        roleIdSeq += 1;
-        rbacAddRole({
-          id: `r-new-${roleIdSeq}`,
-          name: name.trim(),
-          desc: desc.trim(),
-          color: ROLE_COLORS[roles.length % ROLE_COLORS.length],
-          perms,
-        });
-        toast(`Role "${name.trim()}" created`, 'success');
-      } else {
-        rbacUpdateRole(role.id, { name: name.trim(), desc: desc.trim(), perms });
-        toast('Role updated', 'success');
-      }
-      onClose();
-    },
-  });
+  const handleSave = (): void =>
+    savePermissions.mutate(
+      { roleCode: role.code, permissions: gridToPermissionCodes(perms, role.permissionCodes) },
+      {
+        onSuccess: () => {
+          toast(`${role.name} permissions updated`, 'success');
+          onClose();
+        },
+        onError: (failure) => toast(failureText(failure, 'Could not save the role.'), 'error'),
+      },
+    );
 
   const toggle = (mod: RbacModule, act: PermAction): void => {
     if (locked) return;
@@ -136,42 +97,25 @@ export function RoleEditor({ role, onClose, onRequestDelete }: RoleEditorProps) 
     });
   };
 
-  let title: string;
-  if (!role) title = 'Create Role';
-  else if (locked) title = `${role.name} (System)`;
-  else title = `Edit ${role.name}`;
-
-  const previewName = form.values.name.trim() || (role ? role.name : 'This role');
+  const title = locked ? `${role.name} (System)` : `Edit ${role.name}`;
 
   return (
     <Drawer
       open
       onClose={onClose}
       title={title}
-      subtitle="Name the role and choose what it can do in each module"
+      subtitle="Choose what this role can do in each module"
       width={560}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          {!isNew && !locked && role && (
-            <Can perm="Users & Roles.del">
-              <Button
-                variant="ghost"
-                icon="trash-2"
-                style={{ color: 'var(--color-d-500)' }}
-                onClick={() => onRequestDelete(role)}
-              >
-                Delete
-              </Button>
-            </Can>
-          )}
           <span className="flex-1" />
           {!locked && (
-            <Can perm={isNew ? 'Users & Roles.add' : 'Users & Roles.edit'}>
-              <Button icon="check" onClick={form.handleSubmit} busy={form.submitting}>
-                {isNew ? 'Create Role' : 'Save Role'}
+            <Can perm="Users & Roles.edit">
+              <Button icon="check" onClick={handleSave} busy={savePermissions.isPending}>
+                Save Role
               </Button>
             </Can>
           )}
@@ -179,23 +123,11 @@ export function RoleEditor({ role, onClose, onRequestDelete }: RoleEditorProps) 
       }
     >
       <div className="mb-5 grid grid-cols-2 gap-x-4.5 gap-y-4">
-        <Field label="Role Name" required error={form.errorFor('name')}>
-          <TextInput
-            value={form.values.name}
-            onChange={(v) => form.setField('name', v)}
-            onBlur={() => form.blurField('name')}
-            placeholder="e.g. Billing Supervisor"
-            disabled={locked}
-          />
+        <Field label="Role Name" hint="Hospital roles are fixed">
+          <TextInput value={role.name} disabled />
         </Field>
-        <Field label="Description" error={form.errorFor('desc')}>
-          <TextInput
-            value={form.values.desc}
-            onChange={(v) => form.setField('desc', v)}
-            onBlur={() => form.blurField('desc')}
-            placeholder="Short description"
-            disabled={locked}
-          />
+        <Field label="Description">
+          <TextInput value={role.desc} disabled />
         </Field>
       </div>
       {locked && (
@@ -278,8 +210,8 @@ export function RoleEditor({ role, onClose, onRequestDelete }: RoleEditorProps) 
         ) : (
           <RoleAccessPreview
             compact
-            roleName={previewName}
-            roleColor={role?.color}
+            roleName={role.name}
+            roleColor={role.color}
             perms={perms}
             signInAs={signInAs}
             onSignInAsChange={setSignInAs}

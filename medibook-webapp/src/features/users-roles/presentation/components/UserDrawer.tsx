@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useNow } from '@/shared/hooks/useNow';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -8,41 +9,64 @@ import { Card } from '@/shared/ui/Card';
 import { Drawer } from '@/shared/ui/Drawer';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useRbacStore } from '@/features/users-roles/application/store/rbac.store';
-import type { HospitalUser, Role } from '@/features/users-roles/application/store/rbac.types';
+import { useReactivateStaffMutation } from '@/features/users-roles/application/queries/useReactivateStaffMutation';
+import { useResendInvitationMutation } from '@/features/users-roles/application/queries/useResendInvitationMutation';
+import { useRevokeInvitationMutation } from '@/features/users-roles/application/queries/useRevokeInvitationMutation';
+import { useUnlockStaffMutation } from '@/features/users-roles/application/queries/useUnlockStaffMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
+import {
+  failureText,
+  isLockedOut,
+  lastActiveLabel,
+  type RoleView,
+  type UserRow,
+} from '@/features/users-roles/presentation/components/usersRoles.viewModel';
 
 interface UserDrawerProps {
-  user: HospitalUser;
-  roles: readonly Role[];
+  user: UserRow;
+  roles: readonly RoleView[];
   onClose: () => void;
-  onReset: (user: HospitalUser) => void;
+  onReset: (user: UserRow) => void;
   /**
    * Ask the screen for the deactivation confirmation. The screen owns that
    * dialog so the drawer can close first — two overlapping dialogs would fight
    * over the focus trap.
    */
-  onDeactivate: (user: HospitalUser) => void;
+  onDeactivate: (user: UserRow) => void;
+  /** Open the role editor for this staff member (same focus-trap reasoning). */
+  onEditRole: (user: UserRow) => void;
 }
 
 /**
  * User detail drawer (design `Rbac.jsx` `UserDrawer`): identity header with the
  * role annotation, the plain-words access summary, an info card, and the
- * reset-password / activate-deactivate actions.
+ * account actions.
  *
- * Audit 3.6.2 — "deactivating a hospital staff user fires immediately" — is
- * fixed by handing the action to `onDeactivate`, which the screen answers with
- * a `ConfirmModal` naming the consequence before anything is written.
- * Reactivation is not destructive, so it still applies directly.
- * The two actions that have no implementation behind them (editing details,
- * re-delivering an invite) are disabled and say so, rather than raising a
- * toast for work that did not happen.
+ * A row is either a staff member or an invitation not yet accepted:
+ *   - staff: reset password (email link), deactivate (confirmed by the screen,
+ *     audit 3.6.2) or reactivate, unlock a sign-in lockout, and edit the role;
+ *   - invitation: resend the link or revoke it — there is no account yet to
+ *     reset or deactivate.
+ * Every action is a real request; the toast reports what the server accepted.
  */
-export function UserDrawer({ user, roles, onClose, onReset, onDeactivate }: UserDrawerProps) {
-  const rbacUpdateUser = useRbacStore((s) => s.rbacUpdateUser);
+export function UserDrawer({
+  user,
+  roles,
+  onClose,
+  onReset,
+  onDeactivate,
+  onEditRole,
+}: UserDrawerProps) {
+  const now = useNow();
+  const reactivate = useReactivateStaffMutation();
+  const unlock = useUnlockStaffMutation();
+  const resend = useResendInvitationMutation();
+  const revoke = useRevokeInvitationMutation();
 
   const role = roles.find((r) => r.id === user.roleId);
   const active = user.status === 'Active';
+  const isInvitation = user.kind === 'invitation';
+  const locked = isLockedOut(user, now);
 
   const row = (k: string, v: ReactNode) => (
     <div className="border-border-soft flex justify-between border-b py-3">
@@ -50,6 +74,39 @@ export function UserDrawer({ user, roles, onClose, onReset, onDeactivate }: User
       <span className="text-body text-text-strong text-right font-medium">{v}</span>
     </div>
   );
+
+  const handleReactivate = (): void =>
+    reactivate.mutate(user.id, {
+      onSuccess: () => {
+        toast(`${user.name} activated`, 'info');
+        onClose();
+      },
+      onError: (failure) =>
+        toast(failureText(failure, `Could not activate ${user.name}.`), 'error'),
+    });
+
+  const handleUnlock = (): void =>
+    unlock.mutate(user.id, {
+      onSuccess: () => toast(`${user.name} unlocked — they can sign in again`, 'success'),
+      onError: (failure) => toast(failureText(failure, `Could not unlock ${user.name}.`), 'error'),
+    });
+
+  const handleResend = (): void =>
+    resend.mutate(user.id, {
+      onSuccess: () => toast(`Invitation resent to ${user.email}`, 'success'),
+      onError: (failure) =>
+        toast(failureText(failure, 'Could not resend the invitation.'), 'error'),
+    });
+
+  const handleRevoke = (): void =>
+    revoke.mutate(user.id, {
+      onSuccess: () => {
+        toast(`Invitation for ${user.name} revoked — the link no longer works`, 'info');
+        onClose();
+      },
+      onError: (failure) =>
+        toast(failureText(failure, 'Could not revoke the invitation.'), 'error'),
+    });
 
   return (
     <Drawer
@@ -59,32 +116,58 @@ export function UserDrawer({ user, roles, onClose, onReset, onDeactivate }: User
       subtitle={user.email}
       width={460}
       footer={
-        <>
-          <Can perm="Users & Roles.edit">
-            <Button variant="secondary" icon="key-round" onClick={() => onReset(user)}>
-              Reset Password
-            </Button>
-          </Can>
-          <span className="flex-1" />
-          <Can perm="Users & Roles.edit">
-            <Button
-              variant={active ? 'ghost' : 'success'}
-              icon={active ? 'user-x' : 'user-check'}
-              style={active ? { color: 'var(--color-d-500)' } : undefined}
-              onClick={() => {
-                if (active) {
-                  onDeactivate(user);
-                  return;
-                }
-                rbacUpdateUser(user.id, { status: 'Active' });
-                toast(`${user.name} activated`, 'info');
-                onClose();
-              }}
-            >
-              {active ? 'Deactivate' : 'Activate'}
-            </Button>
-          </Can>
-        </>
+        isInvitation ? (
+          <>
+            <Can perm="Users & Roles.add">
+              <Button
+                variant="secondary"
+                icon="send"
+                onClick={handleResend}
+                busy={resend.isPending}
+              >
+                Resend Invite
+              </Button>
+            </Can>
+            <span className="flex-1" />
+            <Can perm="Users & Roles.add">
+              <Button
+                variant="ghost"
+                icon="user-x"
+                style={{ color: 'var(--color-d-500)' }}
+                onClick={handleRevoke}
+                busy={revoke.isPending}
+              >
+                Revoke Invite
+              </Button>
+            </Can>
+          </>
+        ) : (
+          <>
+            <Can perm="Users & Roles.edit">
+              <Button variant="secondary" icon="key-round" onClick={() => onReset(user)}>
+                Reset Password
+              </Button>
+            </Can>
+            <span className="flex-1" />
+            <Can perm="Users & Roles.edit">
+              <Button
+                variant={active ? 'ghost' : 'success'}
+                icon={active ? 'user-x' : 'user-check'}
+                style={active ? { color: 'var(--color-d-500)' } : undefined}
+                busy={reactivate.isPending}
+                onClick={() => {
+                  if (active) {
+                    onDeactivate(user);
+                    return;
+                  }
+                  handleReactivate();
+                }}
+              >
+                {active ? 'Deactivate' : 'Activate'}
+              </Button>
+            </Can>
+          </>
+        )
       }
     >
       <div className="mb-4.5 flex items-center gap-3.5">
@@ -122,22 +205,44 @@ export function UserDrawer({ user, roles, onClose, onReset, onDeactivate }: User
         )}
         <div className="flex justify-between py-3">
           <span className="text-body text-text-muted">Last active</span>
-          <span className="text-body text-text-strong font-medium">{user.last}</span>
+          <span className="text-body text-text-strong font-medium">
+            {lastActiveLabel(user.lastLoginAt, now)}
+          </span>
         </div>
       </Card>
-      <div className="flex gap-2.5">
-        <Button variant="secondary" icon="pencil" className="flex-1" disabled>
-          Edit Details
-        </Button>
-        {user.invite === 'Pending' && (
-          <Button variant="secondary" icon="send" className="flex-1" disabled>
-            Resend Invite
-          </Button>
-        )}
-      </div>
+      {!isInvitation && (
+        <div className="flex gap-2.5">
+          <Can perm="Users & Roles.edit" disableInstead>
+            <Button
+              variant="secondary"
+              icon="pencil"
+              className="flex-1"
+              onClick={() => onEditRole(user)}
+            >
+              Edit Details
+            </Button>
+          </Can>
+          {locked && (
+            <Can perm="Users & Roles.edit">
+              <Button
+                variant="secondary"
+                icon="lock"
+                className="flex-1"
+                onClick={handleUnlock}
+                busy={unlock.isPending}
+              >
+                Unlock
+              </Button>
+            </Can>
+          )}
+        </div>
+      )}
       <div className="text-caption text-grey-900 mt-2.5">
-        Editing a user&apos;s details and re-sending an invite arrive with the users API. Until
-        then, change access through the role editor or a password reset.
+        {isInvitation
+          ? 'They become a user once they accept the emailed link. Resending issues a new link; revoking cancels it.'
+          : locked
+            ? 'Locked out after too many failed sign-ins. Unlock lets them try again now.'
+            : 'Edit Details changes their role. Name, email and phone belong to their own account.'}
       </div>
     </Drawer>
   );

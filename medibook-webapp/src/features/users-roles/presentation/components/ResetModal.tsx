@@ -8,8 +8,11 @@ import type { IconName } from '@/shared/ui/icon-registry';
 import { PasswordInput } from '@/shared/ui/PasswordInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useRbacStore } from '@/features/users-roles/application/store/rbac.store';
-import type { HospitalUser } from '@/features/users-roles/application/store/rbac.types';
+import { useSendPasswordResetMutation } from '@/features/users-roles/application/queries/useSendPasswordResetMutation';
+import {
+  failureText,
+  type UserRow,
+} from '@/features/users-roles/presentation/components/usersRoles.viewModel';
 
 type ResetMethod = 'email' | 'otp' | 'manual';
 
@@ -20,6 +23,13 @@ interface ResetForm {
 
 const PASSWORD_MIN = 8;
 
+/**
+ * `POST /hospital/staff/{id}/reset-password` emails a reset link — the only
+ * reset the backend offers. Mobile OTP and an admin-set temporary password
+ * have no endpoint, so they stay visible but disabled.
+ */
+const AVAILABLE_METHOD: ResetMethod = 'email';
+
 /** Module-level so `useForm`'s error memo stays stable across renders. */
 const RESET_VALIDATORS: FormValidators<ResetForm> = {
   password: (v, all) =>
@@ -27,7 +37,7 @@ const RESET_VALIDATORS: FormValidators<ResetForm> = {
 };
 
 interface ResetModalProps {
-  user: HospitalUser;
+  user: UserRow;
   onClose: () => void;
 }
 
@@ -35,32 +45,27 @@ interface ResetModalProps {
  * Password reset / invite modal (design `Rbac.jsx` `ResetModal`): pick email
  * link, mobile OTP, or a manually set temporary password.
  *
- * A `FormModal` (Enter submits) with the temporary password validated inline,
- * and — per THE LAW on claiming success — the outcome is a real state change:
- * the user's access is marked pending re-verification for the link/OTP routes,
- * or accepted once a temporary password is set. The copy says what was
- * recorded, not that a message was delivered.
+ * A `FormModal` (Enter submits). Only the email link is sent — the backend
+ * accepts it only for an active member with an email address, and its refusal
+ * is shown as is. The copy says a link was sent, not that it was delivered.
  */
 export function ResetModal({ user, onClose }: ResetModalProps) {
-  const rbacUpdateUser = useRbacStore((s) => s.rbacUpdateUser);
+  const sendReset = useSendPasswordResetMutation();
 
   const form = useForm<ResetForm>({
-    initial: { method: 'email', password: '' },
+    initial: { method: AVAILABLE_METHOD, password: '' },
     validate: RESET_VALIDATORS,
-    onSubmit: ({ method }) => {
-      if (method === 'manual') {
-        rbacUpdateUser(user.id, { invite: 'Accepted' });
-        toast(`Temporary password set for ${user.name} — share it securely`, 'success');
-      } else {
-        rbacUpdateUser(user.id, { invite: 'Pending' });
+    onSubmit: async () => {
+      try {
+        await sendReset.mutateAsync(user.id);
         toast(
-          method === 'otp'
-            ? `Reset recorded · ${user.name} must confirm by OTP on ${user.phone}`
-            : `Reset recorded · ${user.name} must confirm from ${user.email}`,
+          `Reset link sent to ${user.email} · ${user.name} sets a new password from it`,
           'success',
         );
+        onClose();
+      } catch (error) {
+        toast(failureText(error, 'Could not send the reset link.'), 'error');
       }
-      onClose();
     },
   });
 
@@ -92,8 +97,9 @@ export function ResetModal({ user, onClose }: ResetModalProps) {
             key={k}
             aria-pressed={form.values.method === k}
             onClick={() => form.setField('method', k)}
+            disabled={k !== AVAILABLE_METHOD}
             className={cn(
-              'flex cursor-pointer items-center gap-3 rounded-md px-3.5 py-3 text-left',
+              'flex cursor-pointer items-center gap-3 rounded-md px-3.5 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50',
               form.values.method === k
                 ? 'border-blue bg-blue-soft-bg border-2'
                 : 'border-border border bg-white',
@@ -130,6 +136,9 @@ export function ResetModal({ user, onClose }: ResetModalProps) {
             />
           </Field>
         )}
+        <div className="text-caption text-text-muted">
+          Mobile OTP and setting a temporary password are not available yet.
+        </div>
       </fieldset>
     </FormModal>
   );

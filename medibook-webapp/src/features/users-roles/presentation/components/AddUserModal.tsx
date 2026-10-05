@@ -8,9 +8,14 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useRbacStore } from '@/features/users-roles/application/store/rbac.store';
-import type { Role } from '@/features/users-roles/application/store/rbac.types';
+import { useInviteStaffMutation } from '@/features/users-roles/application/queries/useInviteStaffMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
+import {
+  failureText,
+  splitFullName,
+  toE164IN,
+  type RoleView,
+} from '@/features/users-roles/presentation/components/usersRoles.viewModel';
 
 type InviteMethod = 'email' | 'otp' | 'manual';
 
@@ -40,9 +45,16 @@ const INVITES: readonly (readonly [InviteMethod, string])[] = [
   ['manual', 'Set password now'],
 ];
 
-/** Shortest acceptable staff name / password. */
+/**
+ * `POST /hospital/staff/invitations` is the only way to add staff: it emails
+ * a link and the person sets their own password on accepting. There is no
+ * endpoint for an OTP invite or an admin-set password, so those stay visible
+ * but disabled, and the username field with them (the backend has none).
+ */
+const AVAILABLE_INVITE: InviteMethod = 'email';
+
+/** Shortest acceptable staff name. */
 const NAME_MIN = 3;
-const PASSWORD_MIN = 8;
 
 /** Module-level so `useForm`'s error memo stays stable across renders. */
 const ADD_USER_VALIDATORS: FormValidators<AddUserForm> = {
@@ -51,14 +63,10 @@ const ADD_USER_VALIDATORS: FormValidators<AddUserForm> = {
   roleId: (v) => required(v, 'Role'),
   // Optional field: only validated once something has been typed.
   phone: (v) => (v.trim() === '' ? undefined : phoneIN(v)),
-  password: (v, all) => (all.invite === 'manual' ? minLen(v, PASSWORD_MIN, 'Password') : undefined),
 };
 
-/** Monotonic counter for new user ids (replaces the prototype's `Date.now()`). */
-let userIdSeq = 0;
-
 interface AddUserModalProps {
-  roles: readonly Role[];
+  roles: readonly RoleView[];
   onClose: () => void;
 }
 
@@ -73,31 +81,26 @@ interface AddUserModalProps {
  * it always opens blank without syncing props into state in an effect.
  */
 export function AddUserModal({ roles, onClose }: AddUserModalProps) {
-  const rbacAddUser = useRbacStore((s) => s.rbacAddUser);
+  const invite = useInviteStaffMutation();
 
   const form = useForm<AddUserForm>({
     initial: BLANK_FORM,
     validate: ADD_USER_VALIDATORS,
-    onSubmit: (f) => {
-      userIdSeq += 1;
-      rbacAddUser({
-        id: `u-${userIdSeq}`,
-        name: f.name.trim(),
-        email: f.email.trim(),
-        phone: f.phone.trim(),
-        username: f.username.trim() || f.email.trim().split('@')[0],
-        roleId: f.roleId,
-        status: 'Active',
-        last: 'Never',
-        invite: f.invite === 'manual' ? 'Accepted' : 'Pending',
-      });
-      toast(
-        f.invite === 'manual'
-          ? 'User created with a password — share it securely'
-          : `User created · access pending ${f.invite === 'otp' ? 'mobile OTP' : 'email invite'}`,
-        'success',
-      );
-      onClose();
+    onSubmit: async (f) => {
+      const role = roles.find((r) => r.id === f.roleId);
+      if (!role) return;
+      try {
+        await invite.mutateAsync({
+          ...splitFullName(f.name),
+          email: f.email.trim(),
+          phone: toE164IN(f.phone),
+          roleCode: role.code,
+        });
+        toast(`Invitation sent to ${f.email.trim()} · access pending until they accept`, 'success');
+        onClose();
+      } catch (error) {
+        toast(failureText(error, 'Could not send the invitation.'), 'error');
+      }
     },
   });
 
@@ -156,20 +159,16 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
             autoComplete="tel"
           />
         </Field>
-        <Field label="Username" hint="Taken from the email if left blank">
+        <Field label="Username" hint="Staff sign in with their email">
           <TextInput
             value={form.values.username}
             onChange={(v) => form.setField('username', v)}
-            placeholder="Auto from email if blank"
+            placeholder="Not used"
             autoComplete="username"
+            disabled
           />
         </Field>
-        <Field
-          label={isManual ? 'Password' : 'Password (set later)'}
-          required={isManual}
-          error={form.errorFor('password')}
-          hint={isManual ? `At least ${PASSWORD_MIN} characters` : undefined}
-        >
+        <Field label={isManual ? 'Password' : 'Password (set later)'} required={isManual}>
           <PasswordInput
             value={form.values.password}
             onChange={(v) => form.setField('password', v)}
@@ -199,8 +198,9 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
               key={k}
               aria-pressed={form.values.invite === k}
               onClick={() => form.setField('invite', k)}
+              disabled={k !== AVAILABLE_INVITE}
               className={cn(
-                'text-body flex-1 cursor-pointer rounded-md py-3 text-center font-medium',
+                'text-body flex-1 cursor-pointer rounded-md py-3 text-center font-medium disabled:cursor-not-allowed disabled:opacity-50',
                 form.values.invite === k
                   ? 'border-blue bg-blue-soft-bg text-blue border-2'
                   : 'border-border text-text-body border bg-white',
@@ -209,6 +209,10 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
               {l}
             </button>
           ))}
+        </div>
+        <div className="text-caption text-text-muted mt-2">
+          They get an email link and set their own password when they accept. Mobile OTP and setting
+          a password for them are not available yet.
         </div>
       </fieldset>
     </FormModal>
