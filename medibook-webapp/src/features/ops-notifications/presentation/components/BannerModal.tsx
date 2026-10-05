@@ -1,21 +1,29 @@
 import { type ChangeEvent, useRef, useState } from 'react';
 
+import { acceptFor } from '@/core/api/files.rules';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
 import { TextInput } from '@/shared/ui/TextInput';
 
-import type { BannerDraft } from '@/features/ops-notifications/application/store/notifications.store';
-import type { Banner } from '@/features/ops-notifications/application/store/notifications.types';
+import { useBannerImageUrlQuery } from '@/features/ops-notifications/application/queries/useBannerImageUrlQuery';
+import type {
+  BannerDraft,
+  BannerImageChange,
+  CampaignBanner,
+} from '@/features/ops-notifications/domain/entities/notifications.entities';
 
 interface BannerModalProps {
   open: boolean;
   /** The campaign banner being edited, or null for a new / default-banner edit. */
-  banner: Banner | null;
+  banner: CampaignBanner | null;
   /** True when editing the always-on default banner (no schedule fields). */
   fallback: boolean;
+  /** Save in flight (upload + write): submit spinner, actions blocked. */
+  busy?: boolean;
   onClose: () => void;
-  onSave: (f: BannerDraft) => void;
+  /** `preview` is the newly picked creative as a data URI (null when none was picked). */
+  onSave: (draft: BannerDraft, preview: string | null) => void;
 }
 
 interface BannerErrors {
@@ -24,20 +32,28 @@ interface BannerErrors {
   to?: string | null;
 }
 
-const EMPTY_DRAFT: BannerDraft = { title: '', img: null, from: '', to: '' };
+/** The text fields of the editor; the creative is tracked separately. */
+interface BannerFieldsDraft {
+  readonly title: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** A newly picked creative: the file to upload and its local preview. */
+interface PickedImage {
+  readonly file: File;
+  readonly preview: string;
+}
+
+const BANNER_IMAGE_ACCEPT = acceptFor('banner');
 
 const dateInputClass =
   'text-body text-text-body rounded-input border-border h-12 w-full border bg-white px-3';
 
-/** The draft this modal opens on — a new banner, a campaign banner, or the default. */
-function initialDraft(banner: Banner | null): BannerDraft {
-  if (!banner) return EMPTY_DRAFT;
-  return {
-    title: banner.title,
-    img: banner.img,
-    from: banner.from || '',
-    to: banner.to || '',
-  };
+/** The fields this modal opens on — a new banner, a campaign banner, or the default. */
+function initialDraft(banner: CampaignBanner | null): BannerFieldsDraft {
+  if (!banner) return { title: '', from: '', to: '' };
+  return { title: banner.title, from: banner.from ?? '', to: banner.to ?? '' };
 }
 
 /**
@@ -47,12 +63,27 @@ function initialDraft(banner: Banner | null): BannerDraft {
  * The editor state is initialised from props rather than synced in an effect —
  * the screen keys this component by which banner is open, so React remounts it
  * with a fresh draft (no `set-state-in-effect`, no stale first render). Built
- * on `FormModal`, so Enter submits (audit 3.4.5).
+ * on `FormModal`, so Enter submits (audit 3.4.5). A picked image is only
+ * uploaded on save.
  */
-export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerModalProps) {
-  const [f, setF] = useState<BannerDraft>(() => initialDraft(banner));
+export function BannerModal({
+  open,
+  banner,
+  fallback,
+  busy = false,
+  onClose,
+  onSave,
+}: BannerModalProps) {
+  const [f, setF] = useState<BannerFieldsDraft>(() => initialDraft(banner));
+  const [picked, setPicked] = useState<PickedImage | null>(null);
+  const [removed, setRemoved] = useState(false);
   const [err, setErr] = useState<BannerErrors>({});
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const storedImageId = removed || picked ? null : (banner?.imageFileId ?? null);
+  const stored = useBannerImageUrlQuery(storedImageId);
+  const previewSrc = picked?.preview ?? stored.data ?? null;
+  const hasImage = picked != null || storedImageId != null;
 
   const pickFile = () => fileRef.current?.click();
 
@@ -61,13 +92,15 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
     if (!file) return;
     const rd = new FileReader();
     rd.onload = () => {
-      if (typeof rd.result === 'string') {
-        const img = rd.result;
-        setF((p) => ({ ...p, img }));
-      }
+      if (typeof rd.result === 'string') setPicked({ file, preview: rd.result });
     };
     rd.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const removeImage = () => {
+    setPicked(null);
+    setRemoved(true);
   };
 
   const submit = () => {
@@ -78,7 +111,12 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
     };
     setErr(e);
     if (e.title || e.from || e.to) return;
-    onSave(f);
+    const image: BannerImageChange = picked
+      ? { kind: 'upload', file: picked.file }
+      : removed
+        ? { kind: 'remove' }
+        : { kind: 'keep' };
+    onSave({ ...f, image }, picked?.preview ?? null);
   };
 
   return (
@@ -89,6 +127,7 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
       width={520}
       onSubmit={submit}
       submitLabel={banner || fallback ? 'Save Banner' : 'Add Banner'}
+      busy={busy}
     >
       <div className="flex flex-col gap-4">
         {fallback && (
@@ -109,14 +148,26 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
           />
         </OpsField>
         <OpsField label="Banner Image">
-          <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
-          {f.img ? (
+          <input
+            ref={fileRef}
+            type="file"
+            accept={BANNER_IMAGE_ACCEPT}
+            onChange={onFile}
+            className="hidden"
+          />
+          {hasImage ? (
             <div className="flex flex-col gap-2">
-              <img
-                src={f.img}
-                alt="Banner preview"
-                className="border-border-soft h-37.5 w-full rounded-md border object-cover"
-              />
+              {previewSrc ? (
+                <img
+                  src={previewSrc}
+                  alt="Banner preview"
+                  className="border-border-soft h-37.5 w-full rounded-md border object-cover"
+                />
+              ) : (
+                <div className="border-border-soft bg-bg-subtle text-text-muted flex h-37.5 w-full items-center justify-center rounded-md border">
+                  <Icon name="image" size={20} />
+                </div>
+              )}
               <div className="flex gap-3.5">
                 <button
                   type="button"
@@ -127,7 +178,7 @@ export function BannerModal({ open, banner, fallback, onClose, onSave }: BannerM
                 </button>
                 <button
                   type="button"
-                  onClick={() => setF({ ...f, img: null })}
+                  onClick={removeImage}
                   className="text-caption text-d-500 cursor-pointer"
                 >
                   Remove
