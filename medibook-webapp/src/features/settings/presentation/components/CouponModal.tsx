@@ -11,19 +11,47 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 
+import type { Department } from '@/features/doctors/domain/entities/doctors.types';
+import type {
+  CouponInput,
+  HospitalCoupon,
+  PricedService,
+} from '@/features/settings/domain/entities/services.entities';
 import {
   couponDiscount,
+  dayEndExclusiveIso,
+  dayStartIso,
   flatCouponCeiling,
-  normaliseCouponCode,
-  validateCouponValue,
-} from '@/features/settings/application/store/services.logic';
-import type { CouponDraft } from '@/features/settings/application/store/services.store';
-import {
-  COUPON_TYPES,
-  type Coupon,
-  type CouponType,
-  type HospitalService,
-} from '@/features/settings/application/store/services.types';
+  lastValidDay,
+  localDay,
+  MAX_PERCENT_COUPON,
+} from '@/features/settings/domain/services.pricing';
+
+const COUPON_TYPES = ['Percent', 'Flat'] as const;
+type CouponType = (typeof COUPON_TYPES)[number];
+
+/** Coupon codes are stored upper-case with no spaces. */
+function normaliseCouponCode(code: string): string {
+  return code.trim().toUpperCase().replace(/\s+/g, '');
+}
+
+/** A message under the value field, or `undefined` when acceptable. */
+function validateCouponValue(
+  type: CouponType,
+  value: number,
+  ceiling: number | null,
+): string | undefined {
+  if (!Number.isFinite(value) || value <= 0) return 'Enter a discount greater than zero.';
+  if (type === 'Percent') {
+    return value > MAX_PERCENT_COUPON
+      ? `A percent coupon cannot exceed ${MAX_PERCENT_COUPON}%.`
+      : undefined;
+  }
+  if (ceiling != null && value > ceiling) {
+    return `A flat coupon cannot exceed the service price — the cheapest applicable service is ${money(ceiling)}.`;
+  }
+  return undefined;
+}
 
 /** Shortest usable code, e.g. "MB20". */
 const MIN_CODE_LENGTH = 4;
@@ -42,8 +70,8 @@ interface CouponForm {
   to: string;
   usageCap: string;
   minOrder: string;
-  departments: string;
-  serviceIds: string;
+  departmentIds: readonly string[];
+  serviceIds: readonly string[];
   active: boolean;
 }
 
@@ -63,21 +91,14 @@ const BASE_VALIDATORS: FormValidators<CouponForm> = {
 interface CouponModalProps {
   open: boolean;
   /** The coupon being edited, or null to create one. */
-  coupon: Coupon | null;
+  coupon: HospitalCoupon | null;
   /** The whole catalogue, for the scope pickers and the flat-value ceiling. */
-  services: readonly HospitalService[];
-  /** Department names from the hospital's master data. */
-  departments: readonly string[];
+  services: readonly PricedService[];
+  /** The hospital's departments (H1). */
+  departments: readonly Department[];
   onClose: () => void;
-  onSave: (draft: CouponDraft) => void;
-}
-
-/** Comma-joined ids/names <-> the arrays the store holds. */
-function splitList(value: string): readonly string[] {
-  return value
-    .split(',')
-    .map((v) => v.trim())
-    .filter((v) => v !== '');
+  /** Persist; resolves `true` when saved (the caller reports failures). */
+  onSave: (input: CouponInput) => Promise<boolean>;
 }
 
 /**
@@ -85,6 +106,11 @@ function splitList(value: string): readonly string[] {
  * audit asks for: a percent coupon may not exceed 100%, and a flat coupon may
  * not exceed the cheapest service it applies to. Both are inline `Field`
  * errors — never a toast.
+ *
+ * The validity window is picked as whole local days and saved as instants:
+ * from the start of the first day to the start of the day after the last
+ * (the backend's `valid_to` is exclusive). A scoped coupon applies when any
+ * scope matches the booking — its department or its service.
  */
 export function CouponModal({
   open,
@@ -105,8 +131,8 @@ export function CouponModal({
           Number(v),
           flatCouponCeiling(
             {
-              serviceIds: splitList(values.serviceIds),
-              departments: splitList(values.departments),
+              serviceIds: values.serviceIds,
+              departmentIds: values.departmentIds,
             },
             services,
           ),
@@ -118,38 +144,38 @@ export function CouponModal({
   const form = useForm<CouponForm>({
     initial: {
       code: coupon?.code ?? '',
-      type: coupon?.type ?? 'Percent',
-      value: String(coupon?.value ?? ''),
-      from: coupon?.from ?? '',
-      to: coupon?.to ?? '',
+      type: coupon?.kind === 'flat' ? 'Flat' : 'Percent',
+      value: coupon ? String(coupon.value) : '',
+      from: coupon ? localDay(coupon.validFrom) : '',
+      to: coupon ? lastValidDay(coupon.validTo) : '',
       usageCap: String(coupon?.usageCap ?? 0),
-      minOrder: String(coupon?.minOrder ?? 0),
-      departments: (coupon?.departments ?? []).join(', '),
-      serviceIds: (coupon?.serviceIds ?? []).join(', '),
-      active: coupon?.active ?? true,
+      minOrder: String(coupon?.minOrderRupees ?? 0),
+      departmentIds: coupon?.departmentIds ?? [],
+      serviceIds: coupon?.serviceIds ?? [],
+      active: coupon?.isActive ?? true,
     },
     validate: validators,
-    onSubmit: (v) => {
-      onSave({
-        ...(coupon ? { id: coupon.id } : {}),
+    onSubmit: async (v) => {
+      const cap = Number(v.usageCap || 0);
+      const saved = await onSave({
         code: normaliseCouponCode(v.code),
-        type: v.type,
+        kind: v.type === 'Flat' ? 'flat' : 'percent',
         value: Number(v.value),
-        from: v.from,
-        to: v.to,
-        usageCap: Number(v.usageCap || 0),
-        minOrder: Number(v.minOrder || 0),
-        departments: splitList(v.departments),
-        serviceIds: splitList(v.serviceIds),
-        active: v.active,
+        validFrom: dayStartIso(v.from),
+        validTo: dayEndExclusiveIso(v.to),
+        usageCap: cap > 0 ? cap : null,
+        minOrderRupees: Number(v.minOrder || 0),
+        departmentIds: v.departmentIds,
+        serviceIds: v.serviceIds,
+        isActive: v.active,
       });
-      onClose();
+      if (saved) onClose();
     },
   });
 
   const scope = {
-    serviceIds: splitList(form.values.serviceIds),
-    departments: splitList(form.values.departments),
+    serviceIds: form.values.serviceIds,
+    departmentIds: form.values.departmentIds,
   };
   const ceiling = flatCouponCeiling(scope, services);
   const value = Number(form.values.value);
@@ -161,23 +187,15 @@ export function CouponModal({
       ? 0
       : couponDiscount(
           {
-            id: 'preview',
-            code: 'PREVIEW',
-            type: form.values.type,
+            kind: form.values.type === 'Flat' ? 'flat' : 'percent',
             value,
-            from: form.values.from,
-            to: form.values.to,
-            usageCap: 0,
-            used: 0,
-            minOrder: Number(form.values.minOrder || 0),
-            serviceIds: scope.serviceIds,
-            departments: scope.departments,
-            active: true,
+            minOrderRupees: Number(form.values.minOrder || 0),
           },
           sampleOrder,
         );
 
-  const serviceOptions = services.map((s) => `${s.id} — ${s.name} (${money(s.price)})`);
+  const serviceLabel = (s: PricedService): string => `${s.name} (${money(s.priceRupees)})`;
+  const deptNameOf = (id: string): string => departments.find((d) => d.id === id)?.name ?? id;
 
   return (
     <FormModal
@@ -205,7 +223,7 @@ export function CouponModal({
             <Select
               value={form.values.type}
               options={COUPON_TYPES}
-              onChange={(v) => form.setField('type', v as CouponType)}
+              onChange={(v) => form.setField('type', v === 'Flat' ? 'Flat' : 'Percent')}
               height={48}
             />
           </Field>
@@ -282,12 +300,17 @@ export function CouponModal({
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="Departments"
-            hint="Leave empty for every department. Pick to add one at a time."
+            hint="Leave both empty for everything. A booking qualifies if any pick matches."
           >
             <Select
               value=""
-              options={departments.filter((d) => !scope.departments.includes(d))}
-              onChange={(v) => form.setField('departments', [...scope.departments, v].join(', '))}
+              options={departments
+                .filter((d) => !scope.departmentIds.includes(d.id))
+                .map((d) => d.name)}
+              onChange={(name) => {
+                const id = departments.find((d) => d.name === name)?.id;
+                if (id) form.setField('departmentIds', [...scope.departmentIds, id]);
+              }}
               placeholder="Add a department…"
               height={48}
             />
@@ -295,28 +318,32 @@ export function CouponModal({
           <Field label="Services" hint="Leave empty for every service.">
             <Select
               value=""
-              options={serviceOptions.filter((o) => !scope.serviceIds.includes(o.split(' — ')[0]))}
-              onChange={(v) =>
-                form.setField('serviceIds', [...scope.serviceIds, v.split(' — ')[0]].join(', '))
-              }
+              options={services.filter((s) => !scope.serviceIds.includes(s.id)).map(serviceLabel)}
+              onChange={(label) => {
+                const id = services.find((s) => serviceLabel(s) === label)?.id;
+                if (id) form.setField('serviceIds', [...scope.serviceIds, id]);
+              }}
               placeholder="Add a service…"
               height={48}
             />
           </Field>
         </div>
 
-        {(scope.departments.length > 0 || scope.serviceIds.length > 0) && (
+        {(scope.departmentIds.length > 0 || scope.serviceIds.length > 0) && (
           <div className="flex flex-wrap items-center gap-2">
-            {scope.departments.map((d) => (
+            {scope.departmentIds.map((id) => (
               <button
-                key={d}
+                key={id}
                 type="button"
                 onClick={() =>
-                  form.setField('departments', scope.departments.filter((x) => x !== d).join(', '))
+                  form.setField(
+                    'departmentIds',
+                    scope.departmentIds.filter((x) => x !== id),
+                  )
                 }
                 className="text-caption bg-blue-soft-bg text-blue inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5"
               >
-                {d} <Icon name="x" size={12} />
+                {deptNameOf(id)} <Icon name="x" size={12} />
               </button>
             ))}
             {scope.serviceIds.map((id) => (
@@ -324,7 +351,10 @@ export function CouponModal({
                 key={id}
                 type="button"
                 onClick={() =>
-                  form.setField('serviceIds', scope.serviceIds.filter((x) => x !== id).join(', '))
+                  form.setField(
+                    'serviceIds',
+                    scope.serviceIds.filter((x) => x !== id),
+                  )
                 }
                 className="text-caption bg-p-100 text-text-navy inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5"
               >
