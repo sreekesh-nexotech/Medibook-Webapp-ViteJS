@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useSort } from '@/shared/hooks/useSort';
-import { money, timeToMinutes } from '@/shared/lib/format';
+import { money } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -15,6 +15,9 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { tdClass, TableShell } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 import { Tabs } from '@/shared/ui/Tabs';
+import { toast } from '@/shared/ui/toast/toast.store';
+
+import { isFailure } from '@/core/error/failure';
 
 import {
   hospitalPath,
@@ -23,24 +26,38 @@ import {
   type HospitalRole,
 } from '@/app/router/paths';
 
+import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
 import {
-  formatUpdatedAt,
-  useListRefresh,
-} from '@/features/appointments/application/queries/useListRefresh';
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
-import {
-  isoToRelLocal,
-  primaryAction,
-  todayISO,
-} from '@/features/appointments/application/store/appointments.logic';
-import type { Appointment } from '@/features/appointments/application/store/appointments.types';
-import {
-  useCatalogDepartments,
-  useCatalogDoctorNames,
-} from '@/features/doctors/application/store/catalog.selectors';
+  useApproveMutation,
+  useCheckInMutation,
+} from '@/features/appointments/application/queries/appointments.mutations';
+import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
+import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
 import { AppointmentDrawer } from '@/features/appointments/presentation/components/AppointmentDrawer';
-import { MarkPaymentModal } from '@/features/appointments/presentation/components/MarkPaymentModal';
-import { ReceiptModal } from '@/features/appointments/presentation/components/ReceiptModal';
+import { AppointmentPaymentModal } from '@/features/appointments/presentation/components/AppointmentPaymentModal';
+import { AppointmentReceiptModal } from '@/features/appointments/presentation/components/AppointmentReceiptModal';
+import {
+  DATE_WINDOWS,
+  isInQueue,
+  localIso,
+  needsApproval,
+  needsPayment,
+  PAYMENT_LABEL,
+  primaryAction,
+  rangeFor,
+  SOURCE_LABEL,
+  STATUS_FILTER_OPTIONS,
+  STATUS_LABEL,
+  dayOf,
+  timeOf,
+  type DateWindow,
+} from '@/features/appointments/presentation/components/appointments.view';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
 
 const APPT_TABS = ['All', 'Online', 'Walk-in', 'Pending Payment', 'In Queue', 'Needs Approval'];
 const APPT_PAGE = 8;
@@ -66,86 +83,82 @@ const COLUMNS = [
   'Action',
 ];
 
-/** Appointments list — tabs, filters, sortable table, drawer + receipt chain (design `Screens.jsx` `Appointments`). */
+/**
+ * Appointments list — tabs, filters, sortable table, drawer + payment and
+ * receipt chain (design `Screens.jsx` `Appointments`), on the hospital API.
+ * The selected date window (Today / Tomorrow / This Week / an exact date) is
+ * fetched in full; tabs, search and the other filters work on it locally so
+ * the tab counts stay exact.
+ */
 export function AppointmentsScreen() {
   const navigate = useNavigate();
   const roleParam = useParams().role;
   const role: HospitalRole = isHospitalRole(roleParam) ? roleParam : 'receptionist';
 
-  const appts = useAppointmentsStore((s) => s.appts);
-  const checkIn = useAppointmentsStore((s) => s.checkIn);
-  // Department and doctor filters follow the hospital's own catalogue, so a
-  // doctor added through Doctors & Departments is filterable here (audit 2.6.3).
-  const departments = useCatalogDepartments();
-  const doctorNames = useCatalogDoctorNames();
-
-  const approve = useAppointmentsStore((s) => s.approve);
-  const ensureReceiptNo = useAppointmentsStore((s) => s.ensureReceiptNo);
-
   const [tab, setTab] = useState('All');
   const [q, setQ] = useState('');
-  const [dateF, setDateF] = useState('Today');
+  const [dateF, setDateF] = useState<DateWindow>('Today');
   const [docF, setDocF] = useState('All Doctors');
   const [statusF, setStatusF] = useState('All Status');
   const [deptF, setDeptF] = useState('All Departments');
   const [exact, setExact] = useState('');
   const [page, setPage] = useState(0);
-  const { sort, onSort, sorted } = useSort<Appointment>();
+  const { sort, onSort, sorted } = useSort<DeskAppointment>();
   const [drawer, setDrawer] = useState<string | null>(null);
-  const [pay, setPay] = useState<Appointment | null>(null);
-  const [receipt, setReceipt] = useState<Appointment | null>(null);
+  const [pay, setPay] = useState<DeskAppointment | null>(null);
+  const [receipt, setReceipt] = useState<string | null>(null);
 
-  /**
-   * Audit 3.1.1 — Refresh re-reads the appointment list out of the store and
-   * the table below re-derives from it, with the shared loading state while it
-   * runs. No toast: the refreshed list is the acknowledgement.
-   */
-  const reload = useCallback((): void => {
-    const fresh = useAppointmentsStore.getState().appts;
-    if (!Array.isArray(fresh)) throw new Error('The appointment list is unavailable.');
-  }, []);
-  const { loading, error, updatedAt, refresh } = useListRefresh(reload);
+  const today = localIso(new Date());
+  const range = rangeFor(dateF, exact, today);
+  const query = useAppointmentsQuery(range);
+  const appts = useMemo(() => query.data ?? [], [query.data]);
+  const approve = useApproveMutation();
+  const checkIn = useCheckInMutation();
+  // Department and doctor filters follow the hospital's own catalogue (H1).
+  const departments = (useDepartmentsQuery().data ?? []).map((d) => d.name);
+  const doctorNames = (useDoctorsQuery().data ?? []).map((d) => d.name);
 
-  const byTab = (a: Appointment) => {
-    if (tab === 'Online') return a.source === 'Online';
-    if (tab === 'Walk-in') return a.source === 'Walk-in';
-    if (tab === 'Pending Payment') return a.payment === 'Pending';
-    if (tab === 'In Queue') return a.status === 'In Queue';
-    if (tab === 'Needs Approval') return a.needsApproval === true;
+  const byTab = (a: DeskAppointment) => {
+    if (tab === 'Online') return a.source === 'online';
+    if (tab === 'Walk-in') return a.source === 'walk_in';
+    if (tab === 'Pending Payment') return needsPayment(a);
+    if (tab === 'In Queue') return isInQueue(a);
+    if (tab === 'Needs Approval') return needsApproval(a);
     return true;
   };
   const counts: Record<string, number> = {
-    Online: appts.filter((a) => a.source === 'Online').length,
-    'Walk-in': appts.filter((a) => a.source === 'Walk-in').length,
-    'Pending Payment': appts.filter((a) => a.payment === 'Pending').length,
-    'In Queue': appts.filter((a) => a.status === 'In Queue').length,
-    'Needs Approval': appts.filter((a) => a.needsApproval === true).length,
+    Online: appts.filter((a) => a.source === 'online').length,
+    'Walk-in': appts.filter((a) => a.source === 'walk_in').length,
+    'Pending Payment': appts.filter(needsPayment).length,
+    'In Queue': appts.filter(isInQueue).length,
+    'Needs Approval': appts.filter(needsApproval).length,
   };
   const ql = q.trim().toLowerCase();
   const filtered = appts.filter((a) => {
     if (!byTab(a)) return false;
-    if (ql && !(a.name + ' ' + a.mrn + ' ' + (a.token || '')).toLowerCase().includes(ql))
-      return false;
-    if (exact) {
-      if (a.date !== isoToRelLocal(exact)) return false;
-    } else if (dateF !== 'This Week' && a.date !== dateF) return false;
-    if (deptF !== 'All Departments' && a.dept !== deptF) return false;
-    if (docF !== 'All Doctors' && a.doctor !== docF) return false;
-    if (statusF !== 'All Status' && a.status !== statusF) return false;
+    const hay = `${a.patient?.fullName ?? ''} ${a.patient?.mrn ?? ''} ${a.tokenLabel ?? ''} ${a.bookingRef}`;
+    if (ql && !hay.toLowerCase().includes(ql)) return false;
+    if (deptF !== 'All Departments' && a.department.name !== deptF) return false;
+    if (docF !== 'All Doctors' && a.doctor.name !== docF) return false;
+    if (statusF !== 'All Status' && STATUS_LABEL[a.status] !== statusF) return false;
     return true;
   });
   const ordered = sorted(filtered, {
-    mrn: (a) => a.mrn,
-    name: (a) => a.name,
-    doctor: (a) => a.doctor,
+    mrn: (a) => a.patient?.mrn ?? '',
+    name: (a) => a.patient?.fullName ?? '',
+    doctor: (a) => a.doctor.name,
     source: (a) => a.source,
-    time: (a) => timeToMinutes(a.time),
-    payment: (a) => a.payment,
-    status: (a) => a.status,
+    time: (a) => a.scheduledStartAt,
+    payment: (a) => a.paymentStatus,
+    status: (a) => STATUS_LABEL[a.status],
   });
   const pages = Math.max(1, Math.ceil(ordered.length / APPT_PAGE));
   const pg = Math.min(page, pages - 1);
   const rows = ordered.slice(pg * APPT_PAGE, pg * APPT_PAGE + APPT_PAGE);
+
+  const refresh = async (): Promise<void> => {
+    await query.refetch();
+  };
 
   const reset =
     <T,>(fn: (v: T) => void) =>
@@ -174,27 +187,38 @@ export function AppointmentsScreen() {
     setPage(0);
   };
 
-  /** Minting on the way in keeps the receipt number out of render and stable. */
-  const openReceipt = (a: Appointment): void => {
-    ensureReceiptNo(a.id);
-    setReceipt(useAppointmentsStore.getState().appts.find((x) => x.id === a.id) ?? a);
-  };
-
-  const doPrimary = (a: Appointment) => {
+  const doPrimary = (a: DeskAppointment) => {
     const p = primaryAction(a);
     if (!p) return;
-    if (p.key === 'approve') approve(a.id);
-    else if (p.key === 'pay') setPay(a);
-    else if (p.key === 'checkin') checkIn(a.id);
-    else if (p.key === 'receipt') openReceipt(a);
+    const fail = (fallback: string) => (error: unknown) =>
+      toast(failureText(error, fallback), 'error');
+    if (p.key === 'approve') {
+      approve.mutate(
+        { id: a.id },
+        {
+          onSuccess: () => toast('Booking approved', 'success'),
+          onError: fail('Could not approve.'),
+        },
+      );
+    } else if (p.key === 'pay') setPay(a);
+    else if (p.key === 'checkin') {
+      checkIn.mutate(
+        { id: a.id },
+        { onSuccess: () => toast('Checked in', 'success'), onError: fail('Could not check in.') },
+      );
+    } else if (p.key === 'receipt') setReceipt(a.id);
     else if (p.key === 'queue') navigate(hospitalPath(role, 'token'));
   };
 
   /** Loading / empty / error live inside the table body so the header stays put. */
-  const tableState: TableStateSpec | undefined = loading
+  const tableState: TableStateSpec | undefined = query.isPending
     ? { kind: 'loading', rows: APPT_PAGE }
-    : error
-      ? { kind: 'error', message: error, onRetry: () => void refresh() }
+    : query.isError
+      ? {
+          kind: 'error',
+          message: failureText(query.error, 'Could not load appointments.'),
+          onRetry: () => void refresh(),
+        }
       : rows.length === 0
         ? filtersActive
           ? {
@@ -238,14 +262,14 @@ export function AppointmentsScreen() {
           <RefreshBtn onRefresh={refresh} title="Refresh appointments" />
           <FilterSelect
             value={dateF}
-            options={['Today', 'Tomorrow', 'This Week']}
-            onChange={reset(setDateF)}
+            options={DATE_WINDOWS}
+            onChange={reset((v: string) => setDateF(DATE_WINDOWS.find((w) => w === v) ?? 'Today'))}
             aria-label="Filter by date"
           />
           <input
             type="date"
             value={exact}
-            min={todayISO()}
+            min={today}
             onChange={(e) => reset(setExact)(e.target.value)}
             title="Pick a specific date"
             aria-label="Filter by a specific date"
@@ -265,7 +289,7 @@ export function AppointmentsScreen() {
           />
           <FilterSelect
             value={statusF}
-            options={['All Status', 'Scheduled', 'In Queue', 'Completed', 'Cancelled', 'No-show']}
+            options={['All Status', ...STATUS_FILTER_OPTIONS]}
             onChange={reset(setStatusF)}
             aria-label="Filter by status"
           />
@@ -276,7 +300,7 @@ export function AppointmentsScreen() {
           )}
           <span className="flex-1"></span>
           <span className="text-caption text-text-muted whitespace-nowrap">
-            Updated {formatUpdatedAt(updatedAt)}
+            Updated {query.dataUpdatedAt ? formatUpdatedAt(query.dataUpdatedAt) : '—'}
           </span>
         </div>
         <TableShell
@@ -295,40 +319,42 @@ export function AppointmentsScreen() {
                 onClick={() => setDrawer(a.id)}
                 className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
               >
-                <td className={tdClass}>{a.mrn}</td>
+                <td className={tdClass}>{a.patient?.mrn ?? '—'}</td>
                 <td className={tdClass}>
                   <div className="flex items-center gap-2.5">
-                    <Avatar name={a.name} size={30} />
-                    <span className="text-text-strong font-medium">{a.name}</span>
+                    <Avatar name={a.patient?.fullName ?? '?'} size={30} />
+                    <span className="text-text-strong font-medium">
+                      {a.patient?.fullName ?? 'Unknown patient'}
+                    </span>
                   </div>
                 </td>
                 <td className={tdClass}>
-                  <div className="text-body">{a.doctor}</div>
-                  <div className="text-caption text-text-muted">{a.dept}</div>
+                  <div className="text-body">{a.doctor.name}</div>
+                  <div className="text-caption text-text-muted">{a.department.name}</div>
                 </td>
                 <td className={tdClass}>
-                  <Badge status={a.source} />
+                  <Badge status={SOURCE_LABEL[a.source]} />
                 </td>
                 <td className={tdClass}>
-                  <div>{a.time}</div>
-                  <div className="text-caption text-text-muted">{a.date}</div>
+                  <div>{timeOf(a.scheduledStartAt)}</div>
+                  <div className="text-caption text-text-muted">{dayOf(a.scheduledDate)}</div>
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-0.75">
-                    <Badge status={a.payment} />
+                    <Badge status={PAYMENT_LABEL[a.paymentStatus]} />
                     <span className="text-caption text-text-muted tabular-nums">
-                      {money(a.amount)}
+                      {money(a.totalRupees)}
                     </span>
                   </div>
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-0.75">
-                    <Badge status={a.status} />
-                    {a.needsApproval ? (
+                    <Badge status={STATUS_LABEL[a.status]} />
+                    {needsApproval(a) ? (
                       <span className="text-caption text-y-700 font-semibold">Needs approval</span>
                     ) : (
-                      a.token && (
-                        <span className="text-caption text-blue font-semibold">{a.token}</span>
+                      a.tokenLabel && (
+                        <span className="text-caption text-blue font-semibold">{a.tokenLabel}</span>
                       )
                     )}
                   </div>
@@ -340,6 +366,14 @@ export function AppointmentsScreen() {
                         size="sm"
                         variant={p.variant}
                         icon={p.icon}
+                        busy={
+                          (p.key === 'approve' &&
+                            approve.isPending &&
+                            approve.variables.id === a.id) ||
+                          (p.key === 'checkin' &&
+                            checkIn.isPending &&
+                            checkIn.variables.id === a.id)
+                        }
                         onClick={() => doPrimary(a)}
                       >
                         {p.label}
@@ -371,20 +405,18 @@ export function AppointmentsScreen() {
       <AppointmentDrawer
         id={drawer}
         onClose={() => setDrawer(null)}
-        onViewPatient={(a) => navigate(`/${role}/${HOSPITAL_VIEW_SEGMENT.patients}/${a.mrn}`)}
+        onViewPatient={(mrn) => navigate(`/${role}/${HOSPITAL_VIEW_SEGMENT.patients}/${mrn}`)}
       />
-      <MarkPaymentModal
+      <AppointmentPaymentModal
         appt={pay}
         onClose={() => setPay(null)}
         onPaid={() => {
-          const fresh = pay
-            ? (useAppointmentsStore.getState().appts.find((x) => x.id === pay.id) ?? null)
-            : null;
+          const paidId = pay?.id ?? null;
           setPay(null);
-          setReceipt(fresh);
+          setReceipt(paidId);
         }}
       />
-      <ReceiptModal appt={receipt} onClose={() => setReceipt(null)} />
+      <AppointmentReceiptModal appointmentId={receipt} onClose={() => setReceipt(null)} />
     </div>
   );
 }
