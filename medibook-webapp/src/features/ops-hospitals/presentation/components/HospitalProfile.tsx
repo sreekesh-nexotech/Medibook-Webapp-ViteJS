@@ -8,7 +8,6 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoGrid, type InfoGridItem } from '@/shared/ui/InfoGrid';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
@@ -16,10 +15,13 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { StatCard, type StatCardData } from '@/shared/ui/StatCard';
 import { Tabs } from '@/shared/ui/Tabs';
 
+import { BillingHospitalCard } from '@/features/ops-billing/presentation/components/BillingHospitalCard';
+import { LogsHospitalActivityCard } from '@/features/ops-logs/presentation/components/LogsHospitalActivityCard';
+import { OpsSettlementsHospitalCard } from '@/features/ops-settlements/presentation/components/OpsSettlementsHospitalCard';
 import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
 import { useReinstateHospitalMutation } from '@/features/ops-hospitals/application/queries/useReinstateHospitalMutation';
 import { useSuspendHospitalMutation } from '@/features/ops-hospitals/application/queries/useSuspendHospitalMutation';
-import { longDateFromTimestamp } from '@/features/ops-hospitals/application/store/opsDates';
+import { longDateFromTimestamp } from '@/features/ops-hospitals/presentation/components/hospitals.dates';
 import type {
   HospitalUsageMeter,
   PlatformHospitalDetail,
@@ -76,8 +78,8 @@ const gb = (bytes: number): string => `${(bytes / BYTES_PER_GB).toFixed(1)} GB`;
  *
  * Approve, reject and the KYC review belong to the onboarding pipeline (P3);
  * a pending hospital is sent there. Departments, doctors and bookings have no
- * platform endpoint, and the invoice, payment, settlement and activity links
- * are deferred to module Z, so those sections point to their own screens.
+ * platform endpoint. Invoices, payments, settlements and activity are this
+ * hospital's latest rows from the billing, settlements and logs modules.
  */
 interface HospitalProfileProps {
   h: PlatformHospitalDetail;
@@ -337,43 +339,12 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
               Plan Catalog
             </Button>
           </Card>
-          <Card>
-            <SectionTitle className="mb-4">Invoices &amp; Payments</SectionTitle>
-            <EmptyState
-              icon="file-text"
-              compact
-              title="Invoices and payments are on the Billing screen."
-              message="This hospital's subscription invoices and payment transactions are not linked into its profile yet."
-              actionLabel="Open billing"
-              onAction={() => navigate(`${opsPath('billing')}?tab=Invoices`)}
-            />
-          </Card>
-          <Card>
-            <SectionTitle className="mb-4">Settlements</SectionTitle>
-            <EmptyState
-              icon="banknote"
-              compact
-              title="Settlement statements are on the Hospital Settlements screen."
-              message="This hospital's payout statements are not linked into its profile yet."
-              actionLabel="Open hospital settlements"
-              onAction={() => navigate(opsPath('settlements'))}
-            />
-          </Card>
+          <BillingHospitalCard hospitalId={h.id} />
+          <OpsSettlementsHospitalCard hospitalId={h.id} />
         </>
       )}
 
-      {tab === 'Activity' && (
-        <Card>
-          <SectionTitle className="mb-4">Compliance Activity</SectionTitle>
-          <EmptyState
-            icon="scroll-text"
-            title="Logged actions are on the Compliance Logs screen."
-            message="Approvals, suspensions, document decisions and settlement releases are not linked into this profile yet."
-            actionLabel="Open compliance logs"
-            onAction={() => navigate(opsPath('logs'))}
-          />
-        </Card>
-      )}
+      {tab === 'Activity' && <LogsHospitalActivityCard hospitalId={h.id} />}
 
       <OpsConfirm
         open={modal === 'suspend'}

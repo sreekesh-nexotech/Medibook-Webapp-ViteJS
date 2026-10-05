@@ -1,40 +1,105 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { cn } from '@/shared/lib/cn';
+import { money } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 
-import type { OpsStaticView, OpsView } from '@/app/router/paths';
+import { opsPath, type OpsStaticView, type OpsView } from '@/app/router/paths';
 
-import { useInboxStore } from '@/features/ops-dashboard/application/store/inbox.store';
-import { hospName } from '@/features/ops-hospitals/application/store/hospitals.store';
-import { useOpsSettlementsStore } from '@/features/ops-settlements/application/store/opsSettlements.store';
+import { usePlanChangesQuery } from '@/features/ops-billing/application/queries/usePlanChangesQuery';
+import type { PlanChangeListParams } from '@/features/ops-billing/domain/entities/billing.entities';
+import { useOpsDashboardQuery } from '@/features/ops-dashboard/application/queries/useOpsDashboardQuery';
+import type { OpsDashboardAlert } from '@/features/ops-dashboard/domain/entities/opsDashboard.entities';
+import {
+  ALERT_SEV_TINT,
+  hospitalHref,
+  toAlertView,
+} from '@/features/ops-dashboard/presentation/components/opsDashboardFormat';
+import { useSettlementPeriodsQuery } from '@/features/ops-settlements/application/queries/useSettlementPeriodsQuery';
+import type {
+  PeriodFilter,
+  SettlementPeriod,
+} from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 
 import { OPS_META } from './ops-nav';
 
-/** A bell target: a static ops view, or one hospital's profile (`hospital:<id>`). */
-type OpsNotifTarget = OpsStaticView | `hospital:${number}`;
-
 interface OpsNotif {
+  readonly key: string;
   readonly icon: IconName;
-  /** Icon-box tint (the design's per-item `c`/`bg` pair as token classes). */
+  /** Icon-box tint as token classes. */
   readonly boxClass: string;
   readonly t: string;
   readonly s: string;
-  readonly go: OpsNotifTarget;
+  /** Where the item leads. */
+  readonly to: string;
   readonly unread?: boolean;
 }
 
-function isHospitalTarget(go: OpsNotifTarget): go is `hospital:${number}` {
-  return go.startsWith('hospital:');
+/** Only the count of open plan-change requests is read. */
+const OPEN_PLAN_CHANGES: PlanChangeListParams = { page: 1, pageSize: 1, statuses: ['requested'] };
+
+/** Closed settlement periods: payable, waiting for a payout run. */
+const PAYABLE_PERIODS: PeriodFilter = { statuses: ['closed'], dateFrom: null, dateTo: null };
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * The bell's items, all from live data: the platform's computed alerts
+ * (`/platform/dashboard`), open plan-change requests and payable settlement
+ * periods. Danger alerts and requests awaiting a decision are unread.
+ */
+function buildNotifs(
+  alerts: readonly OpsDashboardAlert[],
+  planChanges: number,
+  payable: readonly SettlementPeriod[],
+): OpsNotif[] {
+  const out: OpsNotif[] = alerts.map((alert) => {
+    const view = toAlertView(alert);
+    const [bg, fg, icon] = ALERT_SEV_TINT[view.sev];
+    const only = view.hospitals.length === 1 ? view.hospitals[0] : undefined;
+    return {
+      key: view.key,
+      icon,
+      boxClass: `${bg} ${fg}`,
+      t: view.title,
+      s: view.sub,
+      to: view.action?.to ?? (only ? hospitalHref(only.id) : opsPath('dashboard')),
+      unread: view.sev === 'danger',
+    };
+  });
+  if (planChanges > 0) {
+    out.push({
+      key: 'plan-changes',
+      icon: 'layers',
+      boxClass: 'bg-blue-soft-bg text-blue',
+      t: `${plural(planChanges, 'plan change request')} to review`,
+      s: 'Hospitals asking to move plan',
+      to: opsPath('plans'),
+      unread: true,
+    });
+  }
+  if (payable.length > 0) {
+    const net = payable.reduce((sum, p) => sum + p.netPayableRupees, 0);
+    out.push({
+      key: 'payable',
+      icon: 'landmark',
+      boxClass: 'bg-blue-soft-bg text-blue',
+      t: `${plural(payable.length, 'settlement')} awaiting a payout run`,
+      s: `${money(net)} payable to hospitals`,
+      to: opsPath('settlements'),
+    });
+  }
+  return out;
 }
 
 interface OpsTopbarProps {
   view: OpsView;
   onNavigate: (view: OpsStaticView) => void;
-  /** `hospital:<id>` bell targets open that hospital's profile (URL param port of `OpsSel.hosp`). */
-  onOpenHospital: (id: number) => void;
   onLogout: () => void;
   onAccount: () => void;
   /** Signed-in user (from `/platform/me`). */
@@ -53,7 +118,6 @@ interface OpsTopbarProps {
 export function OpsTopbar({
   view,
   onNavigate,
-  onOpenHospital,
   onLogout,
   onAccount,
   userName,
@@ -64,47 +128,17 @@ export function OpsTopbar({
 }: OpsTopbarProps) {
   const [menu, setMenu] = useState(false);
   const [notif, setNotif] = useState(false);
-  const requests = useInboxStore((s) => s.requests);
-  const alerts = useInboxStore((s) => s.alerts);
-  const opsSettlements = useOpsSettlementsStore((s) => s.settlements);
+  const navigate = useNavigate();
   const m = OPS_META[view] ?? ['Operations', ''];
-  const pendingSettle = opsSettlements.filter((s) => s.status === 'Pending').length;
-  const notifs: OpsNotif[] = [
-    ...requests
-      .filter((r) => r.status === 'Open')
-      .map((r): OpsNotif => ({
-        icon: r.type === 'Support' ? 'life-buoy' : r.type === 'Plan' ? 'layers' : 'landmark',
-        boxClass: 'bg-blue-soft-bg text-blue',
-        t: r.subject,
-        s: `${hospName(r)} · ${r.on}`,
-        go: r.type === 'Plan' ? 'plans' : r.type === 'Settlement' ? 'settlements' : 'dashboard',
-        unread: true,
-      })),
-    ...alerts.map((a): OpsNotif => ({
-      icon: a.sev === 'danger' ? 'triangle-alert' : 'gauge',
-      boxClass: a.sev === 'danger' ? 'bg-d-100 text-d-500' : 'bg-y-100 text-y-600',
-      t: a.title,
-      s: a.sub,
-      go: a.go || 'dashboard',
-      unread: a.sev === 'danger',
-    })),
-    ...(pendingSettle
-      ? [
-          {
-            icon: 'landmark',
-            boxClass: 'bg-blue-soft-bg text-blue',
-            t: `${pendingSettle} settlements awaiting release`,
-            s: 'Next payout run: 20 Jun 2026',
-            go: 'settlements',
-          } as const,
-        ]
-      : []),
-  ];
+  const dashboard = useOpsDashboardQuery();
+  const planChanges = usePlanChangesQuery(OPEN_PLAN_CHANGES);
+  const payable = useSettlementPeriodsQuery(PAYABLE_PERIODS);
+  const notifs = buildNotifs(
+    dashboard.data?.alerts ?? [],
+    planChanges.data?.total ?? 0,
+    payable.data ?? [],
+  );
   const unread = notifs.filter((n) => n.unread).length;
-  const openTarget = (go: OpsNotifTarget) => {
-    if (isHospitalTarget(go)) onOpenHospital(Number.parseInt(go.split(':')[1], 10));
-    else onNavigate(go);
-  };
   return (
     <header className="min-h-topbar border-border relative z-20 flex flex-none flex-wrap items-center justify-between gap-y-2 border-b bg-white px-4 py-2 lg:px-7 lg:py-0">
       <div className="flex min-w-0 items-center gap-3.5">
@@ -156,11 +190,16 @@ export function OpsTopbar({
                 Notifications
               </div>
               <div className="max-h-90 overflow-y-auto">
+                {notifs.length === 0 && (
+                  <div className="text-text-faint text-body py-7 text-center">
+                    {"You're all caught up."}
+                  </div>
+                )}
                 {notifs.map((n, i) => (
                   <div
-                    key={i}
+                    key={n.key}
                     onClick={() => {
-                      openTarget(n.go);
+                      navigate(n.to);
                       setNotif(false);
                     }}
                     className={cn(

@@ -10,16 +10,13 @@ import {
   formatIsoDayLabel,
   isoWeekdayIndex,
   isoWeekdayLabel,
+  minutesToTimeLabel,
+  timeLabelToMinutes,
   todayIso,
 } from '@/features/doctors/domain/calendar';
-import {
-  selectSchedulingHorizonDays,
-  useSettingsStore,
-} from '@/features/settings/application/store/settings.store';
-import {
-  durationCopy,
-  parseDurationMinutes,
-} from '@/features/settings/application/store/settings.rules';
+import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
+import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
+import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
 import { useLatestGenerationRunQuery } from '@/features/slots/application/queries/useLatestGenerationRunQuery';
 import { useRegenerateSlotsMutation } from '@/features/slots/application/queries/useRegenerateSlotsMutation';
 import { useSlotGridQuery } from '@/features/slots/application/queries/useSlotGridQuery';
@@ -76,9 +73,11 @@ export function SlotsScreen() {
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
   const doctorsQuery = useDoctorsQuery();
   const departmentsQuery = useDepartmentsQuery();
-  // Hospital Settings (H2) has no query hooks yet: slot length, buffer, hours,
-  // open weekdays and the booking horizon still come from the legacy store.
-  const settings = useSettingsStore((s) => s.settings);
+  // Hospital Settings (H2): the booking horizon, opening hours and the online
+  // booking switch. Slot length is per doctor session, not hospital-wide.
+  const rulesQuery = useHospitalRuleSettingsQuery();
+  const hoursQuery = useHospitalHoursQuery();
+  const profileQuery = useHospitalProfileQuery();
   const canEdit = useCan('Doctors & Departments.edit');
 
   const [date, setDate] = useState(todayIso);
@@ -112,13 +111,15 @@ export function SlotsScreen() {
 
   // Booking is open `horizonDays` calendar days ahead, counting today, so the
   // last bookable date is today + (horizon - 1).
-  const horizonDays = selectSchedulingHorizonDays({ settings });
-  const lastBookableIso = addIsoDays(todayIso(), Math.max(0, horizonDays - 1));
-  const atHorizon = daysBetweenIso(date, lastBookableIso) <= 0;
-  const beyondHorizon = daysBetweenIso(date, lastBookableIso) < 0;
-  const hospitalClosed = settings.hoursDays[isoWeekdayIndex(date)] === false;
-  const slotMinutes = parseDurationMinutes(settings.rules.duration, 0);
-  const bufferMinutes = parseDurationMinutes(settings.rules.buffer, 0);
+  const horizonDays = rulesQuery.data?.bookingWindowDays ?? null;
+  const lastBookableIso =
+    horizonDays === null ? null : addIsoDays(todayIso(), Math.max(0, horizonDays - 1));
+  const atHorizon = lastBookableIso !== null && daysBetweenIso(date, lastBookableIso) <= 0;
+  const beyondHorizon = lastBookableIso !== null && daysBetweenIso(date, lastBookableIso) < 0;
+  const dayHours = hoursQuery.data?.find((d) => d.weekday === isoWeekdayIndex(date));
+  const hospitalClosed = dayHours?.isClosed === true;
+  const hoursCopy = hoursLabel(dayHours?.opensAt ?? null, dayHours?.closesAt ?? null);
+  const onlineBookingOff = profileQuery.data?.onlineBookingEnabled === false;
   const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== todayIso();
   const clearFilters = (): void => {
     setDeptF(ALL_DEPTS);
@@ -174,7 +175,7 @@ export function SlotsScreen() {
           <div className="w-44">
             <TextInput
               value={date}
-              max={lastBookableIso}
+              max={lastBookableIso ?? undefined}
               type="date"
               height={40}
               aria-label="Slot grid date"
@@ -222,11 +223,13 @@ export function SlotsScreen() {
         <div>
           <div className="text-h3 text-text-strong">{formatIsoDayLabel(date)}</div>
           <div className="text-caption text-text-muted flex items-center gap-1.5">
-            <Icon name="clock" size={13} /> {durationCopy(slotMinutes)} consultations
-            {bufferMinutes > 0
-              ? ` + ${durationCopy(bufferMinutes)} buffer`
-              : ' back-to-back'} · {settings.hoursOpen}–{settings.hoursClose}
-            <InfoDot text="Slot length, buffer and opening hours come from Hospital Settings. Each doctor's own hours, shift patterns, leave and date exceptions narrow them." />
+            <Icon name="clock" size={13} />{' '}
+            {hospitalClosed
+              ? 'Hospital closed on this weekday'
+              : hoursCopy
+                ? `Hospital hours ${hoursCopy}`
+                : 'Hospital hours not set'}
+            <InfoDot text="Opening hours come from Hospital Settings. Slot length is set per session in each doctor's weekly hours, and their leave and date exceptions narrow the slots further." />
           </div>
           <div className="text-caption text-text-muted mt-1 flex flex-wrap items-center gap-1.5">
             <Icon name="refresh-cw" size={13} />
@@ -259,7 +262,7 @@ export function SlotsScreen() {
         {grid && <SlotLegend counts={grid.counts} />}
       </Card>
 
-      {!settings.rules.onlineBooking && (
+      {onlineBookingOff && (
         <Card pad={14} className="flex flex-wrap items-center gap-2">
           <Icon name="triangle-alert" size={16} className="text-y-700" />
           <span className="text-body text-text-body">
@@ -278,7 +281,7 @@ export function SlotsScreen() {
         </Card>
       )}
 
-      {beyondHorizon ? (
+      {beyondHorizon && lastBookableIso ? (
         <Card>
           <EmptyState
             icon="calendar-clock"
@@ -363,4 +366,12 @@ export function SlotsScreen() {
       )}
     </div>
   );
+}
+
+/** `"09:00"`, `"17:30"` → `"9:00 am–5:30 pm"`; `null` when either end is unset. */
+function hoursLabel(opensAt: string | null, closesAt: string | null): string | null {
+  const open = timeLabelToMinutes(opensAt);
+  const close = timeLabelToMinutes(closesAt);
+  if (open === null || close === null) return null;
+  return `${minutesToTimeLabel(open)}–${minutesToTimeLabel(close)}`;
 }

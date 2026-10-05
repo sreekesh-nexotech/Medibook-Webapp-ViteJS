@@ -1,6 +1,11 @@
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
+import {
+  hospitalPath,
+  hospitalTokenForDeptPath,
+  isHospitalRole,
+  type HospitalStaticView,
+} from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
 import { cn } from '@/shared/lib/cn';
 import { formatToken, money } from '@/shared/lib/format';
@@ -16,7 +21,6 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonKpiStrip, SkeletonTable } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
-import { useAppointmentsStore } from '@/features/appointments/application/store/appointments.store';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 
@@ -61,8 +65,6 @@ export function ReceptionistDashboardScreen() {
   const today = useAdminDashboardQuery('today');
   const doctors = useDoctorsQuery();
   const departments = useDepartmentsQuery();
-  // The token screen's department is still UI state in the appointments store (H7/H8 → Z).
-  const setDept = useAppointmentsStore((s) => s.setDept);
 
   const refresh = async (): Promise<void> => {
     await Promise.all([
@@ -235,10 +237,7 @@ export function ReceptionistDashboardScreen() {
                 <button
                   type="button"
                   key={d.id}
-                  onClick={() => {
-                    setDept(d.name);
-                    go('token');
-                  }}
+                  onClick={() => navigate(hospitalTokenForDeptPath(activeRole, d.name))}
                   className="text-body hover:bg-grey-200 flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-150"
                 >
                   <span className="text-text-body flex-1">{d.name}</span>

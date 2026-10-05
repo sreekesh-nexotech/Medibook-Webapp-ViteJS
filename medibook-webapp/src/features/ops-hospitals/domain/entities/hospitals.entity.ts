@@ -1,7 +1,6 @@
 /**
  * Platform hospital-registry entities, as `/platform/hospitals` serves them.
- * Plain readonly types. (The fixture-era view models in
- * `application/store/hospitals.types.ts` stay for the screens not yet moved.)
+ * Plain readonly types.
  */
 
 /** Lifecycle status of a hospital instance (backend `Hospital.Status`). */
@@ -101,4 +100,47 @@ export interface HospitalStatusCounts {
   /** `draft` + `onboarding`. */
   readonly pending: number;
   readonly suspended: number;
+}
+
+/** How the per-booking convenience fee is charged: paise, or basis points. */
+export type ConvenienceFeeKind = 'flat' | 'percent';
+
+export type HospitalBillingPeriod = 'monthly' | 'yearly';
+
+/** One numbering series chosen at onboarding: tokens `{PREFIX} {SEQ:n} {FY} {YY} {YYYY} {MM}`. */
+export interface NumberingSpecInput {
+  readonly format: string;
+  readonly prefix: string;
+}
+
+/** Everything `POST /platform/hospitals` needs to provision a new instance. */
+export interface HospitalCreateInput {
+  readonly slug: string;
+  readonly name: string;
+  readonly email: string;
+  /** E.164, e.g. `+919876543210`. */
+  readonly phoneE164: string;
+  readonly addressLine1: string;
+  readonly city: string;
+  readonly state: string;
+  readonly pincode: string;
+  /** Platform commission on online bookings, in basis points. */
+  readonly commissionBp: number;
+  readonly convenienceFeeKind: ConvenienceFeeKind;
+  /** Paise when `flat`, basis points when `percent`. */
+  readonly convenienceFeeValue: number;
+  readonly numbering: {
+    readonly mrn: NumberingSpecInput;
+    readonly booking: NumberingSpecInput;
+    readonly receipt: NumberingSpecInput;
+  };
+  readonly planId: string;
+  readonly billingPeriod: HospitalBillingPeriod;
+  /** Invited as the hospital's first administrator. */
+  readonly firstAdmin: {
+    readonly email: string;
+    readonly firstName: string;
+    readonly lastName: string | null;
+    readonly phoneE164: string | null;
+  };
 }

@@ -41,20 +41,3 @@ export interface Role {
   readonly system?: boolean;
   readonly perms: PermsGrid;
 }
-
-export type UserStatus = 'Active' | 'Inactive';
-
-export type InviteStatus = 'Accepted' | 'Pending';
-
-export interface HospitalUser {
-  readonly id: string;
-  readonly name: string;
-  readonly email: string;
-  readonly phone: string;
-  readonly username: string;
-  readonly roleId: string;
-  readonly status: UserStatus;
-  /** Last-active label, e.g. "5 min ago". */
-  readonly last: string;
-  readonly invite: InviteStatus;
-}

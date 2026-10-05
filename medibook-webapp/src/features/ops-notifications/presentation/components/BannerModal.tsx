@@ -15,10 +15,8 @@ import type {
 
 interface BannerModalProps {
   open: boolean;
-  /** The campaign banner being edited, or null for a new / default-banner edit. */
+  /** The campaign banner being edited, or null for a new one. */
   banner: CampaignBanner | null;
-  /** True when editing the always-on default banner (no schedule fields). */
-  fallback: boolean;
   /** Save in flight (upload + write): submit spinner, actions blocked. */
   busy?: boolean;
   onClose: () => void;
@@ -66,14 +64,7 @@ function initialDraft(banner: CampaignBanner | null): BannerFieldsDraft {
  * on `FormModal`, so Enter submits (audit 3.4.5). A picked image is only
  * uploaded on save.
  */
-export function BannerModal({
-  open,
-  banner,
-  fallback,
-  busy = false,
-  onClose,
-  onSave,
-}: BannerModalProps) {
+export function BannerModal({ open, banner, busy = false, onClose, onSave }: BannerModalProps) {
   const [f, setF] = useState<BannerFieldsDraft>(() => initialDraft(banner));
   const [picked, setPicked] = useState<PickedImage | null>(null);
   const [removed, setRemoved] = useState(false);
@@ -106,8 +97,8 @@ export function BannerModal({
   const submit = () => {
     const e: BannerErrors = {
       title: f.title.trim() ? null : 'Give the banner a title.',
-      from: fallback || f.from ? null : 'Set a start date.',
-      to: fallback || (f.to && f.to >= f.from) ? null : 'Set an end date on or after the start.',
+      from: f.from ? null : 'Set a start date.',
+      to: f.to && f.to >= f.from ? null : 'Set an end date on or after the start.',
     };
     setErr(e);
     if (e.title || e.from || e.to) return;
@@ -123,19 +114,13 @@ export function BannerModal({
     <FormModal
       open={open}
       onClose={onClose}
-      title={fallback ? 'Edit Default Banner' : banner ? 'Edit Banner' : 'Add Banner'}
+      title={banner ? 'Edit Banner' : 'Add Banner'}
       width={520}
       onSubmit={submit}
-      submitLabel={banner || fallback ? 'Save Banner' : 'Add Banner'}
+      submitLabel={banner ? 'Save Banner' : 'Add Banner'}
       busy={busy}
     >
       <div className="flex flex-col gap-4">
-        {fallback && (
-          <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
-            <Icon name="info" size={14} className="mt-px flex-none" /> The default banner has no
-            schedule — the app shows it whenever no campaign banner is live.
-          </div>
-        )}
         <OpsField label="Banner Title" required error={err.title}>
           <TextInput
             value={f.title}
@@ -199,42 +184,40 @@ export function BannerModal({
             </button>
           )}
         </OpsField>
-        {!fallback && (
-          <div className="grid grid-cols-2 gap-4">
-            <OpsField label="Live From" required error={err.from}>
-              {(field) => (
-                <input
-                  type="date"
-                  id={field.id}
-                  aria-invalid={field.invalid || undefined}
-                  aria-describedby={field.describedById}
-                  value={f.from}
-                  onChange={(e) => {
-                    setF({ ...f, from: e.target.value });
-                    setErr({ ...err, from: null });
-                  }}
-                  className={dateInputClass}
-                />
-              )}
-            </OpsField>
-            <OpsField label="Live Until" required error={err.to}>
-              {(field) => (
-                <input
-                  type="date"
-                  id={field.id}
-                  aria-invalid={field.invalid || undefined}
-                  aria-describedby={field.describedById}
-                  value={f.to}
-                  onChange={(e) => {
-                    setF({ ...f, to: e.target.value });
-                    setErr({ ...err, to: null });
-                  }}
-                  className={dateInputClass}
-                />
-              )}
-            </OpsField>
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-4">
+          <OpsField label="Live From" required error={err.from}>
+            {(field) => (
+              <input
+                type="date"
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedById}
+                value={f.from}
+                onChange={(e) => {
+                  setF({ ...f, from: e.target.value });
+                  setErr({ ...err, from: null });
+                }}
+                className={dateInputClass}
+              />
+            )}
+          </OpsField>
+          <OpsField label="Live Until" required error={err.to}>
+            {(field) => (
+              <input
+                type="date"
+                id={field.id}
+                aria-invalid={field.invalid || undefined}
+                aria-describedby={field.describedById}
+                value={f.to}
+                onChange={(e) => {
+                  setF({ ...f, to: e.target.value });
+                  setErr({ ...err, to: null });
+                }}
+                className={dateInputClass}
+              />
+            )}
+          </OpsField>
+        </div>
       </div>
     </FormModal>
   );

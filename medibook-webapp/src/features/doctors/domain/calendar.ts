@@ -20,6 +20,28 @@ export const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as co
 
 export type WeekDayLabel = (typeof WEEK_DAYS)[number];
 
+/**
+ * The clock-time labels the hours, shift and slot pickers offer. A time the
+ * backend returns off this grid is added to its own picker by the caller.
+ */
+export const TIME_OPTS = [
+  '8:00 am',
+  '8:30 am',
+  '9:00 am',
+  '9:30 am',
+  '10:00 am',
+  '11:00 am',
+  '12:00 pm',
+  '1:00 pm',
+  '2:00 pm',
+  '3:00 pm',
+  '4:00 pm',
+  '5:00 pm',
+  '6:00 pm',
+  '7:00 pm',
+  '8:00 pm',
+] as const;
+
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_HALF_DAY = 12;
@@ -68,11 +90,6 @@ export function daysBetweenIso(fromIso: string, toIso: string): number {
   const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
   const b = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
   return Math.round((b - a) / 86400000);
-}
-
-/** Today shifted by `days` calendar days — used by the demo fixtures. */
-export function isoFromToday(days: number): string {
-  return addIsoDays(todayIso(), days);
 }
 
 /** Monday-first weekday index (0 = Mon … 6 = Sun) of an ISO date. */

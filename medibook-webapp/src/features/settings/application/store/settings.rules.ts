@@ -18,15 +18,6 @@
 
 /* ------------------------------------------------------------- option lists */
 
-/** Consultation slot length options, in the order the select offers them. */
-export const SLOT_LENGTH_OPTIONS = ['10 mins', '15 mins', '20 mins', '30 mins'] as const;
-
-/**
- * Gap that follows each consultation. `0 mins` means back-to-back. The buffer
- * is **after** the consultation, never inside it — see `slotsPerDay`.
- */
-export const SLOT_BUFFER_OPTIONS = ['0 mins', '5 mins', '10 mins', '15 mins'] as const;
-
 /**
  * Scheduling horizon: how far ahead the booking calendar is open. The slot
  * generator must not produce a slot beyond it, and the patient app must not
@@ -40,30 +31,8 @@ export const SCHEDULING_HORIZON_OPTIONS = [
   '90 days',
 ] as const;
 
-/**
- * Concurrent capacity of ONE slot time — how many patients may hold the same
- * 9:30 am slot before it reads Full. Not a daily cap: the daily cap is this
- * number times the slots the day holds.
- */
-export const MAX_PER_SLOT_OPTIONS = ['5 slots', '10 slots', '15 slots', '20 slots'] as const;
-
 /** How long before the appointment a patient may still cancel. */
 export const CANCEL_BEFORE_OPTIONS = ['1 hour', '2 hours', '4 hours', '24 hours'] as const;
-
-/** How long after the slot an uncalled patient is auto-marked No-show. */
-export const AUTO_NO_SHOW_OPTIONS = ['30 mins', '1 hour', '2 hours'] as const;
-
-/** How long an unpaid online booking holds its slot. */
-export const HOLD_TIMEOUT_OPTIONS = ['15 mins', '30 mins', '45 mins'] as const;
-
-/** How long a late patient keeps their place in the queue. */
-export const GRACE_OPTIONS = ['15 mins', '30 mins', '45 mins'] as const;
-
-/** What happens when the grace period runs out. */
-export const AFTER_GRACE_OPTIONS = ['Auto Mark No-show', 'Keep waiting'] as const;
-
-/** Who issues the token number. */
-export const TOKEN_GEN_OPTIONS = ['Auto', 'Manual'] as const;
 
 /**
  * Token numbering scheme. `T-001` is the canonical cross-app format

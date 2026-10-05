@@ -1,13 +1,19 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import { hospitalDashboardPath, opsPath } from '@/app/router/paths';
+import { hospitalDashboardPath, OPS_BASE_PATH, opsPath, ROOT_PATH } from '@/app/router/paths';
 
-import { useAuthStore } from '@/features/auth/application/store/auth.store';
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import {
+  hospitalSessionOf,
+  hospitalUrlRole,
+  platformSessionOf,
+} from '@/features/auth/application/store/auth.roles';
 
 /**
  * "Back to dashboard" for screens that render outside a shell (not-found,
  * forbidden): resolves the right home for the signed-in session — the ops
- * dashboard for an ops user, the role's hospital dashboard otherwise.
+ * dashboard under `/ops` or for an ops-only session, the hospital role's
+ * dashboard otherwise, and the root (which sends to login) when signed out.
  */
 export interface HomeTarget {
   path: string;
@@ -17,8 +23,19 @@ export interface HomeTarget {
 
 export function useHomeTarget(): HomeTarget {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.role);
-  const path = role === 'ops' ? opsPath('dashboard') : hospitalDashboardPath(role);
-  const label = role === 'ops' ? 'Back to Operations Dashboard' : 'Back to Dashboard';
+  const { pathname } = useLocation();
+  const hospital = hospitalSessionOf(useSessionQuery('hospital').data);
+  const platform = platformSessionOf(useSessionQuery('platform').data);
+  const toOps = pathname.startsWith(OPS_BASE_PATH) ? platform !== null : !hospital && !!platform;
+
+  let path = ROOT_PATH;
+  let label = 'Back to sign in';
+  if (toOps) {
+    path = opsPath('dashboard');
+    label = 'Back to Operations Dashboard';
+  } else if (hospital) {
+    path = hospitalDashboardPath(hospitalUrlRole(hospital.role.code));
+    label = 'Back to Dashboard';
+  }
   return { path, label, go: () => navigate(path, { replace: true }) };
 }

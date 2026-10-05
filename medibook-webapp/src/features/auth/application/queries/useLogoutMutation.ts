@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { unwrap } from '@/core/error/failure';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
-import { clearAuthStore } from '@/features/auth/application/store/auth.roles';
 import { logoutStaff } from '@/features/auth/application/usecases/logoutStaff';
 
 /**
@@ -17,7 +16,6 @@ export function useLogoutMutation() {
     mutationFn: async (surface: AuthSurface) => unwrap(await logoutStaff(surface)),
     onSettled: () => {
       queryClient.clear();
-      clearAuthStore();
     },
   });
 }

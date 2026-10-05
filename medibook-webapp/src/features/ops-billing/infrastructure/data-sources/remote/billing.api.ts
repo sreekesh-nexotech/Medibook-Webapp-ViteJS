@@ -50,6 +50,7 @@ function invoiceFilters(params: InvoiceListParams) {
     due_from: params.dueFrom ?? undefined,
     due_to: params.dueTo ?? undefined,
     overdue: params.overdue ?? undefined,
+    hospital_id: params.hospitalId,
     sort: sortParam(params.sortField, params.sortDirection),
   };
 }
@@ -122,6 +123,7 @@ export async function getPayments(params: PaymentListParams) {
       status: list(params.statuses),
       method: params.method ?? undefined,
       invoice_id: params.invoiceId ?? undefined,
+      hospital_id: params.hospitalId,
       sort: sortParam(params.sortField, params.sortDirection),
       page: params.page,
       page_size: params.pageSize,

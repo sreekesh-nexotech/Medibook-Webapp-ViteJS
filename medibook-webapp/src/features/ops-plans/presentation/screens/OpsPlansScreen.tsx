@@ -1,43 +1,23 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { cn } from '@/shared/lib/cn';
-import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
-import { OpsConfirm, type OpsTint } from '@/shared/ui/OpsConfirm';
-import { OpsEntity } from '@/shared/ui/OpsEntity';
+import { OpsConfirm } from '@/shared/ui/OpsConfirm';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
-import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
-import { opsHospitalDetailPath } from '@/app/router/paths';
-
-import { hospName, opsHospById } from '@/features/ops-hospitals/application/store/hospitals.store';
+import { PlanChangesPanel } from '@/features/ops-billing/presentation/components/PlanChangesPanel';
 import { useArchivePlanMutation } from '@/features/ops-plans/application/queries/useArchivePlanMutation';
 import { useDeletePlanMutation } from '@/features/ops-plans/application/queries/useDeletePlanMutation';
 import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
-import { usePlansStore } from '@/features/ops-plans/application/store/plans.store';
-import type { PlanChange } from '@/features/ops-plans/application/store/plans.types';
 import type { CatalogPlan } from '@/features/ops-plans/domain/entities/plans.catalog';
 import { PlanCard } from '@/features/ops-plans/presentation/components/PlanCard';
 import { PlanModal } from '@/features/ops-plans/presentation/components/PlanModal';
-
-/**
- * Feature-local port of the design's `opsTintOf` (Ops.jsx) — cycles ops accent
- * tints by record id. Not in shared/ui yet; flagged for extraction when the
- * first shared consumer lands.
- */
-const OPS_TINT_CYCLE = ['primary', 'info', 'success', 'warning', 'neutral'] as const;
-const opsTintOf = (i: number): OpsTint => OPS_TINT_CYCLE[i % OPS_TINT_CYCLE.length];
-
-const PLAN_CHANGE_COLUMNS = ['Hospital', 'Plan Change', 'Requested', 'Status', 'Action'] as const;
 
 /** A plan picked for archiving, with its subscriber count when known. */
 interface ArchiveTarget {
@@ -57,22 +37,18 @@ const failureMessage = (error: unknown, fallback: string): string =>
  * The catalog is live (`/platform/plans`): each card carries both billing
  * periods and the three ceilings the backend stores (users, doctors,
  * storage), plus Archive for plans that have had subscribers and so cannot be
- * deleted. The plan-change queue still reads the legacy store — its endpoints
- * (`billing/plan-change-requests`) belong to module P4.
+ * deleted. Plan-change requests use the billing module's panel (approve / reject
+ * on `billing/plan-change-requests`).
  */
 export function OpsPlansScreen() {
-  const navigate = useNavigate();
   const plansQuery = usePlansQuery();
   const plans = plansQuery.data;
   const deleteMutation = useDeletePlanMutation();
   const archiveMutation = useArchivePlanMutation();
-  const planChanges = usePlansStore((s) => s.planChanges);
-  const applyPlanChange = usePlansStore((s) => s.applyPlanChange);
 
   const [modal, setModal] = useState<CatalogPlan | 'new' | null>(null);
   const [delPlan, setDelPlan] = useState<CatalogPlan | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
-  const [busy, run] = useOpsAct();
 
   /** Guard on the live count; the server refuses any plan that ever had subscribers. */
   const handleDeleteClick = (plan: CatalogPlan, subscribers: number | null) => {
@@ -104,21 +80,6 @@ export function OpsPlansScreen() {
       onSettled: () => setArchiveTarget(null),
     });
   };
-
-  const goHosp = (hid: number) => {
-    if (hid && opsHospById(hid)) navigate(opsHospitalDetailPath(hid));
-  };
-
-  const applyChange = (c: PlanChange, ok: boolean) =>
-    run(
-      `pc${c.id}`,
-      ok
-        ? `Plan change applied — ${hospName(c)} moved to ${c.change.split(' → ')[1]}.`
-        : `Plan change declined for ${hospName(c)}.`,
-      () => {
-        applyPlanChange(c, ok);
-      },
-    );
 
   return (
     <div className="flex flex-col gap-5">
@@ -175,65 +136,9 @@ export function OpsPlansScreen() {
 
       <Card>
         <div className="mb-4 flex items-center justify-between">
-          <SectionTitle>Recent Plan Changes</SectionTitle>
-          <span className="text-caption text-text-muted">Last 30 days</span>
+          <SectionTitle>Plan Change Requests</SectionTitle>
         </div>
-        <TableShell
-          columns={PLAN_CHANGE_COLUMNS}
-          scrollLabel="Recent plan changes"
-          state={
-            planChanges.length === 0
-              ? {
-                  kind: 'empty',
-                  icon: 'git-branch',
-                  title: 'No plan changes in the last 30 days.',
-                  message: 'Upgrade and downgrade requests from hospitals land here for approval.',
-                }
-              : undefined
-          }
-        >
-          {planChanges.map((c) => (
-            <tr key={c.id}>
-              <td
-                onClick={() => goHosp(c.hid)}
-                title="Open hospital profile"
-                className={cn(tdClass, 'cursor-pointer')}
-              >
-                <OpsEntity
-                  icon="building-2"
-                  tint={opsTintOf(c.id)}
-                  title={hospName(c)}
-                  sub={c.email}
-                />
-              </td>
-              <td className={tdClass}>{c.change}</td>
-              <td className={tdClass}>{c.requested}</td>
-              <td className={tdClass}>
-                <Badge status={c.status} />
-              </td>
-              <td className={tdClass}>
-                {c.status === 'Pending' ? (
-                  <div className="flex gap-2">
-                    <Button size="sm" busy={busy[`pc${c.id}`]} onClick={() => applyChange(c, true)}>
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      style={{ color: 'var(--color-d-500)' }}
-                      busy={busy[`pc${c.id}`]}
-                      onClick={() => applyChange(c, false)}
-                    >
-                      Decline
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="text-text-faint">—</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </TableShell>
+        <PlanChangesPanel />
       </Card>
 
       {modal && (

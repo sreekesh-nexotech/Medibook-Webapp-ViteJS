@@ -4,7 +4,6 @@ import { unwrap } from '@/core/error/failure';
 
 import type { AuthSurface, LoginCredentials } from '@/features/auth/domain/entities/auth.types';
 import { authKeys } from '@/features/auth/application/queries/auth.keys';
-import { syncAuthStore } from '@/features/auth/application/store/auth.roles';
 import { loginStaff } from '@/features/auth/application/usecases/loginStaff';
 
 interface LoginInput {
@@ -24,7 +23,6 @@ export function useLoginMutation() {
     onSuccess: (session) => {
       queryClient.clear();
       queryClient.setQueryData(authKeys.session(session.surface), session);
-      syncAuthStore(session);
     },
   });
 }

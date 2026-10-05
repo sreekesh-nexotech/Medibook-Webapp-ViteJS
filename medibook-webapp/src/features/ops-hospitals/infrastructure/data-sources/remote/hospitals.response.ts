@@ -151,3 +151,6 @@ export function toPlatformHospitalDetail(dto: HospitalDetailResponse): PlatformH
     goLiveBlockers: dto.go_live_blockers.map(toBlocker),
   };
 }
+
+/** `POST /platform/hospitals` → 201 `{hospital, subscription}`; only the hospital is read. */
+export const hospitalCreatedResponseSchema = z.object({ hospital: hospitalResponseSchema });

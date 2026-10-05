@@ -1,15 +1,30 @@
-import {
-  DAYS,
-  DEPT_COLORS,
-  TIME_OPTS,
-} from '@/features/doctors/application/store/catalog.fixtures';
 import type { ShiftPattern, WeekDay } from '@/features/doctors/application/store/catalog.types';
-import { minutesToTimeLabel, timeLabelToMinutes } from '@/features/doctors/domain/calendar';
+import {
+  minutesToTimeLabel,
+  TIME_OPTS,
+  timeLabelToMinutes,
+  WEEK_DAYS,
+} from '@/features/doctors/domain/calendar';
 import type {
   DoctorStatus,
   LeaveKind,
   WeeklySession,
 } from '@/features/doctors/domain/entities/doctors.types';
+
+/**
+ * Palette cycled for department swatches, in design-token order: blue, p-400,
+ * g-500, y-500, blue-strong, p-300, orange. Departments carry no colour on the
+ * backend, so the swatch is derived from the department's position.
+ */
+const DEPT_COLORS: readonly string[] = [
+  '#2563eb',
+  '#3f5e85',
+  '#2ecc71',
+  '#f59e0b',
+  '#2055ca',
+  '#8095ae',
+  '#ea7c2b',
+];
 
 /**
  * View-model conversions between the API entities and the editor components
@@ -113,7 +128,7 @@ export interface WeekGrid {
  */
 export function sessionsToGrid(sessions: readonly WeeklySession[]): WeekGrid {
   const patterns = new Map<string, ShiftPattern>();
-  const week = DAYS.map((day, weekday): WeekDay => {
+  const week = WEEK_DAYS.map((day, weekday): WeekDay => {
     const today = sessions
       .filter((s) => s.weekday === weekday)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));

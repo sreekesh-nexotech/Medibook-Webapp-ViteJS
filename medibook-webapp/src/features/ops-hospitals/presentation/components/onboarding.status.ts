@@ -1,8 +1,7 @@
 /**
  * Presentation lookups for the API-backed onboarding pipeline (P3): stage and
  * checklist vocabulary, which status pill each borrows, and the sentence each
- * go-live blocker reads as. (`onboarding.view.ts` serves the fixture-era
- * model and stays for Z to remove.)
+ * go-live blocker reads as.
  */
 import type { IconName } from '@/shared/ui/icon-registry';
 

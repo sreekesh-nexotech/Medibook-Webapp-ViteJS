@@ -1,8 +1,7 @@
 /**
  * Slot inventory as the hospital API serves it (`GET /hospital/slots`,
  * `scheduling/services/slots.py`): per doctor → sessions → materialised
- * slots, capacity 1. Unlike the legacy derived grid (`domain/slot.ts`), every
- * slot here is a stored row with its own id.
+ * slots, capacity 1. Every slot is a stored row with its own id.
  */
 
 /**

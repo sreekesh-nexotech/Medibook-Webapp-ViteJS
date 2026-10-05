@@ -1,136 +1,459 @@
+import { useState } from 'react';
+
+import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { email, required } from '@/shared/lib/validate';
+import { email, phoneIN, pincode, required } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
+import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-import { usePlansStore } from '@/features/ops-plans/application/store/plans.store';
-import { useHospitalsStore } from '@/features/ops-hospitals/application/store/hospitals.store';
+import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
+import { useCreateHospitalMutation } from '@/features/ops-hospitals/application/queries/useCreateHospitalMutation';
+import type {
+  ConvenienceFeeKind,
+  HospitalBillingPeriod,
+  HospitalCreateInput,
+  PlatformHospital,
+} from '@/features/ops-hospitals/domain/entities/hospitals.entity';
 
 /**
- * Onboard Hospital modal (design `OnboardHospitalModal`, Ops.jsx). Creates a
- * Pending-verification instance with all-Missing KYC via the hospitals store;
- * the success toast + fake latency come from `useOpsAct`, as in the prototype.
- *
- * Rebuilt on `FormModal` + `useForm`, which buys three audit fixes at once:
- * Enter submits (3.4.5), an error re-checks while typing instead of vanishing
- * on the first keystroke (3.5.4), and the reset effect that used to fire on
- * every open is gone — the catalog screens mount this fresh, so the starting
- * values come straight from `useState`.
- *
- * What happens *after* onboarding — the first administrator, the document
- * checklist and the per-document review — lives on the onboarding pipeline
- * (`OpsOnboardingScreen`), which this hands the new tenant id to.
+ * Onboard Hospital (design `OnboardHospitalModal`) on `POST /platform/hospitals`.
+ * The backend provisions the instance in onboarding — settings, roles,
+ * numbering series, subscription and onboarding case — and invites the first
+ * administrator, so the form collects everything that call requires. The
+ * document checklist and KYC review then happen on Network › Onboarding.
  */
 
 interface OnboardForm {
   name: string;
+  slug: string;
   email: string;
+  phone: string;
+  address: string;
   city: string;
-  plan: string;
+  state: string;
+  pincode: string;
+  planId: string;
+  billingPeriod: string;
+  commissionPct: string;
+  feeKind: string;
+  feeValue: string;
+  numberPrefix: string;
+  mrnFormat: string;
+  bookingFormat: string;
+  receiptFormat: string;
+  adminFirstName: string;
+  adminLastName: string;
+  adminEmail: string;
+  adminPhone: string;
+}
+
+type FormKey = keyof OnboardForm;
+
+const SLUG_PATTERN = /^[-a-zA-Z0-9_]+$/;
+const PREFIX_PATTERN = /^[A-Z0-9]{1,12}$/;
+const SEQ_TOKEN = /\{SEQ(:\d+)?\}/;
+const INDIA_DIAL_CODE = '+91';
+const BP_PER_PERCENT = 100;
+const PAISE_PER_RUPEE = 100;
+const MAX_PERCENT = 100;
+const FIELD_HEIGHT = 44;
+
+const BILLING_PERIODS: readonly HospitalBillingPeriod[] = ['monthly', 'yearly'];
+const BILLING_PERIOD_LABEL: Readonly<Record<HospitalBillingPeriod, string>> = {
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+};
+const FEE_KINDS: readonly ConvenienceFeeKind[] = ['flat', 'percent'];
+const FEE_KIND_LABEL: Readonly<Record<ConvenienceFeeKind, string>> = {
+  flat: 'Flat amount (₹)',
+  percent: 'Percent of fee (%)',
+};
+
+/** The seeded hospitals' series formats; `{PREFIX}` is the prefix field. */
+const DEFAULT_FORMATS = {
+  mrn: '{PREFIX}{SEQ:6}',
+  booking: '{PREFIX}-{YY}{MM}-{SEQ:5}',
+  receipt: '{PREFIX}/{FY}/{SEQ:5}',
+} as const;
+
+/** `"Sunrise Multispeciality"` → `"sunrise-multispeciality"`. */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function digits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function percent(value: string, label: string): string | undefined {
+  const missing = required(value, label);
+  if (missing) return missing;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 && n <= MAX_PERCENT ? undefined : `${label} must be 0–100%.`;
+}
+
+function seriesFormat(value: string, label: string): string | undefined {
+  const missing = required(value, label);
+  if (missing) return missing;
+  return SEQ_TOKEN.test(value) ? undefined : `${label} must contain {SEQ} or {SEQ:n}.`;
 }
 
 const VALIDATORS: FormValidators<OnboardForm> = {
-  name: (value) => required(value, 'Hospital name'),
-  email: (value) => email(value),
-  city: (value) => required(value, 'City'),
+  name: (v) => required(v, 'Hospital name'),
+  slug: (v) =>
+    required(v, 'Slug') ??
+    (SLUG_PATTERN.test(v) ? undefined : 'Use letters, numbers, hyphens or underscores only.'),
+  email: (v) => email(v),
+  phone: (v) => phoneIN(v),
+  address: (v) => required(v, 'Address'),
+  city: (v) => required(v, 'City'),
+  state: (v) => required(v, 'State'),
+  pincode: (v) => pincode(v),
+  planId: (v) => required(v, 'Plan'),
+  commissionPct: (v) => percent(v, 'Commission'),
+  feeValue: (v, all) => {
+    if (all.feeKind === 'percent') return percent(v, 'Convenience fee');
+    const missing = required(v, 'Convenience fee');
+    if (missing) return missing;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? undefined : 'Enter an amount of ₹0 or more.';
+  },
+  numberPrefix: (v) =>
+    required(v, 'Number prefix') ??
+    (PREFIX_PATTERN.test(v) ? undefined : 'Use up to 12 capital letters or digits.'),
+  mrnFormat: (v) => seriesFormat(v, 'MRN format'),
+  bookingFormat: (v) => seriesFormat(v, 'Booking format'),
+  receiptFormat: (v) => seriesFormat(v, 'Receipt format'),
+  adminFirstName: (v) => required(v, "Administrator's first name"),
+  adminEmail: (v) => email(v),
+  adminPhone: (v) => (v.trim() === '' ? undefined : phoneIN(v)),
+};
+
+/** Server field names (`PlatformHospitalCreateRequest`) → form fields, for a 400. */
+const SERVER_FIELDS: Readonly<Record<string, FormKey>> = {
+  name: 'name',
+  slug: 'slug',
+  email: 'email',
+  phone_e164: 'phone',
+  address_line1: 'address',
+  city: 'city',
+  state: 'state',
+  pincode: 'pincode',
+  plan_id: 'planId',
+  commission_bp: 'commissionPct',
+  convenience_fee_value: 'feeValue',
+};
+
+function toInput(v: OnboardForm): HospitalCreateInput {
+  const feeKind: ConvenienceFeeKind = v.feeKind === 'percent' ? 'percent' : 'flat';
+  const prefix = v.numberPrefix.trim();
+  const adminPhone = digits(v.adminPhone);
+  return {
+    slug: v.slug.trim(),
+    name: v.name.trim(),
+    email: v.email.trim(),
+    phoneE164: `${INDIA_DIAL_CODE}${digits(v.phone)}`,
+    addressLine1: v.address.trim(),
+    city: v.city.trim(),
+    state: v.state.trim(),
+    pincode: v.pincode.trim(),
+    commissionBp: Math.round(Number(v.commissionPct) * BP_PER_PERCENT),
+    convenienceFeeKind: feeKind,
+    convenienceFeeValue: Math.round(
+      Number(v.feeValue) * (feeKind === 'percent' ? BP_PER_PERCENT : PAISE_PER_RUPEE),
+    ),
+    numbering: {
+      mrn: { format: v.mrnFormat.trim(), prefix },
+      booking: { format: v.bookingFormat.trim(), prefix },
+      receipt: { format: v.receiptFormat.trim(), prefix },
+    },
+    planId: v.planId,
+    billingPeriod: v.billingPeriod === 'yearly' ? 'yearly' : 'monthly',
+    firstAdmin: {
+      email: v.adminEmail.trim(),
+      firstName: v.adminFirstName.trim(),
+      lastName: v.adminLastName.trim() || null,
+      phoneE164: adminPhone ? `${INDIA_DIAL_CODE}${adminPhone}` : null,
+    },
+  };
+}
+
+const INITIAL: OnboardForm = {
+  name: '',
+  slug: '',
+  email: '',
+  phone: '',
+  address: '',
+  city: '',
+  state: '',
+  pincode: '',
+  planId: '',
+  billingPeriod: 'monthly',
+  commissionPct: '',
+  feeKind: 'flat',
+  feeValue: '',
+  numberPrefix: '',
+  mrnFormat: DEFAULT_FORMATS.mrn,
+  bookingFormat: DEFAULT_FORMATS.booking,
+  receiptFormat: DEFAULT_FORMATS.receipt,
+  adminFirstName: '',
+  adminLastName: '',
+  adminEmail: '',
+  adminPhone: '',
 };
 
 interface OnboardHospitalModalProps {
   open: boolean;
   onClose: () => void;
-  /** Receives the new tenant id, so the caller can jump straight to its case. */
-  onDone: (hid: number) => void;
-  /** Plan preselected in the dropdown (defaults to the first standard tier). */
-  defaultPlan?: string;
+  /** Receives the provisioned hospital, so the caller can open it. */
+  onDone: (hospital: PlatformHospital) => void;
 }
 
-export function OnboardHospitalModal({
-  open,
-  onClose,
-  onDone,
-  defaultPlan = 'Starter',
-}: OnboardHospitalModalProps) {
-  const [busy, run] = useOpsAct();
-  const plans = usePlansStore((s) => s.plans);
-  const onboardHospital = useHospitalsStore((s) => s.onboardHospital);
+export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalModalProps) {
+  const plansQuery = usePlansQuery();
+  const create = useCreateHospitalMutation();
+  const [serverErrors, setServerErrors] = useState<Partial<Record<FormKey, string>>>({});
+  /** The slug follows the name until someone edits it directly. */
+  const [slugEdited, setSlugEdited] = useState(false);
+  const plans = (plansQuery.data ?? []).filter((p) => p.isActive);
 
   const form = useForm<OnboardForm>({
-    initial: { name: '', email: '', city: '', plan: defaultPlan },
+    initial: INITIAL,
     validate: VALIDATORS,
-    onSubmit: (values) => {
-      run('ob', `${values.name} onboarded. KYC verification pending.`, () => {
-        const hid = onboardHospital(values);
-        onDone(hid);
-      });
+    onSubmit: async (values) => {
+      setServerErrors({});
+      try {
+        const hospital = await create.mutateAsync(toInput(values));
+        toast(`${hospital.name} onboarded. Its administrator has been invited.`, 'success');
+        onDone(hospital);
+      } catch (error) {
+        if (!isFailure(error)) {
+          toast('Could not onboard the hospital.', 'error');
+          return;
+        }
+        const mapped: Partial<Record<FormKey, string>> = {};
+        for (const [key, messages] of Object.entries(error.fieldErrors)) {
+          const field = SERVER_FIELDS[key];
+          if (field && messages[0]) mapped[field] = messages[0];
+        }
+        setServerErrors(mapped);
+        toast(error.message, 'error');
+      }
     },
   });
 
   const { values } = form;
+  const errorFor = (key: FormKey) => form.errorFor(key) ?? serverErrors[key];
+  const set = (key: FormKey, value: string) => {
+    form.setField(key, value);
+    if (serverErrors[key]) setServerErrors((e) => ({ ...e, [key]: undefined }));
+  };
+  const setName = (v: string) => {
+    set('name', v);
+    if (!slugEdited) form.setValues({ slug: slugify(v) });
+  };
+
+  /** A plain text field bound to one form key. */
+  const text = (
+    key: FormKey,
+    props: { placeholder?: string; inputMode?: 'email' | 'tel' | 'numeric' | 'decimal' } = {},
+  ) => (
+    <TextInput
+      value={values[key]}
+      onChange={(v) => set(key, v)}
+      onBlur={() => form.blurField(key)}
+      height={FIELD_HEIGHT}
+      {...props}
+    />
+  );
+
+  const planName = plans.find((p) => p.id === values.planId)?.name ?? '';
+  const billingPeriod: HospitalBillingPeriod =
+    values.billingPeriod === 'yearly' ? 'yearly' : 'monthly';
+  const feeKind: ConvenienceFeeKind = values.feeKind === 'percent' ? 'percent' : 'flat';
 
   return (
     <FormModal
       open={open}
       onClose={onClose}
       title="Onboard Hospital"
-      width={480}
+      width={680}
       onSubmit={form.handleSubmit}
       submitLabel="Onboard Hospital"
-      busy={busy.ob}
+      busy={form.submitting}
     >
-      <div className="flex flex-col gap-4.5">
-        <OpsField label="Hospital Name" required error={form.errorFor('name')}>
-          <TextInput
-            value={values.name}
-            onChange={(v) => form.setField('name', v)}
-            onBlur={() => form.blurField('name')}
-            placeholder="e.g. Sunrise Multispeciality"
-            height={48}
-          />
-        </OpsField>
-        <OpsField
-          label="Admin Email"
-          required
-          error={form.errorFor('email')}
-          hint="The first administrator is invited at this address on the onboarding pipeline."
-        >
-          <TextInput
-            value={values.email}
-            onChange={(v) => form.setField('email', v)}
-            onBlur={() => form.blurField('email')}
-            placeholder="admin@hospital.in"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            height={48}
-          />
-        </OpsField>
-        <div className="grid grid-cols-2 gap-4">
-          <OpsField label="City" required error={form.errorFor('city')}>
-            <TextInput
-              value={values.city}
-              onChange={(v) => form.setField('city', v)}
-              onBlur={() => form.blurField('city')}
-              placeholder="e.g. Pune"
-              height={48}
-            />
+      <div className="flex flex-col gap-5">
+        <section className="flex flex-col gap-4">
+          <SectionTitle>Hospital</SectionTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <OpsField label="Hospital Name" required error={errorFor('name')}>
+              <TextInput
+                value={values.name}
+                onChange={setName}
+                onBlur={() => form.blurField('name')}
+                placeholder="e.g. Sunrise Multispeciality"
+                height={FIELD_HEIGHT}
+              />
+            </OpsField>
+            <OpsField
+              label="Slug"
+              required
+              error={errorFor('slug')}
+              hint="Unique, used in the hospital's links."
+            >
+              <TextInput
+                value={values.slug}
+                onChange={(v) => {
+                  setSlugEdited(true);
+                  set('slug', v);
+                }}
+                onBlur={() => form.blurField('slug')}
+                height={FIELD_HEIGHT}
+              />
+            </OpsField>
+            <OpsField label="Hospital Email" required error={errorFor('email')}>
+              {text('email', { placeholder: 'contact@hospital.in', inputMode: 'email' })}
+            </OpsField>
+            <OpsField label="Hospital Phone" required error={errorFor('phone')}>
+              {text('phone', { placeholder: '10-digit mobile', inputMode: 'tel' })}
+            </OpsField>
+          </div>
+          <OpsField label="Address" required error={errorFor('address')}>
+            {text('address', { placeholder: 'Building, street' })}
           </OpsField>
-          <OpsField label="Subscription Plan">
-            <Select
-              value={values.plan}
-              options={plans.map((p) => p.name)}
-              onChange={(v) => form.setField('plan', v)}
-              height={48}
-            />
-          </OpsField>
-        </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <OpsField label="City" required error={errorFor('city')}>
+              {text('city')}
+            </OpsField>
+            <OpsField label="State" required error={errorFor('state')}>
+              {text('state')}
+            </OpsField>
+            <OpsField label="PIN Code" required error={errorFor('pincode')}>
+              {text('pincode', { inputMode: 'numeric' })}
+            </OpsField>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <SectionTitle>Plan &amp; Fees</SectionTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <OpsField
+              label="Subscription Plan"
+              required
+              error={errorFor('planId')}
+              hint={plansQuery.isError ? 'Plans could not be loaded.' : undefined}
+            >
+              <Select
+                value={planName}
+                options={plans.map((p) => p.name)}
+                placeholder={plansQuery.isPending ? 'Loading plans…' : 'Choose a plan'}
+                onChange={(name) => set('planId', plans.find((p) => p.name === name)?.id ?? '')}
+                height={FIELD_HEIGHT}
+              />
+            </OpsField>
+            <OpsField label="Billing Period">
+              <Select
+                value={BILLING_PERIOD_LABEL[billingPeriod]}
+                options={BILLING_PERIODS.map((p) => BILLING_PERIOD_LABEL[p])}
+                onChange={(label) =>
+                  set(
+                    'billingPeriod',
+                    BILLING_PERIODS.find((p) => BILLING_PERIOD_LABEL[p] === label) ?? 'monthly',
+                  )
+                }
+                height={FIELD_HEIGHT}
+              />
+            </OpsField>
+            <OpsField
+              label="Commission (%)"
+              required
+              error={errorFor('commissionPct')}
+              hint="Platform share of online booking fees."
+            >
+              {text('commissionPct', { placeholder: '10', inputMode: 'decimal' })}
+            </OpsField>
+            <div className="grid grid-cols-2 gap-3">
+              <OpsField label="Convenience Fee">
+                <Select
+                  value={FEE_KIND_LABEL[feeKind]}
+                  options={FEE_KINDS.map((k) => FEE_KIND_LABEL[k])}
+                  onChange={(label) =>
+                    set('feeKind', FEE_KINDS.find((k) => FEE_KIND_LABEL[k] === label) ?? 'flat')
+                  }
+                  height={FIELD_HEIGHT}
+                />
+              </OpsField>
+              <OpsField label="Amount" required error={errorFor('feeValue')}>
+                {text('feeValue', {
+                  placeholder: feeKind === 'percent' ? '2' : '20',
+                  inputMode: 'decimal',
+                })}
+              </OpsField>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <SectionTitle>Numbering</SectionTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <OpsField
+              label="Number Prefix"
+              required
+              error={errorFor('numberPrefix')}
+              hint="Replaces {PREFIX} in every series."
+            >
+              <TextInput
+                value={values.numberPrefix}
+                onChange={(v) => set('numberPrefix', v.toUpperCase())}
+                onBlur={() => form.blurField('numberPrefix')}
+                placeholder="SUN"
+                height={FIELD_HEIGHT}
+              />
+            </OpsField>
+            <OpsField label="MRN Format" required error={errorFor('mrnFormat')}>
+              {text('mrnFormat')}
+            </OpsField>
+            <OpsField label="Booking Format" required error={errorFor('bookingFormat')}>
+              {text('bookingFormat')}
+            </OpsField>
+            <OpsField label="Receipt Format" required error={errorFor('receiptFormat')}>
+              {text('receiptFormat')}
+            </OpsField>
+          </div>
+          <div className="text-caption text-text-muted">
+            Tokens: {'{PREFIX}'} {'{SEQ:n}'} {'{FY}'} {'{YY}'} {'{YYYY}'} {'{MM}'}. The MRN format
+            locks once the first patient is registered.
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <SectionTitle>First Administrator</SectionTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <OpsField label="First Name" required error={errorFor('adminFirstName')}>
+              {text('adminFirstName')}
+            </OpsField>
+            <OpsField label="Last Name">{text('adminLastName')}</OpsField>
+            <OpsField label="Email" required error={errorFor('adminEmail')}>
+              {text('adminEmail', { placeholder: 'admin@hospital.in', inputMode: 'email' })}
+            </OpsField>
+            <OpsField label="Mobile" error={errorFor('adminPhone')}>
+              {text('adminPhone', { placeholder: 'Optional', inputMode: 'tel' })}
+            </OpsField>
+          </div>
+        </section>
+
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
-          <Icon name="info" size={14} className="mt-px flex-none" /> The hospital lands in Pending
-          verification at the start of the onboarding pipeline. Nothing is requested from it yet —
-          choose its document checklist and invite its first administrator on Network › Onboarding.
+          <Icon name="info" size={14} className="mt-px flex-none" /> The hospital starts in
+          onboarding and its administrator is emailed an invitation. Review its documents and take
+          it live on Network › Onboarding.
         </div>
       </div>
     </FormModal>

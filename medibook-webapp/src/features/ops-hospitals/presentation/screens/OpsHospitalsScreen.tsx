@@ -27,7 +27,7 @@ import { useHospitalsQuery } from '@/features/ops-hospitals/application/queries/
 import {
   longDateFromTimestamp,
   opsStampFrom,
-} from '@/features/ops-hospitals/application/store/opsDates';
+} from '@/features/ops-hospitals/presentation/components/hospitals.dates';
 import type { HospitalListQuery } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
 
 import { OnboardHospitalModal } from '@/features/ops-hospitals/presentation/components/OnboardHospitalModal';
@@ -335,13 +335,9 @@ export function OpsHospitalsScreen() {
         <OnboardHospitalModal
           open
           onClose={() => setOnboard(false)}
-          onDone={() => {
+          onDone={(hospital) => {
             setOnboard(false);
-            setTab('All');
-            setQ('');
-            setPlanF('All');
-            setStatusF('All');
-            setPage(0);
+            navigate(hospitalDetailHref(opsPath('hospitals'), hospital.id));
           }}
         />
       )}
