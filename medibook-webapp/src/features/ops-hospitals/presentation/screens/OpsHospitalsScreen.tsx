@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { opsHospitalDetailPath, opsOnboardingPath } from '@/app/router/paths';
+import { opsOnboardingPath, opsPath } from '@/app/router/paths';
+import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
@@ -20,20 +21,34 @@ import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 import { Tabs } from '@/shared/ui/Tabs';
 
-import { usePlansStore } from '@/features/ops-plans/application/store/plans.store';
+import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
+import { useHospitalStatusCountsQuery } from '@/features/ops-hospitals/application/queries/useHospitalStatusCountsQuery';
+import { useHospitalsQuery } from '@/features/ops-hospitals/application/queries/useHospitalsQuery';
 import {
-  hospName,
-  useHospitalsStore,
-} from '@/features/ops-hospitals/application/store/hospitals.store';
-import { longDateFromIso } from '@/features/ops-hospitals/application/store/opsDates';
+  longDateFromTimestamp,
+  opsStampFrom,
+} from '@/features/ops-hospitals/application/store/opsDates';
+import type { HospitalListQuery } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
 
 import { OnboardHospitalModal } from '@/features/ops-hospitals/presentation/components/OnboardHospitalModal';
+import {
+  HOSPITAL_PENDING_STATUSES,
+  HOSPITAL_STATUS_FILTER,
+  HOSPITAL_STATUS_VIEW,
+  hospitalDetailHref,
+} from '@/features/ops-hospitals/presentation/components/hospitals.view';
+import { useHospitalsDebouncedValue } from '@/features/ops-hospitals/presentation/components/useHospitalsDebouncedValue';
 
 /** Ops entity-cell tint cycle (design `opsTintOf`). */
 const OPS_TINT_CYCLE: readonly OpsTint[] = ['primary', 'info', 'success', 'warning', 'neutral'];
 const opsTintOf = (i: number): OpsTint => OPS_TINT_CYCLE[i % OPS_TINT_CYCLE.length];
 
 const OPS_HOSP_PAGE = 6;
+
+const SEARCH_DEBOUNCE_MS = 300;
+
+/** Shown in a cell or KPI the backend has no value for. */
+const NO_VALUE = '—';
 
 const COLUMNS = [
   'Hospital',
@@ -45,23 +60,27 @@ const COLUMNS = [
   'Action',
 ] as const;
 
+/** Sortable column keys → backend `sort` fields (`PlatformHospitalListView.spec.sorts`). */
+const SORT_FIELD: Readonly<Record<string, string>> = {
+  name: 'name',
+  onboarded: 'created_at',
+  status: 'status',
+};
+
 /**
  * Hospital registry (design `Ops.jsx` `OpsHospitals`): KPI row, All / Pending
- * tabs, search + plan and status filters, sortable columns and pagination.
+ * tabs, search + plan and status filters, sortable columns and pagination —
+ * all served by `GET /platform/hospitals` (search, filters, sort and paging
+ * run on the server).
  *
- * Refresh now re-reads the registry and holds the table's loading rows while
- * it does (audit 3.1.1 — the button did nothing), the row action is named for
- * what it opens (3.3.2), the empty state is the shared one, and a suspended
- * instance says *why* it is suspended, so a suspension for non-payment is
- * visible from the list (SA-03).
+ * The registry rows carry no plan or booking volume, so those two columns
+ * show a dash; the plan *filter* still works (`plan_id`).
  */
 export function OpsHospitalsScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const hospitals = useHospitalsStore((s) => s.hospitals);
-  const syncedAt = useHospitalsStore((s) => s.syncedAt);
-  const resync = useHospitalsStore((s) => s.resync);
-  const plans = usePlansStore((s) => s.plans);
+  const plansQuery = usePlansQuery();
+  const plans = plansQuery.data ?? [];
 
   const [tab, setTab] = useState<'All' | 'Pending'>('All');
   const [q, setQ] = useState('');
@@ -69,44 +88,46 @@ export function OpsHospitalsScreen() {
   const [statusF, setStatusF] = useState('All');
   const [page, setPage] = useState(0);
   const [onboard, setOnboard] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { sort, onSort } = useSort();
 
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    try {
-      await resync();
-    } finally {
-      setLoading(false);
-    }
-  }, [resync]);
+  const debouncedQ = useHospitalsDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
+  const planId = planF === 'All' ? null : (plans.find((p) => p.name === planF)?.id ?? null);
+  /* A plan filter waits for the catalogue, so the list never shows unfiltered rows under it;
+   * a plan name the catalogue doesn't have (a stale `?plan=` link) matches nothing. */
+  const isPlanResolved = planF === 'All' || planId !== null;
+  const isUnknownPlan = !isPlanResolved && plansQuery.isSuccess;
+  const sortField = sort.key ? SORT_FIELD[sort.key] : undefined;
 
-  const pendingCt = hospitals.filter((h) => h.status === 'Pending verification').length;
-  const suspended = hospitals.filter((h) => h.status === 'Suspended');
-  const nonPayment = suspended.filter((h) => h.suspension?.reason === 'Non-payment').length;
-  const ql = q.trim().toLowerCase();
-  const filtered = hospitals.filter(
-    (h) =>
-      (tab !== 'Pending' || h.status === 'Pending verification') &&
-      (!ql || h.name.toLowerCase().includes(ql) || h.city.toLowerCase().includes(ql)) &&
-      (planF === 'All' || h.plan === planF) &&
-      (tab === 'Pending' || statusF === 'All' || h.status === statusF),
-  );
-  const pg = Math.min(page, Math.max(0, Math.ceil(filtered.length / OPS_HOSP_PAGE) - 1));
-  const { sort, onSort, sorted } = useSort<(typeof hospitals)[number]>();
-  const ordered = sorted([...filtered], {
-    name: (x) => x.name,
-    plan: (x) => x.plan,
-    bookings: (x) => x.bookings,
-    onboarded: (x) => Date.parse(x.onboarded) || 0,
-    status: (x) => x.status,
-  });
-  const rows = ordered.slice(pg * OPS_HOSP_PAGE, pg * OPS_HOSP_PAGE + OPS_HOSP_PAGE);
+  const listQuery: HospitalListQuery = {
+    page: page + 1,
+    pageSize: OPS_HOSP_PAGE,
+    q: debouncedQ,
+    statuses:
+      tab === 'Pending'
+        ? HOSPITAL_PENDING_STATUSES
+        : statusF === 'All'
+          ? []
+          : (HOSPITAL_STATUS_FILTER[statusF] ?? []),
+    planId,
+    sort: sortField ? `${sort.dir === 'desc' ? '-' : ''}${sortField}` : null,
+  };
+  const hospitals = useHospitalsQuery(listQuery, isPlanResolved);
+  const counts = useHospitalStatusCountsQuery();
+
+  const refresh = async (): Promise<void> => {
+    await Promise.all([hospitals.refetch(), counts.refetch()]);
+  };
+
+  const rows = isUnknownPlan ? [] : (hospitals.data?.items ?? []);
+  const total = hospitals.data?.total ?? 0;
+  const pendingCt = counts.data?.pending;
+  const kpi = (value: number | undefined) => (value === undefined ? NO_VALUE : value);
 
   const KPIS: readonly StatCardData[] = [
     {
       icon: 'building-2',
       label: 'Total Hospitals',
-      value: hospitals.length,
+      value: kpi(counts.data?.total),
       sub: 'All instances on the platform',
       iconClass: 'bg-blue-soft-bg text-text-navy',
       valueClass: 'text-text-navy',
@@ -114,7 +135,7 @@ export function OpsHospitalsScreen() {
     {
       icon: 'circle-check',
       label: 'Active Instances',
-      value: hospitals.filter((h) => h.status === 'Active').length,
+      value: kpi(counts.data?.active),
       sub: 'Live and serving bookings',
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
@@ -122,7 +143,7 @@ export function OpsHospitalsScreen() {
     {
       icon: 'clock',
       label: 'Pending Verification',
-      value: pendingCt,
+      value: kpi(pendingCt),
       sub: 'Awaiting document review',
       iconClass: 'bg-y-100 text-y-600',
       valueClass: 'text-y-600',
@@ -130,18 +151,15 @@ export function OpsHospitalsScreen() {
     {
       icon: 'ban',
       label: 'Suspended',
-      value: suspended.length,
-      sub:
-        nonPayment > 0
-          ? `${nonPayment} for non-payment · ${suspended.length - nonPayment} other`
-          : 'Access paused by platform',
+      value: kpi(counts.data?.suspended),
+      sub: 'Access paused by platform',
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
       subClass: 'text-text-muted',
     },
   ];
 
-  const hasFilters = Boolean(ql) || planF !== 'All' || statusF !== 'All';
+  const hasFilters = Boolean(q.trim()) || planF !== 'All' || statusF !== 'All';
   const reset =
     (fn: (v: string) => void) =>
     (v: string): void => {
@@ -154,35 +172,48 @@ export function OpsHospitalsScreen() {
     setStatusF('All');
     setPage(0);
   };
+  const pendingTabLabel = `Pending verification (${pendingCt ?? NO_VALUE})`;
 
-  const tableState: TableStateSpec | undefined = loading
-    ? { kind: 'loading', rows: OPS_HOSP_PAGE }
-    : rows.length > 0
-      ? undefined
-      : hasFilters
-        ? {
-            kind: 'empty',
-            icon: 'building-2',
-            title: 'No results match your filters.',
-            message: 'No hospital matches the current search, plan and status.',
-            actionLabel: 'Clear filters',
-            onAction: clearAll,
-          }
-        : {
-            kind: 'empty',
-            icon: 'building-2',
-            title:
-              tab === 'Pending'
-                ? 'No hospitals are awaiting verification.'
-                : 'No hospitals on the platform yet.',
-            message:
-              tab === 'Pending'
-                ? 'Every application has been reviewed. New ones arrive through the onboarding pipeline.'
-                : 'Onboard the first hospital to start the network.',
-            actionLabel: tab === 'Pending' ? 'Open onboarding pipeline' : 'Onboard a hospital',
-            onAction:
-              tab === 'Pending' ? () => navigate(opsOnboardingPath()) : () => setOnboard(true),
-          };
+  const listError = isPlanResolved ? hospitals.error : plansQuery.error;
+  const tableState: TableStateSpec | undefined =
+    (isPlanResolved && hospitals.isError) || (!isPlanResolved && plansQuery.isError)
+      ? {
+          kind: 'error',
+          title: "The hospital registry didn't load",
+          message: isFailure(listError) ? listError.message : undefined,
+          onRetry: () => void (isPlanResolved ? hospitals.refetch() : plansQuery.refetch()),
+        }
+      : !isUnknownPlan &&
+          (hospitals.isPending || (hospitals.isFetching && hospitals.isPlaceholderData))
+        ? { kind: 'loading', rows: OPS_HOSP_PAGE }
+        : !isUnknownPlan && rows.length > 0
+          ? undefined
+          : hasFilters
+            ? {
+                kind: 'empty',
+                icon: 'building-2',
+                title: 'No results match your filters.',
+                message: 'No hospital matches the current search, plan and status.',
+                actionLabel: 'Clear filters',
+                onAction: clearAll,
+              }
+            : {
+                kind: 'empty',
+                icon: 'building-2',
+                title:
+                  tab === 'Pending'
+                    ? 'No hospitals are awaiting verification.'
+                    : 'No hospitals on the platform yet.',
+                message:
+                  tab === 'Pending'
+                    ? 'Every application has been reviewed. New ones arrive through the onboarding pipeline.'
+                    : 'Onboard the first hospital to start the network.',
+                actionLabel: tab === 'Pending' ? 'Open onboarding pipeline' : 'Onboard a hospital',
+                onAction:
+                  tab === 'Pending' ? () => navigate(opsOnboardingPath()) : () => setOnboard(true),
+              };
+
+  const openHospital = (id: string) => navigate(hospitalDetailHref(opsPath('hospitals'), id));
 
   return (
     <div className="flex flex-col gap-5">
@@ -193,8 +224,8 @@ export function OpsHospitalsScreen() {
       </div>
       <Card pad={14} className="flex flex-wrap items-center justify-between gap-4">
         <Tabs
-          tabs={['All Hospitals', `Pending verification (${pendingCt})`]}
-          value={tab === 'All' ? 'All Hospitals' : `Pending verification (${pendingCt})`}
+          tabs={['All Hospitals', pendingTabLabel]}
+          value={tab === 'All' ? 'All Hospitals' : pendingTabLabel}
           onChange={(v) => {
             setTab(v.startsWith('All') ? 'All' : 'Pending');
             setPage(0);
@@ -211,7 +242,7 @@ export function OpsHospitalsScreen() {
       </Card>
       <Card>
         <div className="mb-4">
-          <SearchField value={q} onChange={reset(setQ)} placeholder="Search hospital or city" />
+          <SearchField value={q} onChange={reset(setQ)} placeholder="Search hospital name" />
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={refresh} title="Refresh the hospital registry" />
@@ -225,15 +256,19 @@ export function OpsHospitalsScreen() {
             <FilterSelect
               value={statusF}
               aria-label="Filter by instance status"
-              options={['All', 'Active', 'Pending verification', 'Suspended', 'Rejected'].map(
-                (s) => (s === 'All' ? 'Status: All' : s),
+              options={['All', ...Object.keys(HOSPITAL_STATUS_FILTER)].map((s) =>
+                s === 'All' ? 'Status: All' : s,
               )}
               onChange={(v) => reset(setStatusF)(v === 'Status: All' ? 'All' : v)}
             />
           )}
           {hasFilters && <ClearChip onClick={clearAll} />}
           <div className="flex-1"></div>
-          <span className="text-caption text-text-muted">Updated {syncedAt}</span>
+          {hospitals.dataUpdatedAt > 0 && (
+            <span className="text-caption text-text-muted">
+              Updated {opsStampFrom(hospitals.dataUpdatedAt)}
+            </span>
+          )}
         </div>
         <TableShell
           columns={COLUMNS}
@@ -241,63 +276,55 @@ export function OpsHospitalsScreen() {
           scrollLabel="Hospital registry"
           sortKeys={{
             Hospital: 'name',
-            Plan: 'plan',
-            'Bookings / Mo': 'bookings',
             Onboarded: 'onboarded',
             Status: 'status',
           }}
           sort={sort}
-          onSort={onSort}
+          onSort={(key) => {
+            onSort(key);
+            setPage(0);
+          }}
           state={tableState}
         >
-          {rows.map((h) => (
-            <tr
-              key={h.id}
-              onClick={() => navigate(opsHospitalDetailPath(h.id))}
-              className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
-            >
-              <td className={tdClass}>
-                <OpsEntity
-                  icon="building-2"
-                  tint={opsTintOf(h.id)}
-                  title={hospName(h.id)}
-                  sub={h.email}
-                />
-              </td>
-              <td className={tdClass}>{h.plan}</td>
-              <td className={tdClass}>
-                {h.city}
-                {h.st ? `, ${h.st}` : ''}
-              </td>
-              <td className={cn(tdClass, 'text-right tabular-nums')}>
-                {h.bookings.toLocaleString('en-IN')}
-              </td>
-              <td className={tdClass}>{h.onboarded}</td>
-              <td className={tdClass}>
-                <Badge status={h.status} />
-                {h.suspension && (
-                  <div className="text-caption text-text-muted mt-1">
-                    {h.suspension.reason} · since {longDateFromIso(h.suspension.since)}
-                  </div>
-                )}
-              </td>
-              <td className={tdClass} onClick={(e) => e.stopPropagation()}>
-                <IconBtn
-                  name="eye"
-                  label="View hospital"
-                  box={36}
-                  size={16}
-                  title={`Open ${h.name}`}
-                  onClick={() => navigate(opsHospitalDetailPath(h.id))}
-                />
-              </td>
-            </tr>
-          ))}
+          {rows.map((h, i) => {
+            const [badge, label] = HOSPITAL_STATUS_VIEW[h.status];
+            return (
+              <tr
+                key={h.id}
+                onClick={() => openHospital(h.id)}
+                className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+              >
+                <td className={tdClass}>
+                  <OpsEntity icon="building-2" tint={opsTintOf(i)} title={h.name} sub={h.email} />
+                </td>
+                <td className={tdClass}>{NO_VALUE}</td>
+                <td className={tdClass}>
+                  {h.city}
+                  {h.state ? `, ${h.state}` : ''}
+                </td>
+                <td className={cn(tdClass, 'text-right tabular-nums')}>{NO_VALUE}</td>
+                <td className={tdClass}>{longDateFromTimestamp(h.createdAt)}</td>
+                <td className={tdClass}>
+                  <Badge status={badge}>{label}</Badge>
+                </td>
+                <td className={tdClass} onClick={(e) => e.stopPropagation()}>
+                  <IconBtn
+                    name="eye"
+                    label="View hospital"
+                    box={36}
+                    size={16}
+                    title={`Open ${h.name}`}
+                    onClick={() => openHospital(h.id)}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </TableShell>
-        {rows.length > 0 && (
+        {rows.length > 0 && !tableState && (
           <Pager
-            total={filtered.length}
-            page={pg}
+            total={total}
+            page={page}
             pageSize={OPS_HOSP_PAGE}
             onPage={setPage}
             noun="hospitals"
