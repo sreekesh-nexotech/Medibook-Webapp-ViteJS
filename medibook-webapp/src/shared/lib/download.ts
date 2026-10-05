@@ -71,3 +71,20 @@ export function downloadTextFile(filename: string, text: string, mime = 'text/pl
 export function downloadCsv(filename: string, rows: readonly (readonly CsvCell[])[]): void {
   downloadTextFile(filename, UTF8_BOM + toCsv(rows), CSV_MIME);
 }
+
+/**
+ * Download from a URL the browser can fetch directly — e.g. a signed storage
+ * link from `GET /shared/files/{id}/url`, whose response already carries
+ * `Content-Disposition: attachment`. `filename` is a hint only: browsers
+ * ignore `download` on cross-origin links and use the server's name.
+ */
+export function downloadFromUrl(url: string, filename?: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  if (filename) a.download = filename;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
