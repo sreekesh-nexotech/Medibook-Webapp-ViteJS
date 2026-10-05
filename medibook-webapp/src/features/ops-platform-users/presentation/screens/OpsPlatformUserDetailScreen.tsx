@@ -1,77 +1,206 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import { usePlatformUsersStore } from '@/features/ops-platform-users/application/store/platformUsers.store';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
+import { opsPath } from '@/app/router/paths';
+import { isFailure } from '@/core/error/failure';
+import { useBlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useBlockPlatformUserMutation';
+import { usePlatformUserQuery } from '@/features/ops-platform-users/application/queries/usePlatformUserQuery';
+import { useUnblockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnblockPlatformUserMutation';
+import { useUnlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnlockPlatformUserMutation';
+import type { PlatformUserDetail } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
+import {
+  ACCOUNT_STATUS_PILLS,
+  NO_VALUE,
+  ageFrom,
+  bookingStatusPill,
+  formatDate,
+  formatDateTime,
+  fullName,
+  humanize,
+  isLockedAt,
+  userName,
+} from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
+import { useNow } from '@/shared/hooks/useNow';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { InfoGrid } from '@/shared/ui/InfoGrid';
+import type { InfoGridItem } from '@/shared/ui/InfoGrid';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
+import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { Spinner } from '@/shared/ui/Spinner';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import { toast } from '@/shared/ui/toast/toast.store';
 
-/** Read-only patient-account view — access is logged (design `OpsPlatformUserDetail`). */
+/** `UserBlockRequest.reason` max length (`schema.yml`). */
+const BLOCK_REASON_MAX = 500;
+
+/** Read-only patient-account view (design `OpsPlatformUserDetail`). */
 export function OpsPlatformUserDetailScreen() {
-  const { id } = useParams<{ id: string }>();
-  const users = usePlatformUsersStore((s) => s.users);
-  const toggleBlock = usePlatformUsersStore((s) => s.toggleBlock);
-  const [block, setBlock] = useState(false);
-  const [busy, run] = useOpsAct();
+  const { id = '' } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const user = usePlatformUserQuery(id);
 
-  const u = users.find((x) => x.id === Number(id)) ?? users[0];
-  const blocked = u.status === 'Blocked';
+  if (user.isPending) {
+    return (
+      <div className="text-text-muted flex justify-center py-16">
+        <Spinner size={28} label="Loading the account" />
+      </div>
+    );
+  }
+  if (user.isError) {
+    const notFound = isFailure(user.error) && user.error.kind === 'notFound';
+    return (
+      <ErrorState
+        title={notFound ? 'This account does not exist' : "This account didn't load"}
+        message={
+          notFound
+            ? 'It may have been removed, or the link is wrong.'
+            : isFailure(user.error)
+              ? user.error.message
+              : undefined
+        }
+        onRetry={notFound ? undefined : () => void user.refetch()}
+      >
+        <Button variant="secondary" onClick={() => navigate(opsPath('platform-users'))}>
+          Back to Platform Users
+        </Button>
+      </ErrorState>
+    );
+  }
+  return <PlatformUserDetailBody u={user.data} />;
+}
+
+interface PlatformUserDetailBodyProps {
+  u: PlatformUserDetail;
+}
+
+function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
+  const now = useNow();
+  const block = useBlockPlatformUserMutation();
+  const unblock = useUnblockPlatformUserMutation();
+  const unlock = useUnlockPlatformUserMutation();
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [reason, setReason] = useState('');
+
+  const name = userName(u);
+  const pill = ACCOUNT_STATUS_PILLS[u.status];
+  const blocked = u.status === 'blocked';
+  const canModerate = u.status !== 'deleted';
+  const locked = isLockedAt(u.lockedUntil, now);
+  const family = u.persons.filter((p) => !p.isSelf);
+  const busy = block.isPending || unblock.isPending;
+  const trimmedReason = reason.trim();
+
+  const closeConfirm = (): void => {
+    setIsConfirmOpen(false);
+    setReason('');
+  };
+  const onFailure =
+    (fallback: string) =>
+    (failure: unknown): void =>
+      toast(isFailure(failure) ? failure.message : fallback, 'error');
+
+  const handleConfirm = (): void => {
+    if (blocked) {
+      unblock.mutate(u.id, {
+        onSuccess: () => {
+          toast(`${name} unblocked.`);
+          closeConfirm();
+        },
+        onError: onFailure('Could not unblock this account.'),
+      });
+      return;
+    }
+    if (!trimmedReason) return;
+    block.mutate(
+      { id: u.id, reason: trimmedReason },
+      {
+        onSuccess: () => {
+          toast(`${name} blocked.`);
+          closeConfirm();
+        },
+        onError: onFailure('Could not block this account.'),
+      },
+    );
+  };
+
+  const handleUnlock = (): void => {
+    unlock.mutate(u.id, {
+      onSuccess: () => toast(`${name} can sign in again.`),
+      onError: onFailure('Could not unlock sign-in for this account.'),
+    });
+  };
+
+  const contact = [u.phone, u.email].filter(Boolean).join(' · ');
+  const info: InfoGridItem[] = [
+    { k: 'Name', v: name },
+    { k: 'Mobile', v: u.phone ?? NO_VALUE, num: true },
+    { k: 'Email', v: u.email ?? NO_VALUE },
+    { k: 'Registered', v: formatDate(u.createdAt) },
+    { k: 'Status', v: pill.label },
+    { k: 'City', v: NO_VALUE },
+  ];
+  if (blocked) info.push({ k: 'Blocked reason', v: u.blockedReason ?? NO_VALUE });
+  if (locked) info.push({ k: 'Sign-in locked until', v: formatDateTime(u.lockedUntil) });
 
   return (
     <div className="flex flex-col gap-5">
       <Card>
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar src={u.av || undefined} name={u.name} size={56} />
+          <Avatar name={name} size={56} />
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-3">
-              <SectionTitle size={20}>{u.name}</SectionTitle>
-              <Badge status={u.status} />
+              <SectionTitle size={20}>{name}</SectionTitle>
+              <Badge status={pill.badge}>{pill.label}</Badge>
             </div>
-            <span className="text-caption text-text-muted">
-              {u.phone} · {u.email} · {u.city}
-            </span>
+            <span className="text-caption text-text-muted">{contact || NO_VALUE}</span>
           </div>
           <div className="flex-1"></div>
-          <Button
-            variant={blocked ? 'secondary' : 'danger'}
-            icon={blocked ? 'user-check' : 'ban'}
-            onClick={() => setBlock(true)}
-          >
-            {blocked ? 'Unblock Account' : 'Block Account'}
-          </Button>
+          {locked && (
+            <Button
+              variant="secondary"
+              icon="key-round"
+              busy={unlock.isPending}
+              onClick={handleUnlock}
+            >
+              Unlock sign-in
+            </Button>
+          )}
+          {canModerate && (
+            <Button
+              variant={blocked ? 'secondary' : 'danger'}
+              icon={blocked ? 'user-check' : 'ban'}
+              onClick={() => setIsConfirmOpen(true)}
+            >
+              {blocked ? 'Unblock Account' : 'Block Account'}
+            </Button>
+          )}
         </div>
       </Card>
-      <InfoGrid
-        items={[
-          { k: 'Name', v: u.name },
-          { k: 'Mobile', v: u.phone, num: true },
-          { k: 'Email', v: u.email },
-          { k: 'Registered', v: u.joined },
-          { k: 'Status', v: u.status },
-          { k: 'City', v: u.city },
-        ]}
-      />
+      <InfoGrid items={info} />
       <Card>
         <SectionTitle className="mb-4">Family Members</SectionTitle>
-        {u.family.length > 0 ? (
+        {family.length > 0 ? (
           <TableShell
             columns={['Name', 'Relationship', 'Age', 'Gender']}
             scrollLabel="Family members on this account"
             rightCols={['Age']}
           >
-            {u.family.map((f) => (
-              <tr key={f.name}>
-                <td className={`${tdClass} text-text-strong w-[34%] font-medium`}>{f.name}</td>
-                <td className={tdClass}>{f.rel}</td>
-                <td className={`${tdClass} text-right tabular-nums`}>{f.age}</td>
-                <td className={tdClass}>{f.gender}</td>
+            {family.map((f) => (
+              <tr key={f.id}>
+                <td className={`${tdClass} text-text-strong w-[34%] font-medium`}>
+                  {fullName(f.firstName, f.lastName)}
+                </td>
+                <td className={tdClass}>{humanize(f.relation)}</td>
+                <td className={`${tdClass} text-right tabular-nums`}>
+                  {ageFrom(f.dateOfBirth, now)}
+                </td>
+                <td className={tdClass}>{f.gender ? humanize(f.gender) : NO_VALUE}</td>
               </tr>
             ))}
           </TableShell>
@@ -87,23 +216,30 @@ export function OpsPlatformUserDetailScreen() {
       <Card>
         <div className="mb-4 flex items-center gap-2.5">
           <SectionTitle>Booking History</SectionTitle>
-          <span className="text-caption text-text-muted">Read-only · no clinical data</span>
+          <span className="text-caption text-text-muted">
+            Latest bookings · read-only · no clinical data
+          </span>
         </div>
-        {u.history.length > 0 ? (
+        {u.bookings.length > 0 ? (
           <TableShell
-            columns={['Hospital', 'Department', 'Date', 'Status']}
+            columns={['Hospital', 'Doctor', 'Date', 'Status']}
             scrollLabel="Booking history for this account"
           >
-            {u.history.map((b, i) => (
-              <tr key={i}>
-                <td className={`${tdClass} text-text-strong w-[30%] font-medium`}>{b.hospital}</td>
-                <td className={tdClass}>{b.department}</td>
-                <td className={tdClass}>{b.date}</td>
-                <td className={tdClass}>
-                  <Badge status={b.status} />
-                </td>
-              </tr>
-            ))}
+            {u.bookings.map((b) => {
+              const bp = bookingStatusPill(b.status);
+              return (
+                <tr key={b.id}>
+                  <td className={`${tdClass} text-text-strong w-[30%] font-medium`}>
+                    {b.hospitalName}
+                  </td>
+                  <td className={tdClass}>{b.doctorName}</td>
+                  <td className={tdClass}>{formatDate(b.scheduledStartAt)}</td>
+                  <td className={tdClass}>
+                    <Badge status={bp.badge}>{bp.label}</Badge>
+                  </td>
+                </tr>
+              );
+            })}
           </TableShell>
         ) : (
           <EmptyState
@@ -115,28 +251,42 @@ export function OpsPlatformUserDetailScreen() {
         )}
       </Card>
       <OpsConfirm
-        open={block}
-        onClose={() => setBlock(false)}
+        open={isConfirmOpen}
+        onClose={closeConfirm}
         icon="ban"
         tone={blocked ? 'success' : 'neutral'}
         title={blocked ? 'Unblock this account?' : 'Block this account?'}
         body={
           blocked
-            ? `${u.name} can make new bookings again immediately.`
-            : `Existing upcoming bookings are unaffected. ${u.name} cannot make new bookings until unblocked.`
+            ? `${name} can make new bookings again immediately.`
+            : `Existing upcoming bookings are unaffected. ${name} is signed out everywhere and cannot make new bookings until unblocked.`
         }
         confirmLabel={
-          busy.block ? (blocked ? 'Unblocking…' : 'Blocking…') : blocked ? 'Unblock' : 'Block'
+          busy ? (blocked ? 'Unblocking…' : 'Blocking…') : blocked ? 'Unblock' : 'Block'
         }
         confirmVariant={blocked ? 'primary' : 'danger'}
-        busy={busy.block}
-        onConfirm={() =>
-          run('block', blocked ? `${u.name} unblocked.` : `${u.name} blocked.`, () => {
-            toggleBlock(u.id);
-            setBlock(false);
-          })
-        }
-      />
+        busy={busy}
+        disabled={!blocked && !trimmedReason}
+        onConfirm={handleConfirm}
+      >
+        {!blocked && (
+          <div className="w-full text-left">
+            <OpsField label="Reason" required hint="Recorded in the audit log.">
+              {(field) => (
+                <textarea
+                  id={field.id}
+                  aria-describedby={field.describedById}
+                  value={reason}
+                  maxLength={BLOCK_REASON_MAX}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. Repeated no-shows reported by three hospitals"
+                  className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
+                ></textarea>
+              )}
+            </OpsField>
+          </div>
+        )}
+      </OpsConfirm>
     </div>
   );
 }
