@@ -1,76 +1,59 @@
-import { DEMO_TODAY_ISO } from '@/core/config/demo';
-import {
-  OPS_REPORT_DEFS,
-  type OpsReportDef,
-} from '@/features/ops-reports/application/store/opsReports.fixtures';
-import { useOpsReportsStore } from '@/features/ops-reports/application/store/opsReports.store';
-import { useOpsAct } from '@/shared/hooks/useOpsAct';
-import { cn } from '@/shared/lib/cn';
-import { downloadCsv } from '@/shared/lib/download';
-import { Button } from '@/shared/ui/Button';
-import { Card } from '@/shared/ui/Card';
-import { Icon } from '@/shared/ui/Icon';
-import { OPS_TINTS } from '@/shared/ui/OpsConfirm';
-import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { isFailure } from '@/core/error/failure';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
+
+import { useOpsReportsQuery } from '@/features/ops-reports/application/queries/useOpsReportsQuery';
+import { OpsReportCard } from '@/features/ops-reports/presentation/components/OpsReportCard';
+
+/** Placeholder cards while the catalogue loads — two rows of the 3-up grid. */
+const SKELETON_CARD_COUNT = 6;
+const SKELETON_CARD_LINES = 4;
 
 /**
- * Ops platform reports — a 3×2 grid of exportable-report cards (design
- * `OpsReports`).
- *
- * Audit 3.1.4: every card used to fire a "<name> ready." toast and write
- * nothing. Each one now emits a genuine CSV of that report's rows through
- * `downloadCsv` — header row first, rupee columns intact — and only then
- * reports success, with the row count in the message so the claim is
- * checkable. The `useOpsAct` busy/latency feel is unchanged.
+ * Ops platform reports — a 3-column grid of exportable-report cards (design
+ * `OpsReports`), one per report the backend registers
+ * (`GET /platform/reports`). Each card downloads the real CSV from
+ * `GET /platform/reports/{code}/export.csv`.
  */
 export function OpsReportsScreen() {
-  const [busy, run] = useOpsAct();
-  const reportsGen = useOpsReportsStore((s) => s.reportsGen);
-  const markExported = useOpsReportsStore((s) => s.markExported);
+  const reports = useOpsReportsQuery();
 
-  const exportReport = (r: OpsReportDef, i: number): void => {
-    const key = `r${i}`;
-    if (busy[key]) return;
-    // The file is written inside the click itself — a download started from a
-    // timer can be refused by the browser as not user-initiated, and this
-    // control may only claim success for a file that really arrived. The
-    // `useOpsAct` run then carries the busy state, the "last generated" stamp
-    // and the toast.
-    downloadCsv(`${r.file}-${DEMO_TODAY_ISO}.csv`, [r.columns, ...r.rows]);
-    run(key, `Exported ${r.name} — ${r.rows.length} rows.`, () =>
-      markExported(i, r.name, r.rows.length),
+  if (reports.isPending) {
+    return (
+      <SkeletonCards
+        count={SKELETON_CARD_COUNT}
+        lines={SKELETON_CARD_LINES}
+        className="grid grid-cols-3"
+      />
     );
-  };
+  }
+
+  if (reports.isError) {
+    return (
+      <ErrorState
+        title="Reports didn't load"
+        message={isFailure(reports.error) ? reports.error.message : undefined}
+        onRetry={() => void reports.refetch()}
+      />
+    );
+  }
+
+  if (reports.data.length === 0) {
+    return (
+      <EmptyState
+        icon="file-text"
+        title="No reports available."
+        message="No platform reports are registered yet."
+      />
+    );
+  }
 
   return (
     <div className="grid grid-cols-3 gap-4">
-      {OPS_REPORT_DEFS.map((r, i) => {
-        const t = OPS_TINTS[r.tint];
-        const isBusy = Boolean(busy[`r${i}`]);
-        return (
-          <Card key={r.name} className="flex flex-col gap-2.5">
-            <div className={cn('flex size-10 items-center justify-center rounded-md', t[0], t[1])}>
-              <Icon name={r.icon} size={20} />
-            </div>
-            <SectionTitle size={16}>{r.name}</SectionTitle>
-            <span className="text-body text-text-muted">{r.desc}</span>
-            <span className="text-caption text-text-muted">
-              {r.rows.length} rows · {r.columns.length} columns · last generated {reportsGen[i]}
-            </span>
-            <div className="mt-1.5">
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="download"
-                busy={isBusy}
-                onClick={() => exportReport(r, i)}
-              >
-                {isBusy ? 'Exporting…' : 'Download CSV'}
-              </Button>
-            </div>
-          </Card>
-        );
-      })}
+      {reports.data.map((r) => (
+        <OpsReportCard key={r.code} report={r} />
+      ))}
     </div>
   );
 }
