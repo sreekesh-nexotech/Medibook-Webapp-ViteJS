@@ -1,9 +1,10 @@
-import { TIME_OPTS } from '@/features/doctors/application/store/catalog.fixtures';
 import type { ShiftPattern, WeekDay } from '@/features/doctors/application/store/catalog.types';
 import { cn } from '@/shared/lib/cn';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { Select } from '@/shared/ui/Select';
 import { Toggle } from '@/shared/ui/Toggle';
+
+import { timeOptionsWith } from './doctors.view';
 
 interface WeeklyHoursProps {
   /** The grid being edited. This component is **controlled** — it holds no copy. */
@@ -80,7 +81,7 @@ export function WeeklyHours({
                     <div className="w-27.5">
                       <Select
                         value={d.from}
-                        options={TIME_OPTS}
+                        options={timeOptionsWith(d.from)}
                         onChange={(v) => patch(i, { from: v })}
                         height={40}
                         disabled={disabled}
@@ -91,7 +92,7 @@ export function WeeklyHours({
                     <div className="w-27.5">
                       <Select
                         value={d.to}
-                        options={TIME_OPTS}
+                        options={timeOptionsWith(d.to)}
                         onChange={(v) => patch(i, { to: v })}
                         height={40}
                         disabled={disabled}
