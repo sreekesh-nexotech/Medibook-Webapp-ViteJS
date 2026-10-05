@@ -2,21 +2,30 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole, type HospitalRole } from '@/app/router/paths';
-import {
-  HOSPITAL_IDS,
-  HOSPITAL_NAMES,
-  mkWeek,
-} from '@/features/doctors/application/store/catalog.fixtures';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import type {
-  CatalogDoctorStatus,
-  Doctor,
-  WeekDay,
-} from '@/features/doctors/application/store/catalog.types';
+import { isFailure } from '@/core/error/failure';
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import type { ShiftPattern, WeekDay } from '@/features/doctors/application/store/catalog.types';
 import { summariseWeekHours } from '@/features/doctors/domain/schedule';
+import type {
+  Department,
+  DoctorInput,
+  DoctorProfile,
+  DoctorScheduleData,
+} from '@/features/doctors/domain/entities/doctors.types';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import {
+  useCreateDoctorMutation,
+  useDeleteDoctorMutation,
+  useUpdateDoctorMutation,
+} from '@/features/doctors/application/queries/useDoctorMutations';
+import { useDoctorPhotoQuery } from '@/features/doctors/application/queries/useDoctorPhotoQuery';
+import { useDoctorQuery } from '@/features/doctors/application/queries/useDoctorQuery';
+import { useDoctorScheduleQuery } from '@/features/doctors/application/queries/useDoctorScheduleQuery';
+import { useReplaceWeeklySessionsMutation } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useSettingsStore } from '@/features/settings/application/store/settings.store';
+import { useFileUploadMutation } from '@/shared/hooks/useFileUploadMutation';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { email as validateEmail, phoneIN, positiveAmount, required } from '@/shared/lib/validate';
+import { positiveAmount, required } from '@/shared/lib/validate';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -31,52 +40,72 @@ import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { SegTabs } from '@/shared/ui/SegTabs';
 import { Select } from '@/shared/ui/Select';
+import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { Tabs } from '@/shared/ui/Tabs';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { DateExceptionsPanel } from '../components/DateExceptionsPanel';
+import {
+  DOCTOR_STATUS_LABEL,
+  DOCTOR_STATUS_OPTIONS,
+  doctorStatusFromLabel,
+  gridToSessions,
+  sameSessions,
+  sessionsToGrid,
+  type DoctorStatusLabel,
+  type WeekGrid,
+} from '../components/doctors.view';
 import { LeavePanel } from '../components/LeavePanel';
 import { PhotoButton } from '../components/PhotoButton';
+import { ScheduleChangeModal } from '../components/ScheduleChangeModal';
 import { ShiftPatternsPanel } from '../components/ShiftPatternsPanel';
 import { Stars } from '../components/Stars';
+import { useScheduleConfirm } from '../components/useScheduleConfirm';
 import { WeeklyHours } from '../components/WeeklyHours';
 
-/** Doctor statuses offered in the profile controls (design order). */
-const STATUS_OPTIONS = ['Active', 'On Leave', 'Inactive'] as const;
+/** Backend bound on `experience_years`. */
+const MAX_EXPERIENCE_YEARS = 80;
 
-/** Editable draft — `fee` is digits-only text until parsed on save. */
+/** The backend's answer for an unknown doctor id. */
+const NOT_FOUND_KIND = 'notFound';
+
+/** A new doctor starts consulting Mon–Fri 9–5 (design default). */
+const NEW_DOCTOR_WEEK: WeekGrid = sessionsToGrid(
+  [0, 1, 2, 3, 4].map((weekday) => ({
+    weekday,
+    sessionCode: 'morning',
+    label: 'Morning',
+    startsAt: '09:00',
+    endsAt: '17:00',
+  })),
+);
+
+/** Editable draft — `fee` and `exp` are digits-only text until parsed on save. */
 interface DoctorForm {
   name: string;
-  depts: readonly string[];
+  departmentId: string;
   spec: string;
   room: string;
-  phone: string;
-  email: string;
   qual: string;
   exp: string;
   reg: string;
   fee: string;
-  status: CatalogDoctorStatus;
-  hospital: string;
-  photo: string | null;
+  status: DoctorStatusLabel;
+  photoFileId: string | null;
   about: string;
-  week: readonly WeekDay[];
 }
 
-/**
- * Declared at module level so `useForm`'s error memo stays stable.
- *
- * Phone and email are optional on a doctor profile (the seeded roster has
- * neither), so they are only checked once something has been typed — an empty
- * optional field is not an error, a malformed one is.
- */
+/** Declared at module level so `useForm`'s error memo stays stable. */
 const DOCTOR_VALIDATORS: FormValidators<DoctorForm> = {
   name: (v) => required(v, 'Doctor name'),
+  spec: (v) => required(v, 'Specialization'),
   fee: (v) => positiveAmount(v, 'Consultation fee'),
-  phone: (v) => (v.trim() === '' ? undefined : phoneIN(v)),
-  email: (v) => (v.trim() === '' ? undefined : validateEmail(v)),
-  depts: (v) => (v.length > 0 ? undefined : 'Assign at least one department.'),
+  departmentId: (v) => (v ? undefined : 'Assign a department.'),
+  exp: (v) =>
+    v === '' || Number(v) <= MAX_EXPERIENCE_YEARS
+      ? undefined
+      : `Experience can be at most ${MAX_EXPERIENCE_YEARS} years.`,
 };
 
 /** Keep only digits, so the ₹ prefix the input shows never reaches the value. */
@@ -84,147 +113,199 @@ function digits(value: string): string {
   return value.replace(/[^0-9]/g, '');
 }
 
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
 function blankDoctorForm(): DoctorForm {
   return {
     name: '',
-    depts: [],
+    departmentId: '',
     spec: '',
     room: '',
-    phone: '',
-    email: '',
     qual: '',
     exp: '',
     reg: '',
     fee: '',
     status: 'Active',
-    hospital: HOSPITAL_IDS[0],
-    photo: null,
+    photoFileId: null,
     about: '',
-    week: mkWeek([0, 1, 2, 3, 4], '9:00 am', '5:00 pm'),
   };
 }
 
-function toForm(d: Doctor): DoctorForm {
+function toForm(d: DoctorProfile): DoctorForm {
   return {
     name: d.name,
-    depts: d.depts,
-    spec: d.spec,
+    departmentId: d.departmentId,
+    spec: d.specialisation,
     room: d.room,
-    phone: d.phone ?? '',
-    email: d.email ?? '',
-    qual: d.qual ?? '',
-    exp: d.exp ?? '',
-    reg: d.reg ?? '',
-    fee: String(d.fee || ''),
-    status: d.status,
-    hospital: d.hospital,
-    photo: d.photo ?? null,
-    about: d.about ?? '',
-    week: d.week,
+    qual: d.qualification,
+    exp: d.experienceYears === null ? '' : String(d.experienceYears),
+    reg: d.registrationNo,
+    fee: d.feeRupees ? String(d.feeRupees) : '',
+    status: DOCTOR_STATUS_LABEL[d.status],
+    photoFileId: d.photoFileId,
+    about: d.bio,
+  };
+}
+
+function toInput(values: DoctorForm): DoctorInput {
+  return {
+    name: values.name.trim(),
+    departmentId: values.departmentId,
+    specialisation: values.spec.trim(),
+    qualification: values.qual.trim(),
+    registrationNo: values.reg.trim(),
+    experienceYears: values.exp === '' ? null : Number(values.exp),
+    bio: values.about.trim(),
+    room: values.room.trim(),
+    feeRupees: Number(digits(values.fee)) || 0,
+    status: doctorStatusFromLabel(values.status),
+    photoFileId: values.photoFileId,
   };
 }
 
 interface DoctorEditorProps {
   role: HospitalRole;
   /** The stored record, or `null` for `/doctors/new`. */
-  doctor: Doctor | null;
+  doctor: DoctorProfile | null;
+  /** The doctor's schedule (`null` for a new doctor). */
+  schedule: DoctorScheduleData | null;
+  departments: readonly Department[];
 }
 
 /**
- * The doctor profile editor. Mounted with a `key` per doctor id, so the draft
- * is initialised **once** per doctor instead of being re-seeded from the store
- * by an effect — which is what used to throw away weekly-hours edits the
- * moment anything else in the catalog changed (audit 3.1.6).
+ * The doctor profile editor, saving to the hospital API. Mounted with a `key`
+ * per doctor id, so the draft is initialised once per doctor.
+ *
+ * Save Changes writes the profile (`PATCH`, or `POST` for a new doctor) and,
+ * when the working hours changed, replaces the weekly sessions. Both are dry
+ * runs first: if the change would cancel bookings, the user is shown them and
+ * asked before anything is applied. Leave and date exceptions are saved by
+ * their own panels the moment they are edited.
  */
-function DoctorEditor({ role, doctor }: DoctorEditorProps) {
+function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps) {
   const navigate = useNavigate();
   const isNew = doctor === null;
-  const depts = useCatalogStore((s) => s.depts);
-  const patterns = useCatalogStore((s) => s.patterns);
-  const catSaveDoctor = useCatalogStore((s) => s.catSaveDoctor);
-  const catPatchDoctor = useCatalogStore((s) => s.catPatchDoctor);
-  const catDeleteDoctor = useCatalogStore((s) => s.catDeleteDoctor);
+  const createDoctor = useCreateDoctorMutation();
+  const updateDoctor = useUpdateDoctorMutation();
+  const deleteDoctor = useDeleteDoctorMutation();
+  const replaceSessions = useReplaceWeeklySessionsMutation();
+  const upload = useFileUploadMutation();
+  const scheduleConfirm = useScheduleConfirm();
+  const { data: session } = useSessionQuery('hospital');
   const rules = useSettingsStore((s) => s.settings.rules);
   const [tab, setTab] = useState('Profile');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  /**
-   * Leave and date exceptions are committed by their own panels the moment
-   * they are edited, so they are read **live** from the store rather than
-   * copied into the draft — the two can never disagree.
-   */
-  const liveLeave = useCatalogStore((s) => s.docs.find((d) => d.id === doctor?.id)?.leave);
-  const liveExceptions = useCatalogStore(
-    (s) => s.docs.find((d) => d.id === doctor?.id)?.exceptions,
-  );
+  /** The weekly grid + this doctor's named sessions — the Availability draft. */
+  const initialGrid = schedule ? sessionsToGrid(schedule.weeklySessions) : NEW_DOCTOR_WEEK;
+  const [grid, setGrid] = useState<WeekGrid>(initialGrid);
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null);
 
   const back = (): void => {
     void navigate(hospitalPath(role, 'doctors'));
   };
 
+  const finish = (): void => {
+    toast(isNew ? 'Doctor added' : 'Doctor profile saved', 'success');
+    back();
+  };
+
+  const onError = (error: unknown): void => {
+    toast(failureText(error, 'Could not save the doctor.'), 'error');
+  };
+
+  /** Replace the weekly sessions when they changed, then finish. */
+  const saveWeek = async (doctorId: string, version: number): Promise<void> => {
+    const sessions = gridToSessions(grid);
+    if (schedule && sameSessions(sessions, schedule.weeklySessions)) {
+      finish();
+      return;
+    }
+    await scheduleConfirm.run({
+      attempt: (confirm) => replaceSessions.mutateAsync({ doctorId, sessions, version, confirm }),
+      onApplied: finish,
+      onError,
+    });
+  };
+
   const form = useForm<DoctorForm>({
     initial: doctor ? toForm(doctor) : blankDoctorForm(),
     validate: DOCTOR_VALIDATORS,
-    onSubmit: (values) => {
-      const patch = {
-        name: values.name.trim(),
-        depts: values.depts,
-        spec: values.spec.trim(),
-        room: values.room.trim(),
-        phone: values.phone.trim(),
-        email: values.email.trim(),
-        qual: values.qual.trim(),
-        exp: values.exp.trim(),
-        reg: values.reg.trim(),
-        fee: Number(digits(values.fee)) || 0,
-        status: values.status,
-        hospital: values.hospital,
-        photo: values.photo,
-        about: values.about.trim(),
-        week: values.week,
-      };
-      if (doctor) {
-        // Patch, never replace: leave and exceptions already live in the
-        // store and must survive a profile save.
-        catPatchDoctor(doctor.id, patch);
-      } else {
-        catSaveDoctor({ ...patch, rating: 0, reviews: 0, leave: [], exceptions: [], list: [] });
+    onSubmit: async (values) => {
+      const input = toInput(values);
+      if (!doctor) {
+        try {
+          const created = await createDoctor.mutateAsync(input);
+          await saveWeek(created.id, created.version);
+        } catch (error) {
+          onError(error);
+        }
+        return;
       }
-      toast(isNew ? 'Doctor added' : 'Doctor profile saved', 'success');
-      back();
+      await scheduleConfirm.run({
+        attempt: (confirm) =>
+          updateDoctor.mutateAsync({ id: doctor.id, input, version: doctor.version, confirm }),
+        onApplied: (change) => {
+          void saveWeek(doctor.id, change.result?.version ?? doctor.version);
+        },
+        onError,
+      });
     },
   });
 
   const values = form.values;
-  const toggleDept = (name: string): void =>
-    form.setField(
-      'depts',
-      values.depts.includes(name)
-        ? values.depts.filter((n) => n !== name)
-        : [...values.depts, name],
-    );
+  const photo = useDoctorPhotoQuery(localPhoto ? null : values.photoFileId);
+  const photoSrc = localPhoto ?? photo.data ?? undefined;
 
-  const del = (): void => {
-    if (doctor) catDeleteDoctor(doctor.id);
-    toast('Doctor profile deleted', 'info');
-    setConfirmDelete(false);
-    back();
+  const pickPhoto = (file: File): void => {
+    upload.mutate(
+      { file, purpose: 'doctor_photo' },
+      {
+        onSuccess: (stored) => {
+          form.setField('photoFileId', stored.id);
+          if (localPhoto) URL.revokeObjectURL(localPhoto);
+          setLocalPhoto(URL.createObjectURL(file));
+        },
+        onError: (error) => toast(failureText(error, 'Could not upload the photo.'), 'error'),
+      },
+    );
   };
 
-  const deptNames = depts.map((x) => x.name);
+  const del = (): void => {
+    setConfirmDelete(false);
+    if (!doctor) return;
+    void scheduleConfirm.run({
+      attempt: (confirm) => deleteDoctor.mutateAsync({ id: doctor.id, confirm }),
+      onApplied: () => {
+        toast('Doctor profile deleted', 'info');
+        back();
+      },
+      onError: (error) => toast(failureText(error, 'Could not delete the doctor.'), 'error'),
+    });
+  };
+
+  const setWeek = (week: readonly WeekDay[]): void => setGrid((g) => ({ ...g, week }));
+  const setPatterns = (patterns: readonly ShiftPattern[], week: readonly WeekDay[]): void =>
+    setGrid({ patterns, week });
+
+  const deptName = departments.find((d) => d.id === values.departmentId)?.name ?? '';
   const statusCaption =
     values.status === 'Inactive'
       ? 'Disabled — hidden from the patient app'
       : values.status === 'On Leave'
         ? 'Visible, booking paused'
         : 'Live & bookable in the app';
-  const deptError = form.errorFor('depts');
-  const weekSummary = summariseWeekHours(values.week);
+  const deptError = form.errorFor('departmentId');
+  const weekSummary = summariseWeekHours(grid.week);
+  const hospitalName = session?.surface === 'hospital' ? session.hospital.name : '';
+  const isSaving = form.submitting || scheduleConfirm.modal.isApplying;
 
   return (
     <div className="flex max-w-260 flex-col gap-5">
       <Card pad={22} className="flex flex-wrap items-center gap-4.5">
-        <Avatar name={values.name || '?'} src={values.photo ?? undefined} size={64} />
+        <Avatar name={values.name || '?'} src={photoSrc} size={64} />
         <div className="min-w-55 flex-1">
           <div className="flex items-center gap-2.5">
             <span className="text-h1 text-text-strong">
@@ -234,10 +315,10 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
           </div>
           <div className="text-body text-text-muted mt-1.25 flex flex-wrap items-center gap-3">
             {values.spec && <span>{values.spec}</span>}
-            {values.depts.length > 0 && (
+            {deptName && (
               <span>
                 {values.spec ? '· ' : ''}
-                {values.depts.join(', ')}
+                {deptName}
               </span>
             )}
             {!isNew && doctor && (
@@ -250,19 +331,20 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                     className="text-y-500"
                     style={{ fill: 'var(--color-y-500)' }}
                   />{' '}
-                  {doctor.rating} ({doctor.reviews})
+                  {doctor.ratingAvg === null ? '—' : doctor.ratingAvg.toFixed(1)} (
+                  {doctor.ratingCount})
                 </span>
               </span>
             )}
-            <span>· {HOSPITAL_NAMES[values.hospital] ?? values.hospital}</span>
+            {hospitalName && <span>· {hospitalName}</span>}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <span className="text-caption text-text-muted">Profile status</span>
           <SegTabs
-            tabs={STATUS_OPTIONS}
+            tabs={DOCTOR_STATUS_OPTIONS}
             value={values.status}
-            onChange={(v) => form.setField('status', v as CatalogDoctorStatus)}
+            onChange={(v) => form.setField('status', DOCTOR_STATUS_LABEL[doctorStatusFromLabel(v)])}
           />
           <span className="text-caption text-text-muted">{statusCaption}</span>
         </div>
@@ -280,10 +362,17 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
           {tab === 'Profile' && (
             <Form onSubmit={form.handleSubmit} className="flex flex-col gap-4">
               <div className="flex items-center gap-3.5">
-                <Avatar name={values.name || '?'} src={values.photo ?? undefined} size={56} />
+                <Avatar name={values.name || '?'} src={photoSrc} size={56} />
                 <PhotoButton
-                  onPick={(url) => form.setField('photo', url)}
-                  label={values.photo ? 'Change Photo' : 'Upload Photo'}
+                  onPick={pickPhoto}
+                  disabled={upload.isPending}
+                  label={
+                    upload.isPending
+                      ? 'Uploading…'
+                      : values.photoFileId
+                        ? 'Change Photo'
+                        : 'Upload Photo'
+                  }
                 />
               </div>
               <div className="grid grid-cols-2 gap-x-4.5 gap-y-4">
@@ -296,11 +385,12 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                     onBlur={() => form.blurField('name')}
                   />
                 </Field>
-                <Field label="Specialization">
+                <Field label="Specialization" required error={form.errorFor('spec')}>
                   <TextInput
                     value={values.spec}
                     placeholder="e.g. Cardiologist"
                     onChange={(v) => form.setField('spec', v)}
+                    onBlur={() => form.blurField('spec')}
                   />
                 </Field>
                 <Field label="Room Number">
@@ -310,26 +400,6 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                     onChange={(v) => form.setField('room', v)}
                   />
                 </Field>
-                <Field label="Phone Number" error={form.errorFor('phone')}>
-                  <TextInput
-                    value={values.phone}
-                    placeholder="Mobile"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    onChange={(v) => form.setField('phone', v)}
-                    onBlur={() => form.blurField('phone')}
-                  />
-                </Field>
-                <Field label="Email" error={form.errorFor('email')}>
-                  <TextInput
-                    value={values.email}
-                    placeholder="name@hospital.med"
-                    type="email"
-                    autoComplete="email"
-                    onChange={(v) => form.setField('email', v)}
-                    onBlur={() => form.blurField('email')}
-                  />
-                </Field>
                 <Field label="Qualification">
                   <TextInput
                     value={values.qual}
@@ -337,12 +407,13 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                     onChange={(v) => form.setField('qual', v)}
                   />
                 </Field>
-                <Field label="Experience (years)">
+                <Field label="Experience (years)" error={form.errorFor('exp')}>
                   <TextInput
                     value={values.exp}
                     placeholder="e.g. 12"
                     inputMode="numeric"
-                    onChange={(v) => form.setField('exp', v)}
+                    onChange={(v) => form.setField('exp', digits(v))}
+                    onBlur={() => form.blurField('exp')}
                   />
                 </Field>
                 <Field label="Registration No.">
@@ -355,21 +426,14 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                 <Field label="Status">
                   <Select
                     value={values.status}
-                    options={STATUS_OPTIONS}
-                    onChange={(v) => form.setField('status', v as CatalogDoctorStatus)}
+                    options={DOCTOR_STATUS_OPTIONS}
+                    onChange={(v) =>
+                      form.setField('status', DOCTOR_STATUS_LABEL[doctorStatusFromLabel(v)])
+                    }
                   />
                 </Field>
                 <Field label="Hospital">
-                  <Select
-                    value={HOSPITAL_NAMES[values.hospital] ?? ''}
-                    options={HOSPITAL_IDS.map((id) => HOSPITAL_NAMES[id])}
-                    onChange={(name) =>
-                      form.setField(
-                        'hospital',
-                        HOSPITAL_IDS.find((id) => HOSPITAL_NAMES[id] === name) ?? values.hospital,
-                      )
-                    }
-                  />
+                  <TextInput value={hospitalName} readOnly />
                 </Field>
                 <Field
                   label="Consultation Fee"
@@ -387,25 +451,31 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                         onBlur={() => form.blurField('fee')}
                       />
                     </div>
-                    <InfoDot text="Overrides the department's base fee. This is what patients pay & see in the app." />
+                    <InfoDot text="What patients pay & see in the app for a consultation with this doctor." />
                   </div>
                 </Field>
               </div>
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="text-label font-ui text-text-strong">Departments</span>
+                  <span className="text-label font-ui text-text-strong">Department</span>
                   <span className="text-d-500">*</span>
-                  <InfoDot text="A doctor can belong to more than one department." />
+                  <InfoDot text="A doctor belongs to one department." />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {deptNames.map((name) => {
-                    const on = values.depts.includes(name);
+                {departments.length === 0 && (
+                  <span className="text-caption text-text-muted">
+                    Add a department first (Doctors & Departments → Departments).
+                  </span>
+                )}
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Department">
+                  {departments.map(({ id, name }) => {
+                    const on = values.departmentId === id;
                     return (
                       <button
-                        key={name}
+                        key={id}
                         type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleDept(name)}
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => form.setField('departmentId', id)}
                         className={
                           on
                             ? 'text-body border-blue bg-blue-soft-bg text-blue inline-flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-1.75'
@@ -457,7 +527,9 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                 <div className="flex flex-col gap-0.5">
                   <div className="border-border-soft flex items-center justify-between border-b py-2.5">
                     <span className="text-body text-text-body">Consultation duration</span>
-                    <span className="text-body text-text-strong font-medium">{rules.duration}</span>
+                    <span className="text-body text-text-strong font-medium">
+                      {schedule ? `${schedule.slotLengthMin} min` : rules.duration}
+                    </span>
                   </div>
                   <div className="border-border-soft flex items-center justify-between border-b py-2.5">
                     <span className="text-body text-text-body">Max appointments per slot</span>
@@ -478,23 +550,24 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
                 </div>
               </div>
               <WeeklyHours
-                value={values.week}
-                onChange={(week) => form.setField('week', week)}
-                patterns={patterns}
+                value={grid.week}
+                onChange={setWeek}
+                patterns={grid.patterns}
                 info="The Medibook app only offers booking slots during these hours. Outside them, patients can't book."
               />
               <div className="text-caption text-text-muted flex items-center gap-1.5">
                 <Icon name="clock" size={13} /> {weekSummary} · unsaved changes apply when you press{' '}
                 {isNew ? 'Add Doctor' : 'Save Changes'}
               </div>
-              <ShiftPatternsPanel />
-              {doctor ? (
+              <ShiftPatternsPanel
+                patterns={grid.patterns}
+                week={grid.week}
+                onChange={setPatterns}
+              />
+              {doctor && schedule ? (
                 <>
-                  <LeavePanel doctorId={doctor.id} leave={liveLeave ?? doctor.leave} />
-                  <DateExceptionsPanel
-                    doctorId={doctor.id}
-                    exceptions={liveExceptions ?? doctor.exceptions}
-                  />
+                  <LeavePanel doctorId={doctor.id} leave={schedule.leaves} />
+                  <DateExceptionsPanel doctorId={doctor.id} exceptions={schedule.dateExceptions} />
                 </>
               ) : (
                 <EmptyState
@@ -511,45 +584,29 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
             <div>
               <div className="mb-3.5 flex items-center gap-2">
                 <span className="text-caption text-text-muted">
-                  Reviews come from patients in the Medibook app and are read-only.
+                  Ratings come from patients in the Medibook app and are read-only.
                 </span>
                 <InfoDot text="You can't edit or delete patient reviews. Report abuse to Medibook support." />
               </div>
               <Card pad={16} className="mb-3.5 flex items-center gap-4">
                 <div className="text-center">
-                  <div className="text-text-strong text-h1 font-bold">{doctor.rating}</div>
-                  <Stars r={doctor.rating} />
+                  <div className="text-text-strong text-h1 font-bold">
+                    {doctor.ratingAvg === null ? '—' : doctor.ratingAvg.toFixed(1)}
+                  </div>
+                  <Stars r={doctor.ratingAvg ?? 0} />
                 </div>
                 <div className="text-body text-text-muted">
-                  Based on {doctor.reviews} patient reviews
+                  {doctor.ratingCount === 0
+                    ? 'No patient ratings yet'
+                    : `Based on ${doctor.ratingCount} patient rating${doctor.ratingCount === 1 ? '' : 's'}`}
                 </div>
               </Card>
-              {doctor.list.length === 0 ? (
-                <EmptyState
-                  compact
-                  icon="message-circle"
-                  title="No reviews yet"
-                  message="Reviews appear here once patients rate this doctor in the Medibook app."
-                />
-              ) : (
-                <div className="flex flex-col gap-2.5">
-                  {doctor.list.map((rv, i) => (
-                    <div
-                      key={`${rv.a}-${i}`}
-                      className="border-border-soft rounded-md border p-3.5"
-                    >
-                      <div className="mb-1.5 flex items-center gap-2.5">
-                        <Avatar name={rv.a} size={28} />
-                        <span className="text-body text-text-strong font-medium">{rv.a}</span>
-                        <span className="flex-1" />
-                        <Stars r={rv.r} size={13} />
-                      </div>
-                      <div className="text-body text-text-body">{rv.t}</div>
-                      <div className="text-caption text-text-muted mt-1.5">{rv.d}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <EmptyState
+                compact
+                icon="message-circle"
+                title="Individual reviews aren't shown here"
+                message="The hospital app receives each doctor's average rating; the written reviews are moderated by Medibook."
+              />
             </div>
           )}
         </div>
@@ -576,7 +633,7 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
           perm={isNew ? 'Doctors & Departments.add' : 'Doctors & Departments.edit'}
           disableInstead
         >
-          <Button icon="check" busy={form.submitting} onClick={form.handleSubmit}>
+          <Button icon="check" busy={isSaving} onClick={form.handleSubmit}>
             {isNew ? 'Add Doctor' : 'Save Changes'}
           </Button>
         </Can>
@@ -591,6 +648,7 @@ function DoctorEditor({ role, doctor }: DoctorEditorProps) {
         onClose={() => setConfirmDelete(false)}
         onConfirm={del}
       />
+      <ScheduleChangeModal {...scheduleConfirm.modal} />
     </div>
   );
 }
@@ -601,20 +659,54 @@ export function DoctorDetailPageScreen() {
   const navigate = useNavigate();
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
   const isNew = !selId || selId === 'new';
-  const doctor = useCatalogStore((s) => s.docs.find((x) => x.id === selId));
+  const doctorId = isNew ? null : selId;
+  const doctorQuery = useDoctorQuery(doctorId);
+  const scheduleQuery = useDoctorScheduleQuery(doctorId);
+  const departmentsQuery = useDepartmentsQuery();
+  const toList = () => navigate(hospitalPath(role, 'doctors'));
 
-  if (!isNew && !doctor) {
+  const failed = [doctorQuery, scheduleQuery, departmentsQuery].find((q) => q.isError);
+  if (failed) {
+    if (
+      isFailure(failed.error) &&
+      failed.error.kind === NOT_FOUND_KIND &&
+      failed !== departmentsQuery
+    ) {
+      return (
+        <ErrorState
+          icon="user-x"
+          title="Doctor not found"
+          message="This profile is no longer in the catalogue — it may have been deleted on another screen."
+          onRetry={toList}
+          retryLabel="Back to Doctors & Departments"
+        />
+      );
+    }
     return (
       <ErrorState
-        icon="user-x"
-        title="Doctor not found"
-        message="This profile is no longer in the catalogue — it may have been deleted on another screen."
-        onRetry={() => navigate(hospitalPath(role, 'doctors'))}
-        retryLabel="Back to Doctors & Departments"
+        title="Could not load this doctor"
+        message={failureText(failed.error, 'Please try again.')}
+        onRetry={() => {
+          void doctorQuery.refetch();
+          void scheduleQuery.refetch();
+          void departmentsQuery.refetch();
+        }}
       />
     );
   }
 
+  const isLoading =
+    departmentsQuery.isPending || (!isNew && (doctorQuery.isPending || scheduleQuery.isPending));
+  if (isLoading) return <SkeletonCards count={2} lines={6} />;
+
   // Keyed by id: a different doctor is a different editor, with its own draft.
-  return <DoctorEditor key={selId ?? 'new'} role={role} doctor={doctor ?? null} />;
+  return (
+    <DoctorEditor
+      key={selId ?? 'new'}
+      role={role}
+      doctor={doctorQuery.data ?? null}
+      schedule={scheduleQuery.data ?? null}
+      departments={departmentsQuery.data ?? []}
+    />
+  );
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 
-import { TIME_OPTS } from '@/features/doctors/application/store/catalog.fixtures';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import type { DateException } from '@/features/doctors/application/store/catalog.types';
 import { timeLabelToMinutes, todayIso } from '@/features/doctors/domain/calendar';
+import type { DoctorDateException } from '@/features/doctors/domain/entities/doctors.types';
+import {
+  useDeleteDateExceptionMutation,
+  useSaveDateExceptionMutation,
+} from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { fmtDate } from '@/shared/lib/format';
 import { required } from '@/shared/lib/validate';
@@ -20,6 +22,27 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 import { toast } from '@/shared/ui/toast/toast.store';
+
+import { isFailure } from '@/core/error/failure';
+
+import { hhmmToLabel, labelToHhmm, timeOptionsWith } from './doctors.view';
+import { ScheduleChangeModal } from './ScheduleChangeModal';
+import { useScheduleConfirm } from './useScheduleConfirm';
+
+/** Session written for a "different hours" exception (one window, Q32). */
+const EXCEPTION_SESSION_CODE = 'custom-1';
+const EXCEPTION_SESSION_LABEL = 'Special hours';
+
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
+/** "10:00 am – 1:00 pm, 4:00 pm – 7:00 pm" for an exception's windows. */
+function windowsLabel(exception: DoctorDateException): string {
+  return exception.sessions
+    .map((w) => `${hhmmToLabel(w.startsAt)} – ${hhmmToLabel(w.endsAt)}`)
+    .join(', ');
+}
 
 /** What an exception does to one date — the two cases the audit asks for. */
 const EXCEPTION_KINDS = ['Different hours', 'Closed all day'] as const;
@@ -48,105 +71,141 @@ const EXCEPTION_VALIDATORS: FormValidators<ExceptionForm> = {
 
 interface ExceptionModalProps {
   doctorId: string;
-  exception: DateException | null;
+  exception: DoctorDateException | null;
   onClose: () => void;
 }
 
-/** Add / edit one per-date override of the weekly pattern. */
+/**
+ * Add / edit one per-date override of the weekly pattern. Saving is a dry run
+ * first; bookings the new hours would cancel are named before applying.
+ */
 function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
-  const catSaveException = useCatalogStore((s) => s.catSaveException);
+  const save = useSaveDateExceptionMutation();
+  const confirm = useScheduleConfirm();
+  const firstWindow = exception?.sessions[0];
   const form = useForm<ExceptionForm>({
     initial: {
       date: exception?.date ?? todayIso(),
-      kind: exception?.closed ? 'Closed all day' : 'Different hours',
-      from: exception?.from ?? '10:00 am',
-      to: exception?.to ?? '1:00 pm',
+      kind: exception?.kind === 'closed' ? 'Closed all day' : 'Different hours',
+      from: firstWindow ? hhmmToLabel(firstWindow.startsAt) : '10:00 am',
+      to: firstWindow ? hhmmToLabel(firstWindow.endsAt) : '1:00 pm',
       note: exception?.note ?? '',
     },
     validate: EXCEPTION_VALIDATORS,
     onSubmit: (values) => {
       const closed = values.kind === 'Closed all day';
-      catSaveException(doctorId, {
-        id: exception?.id,
-        date: values.date,
-        closed,
-        from: values.from,
-        to: values.to,
-        note: values.note.trim(),
+      const startsAt = labelToHhmm(values.from) ?? '';
+      const endsAt = labelToHhmm(values.to) ?? '';
+      return confirm.run({
+        attempt: (isConfirmed) =>
+          save.mutateAsync({
+            doctorId,
+            confirm: isConfirmed,
+            existing: exception ? { id: exception.id, version: exception.version } : undefined,
+            input: {
+              date: values.date,
+              kind: closed ? 'closed' : 'custom_sessions',
+              note: values.note.trim(),
+              sessions: closed
+                ? []
+                : [
+                    {
+                      sessionCode: EXCEPTION_SESSION_CODE,
+                      label: EXCEPTION_SESSION_LABEL,
+                      startsAt,
+                      endsAt,
+                    },
+                  ],
+            },
+          }),
+        onApplied: () => {
+          toast(exception ? 'Date exception updated' : 'Date exception added', 'success');
+          onClose();
+        },
+        onError: (error) =>
+          toast(failureText(error, 'Could not save the date exception.'), 'error'),
       });
-      toast(exception ? 'Date exception updated' : 'Date exception added', 'success');
-      onClose();
     },
   });
   const isClosed = form.values.kind === 'Closed all day';
+  const hasExtraWindows = (exception?.sessions.length ?? 0) > 1;
   return (
-    <FormModal
-      open
-      onClose={onClose}
-      title={exception ? 'Edit Date Exception' : 'Add Date Exception'}
-      width={560}
-      onSubmit={form.handleSubmit}
-      submitLabel={exception ? 'Save Exception' : 'Add Exception'}
-    >
-      <div className="flex flex-col gap-4.5">
-        <Field
-          label="Date"
-          required
-          error={form.errorFor('date')}
-          hint="This one date only — the weekly pattern is untouched."
-        >
-          <TextInput
-            value={form.values.date}
-            type="date"
-            onChange={(v) => form.setField('date', v)}
-            onBlur={() => form.blurField('date')}
-          />
-        </Field>
-        <div className="border-border-soft flex items-center justify-between rounded-md border px-3.5 py-3">
-          <span className="text-body text-text-body" id="exception-closed-label">
-            Closed all day
-          </span>
-          <Toggle
-            value={isClosed}
-            onChange={(v) => form.setField('kind', v ? 'Closed all day' : 'Different hours')}
-            aria-labelledby="exception-closed-label"
-          />
-        </div>
-        {!isClosed && (
-          <div className="grid grid-cols-2 gap-4.5">
-            <Field label="Opens" required>
-              <Select
-                value={form.values.from}
-                options={TIME_OPTS}
-                onChange={(v) => form.setField('from', v)}
-              />
-            </Field>
-            <Field label="Closes" required error={form.errorFor('to')}>
-              <Select
-                value={form.values.to}
-                options={TIME_OPTS}
-                onChange={(v) => form.setField('to', v)}
-                onBlur={() => form.blurField('to')}
-              />
-            </Field>
+    <>
+      <FormModal
+        open
+        onClose={onClose}
+        title={exception ? 'Edit Date Exception' : 'Add Date Exception'}
+        width={560}
+        onSubmit={form.handleSubmit}
+        submitLabel={exception ? 'Save Exception' : 'Add Exception'}
+        busy={form.submitting || confirm.modal.isApplying}
+      >
+        <div className="flex flex-col gap-4.5">
+          <Field
+            label="Date"
+            required
+            error={form.errorFor('date')}
+            hint="This one date only — the weekly pattern is untouched."
+          >
+            <TextInput
+              value={form.values.date}
+              type="date"
+              onChange={(v) => form.setField('date', v)}
+              onBlur={() => form.blurField('date')}
+            />
+          </Field>
+          <div className="border-border-soft flex items-center justify-between rounded-md border px-3.5 py-3">
+            <span className="text-body text-text-body" id="exception-closed-label">
+              Closed all day
+            </span>
+            <Toggle
+              value={isClosed}
+              onChange={(v) => form.setField('kind', v ? 'Closed all day' : 'Different hours')}
+              aria-labelledby="exception-closed-label"
+            />
           </div>
-        )}
-        <Field label="Reason" required error={form.errorFor('note')}>
-          <TextInput
-            value={form.values.note}
-            placeholder="e.g. Extra weekend clinic"
-            onChange={(v) => form.setField('note', v)}
-            onBlur={() => form.blurField('note')}
-          />
-        </Field>
-      </div>
-    </FormModal>
+          {!isClosed && (
+            <div className="grid grid-cols-2 gap-4.5">
+              <Field label="Opens" required>
+                <Select
+                  value={form.values.from}
+                  options={timeOptionsWith(form.values.from)}
+                  onChange={(v) => form.setField('from', v)}
+                />
+              </Field>
+              <Field label="Closes" required error={form.errorFor('to')}>
+                <Select
+                  value={form.values.to}
+                  options={timeOptionsWith(form.values.to)}
+                  onChange={(v) => form.setField('to', v)}
+                  onBlur={() => form.blurField('to')}
+                />
+              </Field>
+            </div>
+          )}
+          {!isClosed && hasExtraWindows && (
+            <p className="text-caption text-text-muted">
+              This date has {exception?.sessions.length} windows; saving keeps only the one above.
+            </p>
+          )}
+          <Field label="Reason" required error={form.errorFor('note')}>
+            <TextInput
+              value={form.values.note}
+              placeholder="e.g. Extra weekend clinic"
+              onChange={(v) => form.setField('note', v)}
+              onBlur={() => form.blurField('note')}
+            />
+          </Field>
+        </div>
+      </FormModal>
+      <ScheduleChangeModal {...confirm.modal} />
+    </>
   );
 }
 
 interface DateExceptionsPanelProps {
   doctorId: string;
-  exceptions: readonly DateException[];
+  exceptions: readonly DoctorDateException[];
 }
 
 /**
@@ -157,15 +216,22 @@ interface DateExceptionsPanelProps {
  * from it.
  */
 export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPanelProps) {
-  const catDeleteException = useCatalogStore((s) => s.catDeleteException);
-  const [editing, setEditing] = useState<{ exception: DateException | null } | null>(null);
-  const [removing, setRemoving] = useState<DateException | null>(null);
+  const remove = useDeleteDateExceptionMutation();
+  const confirm = useScheduleConfirm();
+  const [editing, setEditing] = useState<{ exception: DoctorDateException | null } | null>(null);
+  const [removing, setRemoving] = useState<DoctorDateException | null>(null);
 
   const confirmRemove = (): void => {
     if (!removing) return;
-    catDeleteException(doctorId, removing.id);
-    toast('Date exception removed', 'info');
+    const target = removing;
     setRemoving(null);
+    void confirm.run({
+      attempt: (isConfirmed) =>
+        remove.mutateAsync({ doctorId, exceptionId: target.id, confirm: isConfirmed }),
+      onApplied: () => toast('Date exception removed', 'info'),
+      onError: (error) =>
+        toast(failureText(error, 'Could not remove the date exception.'), 'error'),
+    });
   };
 
   return (
@@ -204,17 +270,18 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
             >
               <div
                 className={
-                  e.closed
+                  e.kind === 'closed'
                     ? 'bg-d-100 text-d-500 flex size-8.5 flex-none items-center justify-center rounded-md'
                     : 'bg-g-100 text-g-700 flex size-8.5 flex-none items-center justify-center rounded-md'
                 }
               >
-                <Icon name={e.closed ? 'calendar-x' : 'calendar-check'} size={17} />
+                <Icon name={e.kind === 'closed' ? 'calendar-x' : 'calendar-check'} size={17} />
               </div>
               <div className="min-w-40 flex-1">
                 <div className="text-body text-text-strong font-medium">{fmtDate(e.date)}</div>
                 <div className="text-caption text-text-muted">
-                  {e.closed ? 'Closed all day' : `${e.from} – ${e.to}`} · {e.note}
+                  {e.kind === 'closed' ? 'Closed all day' : windowsLabel(e)}
+                  {e.note ? ` · ${e.note}` : ''}
                 </div>
               </div>
               <Can perm={'Doctors & Departments.edit'}>
@@ -262,6 +329,7 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
         onClose={() => setRemoving(null)}
         onConfirm={confirmRemove}
       />
+      <ScheduleChangeModal {...confirm.modal} />
     </div>
   );
 }

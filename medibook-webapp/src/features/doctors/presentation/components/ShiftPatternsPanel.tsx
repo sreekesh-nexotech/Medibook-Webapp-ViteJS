@@ -1,8 +1,6 @@
 import { useState } from 'react';
 
-import { TIME_OPTS } from '@/features/doctors/application/store/catalog.fixtures';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import type { ShiftPattern } from '@/features/doctors/application/store/catalog.types';
+import type { ShiftPattern, WeekDay } from '@/features/doctors/application/store/catalog.types';
 import { timeLabelToMinutes } from '@/features/doctors/domain/calendar';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { required } from '@/shared/lib/validate';
@@ -17,7 +15,11 @@ import { IconBtn } from '@/shared/ui/IconBtn';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
-import { toast } from '@/shared/ui/toast/toast.store';
+
+import { timeOptionsWith } from './doctors.view';
+
+/** Prefix of draft pattern ids (new, not yet saved) — never sent to the API. */
+const DRAFT_ID_PREFIX = 'draft-';
 
 interface PatternForm {
   name: string;
@@ -37,12 +39,12 @@ const PATTERN_VALIDATORS: FormValidators<PatternForm> = {
 
 interface PatternModalProps {
   pattern: ShiftPattern | null;
+  onSave: (pattern: Omit<ShiftPattern, 'id'>) => void;
   onClose: () => void;
 }
 
-/** Add / edit one reusable shift pattern. */
-function PatternModal({ pattern, onClose }: PatternModalProps) {
-  const catSavePattern = useCatalogStore((s) => s.catSavePattern);
+/** Add / edit one of this doctor's named sessions. */
+function PatternModal({ pattern, onSave, onClose }: PatternModalProps) {
   const form = useForm<PatternForm>({
     initial: {
       name: pattern?.name ?? '',
@@ -51,13 +53,7 @@ function PatternModal({ pattern, onClose }: PatternModalProps) {
     },
     validate: PATTERN_VALIDATORS,
     onSubmit: (values) => {
-      catSavePattern({
-        id: pattern?.id,
-        name: values.name.trim(),
-        from: values.from,
-        to: values.to,
-      });
-      toast(pattern ? 'Shift pattern updated' : 'Shift pattern added', 'success');
+      onSave({ name: values.name.trim(), from: values.from, to: values.to });
       onClose();
     },
   });
@@ -88,14 +84,14 @@ function PatternModal({ pattern, onClose }: PatternModalProps) {
           <Field label="Starts" required>
             <Select
               value={form.values.from}
-              options={TIME_OPTS}
+              options={timeOptionsWith(form.values.from)}
               onChange={(v) => form.setField('from', v)}
             />
           </Field>
           <Field label="Ends" required error={form.errorFor('to')}>
             <Select
               value={form.values.to}
-              options={TIME_OPTS}
+              options={timeOptionsWith(form.values.to)}
               onChange={(v) => form.setField('to', v)}
               onBlur={() => form.blurField('to')}
             />
@@ -106,30 +102,49 @@ function PatternModal({ pattern, onClose }: PatternModalProps) {
   );
 }
 
+interface ShiftPatternsPanelProps {
+  /** This doctor's named sessions (the draft the profile's Save commits). */
+  patterns: readonly ShiftPattern[];
+  week: readonly WeekDay[];
+  /** Reports the next patterns and the week with any removed pattern unassigned. */
+  onChange: (patterns: readonly ShiftPattern[], week: readonly WeekDay[]) => void;
+}
+
 /**
- * The hospital's shift-pattern library (audit 2.4 / HA-06: "shift patterns …
- * have no working control"). Patterns are named, reusable windows — defined
- * once here, assigned to any doctor's days in the Working Hours grid above,
- * and read by the slot grid when it generates slots.
- *
- * The design's two hardcoded "Shift 1 / Shift 2" rows, whose red buttons
- * toasted "Shift removed" and changed nothing (audit 3.1.2), are replaced by
- * this: every row is a real record, and Remove really removes it.
+ * This doctor's named consultation sessions ("Morning OPD 9–1"), assigned to
+ * days in Working Hours above. The backend stores sessions per doctor, so
+ * these belong to this doctor only; edits are part of the profile draft and
+ * are saved — with a dry run for bookings — by Save Changes.
  */
-export function ShiftPatternsPanel() {
-  const patterns = useCatalogStore((s) => s.patterns);
-  const docs = useCatalogStore((s) => s.docs);
-  const catDeletePattern = useCatalogStore((s) => s.catDeletePattern);
+export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPanelProps) {
   const [editing, setEditing] = useState<{ pattern: ShiftPattern | null } | null>(null);
   const [removing, setRemoving] = useState<ShiftPattern | null>(null);
 
-  const assignedCount = (id: string): number =>
-    docs.filter((d) => d.week.some((w) => (w.patternIds ?? []).includes(id))).length;
+  const assignedDays = (id: string): number =>
+    week.filter((w) => w.on && (w.patternIds ?? []).includes(id)).length;
+
+  const save = (target: ShiftPattern | null, values: Omit<ShiftPattern, 'id'>): void => {
+    if (target) {
+      onChange(
+        patterns.map((p) => (p.id === target.id ? { ...values, id: target.id } : p)),
+        week,
+      );
+      return;
+    }
+    onChange([...patterns, { ...values, id: `${DRAFT_ID_PREFIX}${crypto.randomUUID()}` }], week);
+  };
 
   const confirmRemove = (): void => {
     if (!removing) return;
-    catDeletePattern(removing.id);
-    toast(`Shift pattern “${removing.name}” removed`, 'info');
+    const id = removing.id;
+    onChange(
+      patterns.filter((p) => p.id !== id),
+      week.map((w) =>
+        (w.patternIds ?? []).includes(id)
+          ? { ...w, patternIds: (w.patternIds ?? []).filter((x) => x !== id) }
+          : w,
+      ),
+    );
     setRemoving(null);
   };
 
@@ -137,7 +152,7 @@ export function ShiftPatternsPanel() {
     <div>
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <span className="text-body text-text-strong font-medium">Shift Patterns</span>
-        <InfoDot text="Named, reusable consultation windows. Assign them to a doctor's days in Working Hours; the slot grid generates slots from them." />
+        <InfoDot text="This doctor's named consultation windows. Assign them to days in Working Hours; changes are saved with Save Changes." />
         <span className="flex-1" />
         <Can perm={'Doctors & Departments.add'}>
           <Button
@@ -163,7 +178,7 @@ export function ShiftPatternsPanel() {
       ) : (
         <div className="flex flex-col gap-2">
           {patterns.map((p) => {
-            const used = assignedCount(p.id);
+            const used = assignedDays(p.id);
             return (
               <div
                 key={p.id}
@@ -175,7 +190,7 @@ export function ShiftPatternsPanel() {
                 <div className="min-w-40 flex-1">
                   <div className="text-body text-text-strong font-medium">{p.name}</div>
                   <div className="text-caption text-text-muted">
-                    {p.from} – {p.to} · assigned to {used} doctor{used === 1 ? '' : 's'}
+                    {p.from} – {p.to} · used on {used} day{used === 1 ? '' : 's'}
                   </div>
                 </div>
                 <Can perm={'Doctors & Departments.edit'}>
@@ -209,6 +224,7 @@ export function ShiftPatternsPanel() {
         <PatternModal
           key={editing.pattern?.id ?? 'new-pattern'}
           pattern={editing.pattern}
+          onSave={(values) => save(editing.pattern, values)}
           onClose={() => setEditing(null)}
         />
       )}
@@ -219,9 +235,9 @@ export function ShiftPatternsPanel() {
         title="Remove Shift Pattern"
         body={
           removing
-            ? `Remove “${removing.name}” (${removing.from} – ${removing.to})? It is assigned to ${assignedCount(
+            ? `Remove “${removing.name}” (${removing.from} – ${removing.to})? It is unassigned from the ${assignedDays(
                 removing.id,
-              )} doctor${assignedCount(removing.id) === 1 ? '' : 's'} and will be unassigned from every day it covers.`
+              )} day${assignedDays(removing.id) === 1 ? '' : 's'} it covers when you save.`
             : ''
         }
         onClose={() => setRemoving(null)}

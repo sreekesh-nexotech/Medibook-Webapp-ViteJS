@@ -1,10 +1,13 @@
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, hospitalSlotsPath, isHospitalRole } from '@/app/router/paths';
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import type { Dept, Doctor } from '@/features/doctors/application/store/catalog.types';
-import { summariseWeekHours } from '@/features/doctors/domain/schedule';
+import { isFailure } from '@/core/error/failure';
+import type { Department, DoctorProfile } from '@/features/doctors/domain/entities/doctors.types';
+import { useDeleteDepartmentMutation } from '@/features/doctors/application/queries/useDepartmentMutations';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDeleteDoctorMutation } from '@/features/doctors/application/queries/useDoctorMutations';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
@@ -16,6 +19,7 @@ import { Card } from '@/shared/ui/Card';
 import { ClearChip } from '@/shared/ui/ClearChip';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -30,17 +34,26 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { DeptDrawer } from '../components/DeptDrawer';
 import { DeptModal } from '../components/DeptModal';
+import { departmentColor, DOCTOR_STATUS_LABEL } from '../components/doctors.view';
+import { ScheduleChangeModal } from '../components/ScheduleChangeModal';
+import { useScheduleConfirm } from '../components/useScheduleConfirm';
 
-interface ConfirmTarget {
-  kind: 'doc' | 'dept';
-  item: Doctor | Dept;
+type ConfirmTarget =
+  | { readonly kind: 'doc'; readonly item: DoctorProfile }
+  | { readonly kind: 'dept'; readonly item: Department };
+
+/** The backend refuses deleting a department that still has doctors. */
+const DEPARTMENT_IN_USE = 'DEPARTMENT_IN_USE';
+
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
 }
 
 const DOC_COLUMNS = [
   'Doctor',
   'Department',
   'Fee',
-  'Working Hours',
+  'Specialization',
   'Rating',
   'Status',
   'Action',
@@ -57,37 +70,43 @@ const DOC_SORT_KEYS = {
 const ALL_DEPTS = 'All Departments';
 const ALL_STATUS = 'All Status';
 
-/** Doctors & Departments catalog list (design `DoctorsDepartments`). */
+/** Doctors & Departments catalogue list (design `DoctorsDepartments`), from the hospital API. */
 export function DoctorsDepartmentsScreen() {
   const { role: roleParam } = useParams();
   const navigate = useNavigate();
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
-  const depts = useCatalogStore((s) => s.depts);
-  const docs = useCatalogStore((s) => s.docs);
-  const catDeleteDoctor = useCatalogStore((s) => s.catDeleteDoctor);
-  const catDeleteDept = useCatalogStore((s) => s.catDeleteDept);
+  const doctorsQuery = useDoctorsQuery();
+  const departmentsQuery = useDepartmentsQuery();
+  const deleteDoctor = useDeleteDoctorMutation();
+  const deleteDepartment = useDeleteDepartmentMutation();
+  const scheduleConfirm = useScheduleConfirm();
+  const docs = useMemo(() => doctorsQuery.data ?? [], [doctorsQuery.data]);
+  const depts = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
   const [tab, setTab] = useState('Doctors');
-  const [deptModal, setDeptModal] = useState<{ open: boolean; dept: Dept | null }>({
+  const [deptModal, setDeptModal] = useState<{ open: boolean; dept: Department | null }>({
     open: false,
     dept: null,
   });
-  const [deptView, setDeptView] = useState<Dept | null>(null);
+  const [deptView, setDeptView] = useState<Department | null>(null);
   const [confirm, setConfirm] = useState<ConfirmTarget | null>(null);
   const [q, setQ] = useState('');
   const [deptF, setDeptF] = useState(ALL_DEPTS);
   const [statusF, setStatusF] = useState(ALL_STATUS);
-  const { sort, onSort, sorted } = useSort<Doctor>();
+  const { sort, onSort, sorted } = useSort<DoctorProfile>();
 
-  /**
-   * `RefreshBtn` re-derives the list off the catalog store (audit 3.1.1 — the
-   * control "does nothing on eight screens"). The recompute runs in a
-   * transition, so `isPending` is React's own report that the new list is not
-   * on screen yet and the table can shimmer honestly while it lands.
-   */
-  const [nonce, setNonce] = useState(0);
-  const [isPending, startTransition] = useTransition();
-  const refresh = (): void => {
-    startTransition(() => setNonce((n) => n + 1));
+  const deptName = useMemo(() => new Map(depts.map((d) => [d.id, d.name])), [depts]);
+  const nameOf = (d: DoctorProfile): string => deptName.get(d.departmentId) ?? '';
+  const colorOf = (dept: Department): string =>
+    departmentColor(
+      Math.max(
+        0,
+        depts.findIndex((d) => d.id === dept.id),
+      ),
+    );
+
+  /** `RefreshBtn` re-reads both lists from the server. */
+  const refresh = async (): Promise<void> => {
+    await Promise.all([doctorsQuery.refetch(), departmentsQuery.refetch()]);
   };
 
   const openDoctor = (id: string): void => {
@@ -101,46 +120,53 @@ export function DoctorsDepartmentsScreen() {
   };
 
   const shownDocs = useMemo(() => {
-    void nonce; // the refresh control's re-derivation trigger
     const needle = q.trim().toLowerCase();
     return docs.filter((d) => {
-      if (needle && !(d.name + d.spec + d.depts.join(' ')).toLowerCase().includes(needle))
+      const dept = deptName.get(d.departmentId) ?? '';
+      if (needle && !(d.name + d.specialisation + dept).toLowerCase().includes(needle))
         return false;
-      if (deptF !== ALL_DEPTS && !d.depts.includes(deptF)) return false;
-      if (statusF !== ALL_STATUS && d.status !== statusF) return false;
+      if (deptF !== ALL_DEPTS && dept !== deptF) return false;
+      if (statusF !== ALL_STATUS && DOCTOR_STATUS_LABEL[d.status] !== statusF) return false;
       return true;
     });
-  }, [docs, q, deptF, statusF, nonce]);
+  }, [docs, deptName, q, deptF, statusF]);
 
   const orderedDocs = sorted(shownDocs, {
     name: (d) => d.name,
-    dept: (d) => d.depts.join(', '),
-    fee: (d) => d.fee,
-    rating: (d) => d.rating,
-    status: (d) => d.status,
+    dept: nameOf,
+    fee: (d) => d.feeRupees,
+    rating: (d) => d.ratingAvg ?? 0,
+    status: (d) => DOCTOR_STATUS_LABEL[d.status],
   });
 
-  const docTableState: TableStateSpec | undefined = isPending
+  const docTableState: TableStateSpec | undefined = doctorsQuery.isPending
     ? { kind: 'loading', rows: 6 }
-    : orderedDocs.length === 0
-      ? hasFilters
-        ? {
-            kind: 'empty',
-            title: 'No doctors match your filters.',
-            message: 'Clear the search and filters to see the whole roster.',
-            actionLabel: 'Clear filters',
-            onAction: clearFilters,
-          }
-        : {
-            kind: 'empty',
-            icon: 'stethoscope',
-            title: 'No doctors in the catalogue yet',
-            message:
-              'Add your first doctor — they become searchable and bookable in the Medibook app.',
-            actionLabel: 'Add Doctor',
-            onAction: () => openDoctor('new'),
-          }
-      : undefined;
+    : doctorsQuery.isError
+      ? {
+          kind: 'error',
+          title: 'Could not load doctors',
+          message: failureText(doctorsQuery.error, 'Please try again.'),
+          onRetry: () => void doctorsQuery.refetch(),
+        }
+      : orderedDocs.length === 0
+        ? hasFilters
+          ? {
+              kind: 'empty',
+              title: 'No doctors match your filters.',
+              message: 'Clear the search and filters to see the whole roster.',
+              actionLabel: 'Clear filters',
+              onAction: clearFilters,
+            }
+          : {
+              kind: 'empty',
+              icon: 'stethoscope',
+              title: 'No doctors in the catalogue yet',
+              message:
+                'Add your first doctor — they become searchable and bookable in the Medibook app.',
+              actionLabel: 'Add Doctor',
+              onAction: () => openDoctor('new'),
+            }
+        : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -215,13 +241,13 @@ export function DoctorsDepartmentsScreen() {
               >
                 <td className={tdClass}>
                   <div className="flex items-center gap-2.5">
-                    <Avatar name={d.name} src={d.photo ?? undefined} size={34} />
+                    <Avatar name={d.name} size={34} />
                     <span className="text-body text-text-strong font-medium">{d.name}</span>
                   </div>
                 </td>
-                <td className={tdClass}>{d.depts.join(', ') || '—'}</td>
-                <td className={cn(tdClass, 'font-semibold tabular-nums')}>{money(d.fee)}</td>
-                <td className={cn(tdClass, 'text-text-muted')}>{summariseWeekHours(d.week)}</td>
+                <td className={tdClass}>{nameOf(d) || '—'}</td>
+                <td className={cn(tdClass, 'font-semibold tabular-nums')}>{money(d.feeRupees)}</td>
+                <td className={cn(tdClass, 'text-text-muted')}>{d.specialisation || '—'}</td>
                 <td className={tdClass}>
                   <span className="inline-flex items-center gap-1.25">
                     <Icon
@@ -230,11 +256,12 @@ export function DoctorsDepartmentsScreen() {
                       className="text-y-500"
                       style={{ fill: 'var(--color-y-500)' }}
                     />{' '}
-                    {d.rating} <span className="text-text-muted text-caption">({d.reviews})</span>
+                    {d.ratingAvg === null ? '—' : d.ratingAvg.toFixed(1)}{' '}
+                    <span className="text-text-muted text-caption">({d.ratingCount})</span>
                   </span>
                 </td>
                 <td className={tdClass}>
-                  <Badge status={d.status} />
+                  <Badge status={DOCTOR_STATUS_LABEL[d.status]} />
                 </td>
                 <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-2">
@@ -265,14 +292,23 @@ export function DoctorsDepartmentsScreen() {
             ))}
           </TableShell>
         </Card>
-      ) : isPending ? (
+      ) : departmentsQuery.isPending ? (
         <SkeletonCards count={6} lines={4} />
+      ) : departmentsQuery.isError ? (
+        <Card>
+          <ErrorState
+            inline
+            title="Could not load departments"
+            message={failureText(departmentsQuery.error, 'Please try again.')}
+            onRetry={() => void departmentsQuery.refetch()}
+          />
+        </Card>
       ) : depts.length === 0 ? (
         <Card>
           <EmptyState
             icon="layers"
             title="No departments yet"
-            message="Departments group your doctors and carry the base consultation fee."
+            message="Departments group your doctors in the Medibook app."
             actionLabel="Add Department"
             actionIcon="plus"
             actionVariant="button"
@@ -281,8 +317,9 @@ export function DoctorsDepartmentsScreen() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {depts.map((d) => {
-            const count = docs.filter((x) => x.depts.includes(d.name)).length;
+          {depts.map((d, index) => {
+            const count = docs.filter((x) => x.departmentId === d.id).length;
+            const color = departmentColor(index);
             return (
               <Card
                 key={d.id}
@@ -294,39 +331,23 @@ export function DoctorsDepartmentsScreen() {
                 <div
                   className="relative flex h-21 items-center justify-center text-white"
                   style={{
-                    background: d.image
-                      ? 'none'
-                      : `linear-gradient(135deg, ${d.color} 0%, color-mix(in srgb, ${d.color} 70%, #000) 100%)`,
+                    background: `linear-gradient(135deg, ${color} 0%, color-mix(in srgb, ${color} 70%, #000) 100%)`,
                   }}
                 >
-                  {d.image ? (
-                    <img
-                      src={d.image}
-                      alt={d.name}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Icon name="stethoscope" size={28} />
-                  )}
+                  <Icon name="stethoscope" size={28} />
                   <span className="absolute top-2.5 right-2.5">
-                    <Badge status={d.status} />
+                    <Badge status={d.isActive ? 'Active' : 'Inactive'} />
                   </span>
                 </div>
                 <div className="p-4">
                   <div className="text-h3 text-text-strong">{d.name}</div>
-                  <div className="text-caption text-text-muted mt-1 mb-3 min-h-9">{d.about}</div>
-                  <div className="text-body text-text-body flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1.25">
+                  <div className="text-caption text-text-muted mt-1 mb-3 min-h-9">
+                    {d.description}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-body text-text-body inline-flex items-center gap-1.25">
                       <Icon name="users" size={15} className="text-text-muted" /> {count} doctor
                       {count === 1 ? '' : 's'}
-                    </span>
-                    <span className="text-text-strong font-semibold tabular-nums">
-                      {money(d.fee)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="text-caption text-text-muted flex items-center gap-1.25">
-                      <Icon name="clock" size={13} /> {d.hours}
                     </span>
                     <span className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <Can perm={'Doctors & Departments.edit'}>
@@ -369,6 +390,7 @@ export function DoctorsDepartmentsScreen() {
       )}
       <DeptDrawer
         dept={deptView}
+        color={deptView ? colorOf(deptView) : departmentColor(0)}
         docs={docs}
         onClose={() => setDeptView(null)}
         onEdit={(dp) => {
@@ -393,29 +415,43 @@ export function DoctorsDepartmentsScreen() {
         onClose={() => setConfirm(null)}
         onConfirm={() => {
           if (!confirm) return;
-          if (confirm.kind === 'doc') {
-            catDeleteDoctor(confirm.item.id);
-            toast('Doctor removed', 'info');
-          } else {
-            catDeleteDept(confirm.item.id);
-            toast('Department deleted', 'info');
-          }
           setConfirm(null);
+          if (confirm.kind === 'doc') {
+            const id = confirm.item.id;
+            void scheduleConfirm.run({
+              attempt: (isConfirmed) => deleteDoctor.mutateAsync({ id, confirm: isConfirmed }),
+              onApplied: () => toast('Doctor removed', 'info'),
+              onError: (error) =>
+                toast(failureText(error, 'Could not remove the doctor.'), 'error'),
+            });
+            return;
+          }
+          deleteDepartment.mutate(confirm.item.id, {
+            onSuccess: () => toast('Department deleted', 'info'),
+            onError: (error) =>
+              toast(
+                isFailure(error) && error.code === DEPARTMENT_IN_USE
+                  ? 'Move or remove its doctors first — a department with doctors cannot be deleted.'
+                  : failureText(error, 'Could not delete the department.'),
+                'error',
+              ),
+          });
         }}
       />
+      <ScheduleChangeModal {...scheduleConfirm.modal} />
     </div>
   );
 }
 
 /** Confirm copy that says what else the delete touches, not just "can't be undone". */
-function confirmBody(target: ConfirmTarget, docs: readonly Doctor[]): string {
+function confirmBody(target: ConfirmTarget, docs: readonly DoctorProfile[]): string {
   if (target.kind === 'doc') {
     return `Remove ${target.item.name} from the catalogue? They disappear from the patient app and from the slot grid. This can't be undone.`;
   }
-  const assigned = docs.filter((d) => d.depts.includes(target.item.name)).length;
-  const tail =
-    assigned === 0
-      ? 'No doctors are assigned to it.'
-      : `It is unassigned from ${assigned} doctor${assigned === 1 ? '' : 's'}, who keep their profiles.`;
-  return `Delete the ${target.item.name} department? ${tail} This can't be undone.`;
+  const id = target.item.id;
+  const assigned = docs.filter((d) => d.departmentId === id).length;
+  if (assigned > 0) {
+    return `${target.item.name} still has ${assigned} doctor${assigned === 1 ? '' : 's'}. Move them to another department first — a department with doctors cannot be deleted.`;
+  }
+  return `Delete the ${target.item.name} department? No doctors are assigned to it. This can't be undone.`;
 }

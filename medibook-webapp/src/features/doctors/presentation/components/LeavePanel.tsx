@@ -1,8 +1,11 @@
 import { useState } from 'react';
 
-import { useCatalogStore } from '@/features/doctors/application/store/catalog.store';
-import type { DoctorLeave, LeaveType } from '@/features/doctors/application/store/catalog.types';
 import { todayIso } from '@/features/doctors/domain/calendar';
+import type { DoctorLeaveEntry, LeaveKind } from '@/features/doctors/domain/entities/doctors.types';
+import {
+  useDeleteLeaveMutation,
+  useSaveLeaveMutation,
+} from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { fmtDate } from '@/shared/lib/format';
 import { dateRange, required } from '@/shared/lib/validate';
@@ -19,13 +22,33 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-/** Leave types offered by the editor (canonical set). */
-const LEAVE_TYPES: readonly LeaveType[] = ['Casual', 'Sick', 'Conference'];
+import { isFailure } from '@/core/error/failure';
+
+import { LEAVE_KIND_LABEL } from './doctors.view';
+import { ScheduleChangeModal } from './ScheduleChangeModal';
+import { useScheduleConfirm } from './useScheduleConfirm';
+
+/** Leave types the backend accepts, in display order. */
+const LEAVE_KINDS: readonly LeaveKind[] = ['casual', 'sick', 'conference', 'other'];
+
+const LEAVE_OPTIONS = LEAVE_KINDS.map((k) => LEAVE_KIND_LABEL[k]);
+
+function kindFromLabel(label: string): LeaveKind {
+  return LEAVE_KINDS.find((k) => LEAVE_KIND_LABEL[k] === label) ?? 'casual';
+}
+
+function failureText(error: unknown, fallback: string): string {
+  return isFailure(error) ? error.message : fallback;
+}
+
+function rangeLabel(from: string, to: string): string {
+  return from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)}`;
+}
 
 interface LeaveForm {
   from: string;
   to: string;
-  type: LeaveType;
+  kind: LeaveKind;
   reason: string;
 }
 
@@ -37,111 +60,129 @@ const LEAVE_VALIDATORS: FormValidators<LeaveForm> = {
 
 interface LeaveModalProps {
   doctorId: string;
-  leave: DoctorLeave | null;
+  leave: DoctorLeaveEntry | null;
   onClose: () => void;
 }
 
-/** Add / edit one leave entry — a real date range, type and reason. */
+/**
+ * Add / edit one leave entry. Saving is a dry run first: if bookings fall in
+ * the range, the user is asked before they are cancelled (and refunded).
+ */
 function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
-  const catSaveLeave = useCatalogStore((s) => s.catSaveLeave);
+  const save = useSaveLeaveMutation();
+  const confirm = useScheduleConfirm();
   const form = useForm<LeaveForm>({
     initial: {
-      from: leave?.from ?? todayIso(),
-      to: leave?.to ?? todayIso(),
-      type: leave?.type ?? 'Casual',
+      from: leave?.dateFrom ?? todayIso(),
+      to: leave?.dateTo ?? todayIso(),
+      kind: leave?.kind ?? 'casual',
       reason: leave?.reason ?? '',
     },
     validate: LEAVE_VALIDATORS,
-    onSubmit: (values) => {
-      catSaveLeave(doctorId, {
-        id: leave?.id,
-        from: values.from,
-        to: values.to,
-        type: values.type,
-        reason: values.reason.trim(),
-      });
-      toast(leave ? 'Leave updated' : 'Leave added', 'success');
-      onClose();
-    },
+    onSubmit: (values) =>
+      confirm.run({
+        attempt: (isConfirmed) =>
+          save.mutateAsync({
+            doctorId,
+            confirm: isConfirmed,
+            existing: leave ? { id: leave.id, version: leave.version } : undefined,
+            input: {
+              kind: values.kind,
+              dateFrom: values.from,
+              dateTo: values.to,
+              reason: values.reason.trim(),
+            },
+          }),
+        onApplied: () => {
+          toast(leave ? 'Leave updated' : 'Leave added', 'success');
+          onClose();
+        },
+        onError: (error) => toast(failureText(error, 'Could not save the leave.'), 'error'),
+      }),
   });
   return (
-    <FormModal
-      open
-      onClose={onClose}
-      title={leave ? 'Edit Leave' : 'Add Leave'}
-      width={560}
-      onSubmit={form.handleSubmit}
-      submitLabel={leave ? 'Save Leave' : 'Add Leave'}
-    >
-      <div className="flex flex-col gap-4.5">
-        <div className="grid grid-cols-2 gap-4.5">
-          <Field label="From" required error={form.errorFor('from')}>
-            <TextInput
-              value={form.values.from}
-              type="date"
-              onChange={(v) => form.setField('from', v)}
-              onBlur={() => form.blurField('from')}
+    <>
+      <FormModal
+        open
+        onClose={onClose}
+        title={leave ? 'Edit Leave' : 'Add Leave'}
+        width={560}
+        onSubmit={form.handleSubmit}
+        submitLabel={leave ? 'Save Leave' : 'Add Leave'}
+        busy={form.submitting || confirm.modal.isApplying}
+      >
+        <div className="flex flex-col gap-4.5">
+          <div className="grid grid-cols-2 gap-4.5">
+            <Field label="From" required error={form.errorFor('from')}>
+              <TextInput
+                value={form.values.from}
+                type="date"
+                onChange={(v) => form.setField('from', v)}
+                onBlur={() => form.blurField('from')}
+              />
+            </Field>
+            <Field label="To" required error={form.errorFor('to')}>
+              <TextInput
+                value={form.values.to}
+                type="date"
+                onChange={(v) => form.setField('to', v)}
+                onBlur={() => form.blurField('to')}
+              />
+            </Field>
+          </div>
+          <Field label="Leave Type" required>
+            <Select
+              value={LEAVE_KIND_LABEL[form.values.kind]}
+              options={LEAVE_OPTIONS}
+              onChange={(v) => form.setField('kind', kindFromLabel(v))}
             />
           </Field>
-          <Field label="To" required error={form.errorFor('to')}>
+          <Field
+            label="Reason"
+            required
+            error={form.errorFor('reason')}
+            hint="Shown to the front desk, never to patients."
+          >
             <TextInput
-              value={form.values.to}
-              type="date"
-              onChange={(v) => form.setField('to', v)}
-              onBlur={() => form.blurField('to')}
+              value={form.values.reason}
+              placeholder="e.g. Cardiology Society annual meet"
+              onChange={(v) => form.setField('reason', v)}
+              onBlur={() => form.blurField('reason')}
             />
           </Field>
         </div>
-        <Field label="Leave Type" required>
-          <Select
-            value={form.values.type}
-            options={LEAVE_TYPES}
-            onChange={(v) => form.setField('type', v as LeaveType)}
-          />
-        </Field>
-        <Field
-          label="Reason"
-          required
-          error={form.errorFor('reason')}
-          hint="Shown to the front desk, never to patients."
-        >
-          <TextInput
-            value={form.values.reason}
-            placeholder="e.g. Cardiology Society annual meet"
-            onChange={(v) => form.setField('reason', v)}
-            onBlur={() => form.blurField('reason')}
-          />
-        </Field>
-      </div>
-    </FormModal>
+      </FormModal>
+      <ScheduleChangeModal {...confirm.modal} />
+    </>
   );
 }
 
 interface LeavePanelProps {
   doctorId: string;
-  leave: readonly DoctorLeave[];
+  leave: readonly DoctorLeaveEntry[];
 }
 
 /**
- * Leave / unavailability for one doctor (audit 2.4 / HA-06: "leave entry …
- * [has] no working control"; audit 3.1.2: the red button "announces a deletion
- * that does not happen").
- *
- * Every row here is a store record: Add and Edit open a real form with
- * validated dates, and Remove asks for confirmation and then actually removes
- * the row. The slot grid reads the same entries, so a doctor on leave has no
- * bookable slots on those dates.
+ * Leave / unavailability for one doctor, saved to the backend. Adding,
+ * editing or removing leave is a dry run first; bookings it would cancel are
+ * named before anything is applied.
  */
 export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
-  const catDeleteLeave = useCatalogStore((s) => s.catDeleteLeave);
-  const [editing, setEditing] = useState<{ leave: DoctorLeave | null } | null>(null);
-  const [removing, setRemoving] = useState<DoctorLeave | null>(null);
+  const remove = useDeleteLeaveMutation();
+  const confirm = useScheduleConfirm();
+  const [editing, setEditing] = useState<{ leave: DoctorLeaveEntry | null } | null>(null);
+  const [removing, setRemoving] = useState<DoctorLeaveEntry | null>(null);
 
   const confirmRemove = (): void => {
     if (!removing) return;
-    catDeleteLeave(doctorId, removing.id);
-    toast('Leave removed', 'info');
+    const target = removing;
     setRemoving(null);
+    void confirm.run({
+      attempt: (isConfirmed) =>
+        remove.mutateAsync({ doctorId, leaveId: target.id, confirm: isConfirmed }),
+      onApplied: () => toast('Leave removed', 'info'),
+      onError: (error) => toast(failureText(error, 'Could not remove the leave.'), 'error'),
+    });
   };
 
   return (
@@ -183,10 +224,10 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
               </div>
               <div className="min-w-40 flex-1">
                 <div className="text-body text-text-strong font-medium">
-                  {l.from === l.to ? fmtDate(l.from) : `${fmtDate(l.from)} – ${fmtDate(l.to)}`}
+                  {rangeLabel(l.dateFrom, l.dateTo)}
                 </div>
                 <div className="text-caption text-text-muted">
-                  {l.type} leave · {l.reason}
+                  {LEAVE_KIND_LABEL[l.kind]} leave{l.reason ? ` · ${l.reason}` : ''}
                 </div>
               </div>
               <Can perm={'Doctors & Departments.edit'}>
@@ -228,16 +269,16 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
         title="Remove Leave"
         body={
           removing
-            ? `Remove the ${removing.type.toLowerCase()} leave on ${
-                removing.from === removing.to
-                  ? fmtDate(removing.from)
-                  : `${fmtDate(removing.from)} – ${fmtDate(removing.to)}`
-              }? Those dates become bookable again.`
+            ? `Remove the ${LEAVE_KIND_LABEL[removing.kind].toLowerCase()} leave on ${rangeLabel(
+                removing.dateFrom,
+                removing.dateTo,
+              )}? Those dates become bookable again.`
             : ''
         }
         onClose={() => setRemoving(null)}
         onConfirm={confirmRemove}
       />
+      <ScheduleChangeModal {...confirm.modal} />
     </div>
   );
 }
