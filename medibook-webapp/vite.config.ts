@@ -11,6 +11,9 @@ const DEFAULT_WS_PROXY_TARGET = 'ws://localhost:8001';
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
+  // Opt-in for a backend with a self-signed certificate (e.g. a dev server on
+  // :8443). Certificate checks stay on unless this is exactly 'true'.
+  const verifyTls = env.VITE_PROXY_INSECURE_TLS !== 'true';
 
   return {
     plugins: [react(), tailwindcss()],
@@ -34,11 +37,13 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.VITE_API_PROXY_TARGET || DEFAULT_API_PROXY_TARGET,
           changeOrigin: true,
+          secure: verifyTls,
         },
         '/ws': {
           target: env.VITE_WS_PROXY_TARGET || DEFAULT_WS_PROXY_TARGET,
           changeOrigin: true,
           ws: true,
+          secure: verifyTls,
         },
       },
     },
