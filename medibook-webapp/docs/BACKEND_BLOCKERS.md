@@ -11,24 +11,28 @@ Paths under `backend:` are in the Django repository.
 
 ## Summary
 
-| ID        | Problem                                                       | Severity | Web app status                         |
-| --------- | ------------------------------------------------------------- | -------- | -------------------------------------- |
-| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available |
-| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only             |
-| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision   |
-| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`   |
-| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself         |
-| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs    |
-| CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                          |
-| ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates     |
-| CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)      |
-| ENV-01    | Email links are relative when the frontend URLs are unset     | High     | Deployment setting                     |
-| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                |
-| ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing     |
-| API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible       |
-| DASH-01   | Admin dashboard counts cancelled bookings as appointments     | Medium   | Web app subtracts them; walk-ins can't |
-| DASH-02   | Refunds are not split by channel or payment method            | Medium   | Front desk shows refunds separately    |
-| DASH-03   | No server-side read state for hospital notifications          | Low      | Bell remembers "read" per browser tab  |
+| ID        | Problem                                                       | Severity | Web app status                          |
+| --------- | ------------------------------------------------------------- | -------- | --------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available  |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only              |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision    |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`    |
+| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself          |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs     |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                           |
+| ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates      |
+| CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)       |
+| ENV-01    | Email links are relative when the frontend URLs are unset     | High     | Deployment setting                      |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                 |
+| ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing      |
+| API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible        |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments     | Medium   | Web app subtracts them; walk-ins can't  |
+| DASH-02   | Refunds are not split by channel or payment method            | Medium   | Front desk shows refunds separately     |
+| DASH-03   | No server-side read state for hospital notifications          | Low      | Bell remembers "read" per browser tab   |
+| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid    | High     | Desk must collect again before check-in |
+| APPT-02   | Cancelled unpaid bookings keep payment status "pending"       | Low      | Shown as "Not paid"                     |
+| APPT-03   | No per-hospital list of accepted desk payment methods         | Low      | Fixed list: cash, UPI, card, POS, other |
+| APPT-04   | Appointment history names no actor                            | Low      | Shows patient / staff / system only     |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -334,3 +338,57 @@ the alert counts.
 **What the web app does meanwhile.** Every bell item counts towards the badge. "Mark all
 read" clears the badge for that tab until a count changes (a new booking or drawer makes
 the item unread again).
+
+## APPT-01 — A refunded walk-in stays scheduled and can be checked in unpaid
+
+**New finding (live check of the Appointments screen, 6 Oct 2026).**
+
+**What fails.** A desk refund on a walk-in whose visit is still on changes only the
+payment status: the appointment stays `scheduled` with `payment_status = refunded`
+(backend: `payments/services/refunds.py:106-119`). Check-in looks only at the status and
+the date, not at payment (backend: `appointments/services/desk.py:164-171`), so the
+patient can be checked in and seen after their money was handed back. On Lakeshore today
+the only live walk-in is in exactly this state, and the screen offered "Check in" for it.
+
+**What the backend needs.** Either cancel the appointment when its payment is refunded
+in full while the visit is still on, or refuse check-in for a walk-in that is not paid
+(`APPOINTMENT_NOT_ACTIONABLE`).
+
+**What the web app does meanwhile.** A refunded walk-in whose visit is still on counts
+as Pending Payment: its action is Collect (the backend accepts a new payment for it), the
+drawer explains the refund, and Check in is hidden until it is paid again.
+
+## APPT-02 — Cancelled unpaid bookings keep payment status "pending"
+
+**What fails.** An online booking cancelled before checkout completed keeps
+`payment_status = pending` for good. On Lakeshore today 12 of 13 appointments are such
+cancelled bookings. A desk list reading "Pending ₹…" on them suggests money is still owed.
+
+**What the backend needs.** A terminal payment status for bookings that end without
+payment (e.g. `void` or `unpaid`), set when the appointment is cancelled or expires.
+
+**What the web app does meanwhile.** Cancelled and no-show bookings that were never paid
+show "Not paid".
+
+## APPT-03 — No per-hospital list of accepted desk payment methods
+
+**What fails.** The desk payment endpoint accepts every method in `Payment.Method`
+(backend: `payments/services/desk.py:18`), and no hospital setting says which ones a
+hospital takes at the counter. The web app has to decide the list itself.
+
+**What the backend needs.** A hospital setting for accepted desk methods (exposed on
+`/hospital/settings` or `/hospital/me`), validated by the desk payment endpoint.
+
+**What the web app does meanwhile.** Collect Payment offers cash, UPI, card, POS (card
+machine) and other.
+
+## APPT-04 — Appointment history names no actor
+
+**What fails.** Appointment events carry `actor_kind` and `actor_user_id` only. The desk
+cannot see which staff member checked a patient in, cancelled or refunded.
+
+**What the backend needs.** The actor's display name on each event (e.g. `actor_name`),
+as patient approvals already do (`requested_by_name`).
+
+**What the web app does meanwhile.** History lists each step with Patient, Hospital
+staff or System, and the status change it made.

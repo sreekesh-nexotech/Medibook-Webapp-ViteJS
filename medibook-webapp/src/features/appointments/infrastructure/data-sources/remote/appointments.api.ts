@@ -161,6 +161,14 @@ export async function getReceiptPdfUrl(id: string) {
   return receiptPdfResponseSchema.parse(response.data).url;
 }
 
+/** The token slip as the backend renders it (`Content-Type: application/pdf`). */
+export async function getTokenSlipPdf(id: string): Promise<Blob> {
+  const response = await hospitalApi.get<Blob>(`${base(id)}/token-slip.pdf`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 export async function getTokenSlip(id: string) {
   const response = await hospitalApi.get(`${base(id)}/token-slip`);
   return tokenSlipResponseSchema.parse(response.data);

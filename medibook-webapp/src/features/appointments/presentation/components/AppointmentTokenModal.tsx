@@ -1,13 +1,22 @@
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
+import { downloadFromUrl } from '@/shared/lib/download';
 import { Button } from '@/shared/ui/Button';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Modal } from '@/shared/ui/Modal';
 import { Spinner } from '@/shared/ui/Spinner';
+import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
+import { useTokenSlipPdfMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import { useTokenSlipQuery } from '@/features/appointments/application/queries/appointments.queries';
 import { dayOf, timeOf } from '@/features/appointments/presentation/components/appointments.view';
+
+/** The backend renders PDFs only where its PDF libraries are installed. */
+const NOT_IMPLEMENTED_STATUS = 501;
+
+/** Revoking an object URL in the same tick can cancel the download. */
+const REVOKE_DELAY_MS = 10_000;
 
 interface AppointmentTokenModalProps {
   /** Appointment whose token slip to print; `null` = closed. */
@@ -17,11 +26,34 @@ interface AppointmentTokenModalProps {
 
 /**
  * The queue token slip as the backend prints it (`/token-slip`): only
- * human-readable numbers, never an id (Q43). "Save as PDF" prints this slip.
+ * human-readable numbers, never an id (Q43). "Download PDF" fetches the slip
+ * the backend renders (`/token-slip.pdf`); "Save as PDF" prints this view.
  */
 export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTokenModalProps) {
   const slip = useTokenSlipQuery(appointmentId);
   const { ref, print } = usePrintArea<HTMLDivElement>();
+  const pdf = useTokenSlipPdfMutation();
+
+  const downloadPdf = (): void => {
+    if (!appointmentId || !slip.data) return;
+    const filename = `token-${slip.data.tokenLabel}.pdf`;
+    pdf.mutate(appointmentId, {
+      onSuccess: (blob) => {
+        const url = URL.createObjectURL(blob);
+        downloadFromUrl(url, filename);
+        setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+      },
+      onError: (failure) =>
+        toast(
+          isFailure(failure) && failure.status === NOT_IMPLEMENTED_STATUS
+            ? 'The server cannot render PDFs yet — use Save as PDF.'
+            : isFailure(failure)
+              ? failure.message
+              : 'Could not download the token slip.',
+          'error',
+        ),
+    });
+  };
 
   const row = (k: string, v: string) => (
     <div className="flex justify-between gap-3">
@@ -38,6 +70,15 @@ export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTok
       width={380}
       footer={
         <>
+          <Button
+            variant="secondary"
+            icon="download"
+            onClick={downloadPdf}
+            busy={pdf.isPending}
+            disabled={!slip.data}
+          >
+            Download PDF
+          </Button>
           <Button variant="secondary" icon="printer" onClick={print} disabled={!slip.data}>
             Save as PDF
           </Button>

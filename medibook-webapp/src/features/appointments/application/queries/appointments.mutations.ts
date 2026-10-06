@@ -14,6 +14,7 @@ import { cancelAppointment } from '@/features/appointments/application/usecases/
 import { checkInAppointment } from '@/features/appointments/application/usecases/appointments.checkInAppointment';
 import { collectPayment } from '@/features/appointments/application/usecases/appointments.collectPayment';
 import { fetchReceiptPdfUrl } from '@/features/appointments/application/usecases/appointments.fetchReceiptPdfUrl';
+import { fetchTokenSlipPdf } from '@/features/appointments/application/usecases/appointments.fetchTokenSlipPdf';
 import { markNoShow } from '@/features/appointments/application/usecases/appointments.markNoShow';
 import { refundAppointment } from '@/features/appointments/application/usecases/appointments.refundAppointment';
 import { rejectAppointment } from '@/features/appointments/application/usecases/appointments.rejectAppointment';
@@ -137,5 +138,12 @@ export function useRefundMutation() {
 export function useReceiptPdfMutation() {
   return useMutation({
     mutationFn: async (id: string) => unwrap(await fetchReceiptPdfUrl(id)),
+  });
+}
+
+/** Fetch the backend-rendered token slip PDF. */
+export function useTokenSlipPdfMutation() {
+  return useMutation({
+    mutationFn: async (id: string) => unwrap(await fetchTokenSlipPdf(id)),
   });
 }

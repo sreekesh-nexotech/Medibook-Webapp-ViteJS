@@ -34,4 +34,6 @@ export interface AppointmentsRepository {
   /** A short-lived URL for the receipt PDF. */
   receiptPdfUrl(id: string): Promise<Result<string>>;
   tokenSlip(id: string): Promise<Result<TokenSlipData>>;
+  /** The token slip PDF the backend renders (a 501 when it cannot render PDFs). */
+  tokenSlipPdf(id: string): Promise<Result<Blob>>;
 }
