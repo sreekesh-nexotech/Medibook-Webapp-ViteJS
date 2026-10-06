@@ -11,6 +11,7 @@ import {
   type Role,
 } from '@/features/users-roles/application/store/rbac.types';
 import type {
+  PermissionModule,
   RolePreviewModule,
   StaffInvitation,
   StaffMember,
@@ -128,6 +129,22 @@ export function gridToPermissionCodes(grid: PermsGrid, current: readonly string[
   return [...kept, ...granted].sort();
 }
 
+/**
+ * Catalogue modules the ten-row grid does not have (on the test backend:
+ * Cash Desk, Patient Approvals, Display Devices). The role editor lists them
+ * under the grid so they can be seen and changed, not only carried over.
+ */
+export function extraPermissionModules(
+  catalogue: readonly PermissionModule[],
+): readonly PermissionModule[] {
+  return catalogue.filter((m) => !GRID_MODULE_CODES.has(m.module));
+}
+
+/** How many catalogue modules a permission set touches at all. */
+export function modulesHeld(codes: readonly string[]): number {
+  return new Set(codes.map(moduleOf)).size;
+}
+
 export function toRoleView(role: StaffRole): RoleView {
   const look = ROLE_PRESENTATION[role.code];
   return {
@@ -145,7 +162,7 @@ export function toRoleView(role: StaffRole): RoleView {
 
 /* ------------------------------------------------------------------- users */
 
-export type UserRowStatus = 'Active' | 'Inactive' | 'Pending';
+export type UserRowStatus = 'Active' | 'Inactive' | 'Pending' | 'Expired';
 
 /** One row of the Users table — a staff member, or an invitation not yet accepted. */
 export interface UserRow {
@@ -157,8 +174,11 @@ export interface UserRow {
   readonly name: string;
   readonly email: string;
   readonly phone: string;
-  /** The backend has no usernames; shown as a dash. */
-  readonly username: string;
+  /** Staff sign in with their email — the hospital's own ID for them, if set. */
+  readonly employeeCode: string | null;
+  readonly designation: string | null;
+  /** Default counter id (staff only). */
+  readonly counterId: string | null;
   /** The role code — `RoleView.id`. */
   readonly roleId: string;
   readonly status: UserRowStatus;
@@ -169,9 +189,17 @@ export interface UserRow {
   readonly lockedUntil: string | null;
   /** Row version for the role-change `If-Match` (0 for invitations, which have none). */
   readonly version: number;
+  /** Staff: joined and deactivated dates. */
+  readonly joinedAt: string | null;
+  readonly deactivatedAt: string | null;
+  /** Invitations: when it was first and last sent, how often resent, when the link dies. */
+  readonly invitedAt: string | null;
+  readonly lastSentAt: string | null;
+  readonly resendCount: number;
+  readonly expiresAt: string | null;
 }
 
-/** Shown where the backend has no value (username, phone). */
+/** Shown where the backend has no value (employee code, phone). */
 export const NO_VALUE = '—';
 
 const STAFF_STATUS: Readonly<Record<StaffMember['status'], UserRowStatus>> = {
@@ -192,17 +220,31 @@ export function staffToRow(s: StaffMember): UserRow {
     name: fullName(s.firstName, s.lastName),
     email: s.email ?? NO_VALUE,
     phone: s.phone ?? NO_VALUE,
-    username: NO_VALUE,
+    employeeCode: s.employeeCode,
+    designation: s.designation,
+    counterId: s.counterId,
     roleId: s.roleCode,
     status: STAFF_STATUS[s.status],
     lastLoginAt: s.lastLoginAt,
     invite: s.status === 'invited' ? 'Pending' : 'Accepted',
     lockedUntil: s.lockedUntil,
     version: s.version,
+    joinedAt: s.joinedAt,
+    deactivatedAt: s.deactivatedAt,
+    invitedAt: null,
+    lastSentAt: null,
+    resendCount: 0,
+    expiresAt: null,
   };
 }
 
-export function invitationToRow(i: StaffInvitation): UserRow {
+/**
+ * An invitation is listed as `invited` until the same email is invited again
+ * (BACKEND_BLOCKERS USR-01), so whether its link still works comes from
+ * `expires_at`, compared with `now` (epoch ms).
+ */
+export function invitationToRow(i: StaffInvitation, now: number): UserRow {
+  const expired = Date.parse(i.expiresAt) <= now;
   return {
     key: `invitation:${i.id}`,
     kind: 'invitation',
@@ -210,13 +252,21 @@ export function invitationToRow(i: StaffInvitation): UserRow {
     name: fullName(i.firstName, i.lastName),
     email: i.email,
     phone: i.phone ?? NO_VALUE,
-    username: NO_VALUE,
+    employeeCode: null,
+    designation: null,
+    counterId: null,
     roleId: i.roleCode,
-    status: 'Pending',
+    status: expired ? 'Expired' : 'Pending',
     lastLoginAt: null,
     invite: 'Pending',
     lockedUntil: null,
     version: 0,
+    joinedAt: null,
+    deactivatedAt: null,
+    invitedAt: i.invitedAt,
+    lastSentAt: i.lastSentAt,
+    resendCount: i.resendCount,
+    expiresAt: i.expiresAt,
   };
 }
 

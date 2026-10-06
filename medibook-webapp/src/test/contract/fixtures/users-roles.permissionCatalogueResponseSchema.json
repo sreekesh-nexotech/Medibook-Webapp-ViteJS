@@ -1,0 +1,383 @@
+{
+  "modules": [
+    {
+      "module": "appointments",
+      "label": "Appointments",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "billing_settlements",
+      "label": "Billing & Settlements",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "cash_desk",
+      "label": "Cash Desk",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "dashboard",
+      "label": "Dashboard",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "display_devices",
+      "label": "Display Devices",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "doctors_departments",
+      "label": "Doctors & Departments",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "hospital_settings",
+      "label": "Hospital Settings",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "patient_approvals",
+      "label": "Patient Approvals",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "patients",
+      "label": "Patients",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "payments",
+      "label": "Payments",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "reports",
+      "label": "Reports",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "token_management",
+      "label": "Token Management",
+      "actions": ["add", "del", "edit", "view"]
+    },
+    {
+      "module": "users_roles",
+      "label": "Users & Roles",
+      "actions": ["add", "del", "edit", "view"]
+    }
+  ],
+  "permissions": [
+    {
+      "code": "appointments.add",
+      "module": "appointments",
+      "action": "add",
+      "label": "Appointments.add"
+    },
+    {
+      "code": "appointments.del",
+      "module": "appointments",
+      "action": "del",
+      "label": "Appointments.del"
+    },
+    {
+      "code": "appointments.edit",
+      "module": "appointments",
+      "action": "edit",
+      "label": "Appointments.edit"
+    },
+    {
+      "code": "appointments.view",
+      "module": "appointments",
+      "action": "view",
+      "label": "Appointments.view"
+    },
+    {
+      "code": "billing_settlements.add",
+      "module": "billing_settlements",
+      "action": "add",
+      "label": "Billing & Settlements.add"
+    },
+    {
+      "code": "billing_settlements.del",
+      "module": "billing_settlements",
+      "action": "del",
+      "label": "Billing & Settlements.del"
+    },
+    {
+      "code": "billing_settlements.edit",
+      "module": "billing_settlements",
+      "action": "edit",
+      "label": "Billing & Settlements.edit"
+    },
+    {
+      "code": "billing_settlements.view",
+      "module": "billing_settlements",
+      "action": "view",
+      "label": "Billing & Settlements.view"
+    },
+    {
+      "code": "cash_desk.add",
+      "module": "cash_desk",
+      "action": "add",
+      "label": "Cash Desk.add"
+    },
+    {
+      "code": "cash_desk.del",
+      "module": "cash_desk",
+      "action": "del",
+      "label": "Cash Desk.del"
+    },
+    {
+      "code": "cash_desk.edit",
+      "module": "cash_desk",
+      "action": "edit",
+      "label": "Cash Desk.edit"
+    },
+    {
+      "code": "cash_desk.view",
+      "module": "cash_desk",
+      "action": "view",
+      "label": "Cash Desk.view"
+    },
+    {
+      "code": "dashboard.add",
+      "module": "dashboard",
+      "action": "add",
+      "label": "Dashboard.add"
+    },
+    {
+      "code": "dashboard.del",
+      "module": "dashboard",
+      "action": "del",
+      "label": "Dashboard.del"
+    },
+    {
+      "code": "dashboard.edit",
+      "module": "dashboard",
+      "action": "edit",
+      "label": "Dashboard.edit"
+    },
+    {
+      "code": "dashboard.view",
+      "module": "dashboard",
+      "action": "view",
+      "label": "Dashboard.view"
+    },
+    {
+      "code": "display_devices.add",
+      "module": "display_devices",
+      "action": "add",
+      "label": "Display Devices.add"
+    },
+    {
+      "code": "display_devices.del",
+      "module": "display_devices",
+      "action": "del",
+      "label": "Display Devices.del"
+    },
+    {
+      "code": "display_devices.edit",
+      "module": "display_devices",
+      "action": "edit",
+      "label": "Display Devices.edit"
+    },
+    {
+      "code": "display_devices.view",
+      "module": "display_devices",
+      "action": "view",
+      "label": "Display Devices.view"
+    },
+    {
+      "code": "doctors_departments.add",
+      "module": "doctors_departments",
+      "action": "add",
+      "label": "Doctors & Departments.add"
+    },
+    {
+      "code": "doctors_departments.del",
+      "module": "doctors_departments",
+      "action": "del",
+      "label": "Doctors & Departments.del"
+    },
+    {
+      "code": "doctors_departments.edit",
+      "module": "doctors_departments",
+      "action": "edit",
+      "label": "Doctors & Departments.edit"
+    },
+    {
+      "code": "doctors_departments.view",
+      "module": "doctors_departments",
+      "action": "view",
+      "label": "Doctors & Departments.view"
+    },
+    {
+      "code": "hospital_settings.add",
+      "module": "hospital_settings",
+      "action": "add",
+      "label": "Hospital Settings.add"
+    },
+    {
+      "code": "hospital_settings.del",
+      "module": "hospital_settings",
+      "action": "del",
+      "label": "Hospital Settings.del"
+    },
+    {
+      "code": "hospital_settings.edit",
+      "module": "hospital_settings",
+      "action": "edit",
+      "label": "Hospital Settings.edit"
+    },
+    {
+      "code": "hospital_settings.view",
+      "module": "hospital_settings",
+      "action": "view",
+      "label": "Hospital Settings.view"
+    },
+    {
+      "code": "patient_approvals.add",
+      "module": "patient_approvals",
+      "action": "add",
+      "label": "Patient Approvals.add"
+    },
+    {
+      "code": "patient_approvals.del",
+      "module": "patient_approvals",
+      "action": "del",
+      "label": "Patient Approvals.del"
+    },
+    {
+      "code": "patient_approvals.edit",
+      "module": "patient_approvals",
+      "action": "edit",
+      "label": "Patient Approvals.edit"
+    },
+    {
+      "code": "patient_approvals.view",
+      "module": "patient_approvals",
+      "action": "view",
+      "label": "Patient Approvals.view"
+    },
+    {
+      "code": "patients.add",
+      "module": "patients",
+      "action": "add",
+      "label": "Patients.add"
+    },
+    {
+      "code": "patients.del",
+      "module": "patients",
+      "action": "del",
+      "label": "Patients.del"
+    },
+    {
+      "code": "patients.edit",
+      "module": "patients",
+      "action": "edit",
+      "label": "Patients.edit"
+    },
+    {
+      "code": "patients.view",
+      "module": "patients",
+      "action": "view",
+      "label": "Patients.view"
+    },
+    {
+      "code": "payments.add",
+      "module": "payments",
+      "action": "add",
+      "label": "Payments.add"
+    },
+    {
+      "code": "payments.del",
+      "module": "payments",
+      "action": "del",
+      "label": "Payments.del"
+    },
+    {
+      "code": "payments.edit",
+      "module": "payments",
+      "action": "edit",
+      "label": "Payments.edit"
+    },
+    {
+      "code": "payments.view",
+      "module": "payments",
+      "action": "view",
+      "label": "Payments.view"
+    },
+    {
+      "code": "reports.add",
+      "module": "reports",
+      "action": "add",
+      "label": "Reports.add"
+    },
+    {
+      "code": "reports.del",
+      "module": "reports",
+      "action": "del",
+      "label": "Reports.del"
+    },
+    {
+      "code": "reports.edit",
+      "module": "reports",
+      "action": "edit",
+      "label": "Reports.edit"
+    },
+    {
+      "code": "reports.view",
+      "module": "reports",
+      "action": "view",
+      "label": "Reports.view"
+    },
+    {
+      "code": "token_management.add",
+      "module": "token_management",
+      "action": "add",
+      "label": "Token Management.add"
+    },
+    {
+      "code": "token_management.del",
+      "module": "token_management",
+      "action": "del",
+      "label": "Token Management.del"
+    },
+    {
+      "code": "token_management.edit",
+      "module": "token_management",
+      "action": "edit",
+      "label": "Token Management.edit"
+    },
+    {
+      "code": "token_management.view",
+      "module": "token_management",
+      "action": "view",
+      "label": "Token Management.view"
+    },
+    {
+      "code": "users_roles.add",
+      "module": "users_roles",
+      "action": "add",
+      "label": "Users & Roles.add"
+    },
+    {
+      "code": "users_roles.del",
+      "module": "users_roles",
+      "action": "del",
+      "label": "Users & Roles.del"
+    },
+    {
+      "code": "users_roles.edit",
+      "module": "users_roles",
+      "action": "edit",
+      "label": "Users & Roles.edit"
+    },
+    {
+      "code": "users_roles.view",
+      "module": "users_roles",
+      "action": "view",
+      "label": "Users & Roles.view"
+    }
+  ]
+}

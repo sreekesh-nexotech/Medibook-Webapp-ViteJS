@@ -1,15 +1,15 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
+  StaffDetailsDraft,
   StaffMember,
-  StaffRoleCode,
 } from '@/features/users-roles/domain/entities/usersRoles.types';
 import { usersRolesRepository } from '@/features/users-roles/infrastructure/repositories/usersRoles.repository.impl';
 
-export function changeStaffRole(
+export function updateStaffDetails(
   staffId: string,
-  roleCode: StaffRoleCode,
+  details: StaffDetailsDraft,
   version: number,
 ): Promise<Result<StaffMember>> {
-  return usersRolesRepository.changeStaffRole(staffId, roleCode, version);
+  return usersRolesRepository.updateStaffDetails(staffId, details, version);
 }

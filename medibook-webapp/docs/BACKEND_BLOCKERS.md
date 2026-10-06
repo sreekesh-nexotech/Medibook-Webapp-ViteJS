@@ -46,6 +46,8 @@ Paths under `backend:` are in the Django repository.
 | DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                      |
 | SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings              |
 | SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged            |
+| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                  |
+| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                      |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -628,3 +630,37 @@ with the fee engine.
 a service on a switched-off rate still shows the tax, marked "rate switched off, still
 charged", and the Taxes tab says how many services still use it. Saves no longer
 re-send an unchanged rate, so such a service can still be edited or toggled.
+
+## USR-01 — Expired staff invitations still read as `invited`
+
+**New finding (live check of Users & Roles, 6 Oct 2026).**
+
+**What fails.** An invitation's `status` becomes `expired` only when the same email is
+invited again (`rbac/services/invitations.py`); nothing sweeps them when `expires_at`
+passes. So `GET /hospital/staff/invitations?status=invited` also returns invitations
+whose link no longer works — on Lakeshore, the receptionist invitation due at 17:21 on
+6 Oct keeps reading `invited` after that.
+
+**What the backend needs.** Treat `expires_at <= now` as expired when listing and
+filtering (or a periodic job that flips the status), so `status=invited` means the link
+still works.
+
+**What the web app does meanwhile.** It works the state out from `expires_at`: such a
+row reads "Invite expired", has its own status filter, is not counted as a pending
+invite, and its drawer offers Resend (which issues a new link) or Revoke.
+
+## USR-02 — No OTP invite, admin-set password, or role description
+
+**What fails.** The design's Add User and Reset Password flows offer a mobile OTP and an
+administrator-set (temporary) password; the backend only emails links
+(`POST /staff/invitations`, `POST /staff/{id}/reset-password`). Roles also carry no
+description or colour (`RoleSerializer`: id, code, name, flags, permissions), so the
+screen's one-line summaries and colours are fixed copy per role code.
+
+**What the backend needs.** If the product wants them: an OTP invite / OTP reset, an
+admin-set temporary password with forced change at next sign-in, and a `description`
+on roles.
+
+**What the web app does meanwhile.** The OTP and set-a-password options are shown but
+disabled with an explanation; the email link is the only method that works. Role
+descriptions and colours are presentation copy.

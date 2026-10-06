@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  PermissionModule,
   RolePreview,
+  StaffCounter,
   StaffInvitation,
   StaffMember,
   StaffRole,
@@ -89,6 +91,34 @@ export const rolePreviewResponseSchema = z.object({
 
 export type RolePreviewResponse = z.infer<typeof rolePreviewResponseSchema>;
 
+/** `GET /permissions` — the hospital permission catalogue, grouped by module. */
+export const permissionCatalogueResponseSchema = z.object({
+  modules: z.array(
+    z.object({ module: z.string(), label: z.string(), actions: z.array(z.string()) }),
+  ),
+});
+
+export type PermissionCatalogueResponse = z.infer<typeof permissionCatalogueResponseSchema>;
+
+export const counterResponseSchema = z.object({
+  id: z.string(),
+  code: z.string(),
+  name: z.string(),
+  is_active: z.boolean(),
+});
+
+export const counterPageResponseSchema = paginatedSchema(counterResponseSchema);
+
+export type CounterResponse = z.infer<typeof counterResponseSchema>;
+
+export function toPermissionModules(dto: PermissionCatalogueResponse): PermissionModule[] {
+  return dto.modules.map((m) => ({ module: m.module, label: m.label, actions: m.actions }));
+}
+
+export function toStaffCounter(dto: CounterResponse): StaffCounter {
+  return { id: dto.id, code: dto.code, name: dto.name, isActive: dto.is_active };
+}
+
 export function toStaffMember(dto: StaffResponse): StaffMember {
   return {
     id: dto.id,
@@ -101,7 +131,10 @@ export function toStaffMember(dto: StaffResponse): StaffMember {
     roleName: dto.role.name,
     employeeCode: dto.employee_code,
     designation: dto.designation,
+    counterId: dto.counter_id,
     status: dto.status,
+    joinedAt: dto.joined_at,
+    deactivatedAt: dto.deactivated_at,
     lastLoginAt: dto.user.last_login_at,
     lockedUntil: dto.locked_until,
     version: dto.version,

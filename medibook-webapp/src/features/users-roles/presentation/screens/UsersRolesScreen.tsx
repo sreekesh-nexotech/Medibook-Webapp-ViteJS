@@ -29,14 +29,11 @@ import type { HospitalRole } from '@/app/router/paths';
 
 import { useDeactivateStaffMutation } from '@/features/users-roles/application/queries/useDeactivateStaffMutation';
 import { usePendingInvitationsQuery } from '@/features/users-roles/application/queries/usePendingInvitationsQuery';
+import { usePermissionModulesQuery } from '@/features/users-roles/application/queries/usePermissionModulesQuery';
 import { useRolePreviewQuery } from '@/features/users-roles/application/queries/useRolePreviewQuery';
 import { useStaffMembersQuery } from '@/features/users-roles/application/queries/useStaffMembersQuery';
 import { useStaffRolesQuery } from '@/features/users-roles/application/queries/useStaffRolesQuery';
-import {
-  PERM_ACTIONS,
-  RBAC_MODULES,
-  type PermsGrid,
-} from '@/features/users-roles/application/store/rbac.types';
+import { RBAC_MODULES, type PermsGrid } from '@/features/users-roles/application/store/rbac.types';
 import { defaultSignInAs } from '@/features/users-roles/presentation/components/access-preview';
 import { AddUserModal } from '@/features/users-roles/presentation/components/AddUserModal';
 import { ResetModal } from '@/features/users-roles/presentation/components/ResetModal';
@@ -48,19 +45,14 @@ import {
   failureText,
   invitationToRow,
   lastActiveLabel,
+  modulesHeld,
+  NO_VALUE,
   previewToPermsGrid,
   staffToRow,
   toRoleView,
   type RoleView,
   type UserRow,
 } from '@/features/users-roles/presentation/components/usersRoles.viewModel';
-
-/** Module coverage summary for a role card (design `permSummary`). */
-function permSummary(perms: PermsGrid): { count: number; full: number } {
-  const mods = RBAC_MODULES.filter((m) => PERM_ACTIONS.some((a) => perms[m][a]));
-  const full = RBAC_MODULES.filter((m) => PERM_ACTIONS.every((a) => perms[m][a]));
-  return { count: mods.length, full: full.length };
-}
 
 interface Kpi {
   readonly icon: IconName;
@@ -75,16 +67,16 @@ const TABS = ['Users', 'Roles & Permissions', 'Access Preview'] as const;
 const ALL_ROLES = 'All Roles';
 const ALL_STATUS = 'All Status';
 
-const USER_COLUMNS = ['User', 'Username', 'Role', 'Last Active', 'Status', 'Action'] as const;
+const USER_COLUMNS = ['User', 'Employee Code', 'Role', 'Last Active', 'Status', 'Action'] as const;
 
 const USER_SORT_KEYS: Readonly<Record<string, string | undefined>> = {
   User: 'name',
-  Username: 'username',
+  'Employee Code': 'code',
   Role: 'role',
   Status: 'status',
 };
 
-const STATUS_OPTIONS = [ALL_STATUS, 'Active', 'Inactive', 'Pending'] as const;
+const STATUS_OPTIONS = [ALL_STATUS, 'Active', 'Inactive', 'Pending', 'Expired'] as const;
 
 /** Staff members holding `roleId` (pending invitations hold no role yet). */
 function roleHolders(users: readonly UserRow[], roleId: string): readonly UserRow[] {
@@ -116,6 +108,9 @@ export function UsersRolesScreen() {
   const staffQuery = useStaffMembersQuery();
   const invitationsQuery = usePendingInvitationsQuery(canAddUser);
   const rolesQuery = useStaffRolesQuery();
+  const catalogueQuery = usePermissionModulesQuery();
+  const catalogue = catalogueQuery.data ?? [];
+  const moduleTotal = catalogue.length > 0 ? catalogue.length : RBAC_MODULES.length;
   const deactivateStaff = useDeactivateStaffMutation();
 
   const [tab, setTab] = useState<string>(TABS[0]);
@@ -134,7 +129,7 @@ export function UsersRolesScreen() {
   const roles: readonly RoleView[] = (rolesQuery.data ?? []).map(toRoleView);
   // Pending invitations first: they are the rows an administrator acts on next.
   const users: readonly UserRow[] = [
-    ...(invitationsQuery.data ?? []).map(invitationToRow),
+    ...(invitationsQuery.data ?? []).map((i) => invitationToRow(i, now)),
     ...(staffQuery.data ?? []).map(staffToRow),
   ];
 
@@ -144,6 +139,7 @@ export function UsersRolesScreen() {
     await Promise.all([
       staffQuery.refetch(),
       rolesQuery.refetch(),
+      catalogueQuery.refetch(),
       canAddUser ? invitationsQuery.refetch() : Promise.resolve(),
     ]);
   };
@@ -152,7 +148,13 @@ export function UsersRolesScreen() {
   const { sort, onSort, sorted } = useSort<UserRow>();
 
   const shown = users.filter((u) => {
-    if (q && !(u.name + u.email + u.username).toLowerCase().includes(q.toLowerCase())) return false;
+    if (
+      q &&
+      !(u.name + u.email + (u.employeeCode ?? '') + (u.designation ?? ''))
+        .toLowerCase()
+        .includes(q.toLowerCase())
+    )
+      return false;
     if (roleFilter !== ALL_ROLES && roleById[u.roleId]?.name !== roleFilter) return false;
     if (statusFilter !== ALL_STATUS && u.status !== statusFilter) return false;
     return true;
@@ -177,7 +179,8 @@ export function UsersRolesScreen() {
     {
       icon: 'mail',
       label: 'Pending Invites',
-      value: users.filter((u) => u.invite === 'Pending').length,
+      // Expired links are not pending — they need resending.
+      value: users.filter((u) => u.status === 'Pending').length,
       fg: 'text-y-600',
       bg: 'bg-y-100',
     },
@@ -289,7 +292,7 @@ export function UsersRolesScreen() {
               <SearchField
                 value={q}
                 onChange={setQ}
-                placeholder="Search users by name, email or username"
+                placeholder="Search users by name, email, employee code or designation"
               />
             </div>
             <div className="mb-4.5 flex flex-wrap items-center gap-3">
@@ -333,7 +336,7 @@ export function UsersRolesScreen() {
             >
               {sorted(shown, {
                 name: (u) => u.name,
-                username: (u) => u.username,
+                code: (u) => u.employeeCode ?? '',
                 role: (u) => roleById[u.roleId]?.name,
                 status: (u) => u.status,
               }).map((u) => {
@@ -353,7 +356,10 @@ export function UsersRolesScreen() {
                         </div>
                       </div>
                     </td>
-                    <td className={cn(tdClass, 'text-text-muted')}>{u.username}</td>
+                    <td className={cn(tdClass, 'text-text-muted')}>
+                      <div className="text-body text-text-body">{u.employeeCode ?? NO_VALUE}</div>
+                      {u.designation && <div className="text-caption">{u.designation}</div>}
+                    </td>
                     <td className={tdClass}>
                       {r ? (
                         <span
@@ -371,7 +377,9 @@ export function UsersRolesScreen() {
                       {lastActiveLabel(u.lastLoginAt, now)}
                     </td>
                     <td className={tdClass}>
-                      <Badge status={u.status} />
+                      <Badge status={u.status === 'Expired' ? 'Cancelled' : u.status}>
+                        {u.status === 'Expired' ? 'Invite expired' : u.status}
+                      </Badge>
                     </td>
                     <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2">
@@ -411,7 +419,7 @@ export function UsersRolesScreen() {
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {roles.map((r) => {
-              const s = permSummary(r.perms);
+              const held = modulesHeld(r.permissionCodes);
               const count = roleHolders(users, r.id).length;
               return (
                 <Card key={r.id} pad={18} hover onClick={() => setRoleEdit(r)}>
@@ -433,8 +441,8 @@ export function UsersRolesScreen() {
                       {count === 1 ? 'user' : 'users'}
                     </span>
                     <span className="inline-flex items-center gap-1.25">
-                      <Icon name="shield-check" size={14} className="text-text-muted" /> {s.count}/
-                      {RBAC_MODULES.length} modules
+                      <Icon name="shield-check" size={14} className="text-text-muted" /> {held}/
+                      {moduleTotal} modules
                     </span>
                   </div>
                 </Card>
@@ -506,7 +514,9 @@ export function UsersRolesScreen() {
       )}
 
       {add && <AddUserModal roles={roles} onClose={() => setAdd(false)} />}
-      {roleEdit && <RoleEditor role={roleEdit} onClose={() => setRoleEdit(null)} />}
+      {roleEdit && (
+        <RoleEditor role={roleEdit} catalogue={catalogue} onClose={() => setRoleEdit(null)} />
+      )}
       {userView && (
         <UserDrawer
           user={userView}

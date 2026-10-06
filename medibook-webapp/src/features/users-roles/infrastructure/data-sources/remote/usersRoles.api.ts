@@ -11,14 +11,18 @@ import type {
   StaffRolePatchRequest,
 } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.request';
 import {
+  counterPageResponseSchema,
   invitationPageResponseSchema,
+  permissionCatalogueResponseSchema,
   invitationResponseSchema,
   rolePageResponseSchema,
   rolePreviewResponseSchema,
   roleResponseSchema,
   staffPageResponseSchema,
   staffResponseSchema,
+  type CounterResponse,
   type InvitationResponse,
+  type PermissionCatalogueResponse,
   type RolePreviewResponse,
   type RoleResponse,
   type StaffResponse,
@@ -128,6 +132,17 @@ export async function patchRolePermissions(
     body,
   );
   return roleResponseSchema.parse(response.data);
+}
+
+/** The permission catalogue: every module and the actions it has. */
+export async function getPermissionCatalogue(): Promise<PermissionCatalogueResponse> {
+  const response = await hospitalApi.get('/permissions');
+  return permissionCatalogueResponseSchema.parse(response.data);
+}
+
+/** The hospital's counters, for naming and assigning a staff member's default counter. */
+export function getCounters(): Promise<CounterResponse[]> {
+  return getAllPages('/counters', counterPageResponseSchema);
 }
 
 export async function getRolePreview(roleCode: StaffRoleCode): Promise<RolePreviewResponse> {

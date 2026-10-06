@@ -147,6 +147,8 @@ import { sessionPageSchema } from '@/features/token-queue/infrastructure/data-so
 import {
   invitationPageResponseSchema,
   rolePreviewResponseSchema,
+  counterPageResponseSchema as usersRolesCounterPageResponseSchema,
+  permissionCatalogueResponseSchema,
   rolePageResponseSchema as usersRolesRolePageResponseSchema,
   staffPageResponseSchema as usersRolesStaffPageResponseSchema,
 } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.response';
@@ -251,7 +253,9 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'slots.generationRunPageResponseSchema': generationRunPageResponseSchema,
   'slots.slotGridPageResponseSchema': slotGridPageResponseSchema,
   'token-queue.sessionPageSchema': sessionPageSchema,
+  'users-roles.counterPageResponseSchema': usersRolesCounterPageResponseSchema,
   'users-roles.invitationPageResponseSchema': invitationPageResponseSchema,
+  'users-roles.permissionCatalogueResponseSchema': permissionCatalogueResponseSchema,
   'users-roles.rolePageResponseSchema': usersRolesRolePageResponseSchema,
   'users-roles.rolePreviewResponseSchema': rolePreviewResponseSchema,
   'users-roles.staffPageResponseSchema': usersRolesStaffPageResponseSchema,

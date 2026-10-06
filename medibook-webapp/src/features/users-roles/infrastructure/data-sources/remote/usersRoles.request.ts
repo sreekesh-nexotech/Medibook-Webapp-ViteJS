@@ -1,4 +1,5 @@
 import type {
+  StaffDetailsDraft,
   StaffInviteDraft,
   StaffRoleCode,
 } from '@/features/users-roles/domain/entities/usersRoles.types';
@@ -12,9 +13,21 @@ export interface InvitationCreateRequest {
   readonly role_code: StaffRoleCode;
 }
 
-/** `PatchedStaffPatchRequest` — only the role is edited from this screen. */
+/** `PatchedStaffPatchRequest` — role, employee code, designation and default counter. */
 export interface StaffRolePatchRequest {
   readonly role_code: StaffRoleCode;
+  readonly employee_code: string | null;
+  readonly designation: string | null;
+  readonly counter_id: string | null;
+}
+
+export function toStaffPatchRequest(draft: StaffDetailsDraft): StaffRolePatchRequest {
+  return {
+    role_code: draft.roleCode,
+    employee_code: draft.employeeCode,
+    designation: draft.designation,
+    counter_id: draft.counterId,
+  };
 }
 
 /** `PatchedRolePermissionsPatchRequest` — the full replacement grid. */

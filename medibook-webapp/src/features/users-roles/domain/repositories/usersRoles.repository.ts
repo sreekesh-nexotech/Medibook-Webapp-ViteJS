@@ -1,7 +1,10 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
+  PermissionModule,
   RolePreview,
+  StaffCounter,
+  StaffDetailsDraft,
   StaffInvitation,
   StaffInviteDraft,
   StaffMember,
@@ -26,12 +29,15 @@ export interface UsersRolesRepository {
   sendPasswordReset(staffId: string): Promise<Result<StaffMember>>;
   /** Clears a sign-in lockout. */
   unlockStaff(staffId: string): Promise<Result<StaffMember>>;
-  /** `version` guards against a concurrent edit. */
-  changeStaffRole(
+  /** Role, employee code, designation and default counter; `version` guards a concurrent edit. */
+  updateStaffDetails(
     staffId: string,
-    roleCode: StaffRoleCode,
+    details: StaffDetailsDraft,
     version: number,
   ): Promise<Result<StaffMember>>;
+  listCounters(): Promise<Result<readonly StaffCounter[]>>;
+  /** The permission catalogue — every module a role can be granted. */
+  listPermissionModules(): Promise<Result<readonly PermissionModule[]>>;
   listRoles(): Promise<Result<readonly StaffRole[]>>;
   /** Replaces the role's whole permission set with `permissions`. */
   updateRolePermissions(

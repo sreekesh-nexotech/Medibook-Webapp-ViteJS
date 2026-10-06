@@ -24,7 +24,12 @@ export interface StaffMember {
   readonly roleName: string;
   readonly employeeCode: string | null;
   readonly designation: string | null;
+  /** The counter they work at by default, or `null`. */
+  readonly counterId: string | null;
   readonly status: StaffStatus;
+  /** ISO date-time they joined (accepted the invitation). */
+  readonly joinedAt: string | null;
+  readonly deactivatedAt: string | null;
   /** ISO date-time of the last sign-in, `null` when they never signed in. */
   readonly lastLoginAt: string | null;
   /** ISO date-time the sign-in lockout ends, `null` when not locked out. */
@@ -69,6 +74,31 @@ export interface RolePreview {
   readonly roleCode: string;
   readonly roleName: string;
   readonly modules: readonly RolePreviewModule[];
+}
+
+/** A front-desk counter staff can be assigned to by default. */
+export interface StaffCounter {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** One module of the hospital permission catalogue (`GET /permissions`). */
+export interface PermissionModule {
+  /** Backend module code, e.g. `cash_desk`. */
+  readonly module: string;
+  readonly label: string;
+  /** The actions that exist for it (`view`, `add`, `edit`, `del`). */
+  readonly actions: readonly string[];
+}
+
+/** What an administrator may change on a staff member (`PATCH /staff/{id}`). */
+export interface StaffDetailsDraft {
+  readonly roleCode: StaffRoleCode;
+  readonly employeeCode: string | null;
+  readonly designation: string | null;
+  readonly counterId: string | null;
 }
 
 /** What an administrator fills in to invite a new staff member. */

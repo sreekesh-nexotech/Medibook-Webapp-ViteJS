@@ -6,6 +6,8 @@ export const usersRolesKeys = {
   staff: () => [...usersRolesKeys.all, 'staff'] as const,
   invitations: () => [...usersRolesKeys.all, 'invitations'] as const,
   roles: () => [...usersRolesKeys.all, 'roles'] as const,
+  counters: () => [...usersRolesKeys.all, 'counters'] as const,
+  permissionModules: () => [...usersRolesKeys.all, 'permission-modules'] as const,
   previews: () => [...usersRolesKeys.all, 'preview'] as const,
   preview: (roleCode: StaffRoleCode) => [...usersRolesKeys.previews(), roleCode] as const,
 };
