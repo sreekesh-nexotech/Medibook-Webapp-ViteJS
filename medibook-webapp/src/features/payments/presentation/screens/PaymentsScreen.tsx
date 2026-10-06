@@ -40,6 +40,8 @@ import { useInvalidatePayments } from '@/features/payments/application/queries/u
 import { usePaymentRefundsQuery } from '@/features/payments/application/queries/usePaymentRefundsQuery';
 import { usePaymentsQuery } from '@/features/payments/application/queries/usePaymentsQuery';
 import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
+import { PaymentsCashDrawer } from '@/features/payments/presentation/components/PaymentsCashDrawer';
+import { PaymentsCashReconcile } from '@/features/payments/presentation/components/PaymentsCashReconcile';
 import { PaymentsVisitReceiptsModal } from '@/features/payments/presentation/components/PaymentsVisitReceiptsModal';
 import {
   LINE_STATUS_LABEL,
@@ -58,11 +60,11 @@ type PayTab = 'All' | 'Paid' | 'Pending' | 'Refunded';
 
 const PAY_TABS: readonly PayTab[] = ['All', 'Paid', 'Pending', 'Refunded'];
 
-/** Server status per tab that shows payment lines. */
-const TAB_STATUS: Readonly<Record<Exclude<PayTab, 'Pending'>, PaymentLineStatus>> = {
-  All: 'captured',
-  Paid: 'captured',
-  Refunded: 'refunded',
+/** Line statuses per tab that shows payment lines. All keeps refunded lines, so a payment never vanishes once refunded. */
+const TAB_STATUSES: Readonly<Record<Exclude<PayTab, 'Pending'>, readonly PaymentLineStatus[]>> = {
+  All: ['captured', 'refunded'],
+  Paid: ['captured'],
+  Refunded: ['refunded'],
 };
 
 /** Records shown per page (design `PAY_PAGE`). */
@@ -79,6 +81,11 @@ const SOURCE_ONLINE = 'Online';
 
 const CSV_FILENAME = 'medibook-payments.csv';
 const CSV_MIME = 'text/csv';
+
+/** The backend's answer when a cash refund has no open cash drawer (D-28). */
+const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
+const REFUND_NEEDS_DRAWER =
+  'Open your cash drawer above before refunding cash. Other payment methods do not need it.';
 
 const REFUND_COPY = {
   title: 'Refund Payment',
@@ -133,7 +140,7 @@ export function PaymentsScreen() {
 
   const filters: PaymentFilters = {
     ...range,
-    status: tab === 'Pending' ? null : TAB_STATUS[tab],
+    statuses: tab === 'Pending' ? [] : TAB_STATUSES[tab],
     method: MODE_FILTER[modeF] ?? null,
     doctorId,
     departmentId,
@@ -148,7 +155,7 @@ export function PaymentsScreen() {
   const todayApptsQuery = useAppointmentsQuery(today);
   const totalsQuery = usePaymentTotalsQuery({
     ...today,
-    status: 'captured',
+    statuses: ['captured'],
     method: null,
     doctorId: null,
     departmentId: null,
@@ -292,7 +299,13 @@ export function PaymentsScreen() {
           setRefundFor(null);
           invalidatePayments();
         },
-        onError: (error) => toast(errorCopy(error) ?? 'The refund failed.', 'error'),
+        onError: (error) =>
+          toast(
+            isFailure(error) && error.code === CASH_SESSION_REQUIRED
+              ? REFUND_NEEDS_DRAWER
+              : (errorCopy(error) ?? 'The refund failed.'),
+            'error',
+          ),
       },
     );
   };
@@ -352,6 +365,8 @@ export function PaymentsScreen() {
   return (
     <div className="flex flex-col gap-5" data-role={role}>
       <KpiStrip items={KPIS} />
+      <PaymentsCashDrawer />
+      <PaymentsCashReconcile />
       <Card pad={14} className="flex flex-wrap items-center justify-between gap-4">
         <Tabs tabs={PAY_TABS.map(tabLabel)} value={tabLabel(tab)} onChange={onTab} />
         <span

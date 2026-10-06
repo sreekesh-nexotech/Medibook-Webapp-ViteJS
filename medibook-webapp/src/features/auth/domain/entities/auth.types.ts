@@ -27,10 +27,21 @@ export interface StaffRole {
   readonly name: string;
 }
 
+/** A front-desk counter (`HospitalCounter`). */
+export interface StaffCounter {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+}
+
 /** A signed-in hospital staff member, as `GET /hospital/me` describes them. */
 export interface HospitalSession {
   readonly surface: 'hospital';
   readonly user: StaffUser;
+  /** The staff row's id — how cash sessions and payment lines name their owner. */
+  readonly staffId: string;
+  /** The counter this staff member works by default, if one is assigned. */
+  readonly defaultCounter: StaffCounter | null;
   readonly role: StaffRole;
   /** Short permission codes, e.g. `appointments.view`. */
   readonly permissions: readonly string[];

@@ -2,6 +2,7 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  CashSession,
   PaymentFilters,
   PaymentLine,
   PaymentPageQuery,
@@ -19,4 +20,21 @@ export interface PaymentsRepository {
   listVisitReceipts(visitId: string): Promise<Result<readonly VisitReceipt[]>>;
   /** The server-built CSV of every line matching `filters`. */
   exportCsv(filters: PaymentFilters): Promise<Result<string>>;
+
+  /** `staffId`'s open cash drawer, or `null` when it is closed. */
+  getOpenCashSession(staffId: string): Promise<Result<CashSession | null>>;
+  /** Open the signed-in staff member's drawer with a float, at a counter or their default. */
+  openCashSession(
+    openingFloatPaise: number,
+    counterId: string | null,
+  ): Promise<Result<CashSession>>;
+  /** Close a drawer with the cash counted; the server works out the variance. */
+  closeCashSession(
+    id: string,
+    countedCashPaise: number,
+    note: string | null,
+  ): Promise<Result<CashSession>>;
+  /** Closed drawers waiting for an admin to reconcile, oldest first. */
+  listCashSessionsToReconcile(): Promise<Result<readonly CashSession[]>>;
+  reconcileCashSession(id: string): Promise<Result<CashSession>>;
 }

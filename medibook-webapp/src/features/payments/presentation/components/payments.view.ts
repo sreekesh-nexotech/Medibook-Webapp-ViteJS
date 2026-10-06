@@ -2,7 +2,7 @@
  * Presentation lookups and pure helpers for the Payments screen (H9): the
  * look-back date windows, method / status vocabulary, and the day's totals.
  */
-import { addDaysISO, todayISO } from '@/shared/lib/format';
+import { addDaysISO, parseHundredths, todayISO } from '@/shared/lib/format';
 
 import type {
   PaymentLine,
@@ -98,4 +98,35 @@ export function totalsOf(lines: readonly PaymentLine[]): PaymentTotals {
 export function updatedCopy(at: number): string {
   if (!at) return '—';
   return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/* ------------------------------------------------------------- cash drawer */
+
+const PAISE_PER_RUPEE = 100;
+
+/**
+ * A rupee amount typed by staff ("500", "500.5", "1,250.75") as integer paise,
+ * or `null` when it is not a plain amount with at most two decimals.
+ */
+export function rupeesToPaise(text: string): number | null {
+  return parseHundredths(text);
+}
+
+/** Integer paise as rupees for display. */
+export function paiseToRupees(paise: number): number {
+  return paise / PAISE_PER_RUPEE;
+}
+
+/** How a counted drawer compares with what the server expected. */
+export type DrawerBalance = 'balanced' | 'short' | 'over';
+
+export function drawerBalance(variancePaise: number): DrawerBalance {
+  if (variancePaise === 0) return 'balanced';
+  return variancePaise < 0 ? 'short' : 'over';
+}
+
+/** "9:14 am" in the device's clock, for when a drawer opened or closed. */
+export function clockCopy(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }

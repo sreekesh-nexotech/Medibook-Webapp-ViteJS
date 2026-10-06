@@ -29,6 +29,7 @@ const roleSchema = z.object({ code: z.string(), name: z.string() });
 
 export const hospitalMeResponseSchema = z.object({
   user: userSchema,
+  staff: z.object({ id: z.string() }),
   role: roleSchema,
   permissions: z.array(z.string()),
   hospital: z.object({
@@ -37,6 +38,7 @@ export const hospitalMeResponseSchema = z.object({
     status: z.enum(['draft', 'onboarding', 'active', 'suspended', 'closed']),
     read_only: z.boolean(),
   }),
+  default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
 });
 
 export const platformMeResponseSchema = z.object({
@@ -76,6 +78,8 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
   return {
     surface: 'hospital',
     user: toStaffUser(dto.user),
+    staffId: dto.staff.id,
+    defaultCounter: dto.default_counter,
     role: dto.role,
     permissions: dto.permissions,
     hospital: {

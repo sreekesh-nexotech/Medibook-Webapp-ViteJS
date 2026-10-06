@@ -153,3 +153,19 @@ export function opsTime(s: string): number {
 export function formatToken(seq: number): string {
   return 'T-' + String(seq).padStart(3, '0');
 }
+
+/** Up to nine whole digits and at most two decimals, commas allowed ("1,250.75"). */
+const HUNDREDTHS_PATTERN = /^(\d{1,9})(?:\.(\d{1,2}))?$/;
+
+/**
+ * A decimal a person typed, with at most two places, as an integer count of
+ * hundredths — paise for a rupee amount, basis points for a percentage — or
+ * `null` when it is not such a number. Parsed from the digits, so there is no
+ * floating-point rounding.
+ */
+export function parseHundredths(text: string): number | null {
+  const match = HUNDREDTHS_PATTERN.exec(text.replace(/,/g, '').trim());
+  if (!match) return null;
+  const [, whole = '0', fraction = ''] = match;
+  return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+}

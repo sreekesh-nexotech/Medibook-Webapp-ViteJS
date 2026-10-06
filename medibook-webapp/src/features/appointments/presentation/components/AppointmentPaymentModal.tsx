@@ -115,7 +115,7 @@ function PaymentForm({
         onError: (failure) => {
           const message =
             isFailure(failure) && failure.code === CASH_SESSION_REQUIRED
-              ? 'Open your cash session before taking cash, or collect by UPI or card.'
+              ? 'Open your cash drawer on the Payments screen before taking cash, or collect by UPI or card.'
               : isFailure(failure)
                 ? failure.message
                 : 'Could not record the payment.';

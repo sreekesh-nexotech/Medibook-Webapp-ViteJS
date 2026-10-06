@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  CashSession,
   PaymentLine,
   PaymentRefund,
   VisitReceipt,
@@ -121,4 +122,47 @@ export function toVisitReceipts(dto: VisitReceiptPageResponse): readonly VisitRe
     totalRupees: rupees(r.total_paise),
     issuedAt: r.issued_at,
   }));
+}
+
+/* ------------------------------------------------------------ cash sessions */
+
+/** `HospitalCashSession` (`schema.yml`, `hospital_cash_session_serializer.py`). */
+export const cashSessionResponseSchema = z.object({
+  id: z.string(),
+  staff_id: z.string(),
+  staff_name: z.string(),
+  counter_code: z.string().nullable(),
+  business_date: z.string(),
+  opened_at: z.string(),
+  opening_float_paise: z.number().int(),
+  expected_cash_paise: z.number().int(),
+  counted_cash_paise: z.number().int().nullable(),
+  variance_paise: z.number().int().nullable(),
+  closed_at: z.string().nullable(),
+  close_note: z.string().nullable(),
+  status: z.enum(['open', 'closed', 'reconciled']),
+  reconciled_at: z.string().nullable(),
+});
+
+export const cashSessionPageResponseSchema = paginatedSchema(cashSessionResponseSchema);
+
+export type CashSessionResponse = z.infer<typeof cashSessionResponseSchema>;
+
+export function toCashSession(dto: CashSessionResponse): CashSession {
+  return {
+    id: dto.id,
+    staffId: dto.staff_id,
+    staffName: dto.staff_name,
+    counterCode: dto.counter_code,
+    businessDate: dto.business_date,
+    openedAt: dto.opened_at,
+    openingFloatPaise: dto.opening_float_paise,
+    expectedCashPaise: dto.expected_cash_paise,
+    countedCashPaise: dto.counted_cash_paise,
+    variancePaise: dto.variance_paise,
+    closedAt: dto.closed_at,
+    closeNote: dto.close_note,
+    status: dto.status,
+    reconciledAt: dto.reconciled_at,
+  };
 }

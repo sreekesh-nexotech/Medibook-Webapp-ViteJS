@@ -1,18 +1,21 @@
 import { z } from 'zod';
 
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, fetchAllPages } from '@/core/api/pagination';
 
 import type {
   PaymentFilters,
   PaymentPageQuery,
 } from '@/features/payments/domain/entities/payments.entities';
 import type {
+  CashSessionResponse,
   PaymentDetailResponse,
   PaymentLineResponse,
   VisitReceiptPageResponse,
 } from '@/features/payments/infrastructure/data-sources/remote/payments.response';
 import {
+  cashSessionPageResponseSchema,
+  cashSessionResponseSchema,
   paymentDetailResponseSchema,
   paymentPageResponseSchema,
   visitReceiptPageResponseSchema,
@@ -31,7 +34,8 @@ function filterParams(f: PaymentFilters): Readonly<Record<string, string>> {
   return {
     date_from: f.dateFrom,
     date_to: f.dateTo,
-    ...(f.status && { status: f.status }),
+    // `status` takes several values, comma-separated (`FilterSpec` `many=True`).
+    ...(f.statuses.length > 0 && { status: f.statuses.join(',') }),
     ...(f.method && { method: f.method }),
     ...(f.doctorId && { doctor_id: f.doctorId }),
     ...(f.departmentId && { department_id: f.departmentId }),
@@ -77,4 +81,56 @@ export async function exportPaymentsCsv(filters: PaymentFilters): Promise<string
     responseType: 'text',
   });
   return z.string().parse(response.data);
+}
+
+/* ------------------------------------------------------------ cash sessions */
+
+const CASH_SESSIONS_PATH = '/cash-sessions';
+
+/** `staffId`'s open drawer — at most one exists (`uq_open_session`). */
+export async function getOpenCashSession(staffId: string): Promise<CashSessionResponse | null> {
+  const response = await hospitalApi.get(CASH_SESSIONS_PATH, {
+    params: { status: 'open', staff_id: staffId, page_size: 1 },
+  });
+  return cashSessionPageResponseSchema.parse(response.data).results[0] ?? null;
+}
+
+export async function postCashSession(
+  openingFloatPaise: number,
+  counterId: string | null,
+): Promise<CashSessionResponse> {
+  const response = await hospitalApi.post(CASH_SESSIONS_PATH, {
+    opening_float_paise: openingFloatPaise,
+    ...(counterId ? { counter_id: counterId } : {}),
+  });
+  return cashSessionResponseSchema.parse(response.data);
+}
+
+export async function postCloseCashSession(
+  id: string,
+  countedCashPaise: number,
+  note: string | null,
+): Promise<CashSessionResponse> {
+  const response = await hospitalApi.post(`${CASH_SESSIONS_PATH}/${encodeURIComponent(id)}/close`, {
+    counted_cash_paise: countedCashPaise,
+    note,
+  });
+  return cashSessionResponseSchema.parse(response.data);
+}
+
+/** Every closed drawer (any staff, any day), oldest first. */
+export async function listClosedCashSessions(): Promise<CashSessionResponse[]> {
+  return fetchAllPages(async (params) => {
+    const response = await hospitalApi.get(CASH_SESSIONS_PATH, {
+      params: { ...params, status: 'closed', sort: 'closed_at' },
+    });
+    return cashSessionPageResponseSchema.parse(response.data);
+  });
+}
+
+export async function postReconcileCashSession(id: string): Promise<CashSessionResponse> {
+  const response = await hospitalApi.post(
+    `${CASH_SESSIONS_PATH}/${encodeURIComponent(id)}/reconcile`,
+  );
+  return cashSessionResponseSchema.parse(response.data);
 }
