@@ -4,6 +4,7 @@ import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { usePermission } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
+import { fmtDate, todayISO } from '@/shared/lib/format';
 import { required } from '@/shared/lib/validate';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -38,6 +39,7 @@ import type {
 import { InvoiceModal } from '@/features/settlements/presentation/components/InvoiceModal';
 import {
   billingPeriodLabel,
+  bpToPct,
   fmtDateTime,
   invoiceStatus,
   periodLabel,
@@ -48,7 +50,18 @@ import {
   usageValue,
 } from '@/features/settlements/presentation/components/settlementsFormat';
 
-const INVOICE_COLUMNS = ['Invoice', 'Period', 'Issued', 'Amount', 'Status', ''] as const;
+const INVOICE_COLUMNS = ['Invoice', 'Period', 'Issued', 'Due', 'Amount', 'Status', ''] as const;
+
+/** Invoice statuses that still need paying (backend `UNPAID_INVOICE`). */
+const UNPAID_INVOICE_STATUSES: ReadonlySet<string> = new Set(['issued', 'overdue']);
+
+/** Decided plan-change outcomes, and how the hospital is told about each. */
+const DECIDED_COPY: Readonly<Record<string, string>> = {
+  applied: 'was approved and applied',
+  approved: 'was approved',
+  rejected: 'was declined',
+  withdrawn: 'was withdrawn',
+};
 const INVOICE_PAGE_SIZE = 10;
 
 /** Usage bar turns red past this share of the plan limit. */
@@ -100,6 +113,9 @@ export function PlanBilling() {
   const usageQuery = useBillingUsageQuery();
   const [invoicePage, setInvoicePage] = useState(0);
   const invoicesQuery = useInvoicesQuery(invoicePage + 1, INVOICE_PAGE_SIZE);
+  // The newest invoices, whatever page the table is on — the source of the
+  // "payment due" banner.
+  const latestInvoicesQuery = useInvoicesQuery(1, INVOICE_PAGE_SIZE);
   const requestsQuery = usePlanChangeRequestsQuery(canEdit);
   const requestMutation = useRequestPlanChangeMutation();
 
@@ -107,13 +123,27 @@ export function PlanBilling() {
   const [invoice, setInvoice] = useState<BillingInvoice | null>(null);
 
   const pendingRequest = requestsQuery.data?.find((r) => r.status === 'requested') ?? null;
-  const plansQuery = useBillingPlansQuery(reqOpen || pendingRequest !== null);
+  // Once Medibook has decided, the latest outcome (and its note) is shown
+  // until the hospital raises a new request.
+  const latestDecided = pendingRequest
+    ? null
+    : ([...(requestsQuery.data ?? [])]
+        .filter((r) => DECIDED_COPY[r.status] !== undefined)
+        .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))[0] ?? null);
+  const plansQuery = useBillingPlansQuery(
+    reqOpen || pendingRequest !== null || latestDecided !== null,
+  );
   const plans = plansQuery.data ?? [];
 
   const sub = subscriptionQuery.data;
   const planOptions = plans.filter((p) => p.id !== sub?.plan.id);
   const pendingPlanName =
     pendingRequest && plans.find((p) => p.id === pendingRequest.toPlanId)?.name;
+  const decidedPlanName = latestDecided && plans.find((p) => p.id === latestDecided.toPlanId)?.name;
+  const today = todayISO();
+  const dueInvoices = (latestInvoicesQuery.data?.items ?? []).filter(
+    (i) => UNPAID_INVOICE_STATUSES.has(i.status) && i.dueAt <= today,
+  );
 
   const form = useForm<PlanChangeForm>({
     initial: { plan: '', period: PERIOD_MONTHLY, note: '' },
@@ -191,10 +221,36 @@ export function PlanBilling() {
             </div>
             <div className="text-h1 font-bold text-white tabular-nums">
               {rupees(price.paise)}
-              <span className="text-body font-normal text-white/70">{price.suffix}</span>
+              <span className="text-body font-normal text-white/70">
+                {price.suffix} + {bpToPct(sub.plan.gstRateBp)} GST
+              </span>
             </div>
           </div>
           <div className="flex flex-col gap-3.5 p-6">
+            {dueInvoices.length > 0 && (
+              <div className="text-body text-d-700 bg-d-100 flex flex-wrap items-center gap-2 rounded-md px-3.5 py-2.5">
+                <Icon name="triangle-alert" size={16} />
+                <span className="flex-1">
+                  Payment due to Medibook:{' '}
+                  {dueInvoices
+                    .map(
+                      (i) =>
+                        `${i.invoiceNo} · ${rupees(i.totalPaise - i.amountPaidPaise)} (due ${fmtDate(i.dueAt)})`,
+                    )
+                    .join('; ')}
+                </span>
+                {dueInvoices[0] && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon="receipt"
+                    onClick={() => setInvoice(dueInvoices[0] ?? null)}
+                  >
+                    View invoice
+                  </Button>
+                )}
+              </div>
+            )}
             {sub.readOnly && (
               <div className="text-body text-d-700 bg-d-100 flex items-center gap-2 rounded-md px-3.5 py-2.5">
                 <Icon name="triangle-alert" size={16} /> Your subscription has lapsed. The app is
@@ -235,11 +291,28 @@ export function PlanBilling() {
                 pending Medibook review
               </span>
             ) : (
-              <Can perm="Billing & Settlements.edit">
-                <Button size="sm" variant="secondary" icon="send" onClick={openRequest}>
-                  Request Plan Change
-                </Button>
-              </Can>
+              <>
+                {latestDecided && (
+                  <span
+                    className={cn(
+                      'text-caption rounded-full px-3 py-1.5',
+                      latestDecided.status === 'rejected'
+                        ? 'text-d-700 bg-d-100'
+                        : 'text-g-700 bg-g-100',
+                    )}
+                  >
+                    Your request to change to {decidedPlanName ?? 'a new plan'} (
+                    {billingPeriodLabel(latestDecided.toBillingPeriod).toLowerCase()}){' '}
+                    {DECIDED_COPY[latestDecided.status]}
+                    {latestDecided.reviewNote ? ` — “${latestDecided.reviewNote}”` : ''}
+                  </span>
+                )}
+                <Can perm="Billing & Settlements.edit">
+                  <Button size="sm" variant="secondary" icon="send" onClick={openRequest}>
+                    Request Plan Change
+                  </Button>
+                </Can>
+              </>
             )}
           </div>
         </Card>
@@ -345,6 +418,14 @@ export function PlanBilling() {
                 <td className={cn(tdClass, 'text-blue font-medium')}>{r.invoiceNo}</td>
                 <td className={tdClass}>{periodLabel(r.periodStart, r.periodEnd)}</td>
                 <td className={tdClass}>{fmtDateTime(r.issuedAt)}</td>
+                <td
+                  className={cn(
+                    tdClass,
+                    UNPAID_INVOICE_STATUSES.has(r.status) && r.dueAt <= today && 'text-d-700',
+                  )}
+                >
+                  {fmtDate(r.dueAt)}
+                </td>
                 <td className={cn(tdClass, 'text-right font-semibold tabular-nums')}>
                   {rupees(r.totalPaise)}
                 </td>

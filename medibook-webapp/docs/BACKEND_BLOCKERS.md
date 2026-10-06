@@ -41,6 +41,8 @@ Paths under `backend:` are in the Django repository.
 | TOK-02    | A session snapshot does not list its queue                    | Medium   | Queue rebuilt from the appointment list     |
 | PAY-02    | Refunding one consultation of a visit refunds the whole visit | High     | Desk collects per consultation              |
 | PAY-01    | Payments cannot be filtered by source (desk / online)         | Low      | Source filters the visible page only        |
+| SET-01    | A paid period's net payable differs from its own ledger       | High     | Drawer flags the gap                        |
+| SET-02    | Statement PDFs are served by a redirect to file storage       | Low      | Stored copy used; storage needs CORS        |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -530,3 +532,36 @@ already loaded, so page counts and totals ignore it.
 its exports.
 
 **What the web app does meanwhile.** Source filters the visible page and says so.
+
+## SET-01 — A paid period's net payable differs from its own ledger
+
+**New finding (live check of Billing & Settlements, 6 Oct 2026).**
+
+**What fails.** `GET /hospital/settlements/periods/{id}` returns the period's
+`net_payable_paise` and a `breakdown` whose `ledger_net_paise` is the sum of its ledger
+entries. For Lakeshore's August period (paid, payout released, UTR `HDFCN01A0EE2F9F8B`) the
+ledger nets to ₹6,889.84 but the period — and the released payout — say ₹6,989.84: ₹100
+more, with no adjustment recorded (`adjustments_paise = 0`). The 1–15 Sep period agrees
+(₹15,642.47 both ways).
+
+**What the backend needs.** Find where the ₹100 came from (a ledger entry missing from
+the breakdown, or a net computed outside the ledger), and keep `net_payable_paise` equal
+to `ledger_net_paise + adjustments_paise`, ideally enforced when a period closes.
+
+**What the web app does meanwhile.** The period drawer lists every deduction (including
+commission GST and the convenience fees Medibook keeps, which it used to omit — so its
+lines never added up) and, when the ledger and the net disagree, says by how much.
+
+## SET-02 — Statement PDFs are served by a redirect to file storage
+
+**What fails.** `GET /hospital/statements/{id}.pdf` answers `302` to a signed storage link
+(on the test backend, the unreachable `storage.fake.local` — see ENV-02). The web app
+fetches a rendered PDF with a background request, which follows that redirect only if the
+storage host allows cross-origin reads (CORS).
+
+**What the backend needs.** Either return the PDF bytes directly, or return
+`{url}` (as `/appointments/{id}/receipt.pdf` does) so the app can hand the link to the
+browser; and configure CORS on the storage bucket for the app's origin.
+
+**What the web app does meanwhile.** Statements that have a stored PDF (both on
+Lakeshore) download through the shared files API; the on-demand render is the fallback.

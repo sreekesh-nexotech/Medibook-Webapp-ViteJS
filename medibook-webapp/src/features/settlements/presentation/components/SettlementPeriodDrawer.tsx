@@ -85,7 +85,7 @@ function StatementButton({ statement }: { statement: SettlementStatement }) {
       onClick={handleDownload}
       busy={storedDownload.isPending || rendered.isPending}
     >
-      Statement {statement.statementNo}
+      Statement {statement.statementNo} · {periodLabel(statement.periodStart, statement.periodEnd)}
     </Button>
   );
 }
@@ -120,20 +120,36 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
     );
   } else {
     const payout = detail.payout;
+    const b = detail.breakdown;
+    // The ledger's own total plus any adjustments should equal the net
+    // payable; when it does not, say so (BACKEND_BLOCKERS SET-01).
+    const ledgerGap = detail.netPayablePaise - (b.ledgerNetPaise + detail.adjustmentsPaise);
     body = (
       <div className="flex flex-col gap-5">
         <section>
           <SectionTitle size={15} className="mb-1.5">
             How the net was reached
           </SectionTitle>
-          <Line label="Bookings in period" value={detail.breakdown.bookingsCount} />
-          <Line label="Gross collected" value={rupees(detail.grossPaise)} />
-          <Line label="Refunds" value={minus(detail.refundsPaise)} />
-          <Line label="Gateway fees" value={minus(detail.gatewayFeesPaise)} />
+          <Line label="Bookings in period" value={b.bookingsCount} />
+          <Line label="Gross collected" value={rupees(b.grossPaise)} />
+          <Line label="Refunds" value={minus(b.refundsPaise)} />
+          <Line label="Gateway fees" value={minus(b.gatewayFeesPaise)} />
           <Line
-            label={`Commission (${effectiveRate(detail.commissionPaise, detail.grossPaise)})`}
-            value={minus(detail.commissionPaise)}
+            label={`Commission (${effectiveRate(b.commissionPaise, b.grossPaise)})`}
+            value={minus(b.commissionPaise)}
           />
+          {b.commissionGstPaise !== 0 && (
+            <Line label="GST on commission" value={minus(b.commissionGstPaise)} />
+          )}
+          {b.convenienceFeesPaise !== 0 && (
+            <Line
+              label="Convenience fees (kept by Medibook)"
+              value={minus(b.convenienceFeesPaise)}
+            />
+          )}
+          {b.convenienceFeeGstPaise !== 0 && (
+            <Line label="GST on convenience fees" value={minus(b.convenienceFeeGstPaise)} />
+          )}
           {detail.tdsPaise !== 0 && <Line label="TDS" value={minus(detail.tdsPaise)} />}
           {detail.adjustmentsPaise !== 0 && (
             <Line label="Adjustments" value={rupees(detail.adjustmentsPaise)} />
@@ -141,6 +157,16 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
           <div className="border-border-soft mt-1.5 border-t pt-1.5">
             <Line label="Net payable" value={rupees(detail.netPayablePaise)} strong />
           </div>
+          {ledgerGap !== 0 && (
+            <p className="text-caption text-d-700 m-0 mt-1.5">
+              Medibook&apos;s ledger for this period adds up to {rupees(b.ledgerNetPaise)}
+              {detail.adjustmentsPaise !== 0
+                ? ` plus ${rupees(detail.adjustmentsPaise)} of adjustments`
+                : ''}
+              , {rupees(Math.abs(ledgerGap))} {ledgerGap > 0 ? 'less' : 'more'} than the net
+              payable. Ask Medibook to explain the difference before the payout.
+            </p>
+          )}
         </section>
 
         {detail.adjustments.length > 0 && (
