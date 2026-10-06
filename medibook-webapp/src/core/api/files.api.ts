@@ -61,6 +61,10 @@ function checkUpload(input: FileUploadInput, mime: string): Failure | null {
   return null;
 }
 
+/** Shown when the presigned upload link cannot be reached. */
+const STORAGE_UNREACHABLE =
+  'The file could not be sent to file storage, so it was not uploaded. The Medibook server is reachable — its file storage is not. Ask your administrator to check the storage setup.';
+
 /**
  * Upload one file end to end:
  * 1. `POST /files/uploads` — create the pending row, get a presigned PUT;
@@ -95,10 +99,20 @@ export async function uploadFile(input: FileUploadInput): Promise<Result<StoredF
       );
     }
 
-    await axios.put(ticket.upload_url, input.file, {
-      headers: ticket.headers,
-      timeout: STORAGE_PUT_TIMEOUT_MS,
-    });
+    try {
+      await axios.put(ticket.upload_url, input.file, {
+        headers: ticket.headers,
+        timeout: STORAGE_PUT_TIMEOUT_MS,
+      });
+    } catch (error) {
+      // No answer at all means the storage host itself is unreachable (e.g.
+      // the test backend's fake store, BACKEND_BLOCKERS ENV-02) — not the API,
+      // which just answered step 1. Say so rather than "check your connection".
+      if (axios.isAxiosError(error) && !error.response) {
+        throw clientFailure('network', STORAGE_UNREACHABLE, 'STORAGE_UNREACHABLE');
+      }
+      throw error;
+    }
 
     const completed = await sharedApi.post(`/files/${encodeURIComponent(ticket.file_id)}/complete`);
     return toStoredFile(storedFileResponseSchema.parse(completed.data));

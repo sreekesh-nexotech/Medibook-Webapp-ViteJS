@@ -24,7 +24,7 @@ Paths under `backend:` are in the Django repository.
 | CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)           |
 | ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                          |
 | SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                     |
-| ENV-02    | Test backend signs file links for an unreachable host                      | Medium   | Blocks end-to-end download testing          |
+| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads     |
 | API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible            |
 | DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't      |
 | DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately         |
@@ -277,14 +277,27 @@ detail and update responses of `/platform/hospitals/{id}` are also untyped
 
 ## ENV-02 — The test backend signs file links for a fake host
 
-**What fails.** `GET /shared/files/{id}/url` on the shared test backend returns links to
-`storage.fake.local`, which browsers cannot reach. No download can complete end to end
-there: KYC scans, receipts, or the new report-download page. The report-download page
-was verified by answering that host from the test browser, the way real object storage
-would.
+**What fails.** The shared test backend runs the in-process `FakeStorage`
+(`integrations/storage/client.py`), whose links all point at `storage.fake.local` — a
+host browsers cannot reach, backed by memory inside the backend process.
+
+- **Downloads:** `GET /shared/files/{id}/url` returns such a link, so no download can
+  complete: KYC scans, receipts, statements, report downloads. The report-download page
+  was verified by answering that host from the test browser, the way real object storage
+  would.
+- **Uploads** (reported 6 Oct 2026 — a doctor photo would not upload):
+  `POST /shared/files/uploads` returns an `upload_url` on that host, so the browser's
+  `PUT` of the file fails and `/complete` is never reached. Every upload in the app is
+  blocked on this backend: doctor photos, the hospital logo and cover, patient banners,
+  KYC documents.
 
 **What the backend needs.** Point the test environment at a reachable object store, for
-example MinIO, that sends `Content-Disposition: attachment` on signed GETs.
+example MinIO, that accepts presigned `PUT`s from the app's origin (CORS) and sends
+`Content-Disposition: attachment` on signed GETs.
+
+**What the web app does meanwhile.** A failed upload says the file store could not be
+reached (instead of "check your connection" — the API itself answered); photos that
+cannot load fall back to initials.
 
 ## API-01 — Commission history cannot be read
 
