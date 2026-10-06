@@ -231,6 +231,10 @@
   --color-badge-completed-fg: #15803d;
   --color-badge-queue-bg: #fef3c7;
   --color-badge-queue-fg: #8a5208;
+  /* The held-slot outline. Named apart from the `y-*` scale on purpose: in
+   * Tailwind `y` is also the top-and-bottom axis, so `border-y-300` compiles to
+   * a yellow border AND 300px top and bottom borders. */
+  --color-badge-queue-border: var(--color-y-300);
   --color-badge-cancelled-bg: #fee2e2;
   --color-badge-cancelled-fg: #a82d20;
   --color-badge-noshow-bg: #ffedd5;
