@@ -349,7 +349,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
               label="Subscription Plan"
               required
               error={errorFor('planId')}
-              hint={plansQuery.isError ? 'Plans could not be loaded.' : undefined}
+              hint={plansQuery.isLoadingError ? 'Plans could not be loaded.' : undefined}
             >
               <Select
                 value={planName}

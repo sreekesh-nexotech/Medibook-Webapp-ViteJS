@@ -32,6 +32,7 @@ import type {
   BannerInput,
   Holiday,
   HolidayInput,
+  HolidayTarget,
   HospitalBanner,
   ScheduleChange,
 } from '@/features/settings/domain/entities/profile.entities';
@@ -85,7 +86,7 @@ const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 interface DeleteTarget {
   readonly kind: 'holiday' | 'banner';
   readonly id: string;
-  /** Row version for `If-Match`; holidays have none. */
+  /** Row version for `If-Match`. */
   readonly version: number | null;
   readonly label: string;
   readonly body: string;
@@ -93,8 +94,8 @@ interface DeleteTarget {
 
 /** A calendar write, replayable as a dry run and then for real. */
 type HolidayOp =
-  | { readonly kind: 'save'; readonly id: string | null; readonly input: HolidayInput }
-  | { readonly kind: 'remove'; readonly id: string; readonly name: string };
+  | { readonly kind: 'save'; readonly target: HolidayTarget | null; readonly input: HolidayInput }
+  | { readonly kind: 'remove'; readonly target: HolidayTarget; readonly name: string };
 
 /** A calendar write waiting on the user because it would cancel bookings. */
 interface PendingImpact {
@@ -108,7 +109,7 @@ function errorCopy(error: unknown): string {
 
 function holidayOpSuccessCopy(op: HolidayOp): string {
   if (op.kind === 'remove') return 'Holiday removed — the day is bookable again';
-  return op.id === null ? 'Holiday added — slots will not be generated' : 'Holiday saved';
+  return op.target === null ? 'Holiday added — slots will not be generated' : 'Holiday saved';
 }
 
 /**
@@ -213,8 +214,8 @@ export function HospitalProfileScreen() {
 
   const runHolidayOp = (op: HolidayOp, confirm: boolean): Promise<ScheduleChange> =>
     op.kind === 'save'
-      ? saveHoliday.mutateAsync({ id: op.id, input: op.input, confirm })
-      : removeHoliday.mutateAsync({ id: op.id, confirm });
+      ? saveHoliday.mutateAsync({ target: op.target, input: op.input, confirm })
+      : removeHoliday.mutateAsync({ target: op.target, confirm });
 
   /** Resolves `true` once the op is applied or handed to the impact confirm. */
   const startHolidayOp = async (op: HolidayOp): Promise<boolean> => {
@@ -297,7 +298,12 @@ export function HospitalProfileScreen() {
     const target = toDelete;
     setToDelete(null);
     if (target.kind === 'holiday') {
-      void startHolidayOp({ kind: 'remove', id: target.id, name: target.label });
+      if (target.version === null) return;
+      void startHolidayOp({
+        kind: 'remove',
+        target: { id: target.id, version: target.version },
+        name: target.label,
+      });
       return;
     }
     if (target.version === null) return;
@@ -324,7 +330,7 @@ export function HospitalProfileScreen() {
 
   const holidayTableState: TableStateSpec | undefined = holidaysQuery.isPending
     ? { kind: 'loading', rows: 4 }
-    : holidaysQuery.isError
+    : holidaysQuery.isLoadingError
       ? {
           kind: 'error',
           title: 'The holiday calendar did not load',
@@ -542,7 +548,7 @@ export function HospitalProfileScreen() {
                             setToDelete({
                               kind: 'holiday',
                               id: h.id,
-                              version: null,
+                              version: h.version,
                               label: h.name,
                               body: `Removing “${h.name}” makes ${days} ${
                                 days === 1 ? 'day' : 'days'
@@ -598,7 +604,7 @@ export function HospitalProfileScreen() {
             </div>
             {bannersQuery.isPending ? (
               <SkeletonCards count={2} lines={3} />
-            ) : bannersQuery.isError ? (
+            ) : bannersQuery.isLoadingError ? (
               <ErrorState
                 inline
                 title="Banners did not load"
@@ -732,7 +738,13 @@ export function HospitalProfileScreen() {
           departments={departments}
           onClose={() => setHolidayEdit(null)}
           onSave={(input) =>
-            startHolidayOp({ kind: 'save', id: holidayEdit.holiday?.id ?? null, input })
+            startHolidayOp({
+              kind: 'save',
+              target: holidayEdit.holiday
+                ? { id: holidayEdit.holiday.id, version: holidayEdit.holiday.version }
+                : null,
+              input,
+            })
           }
         />
       )}

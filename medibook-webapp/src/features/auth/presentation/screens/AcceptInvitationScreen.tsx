@@ -74,7 +74,7 @@ export function AcceptInvitationScreen() {
         <Spinner size={32} label="Loading your invitation" />
       </div>
     );
-  } else if (invitation.isError) {
+  } else if (invitation.isLoadingError) {
     body =
       isFailure(invitation.error) && invitation.error.code === INVITATION_EXPIRED_CODE ? (
         <DeadEnd

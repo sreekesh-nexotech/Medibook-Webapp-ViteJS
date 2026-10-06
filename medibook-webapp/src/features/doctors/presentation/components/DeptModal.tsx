@@ -51,7 +51,7 @@ export function DeptModal({ dept, open, onClose }: DeptModalProps) {
     onSubmit: async (values) => {
       try {
         await save.mutateAsync({
-          id: dept?.id,
+          existing: dept ? { id: dept.id, version: dept.version } : undefined,
           input: {
             name: values.name.trim(),
             description: values.about.trim(),

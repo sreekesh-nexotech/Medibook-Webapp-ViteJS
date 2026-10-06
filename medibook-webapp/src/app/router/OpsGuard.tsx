@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { setCalendarZone } from '@/shared/lib/format';
 
 import { isFailure } from '@/core/error/failure';
 
@@ -10,6 +11,7 @@ import { useSessionExit } from '@/app/router/useSessionExit';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import { platformSessionOf } from '@/features/auth/application/store/auth.roles';
+import { OfflineSession } from '@/app/router/SessionError';
 
 /**
  * Guard for the `/ops/*` layout. Validates the stored platform tokens with
@@ -22,7 +24,7 @@ export function OpsGuard() {
   const data = platformSessionOf(session.data);
 
   if (!data) {
-    if (session.isError) {
+    if (session.isLoadingError) {
       if (isFailure(session.error) && session.error.kind === 'unauthorized') {
         return <Navigate to={AUTH_LOGIN_PATH} replace />;
       }
@@ -35,8 +37,12 @@ export function OpsGuard() {
       );
     }
     if (session.fetchStatus === 'idle') return <Navigate to={AUTH_LOGIN_PATH} replace />;
+    if (session.fetchStatus === 'paused') return <OfflineSession onLogout={logout} />;
     return <SessionLoading />;
   }
+
+  // The console works in India Standard Time, whichever hospital this tab visited before.
+  setCalendarZone(null);
 
   return <OpsShell session={data} onLogout={logout} />;
 }

@@ -11,6 +11,7 @@
  * See docs/REACT_VITEJS_CODING_STANDARDS.md 5 (layer rules) and 6 (errors).
  */
 import type { ZodType } from 'zod';
+import { todayISO } from '@/shared/lib/format';
 
 /** What every validator returns: a message, or `undefined` when valid. */
 export type ValidationError = string | undefined;
@@ -28,13 +29,6 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 /** Strip the separators humans type into phone / PIN fields. */
 function digitsOnly(value: string): string {
   return value.replace(/[\s\-()+]/g, '');
-}
-
-/** Today at midnight, so "not in the future" treats today as allowed. */
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
 }
 
 /** Non-empty after trimming. `label` personalises the message. */
@@ -99,7 +93,8 @@ export function notFutureDate(value: string | null | undefined, label = 'Date'):
   if (!ISO_DATE_PATTERN.test(raw)) return `${label} must be a valid date.`;
   const d = new Date(`${raw}T00:00:00`);
   if (Number.isNaN(d.getTime())) return `${label} must be a valid date.`;
-  return d.getTime() <= startOfToday().getTime() ? undefined : `${label} cannot be in the future.`;
+  // Compared as calendar dates on the hospital's calendar, so today is allowed.
+  return raw <= todayISO() ? undefined : `${label} cannot be in the future.`;
 }
 
 /**

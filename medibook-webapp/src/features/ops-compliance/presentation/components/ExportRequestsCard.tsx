@@ -121,7 +121,7 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
 
   const tableState: TableStateSpec | undefined = requestsQuery.isLoading
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : requestsQuery.isError
+    : requestsQuery.isLoadingError
       ? {
           kind: 'error',
           title: "Recorded requests didn't load.",

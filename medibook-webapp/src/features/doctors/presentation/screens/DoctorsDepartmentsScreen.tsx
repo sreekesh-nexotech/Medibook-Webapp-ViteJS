@@ -141,7 +141,7 @@ export function DoctorsDepartmentsScreen() {
 
   const docTableState: TableStateSpec | undefined = doctorsQuery.isPending
     ? { kind: 'loading', rows: 6 }
-    : doctorsQuery.isError
+    : doctorsQuery.isLoadingError
       ? {
           kind: 'error',
           title: 'Could not load doctors',
@@ -294,7 +294,7 @@ export function DoctorsDepartmentsScreen() {
         </Card>
       ) : departmentsQuery.isPending ? (
         <SkeletonCards count={6} lines={4} />
-      ) : departmentsQuery.isError ? (
+      ) : departmentsQuery.isLoadingError ? (
         <Card>
           <ErrorState
             inline

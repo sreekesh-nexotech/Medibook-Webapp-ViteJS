@@ -49,8 +49,8 @@ describe('bpCopy', () => {
 
 describe('convenienceFeeCopy', () => {
   it('reads a flat fee in rupees and a percentage of the consultation fee', () => {
-    expect(convenienceFeeCopy('flat', 2000)).toBe('₹ 20 per booking');
-    expect(convenienceFeeCopy('flat', 1550)).toBe('₹ 15.5 per booking');
+    expect(convenienceFeeCopy('flat', 2000)).toBe('₹ 20.00 per booking');
+    expect(convenienceFeeCopy('flat', 1550)).toBe('₹ 15.50 per booking');
     expect(convenienceFeeCopy('percent', 300)).toBe('3% of the consultation fee');
   });
 });

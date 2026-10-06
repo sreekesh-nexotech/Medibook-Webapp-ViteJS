@@ -5,7 +5,7 @@
  * state. No React, no store, no I/O.
  */
 
-import { toLocalISO } from '@/shared/lib/format';
+import { calendarDate, calendarInstant } from '@/shared/lib/format';
 
 import type {
   AffectedBooking,
@@ -83,29 +83,24 @@ export function audienceForLabel(label: string): BannerAudience {
     : 'hospital_patients';
 }
 
-const END_OF_DAY_HOUR = 23;
-const END_OF_DAY_MINUTE = 59;
-const END_OF_DAY_SECOND = 59;
+/** The last second of a day, for inclusive end dates. */
+const END_OF_DAY = '23:59:59';
 
-/** `yyyy-mm-dd` → the start of that day in the browser's time zone, as ISO. */
+/** `yyyy-mm-dd` → the start of that day in the hospital's zone (DATA-03). */
 export function dayStartIso(date: string): string {
-  const d = localNoon(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  return calendarInstant(date);
 }
 
-/** `yyyy-mm-dd` → the last second of that day in the browser's time zone, as ISO. */
+/** `yyyy-mm-dd` → the last second of that day in the hospital's zone. */
 export function dayEndIso(date: string): string {
-  const d = localNoon(date);
-  d.setHours(END_OF_DAY_HOUR, END_OF_DAY_MINUTE, END_OF_DAY_SECOND, 0);
-  return d.toISOString();
+  return calendarInstant(date, END_OF_DAY);
 }
 
-/** An ISO date-time as the local `yyyy-mm-dd` it falls on; `''` for none. */
+/** An ISO date-time as the hospital day it falls on; `''` for none. */
 export function localDateOf(dateTime: string | null): string {
   if (!dateTime) return '';
   const d = new Date(dateTime);
-  return Number.isNaN(d.getTime()) ? '' : toLocalISO(d);
+  return Number.isNaN(d.getTime()) ? '' : calendarDate(d);
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatInstant } from '@/shared/lib/format';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole } from '@/app/router/paths';
@@ -58,7 +59,7 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 function runTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', {
+  return formatInstant(iso, {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
@@ -157,7 +158,9 @@ export function SlotsScreen() {
   };
 
   const isCatalogLoading = doctorsQuery.isPending || departmentsQuery.isPending;
-  const catalogError = doctorsQuery.error ?? departmentsQuery.error;
+  const catalogError =
+    (doctorsQuery.isLoadingError ? doctorsQuery.error : null) ??
+    (departmentsQuery.isLoadingError ? departmentsQuery.error : null);
   const doctorsPage = gridQuery.data;
   const isTruncated = doctorsPage ? doctorsPage.total > doctorsPage.days.length : false;
 
@@ -235,7 +238,7 @@ export function SlotsScreen() {
             <Icon name="refresh-cw" size={13} />
             {latestRun.isPending
               ? 'Checking when slots were last generated…'
-              : latestRun.isError
+              : latestRun.isLoadingError
                 ? 'Could not read the last generation run.'
                 : latestRun.data
                   ? `Slots last generated ${runTime(latestRun.data.startedAt)}${
@@ -312,7 +315,7 @@ export function SlotsScreen() {
             void departmentsQuery.refetch();
           }}
         />
-      ) : gridQuery.isError && !grid ? (
+      ) : gridQuery.isLoadingError && !grid ? (
         <ErrorState
           title="The slot grid could not be loaded"
           message={errorText(gridQuery.error, 'Please try again.')}

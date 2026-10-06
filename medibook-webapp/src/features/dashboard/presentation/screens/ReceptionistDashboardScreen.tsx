@@ -78,7 +78,7 @@ export function ReceptionistDashboardScreen() {
   const data = reception.data;
   const loading = reception.isLoading;
 
-  if (reception.isError && !data) {
+  if (reception.isLoadingError && !data) {
     return (
       <ErrorState
         title="The front desk view could not load"
@@ -153,7 +153,7 @@ export function ReceptionistDashboardScreen() {
     {
       icon: 'footprints',
       label: 'Walk-ins Today',
-      value: today.isError ? '—' : (todayFigures?.appointmentsBySource.walk_in ?? 0),
+      value: today.isLoadingError ? '—' : (todayFigures?.appointmentsBySource.walk_in ?? 0),
       sub: 'Booked at the desk',
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
@@ -222,13 +222,17 @@ export function ReceptionistDashboardScreen() {
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            {loading || departments.isLoading ? (
+            {loading || departments.isLoading || doctors.isLoading ? (
               <SkeletonTable rows={3} cols={3} card={false} />
-            ) : departments.isError ? (
+            ) : departments.isLoadingError || doctors.isLoadingError ? (
+              // Without the doctor list every department would read "idle, 0 waiting" (RUN-05).
               <ErrorState
                 inline
                 title="Departments could not be loaded"
-                onRetry={() => void departments.refetch()}
+                onRetry={() => {
+                  void departments.refetch();
+                  void doctors.refetch();
+                }}
               />
             ) : deptRows.length === 0 ? (
               <EmptyState compact icon="ticket" title="No departments set up yet." />
@@ -321,7 +325,7 @@ export function ReceptionistDashboardScreen() {
             Open Payments
           </button>
         </div>
-        {today.isError ? (
+        {today.isLoadingError ? (
           <ErrorState
             inline
             title="Today's collection could not be loaded"

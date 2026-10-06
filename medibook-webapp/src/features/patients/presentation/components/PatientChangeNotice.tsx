@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { fmtDate } from '@/shared/lib/format';
+import { calendarDate, fmtDate } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Field } from '@/shared/ui/Field';
@@ -86,8 +86,8 @@ export function PatientChangeNotice({ change }: PatientChangeNoticeProps) {
           {what} is waiting for admin approval.
         </div>
         <div className="text-caption text-text-muted mt-1">
-          Requested {fmtDate(change.requestedAt.slice(0, 10))}. The record shows the current details
-          until it is approved.
+          Requested {fmtDate(calendarDate(change.requestedAt))}. The record shows the current
+          details until it is approved.
         </div>
       </div>
       {canDecide && (

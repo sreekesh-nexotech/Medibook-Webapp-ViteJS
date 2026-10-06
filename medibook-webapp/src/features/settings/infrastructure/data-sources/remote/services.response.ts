@@ -48,6 +48,7 @@ export const couponResponseSchema = z.object({
   kind: z.enum(['percent', 'flat']),
   value: z.number().int(),
   min_order_paise: z.number().int(),
+  max_discount_paise: z.number().int().nullable(),
   valid_from: z.string(),
   valid_to: z.string(),
   usage_cap: z.number().int().nullable(),
@@ -103,6 +104,8 @@ export function toCoupon(dto: CouponResponse): HospitalCoupon {
     usageCap: dto.usage_cap,
     usedCount: dto.used_count,
     minOrderRupees: dto.min_order_paise / PAISE_PER_RUPEE,
+    maxDiscountRupees:
+      dto.max_discount_paise === null ? null : dto.max_discount_paise / PAISE_PER_RUPEE,
     departmentIds: scopes.flatMap((s) => (s.department_id ? [s.department_id] : [])),
     serviceIds: scopes.flatMap((s) => (s.service_id ? [s.service_id] : [])),
     isActive: dto.is_active,

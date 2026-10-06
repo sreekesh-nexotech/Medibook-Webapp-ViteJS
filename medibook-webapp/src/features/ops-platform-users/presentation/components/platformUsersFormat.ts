@@ -4,6 +4,7 @@ import type {
   PlatformUserStatus,
   PlatformUserSummary,
 } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
+import { formatInstant } from '@/shared/lib/format';
 
 /** Shown wherever the backend has no value for a column. */
 export const NO_VALUE = '—';
@@ -51,29 +52,21 @@ export function userName(u: PlatformUserSummary): string {
   return fullName(u.firstName, u.lastName);
 }
 
-const DATE_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
-
-function format(fmt: Intl.DateTimeFormat, iso: string | null): string {
+function format(options: Intl.DateTimeFormatOptions, iso: string | null): string {
   if (!iso) return NO_VALUE;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? NO_VALUE : fmt.format(date);
+  return Number.isNaN(date.getTime()) ? NO_VALUE : formatInstant(date, options);
 }
 
-/** "2026-01-12T05:30:00Z" → "12 Jan 2026" in the viewer's zone. */
+/** "2026-01-12T05:30:00Z" → "12 Jan 2026" in India Standard Time. */
 export function formatDate(iso: string | null): string {
   return format(DATE_FORMAT, iso);
 }
 
-/** "2026-01-12T05:30:00Z" → "12 Jan 2026, 11:00 am" in the viewer's zone. */
+/** "2026-01-12T05:30:00Z" → "12 Jan 2026, 11:00 am" in India Standard Time. */
 export function formatDateTime(iso: string | null): string {
   return format(DATE_TIME_FORMAT, iso);
 }

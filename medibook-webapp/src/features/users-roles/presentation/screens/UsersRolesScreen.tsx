@@ -192,7 +192,7 @@ export function UsersRolesScreen() {
 
   let tableState: TableStateSpec | undefined;
   if (loading) tableState = { kind: 'loading', rows: 5 };
-  else if (staffQuery.isError)
+  else if (staffQuery.isLoadingError)
     tableState = {
       kind: 'error',
       title: 'Users could not be loaded',
@@ -222,7 +222,7 @@ export function UsersRolesScreen() {
     ? previewToPermsGrid(previewQuery.data.modules)
     : null;
 
-  const rolesError = rolesQuery.isError ? (
+  const rolesError = rolesQuery.isLoadingError ? (
     <ErrorState
       inline
       title="Roles could not be loaded"
@@ -311,7 +311,7 @@ export function UsersRolesScreen() {
                 {shown.length} of {users.length} users
               </span>
             </div>
-            {invitationsQuery.isError && (
+            {invitationsQuery.isLoadingError && (
               <ErrorState
                 inline
                 title="Pending invitations could not be loaded"
@@ -406,7 +406,7 @@ export function UsersRolesScreen() {
       ) : tab === 'Roles & Permissions' ? (
         loading ? (
           <SkeletonCards count={3} lines={4} />
-        ) : rolesQuery.isError ? (
+        ) : rolesQuery.isLoadingError ? (
           rolesError
         ) : (
           <div className="grid grid-cols-3 gap-4">
@@ -466,7 +466,7 @@ export function UsersRolesScreen() {
           </div>
           {loading || previewQuery.isLoading ? (
             <SkeletonCards count={2} lines={4} />
-          ) : rolesQuery.isError ? (
+          ) : rolesQuery.isLoadingError ? (
             rolesError
           ) : !previewRole ? (
             <ErrorState
@@ -475,7 +475,7 @@ export function UsersRolesScreen() {
               message="This hospital has no roles provisioned yet."
               onRetry={() => void rolesQuery.refetch()}
             />
-          ) : previewQuery.isError || !previewPerms ? (
+          ) : previewQuery.isLoadingError || !previewPerms ? (
             <ErrorState
               inline
               title={`${previewRole.name} access could not be loaded`}

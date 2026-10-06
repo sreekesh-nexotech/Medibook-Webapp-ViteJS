@@ -1,6 +1,6 @@
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, paginatedSchema, fetchCappedPages } from '@/core/api/pagination';
 
 import type {
   AppointmentRange,
@@ -11,7 +11,6 @@ import {
   appointmentEventSchema,
   appointmentResponseSchema,
   cancellationResponseSchema,
-  PAISE_PER_RUPEE,
   paymentResponseSchema,
   receiptPdfResponseSchema,
   receiptResponseSchema,
@@ -27,6 +26,9 @@ import {
  */
 
 export const appointmentPageSchema = paginatedSchema(appointmentResponseSchema);
+
+/** 50 pages of 100: far beyond a desk's day or week, and a bound on the page walk. */
+const APPOINTMENT_PAGES_MAX = 50;
 export const eventPageSchema = paginatedSchema(appointmentEventSchema);
 
 async function fetchAllPages<T>(
@@ -42,8 +44,12 @@ async function fetchAllPages<T>(
 
 const base = (id: string) => `/appointments/${encodeURIComponent(id)}`;
 
+/**
+ * Every appointment in a window, up to `APPOINTMENT_PAGES_MAX` pages. A longer
+ * window comes back `truncated`, and the screen says "first N shown" (DATA-07).
+ */
 export function getAppointments(range: AppointmentRange) {
-  return fetchAllPages(async (page) => {
+  return fetchCappedPages(async (page) => {
     const response = await hospitalApi.get('/appointments', {
       params: {
         page,
@@ -53,7 +59,7 @@ export function getAppointments(range: AppointmentRange) {
       },
     });
     return appointmentPageSchema.parse(response.data);
-  });
+  }, APPOINTMENT_PAGES_MAX);
 }
 
 export async function getAppointment(id: string) {
@@ -70,7 +76,7 @@ export function getEvents(id: string) {
   });
 }
 
-export async function postWalkIn(input: WalkInInput) {
+export async function postWalkIn(input: WalkInInput, replayKey: string) {
   const patient =
     input.patient.kind === 'existing'
       ? { hospital_patient_id: input.patient.hospitalPatientId }
@@ -94,7 +100,7 @@ export async function postWalkIn(input: WalkInInput) {
       })),
       remark: input.remark || null,
     },
-    { headers: idempotencyKey() },
+    { headers: idempotencyKey(replayKey) },
   );
   return walkInResponseSchema.parse(response.data);
 }
@@ -108,47 +114,62 @@ export async function patchRemark(id: string, remark: string, version: number) {
   return appointmentResponseSchema.parse(response.data);
 }
 
-/** A bodiless action that answers the updated appointment. */
-async function act(id: string, action: 'approve' | 'check-in' | 'no-show', idempotent: boolean) {
+/**
+ * A bodiless action that answers the updated appointment. Idempotent actions
+ * carry the caller's replay key: one per user intent, never one per call.
+ */
+async function act(id: string, action: 'approve' | 'check-in' | 'no-show', replayKey?: string) {
   const response = await hospitalApi.post(`${base(id)}/${encodeURIComponent(action)}`, undefined, {
-    headers: idempotent ? idempotencyKey() : undefined,
+    headers: replayKey ? idempotencyKey(replayKey) : undefined,
   });
   return appointmentResponseSchema.parse(response.data);
 }
 
-export const postApprove = (id: string) => act(id, 'approve', false);
-export const postCheckIn = (id: string) => act(id, 'check-in', true);
-export const postNoShow = (id: string) => act(id, 'no-show', false);
+export const postApprove = (id: string) => act(id, 'approve');
+export const postCheckIn = (id: string, replayKey: string) => act(id, 'check-in', replayKey);
+export const postNoShow = (id: string) => act(id, 'no-show');
 
-async function withReason(id: string, action: 'cancel' | 'reject', reason: string) {
+async function withReason(
+  id: string,
+  action: 'cancel' | 'reject',
+  reason: string,
+  replayKey: string,
+) {
   const response = await hospitalApi.post(
     `${base(id)}/${encodeURIComponent(action)}`,
     { reason },
-    { headers: idempotencyKey() },
+    { headers: idempotencyKey(replayKey) },
   );
   return cancellationResponseSchema.parse(response.data).appointment;
 }
 
-export const postCancel = (id: string, reason: string) => withReason(id, 'cancel', reason);
-export const postReject = (id: string, reason: string) => withReason(id, 'reject', reason);
+export const postCancel = (id: string, reason: string, replayKey: string) =>
+  withReason(id, 'cancel', reason, replayKey);
+export const postReject = (id: string, reason: string, replayKey: string) =>
+  withReason(id, 'reject', reason, replayKey);
 
-export async function postPayment(id: string, lines: readonly PaymentLineInput[]) {
+/** Lines are in integer paise, so they add up exactly to the amount due (DATA-09). */
+export async function postPayment(
+  id: string,
+  lines: readonly PaymentLineInput[],
+  replayKey: string,
+) {
   const response = await hospitalApi.post(
     `${base(id)}/payments`,
     {
       lines: lines.map((l) => ({
         method: l.method,
-        amount_paise: Math.round(l.amountRupees * PAISE_PER_RUPEE),
+        amount_paise: l.amountPaise,
         reference: l.reference || null,
       })),
     },
-    { headers: idempotencyKey() },
+    { headers: idempotencyKey(replayKey) },
   );
   return paymentResponseSchema.parse(response.data).receipt;
 }
 
-export async function postRefund(id: string, reason: string): Promise<void> {
-  await hospitalApi.post(`${base(id)}/refunds`, { reason }, { headers: idempotencyKey() });
+export async function postRefund(id: string, reason: string, replayKey: string): Promise<void> {
+  await hospitalApi.post(`${base(id)}/refunds`, { reason }, { headers: idempotencyKey(replayKey) });
 }
 
 export async function getReceipt(id: string) {

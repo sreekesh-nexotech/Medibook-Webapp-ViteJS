@@ -136,8 +136,6 @@ const NOT_AVAILABLE_PLACEHOLDER = 'Not available';
 const PLATFORM_MANAGED_HINT = 'Managed by Medibook — contact support to change it.';
 
 /** Fallback artwork while the hospital has no logo of its own. */
-const DEFAULT_LOGO_SRC = '/assets/apollo-logo.png';
-
 /** Landline or mobile: 10 or 11 digits once separators are stripped. */
 const MIN_PHONE_DIGITS = 10;
 const MAX_PHONE_DIGITS = 11;
@@ -255,7 +253,7 @@ function validateBank(b: BankForm, hasAccount: boolean, errors: SettingsErrors):
     errors.bankAccount = 'Account number must be 9–18 digits.';
   }
   if (!IFSC_PATTERN.test(b.ifsc.trim().toUpperCase())) {
-    errors.bankIfsc = 'IFSC looks like HDFC0001234 — 4 letters, a zero, then 6 characters.';
+    errors.bankIfsc = 'IFSC looks like ABCD0123456 — 4 letters, a zero, then 6 characters.';
   }
   if (b.upi.trim() !== '' && !UPI_PATTERN.test(b.upi.trim())) {
     errors.bankUpi = 'UPI ID looks like name@bank.';
@@ -599,11 +597,11 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
               </SettingsHead>
               <div className="mb-6.5 flex items-center gap-4.5">
                 <div className="bg-blue-soft-bg flex size-18 flex-none items-center justify-center overflow-hidden rounded-lg">
-                  <img
-                    src={logoSrc ?? DEFAULT_LOGO_SRC}
-                    className={cn('object-cover', logoSrc ? 'h-full w-full' : 'size-12')}
-                    alt=""
-                  />
+                  {logoSrc ? (
+                    <img src={logoSrc} className="h-full w-full object-cover" alt="" />
+                  ) : (
+                    <Icon name="building-2" size={32} className="text-blue" />
+                  )}
                 </div>
                 <div>
                   <label className="inline-block">

@@ -227,7 +227,12 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
     setRemoving(null);
     void confirm.run({
       attempt: (isConfirmed) =>
-        remove.mutateAsync({ doctorId, exceptionId: target.id, confirm: isConfirmed }),
+        remove.mutateAsync({
+          doctorId,
+          exceptionId: target.id,
+          version: target.version,
+          confirm: isConfirmed,
+        }),
       onApplied: () => toast('Date exception removed', 'info'),
       onError: (error) =>
         toast(failureText(error, 'Could not remove the date exception.'), 'error'),

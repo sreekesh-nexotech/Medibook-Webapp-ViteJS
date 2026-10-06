@@ -86,13 +86,16 @@ export async function postDepartment(input: DepartmentInput): Promise<Department
   return departmentResponseSchema.parse(response.data);
 }
 
+/** `If-Match` is mandatory here: without it every edit is refused (DATA-05). */
 export async function patchDepartment(
   id: string,
   input: DepartmentInput,
+  version: number,
 ): Promise<DepartmentResponse> {
   const response = await hospitalApi.patch(
     `/departments/${encodeURIComponent(id)}`,
     departmentBody(input),
+    { headers: ifMatch(version) },
   );
   return departmentResponseSchema.parse(response.data);
 }
@@ -246,12 +249,13 @@ export async function deleteLeave(
   doctorId: string,
   leaveId: string,
   confirm: boolean,
+  version: number,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.delete(
     `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leaveId)}`,
     {
       params: confirmParams(confirm),
-      headers: idempotencyKey(),
+      headers: { ...ifMatch(version), ...idempotencyKey() },
     },
   );
   return scheduleChangeResponseSchema.parse(response.data);
@@ -306,12 +310,13 @@ export async function deleteDateException(
   doctorId: string,
   exceptionId: string,
   confirm: boolean,
+  version: number,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.delete(
     `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exceptionId)}`,
     {
       params: confirmParams(confirm),
-      headers: idempotencyKey(),
+      headers: { ...ifMatch(version), ...idempotencyKey() },
     },
   );
   return scheduleChangeResponseSchema.parse(response.data);

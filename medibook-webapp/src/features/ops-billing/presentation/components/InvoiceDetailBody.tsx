@@ -5,7 +5,7 @@ import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, rupeesFromPaise } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -42,7 +42,6 @@ import {
   isNotImplemented,
   isUnpaid,
   outstandingPaise,
-  paiseToRupees,
   plural,
   rupees,
   saveFile,
@@ -166,14 +165,15 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
         planName ?? '',
         inv.periodStart,
         inv.periodEnd,
-        inv.issuedAt,
+        // The IST calendar day, not the UTC one (DATA-01).
+        dateOf(inv.issuedAt),
         inv.dueAt,
         statusBadge.label,
-        paiseToRupees(inv.subtotalPaise),
-        paiseToRupees(inv.gstPaise),
-        paiseToRupees(inv.totalPaise),
-        paiseToRupees(inv.amountPaidPaise),
-        inv.paidAt ?? '',
+        rupeesFromPaise(inv.subtotalPaise),
+        rupeesFromPaise(inv.gstPaise),
+        rupeesFromPaise(inv.totalPaise),
+        rupeesFromPaise(inv.amountPaidPaise),
+        inv.paidAt ? fmtDateTime(inv.paidAt) : '',
       ],
     ]);
     toast(`Exported ${filename}`, 'success');
@@ -212,7 +212,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
   const reminders = remindersQuery.data ?? [];
   const reminderState: TableStateSpec | undefined = remindersQuery.isPending
     ? { kind: 'loading', rows: HISTORY_LOADING_ROWS }
-    : remindersQuery.isError
+    : remindersQuery.isLoadingError
       ? {
           kind: 'error',
           message: failureText(remindersQuery.error, 'The reminder history could not be loaded.'),
@@ -235,7 +235,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
   const payments = paymentsQuery.data?.items ?? [];
   const paymentState: TableStateSpec | undefined = paymentsQuery.isPending
     ? { kind: 'loading', rows: HISTORY_LOADING_ROWS }
-    : paymentsQuery.isError
+    : paymentsQuery.isLoadingError
       ? {
           kind: 'error',
           message: failureText(paymentsQuery.error, 'The payments could not be loaded.'),

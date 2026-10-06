@@ -26,13 +26,29 @@ const REVOKE_DELAY_MS = 1000;
 /** One CSV cell as a screen can hand it over. */
 export type CsvCell = string | number | null | undefined;
 
+/** Spreadsheet apps run a cell that starts with one of these as a formula. */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+/** A plain number cannot run anything, so it stays a number in the spreadsheet. */
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+/**
+ * Neutralise spreadsheet formula injection the way the backend's own exports
+ * do (`settlements/services/export.py`): text a spreadsheet would run as a
+ * formula gets a leading apostrophe, so it opens as plain text.
+ */
+export function neutraliseFormula(text: string): string {
+  return FORMULA_PREFIX.test(text) && !PLAIN_NUMBER.test(text) ? `'${text}` : text;
+}
+
 /**
  * RFC-4180 cell: empty for nullish, always quoted, embedded `"` doubled.
  * Quoting unconditionally means commas, newlines and leading zeros survive.
+ * Text cells are formula-neutralised (PHI-04); numbers are written as they are.
  */
 function csvCell(cell: CsvCell): string {
   if (cell == null) return '""';
-  return `"${String(cell).replace(/"/g, '""')}"`;
+  const text = typeof cell === 'string' ? neutraliseFormula(cell) : String(cell);
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 /** Serialise rows to an RFC-4180 CSV body (no BOM — `downloadCsv` adds it). */

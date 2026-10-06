@@ -15,6 +15,8 @@ const RETRYABLE: ReadonlySet<FailureKind> = new Set(['network', 'server']);
  * Server-state cache. Query functions throw a typed `Failure` (`unwrap`), so
  * a 4xx — validation, permission, not found — fails at once instead of being
  * retried; mutations never retry (a repeated write is the caller's decision).
+ * Offline, a write fails at once with a connection message instead of pausing
+ * and firing by itself when the network returns (RUN-03).
  */
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,7 +25,7 @@ const queryClient = new QueryClient({
       retry: (failureCount, error) =>
         failureCount < QUERY_MAX_RETRIES && (!isFailure(error) || RETRYABLE.has(error.kind)),
     },
-    mutations: { retry: false },
+    mutations: { retry: false, networkMode: 'always' },
   },
 });
 

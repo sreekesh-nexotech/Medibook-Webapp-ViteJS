@@ -157,7 +157,7 @@ export function OpsPlatformUsersScreen() {
 
   const tableState: TableStateSpec | undefined = list.isPending
     ? { kind: 'loading', rows: OPS_PU_PAGE }
-    : list.isError
+    : list.isLoadingError
       ? {
           kind: 'error',
           title: "Patient accounts didn't load",

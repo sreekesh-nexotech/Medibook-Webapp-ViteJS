@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { formatInstant } from '@/shared/lib/format';
 
 /**
  * The hospital half of audit 3.1.1 — "the Refresh button does nothing on eight
@@ -65,8 +66,5 @@ export function useListRefresh(reload: () => void): ListRefreshState {
 
 /** "Updated 10:42" — the caption that sits next to a wired Refresh button. */
 export function formatUpdatedAt(updatedAt: number): string {
-  return new Date(updatedAt).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatInstant(updatedAt, { hour: '2-digit', minute: '2-digit' });
 }

@@ -70,11 +70,13 @@ export function useSaveLeaveMutation() {
 
 interface LeaveDelete extends ScheduleWrite {
   readonly leaveId: string;
+  /** The leave's version as shown, for `If-Match` (DATA-05). */
+  readonly version: number;
 }
 
 export function useDeleteLeaveMutation() {
-  return useScheduleWrite(async ({ doctorId, leaveId, confirm }: LeaveDelete) =>
-    unwrap(await deleteLeave(doctorId, leaveId, confirm)),
+  return useScheduleWrite(async ({ doctorId, leaveId, confirm, version }: LeaveDelete) =>
+    unwrap(await deleteLeave(doctorId, leaveId, confirm, version)),
   );
 }
 
@@ -95,10 +97,12 @@ export function useSaveDateExceptionMutation() {
 
 interface ExceptionDelete extends ScheduleWrite {
   readonly exceptionId: string;
+  /** The exception's version as shown, for `If-Match` (DATA-05). */
+  readonly version: number;
 }
 
 export function useDeleteDateExceptionMutation() {
-  return useScheduleWrite(async ({ doctorId, exceptionId, confirm }: ExceptionDelete) =>
-    unwrap(await deleteDateException(doctorId, exceptionId, confirm)),
+  return useScheduleWrite(async ({ doctorId, exceptionId, confirm, version }: ExceptionDelete) =>
+    unwrap(await deleteDateException(doctorId, exceptionId, confirm, version)),
   );
 }

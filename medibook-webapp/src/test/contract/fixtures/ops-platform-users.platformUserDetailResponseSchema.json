@@ -36,7 +36,7 @@
       "booking_ref": "LKSB-2609-00180",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-        "name": "Lakeshore Multispeciality Hospital"
+        "name": "Example Multispeciality Hospital"
       },
       "doctor": {
         "id": "01a0ee28-85e5-7da3-9304-2a385af65a5a",
@@ -51,7 +51,7 @@
       "booking_ref": "LKSB-2609-00163",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-        "name": "Lakeshore Multispeciality Hospital"
+        "name": "Example Multispeciality Hospital"
       },
       "doctor": {
         "id": "01a0ee28-8648-7251-b8f0-4b2b222f6f9c",
@@ -66,7 +66,7 @@
       "booking_ref": "LKSB-2609-00158",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-        "name": "Lakeshore Multispeciality Hospital"
+        "name": "Example Multispeciality Hospital"
       },
       "doctor": {
         "id": "01a0ee28-86bf-7ce0-91fb-9c66da9bd3bd",
@@ -81,7 +81,7 @@
       "booking_ref": "LKSB-2609-00148",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-        "name": "Lakeshore Multispeciality Hospital"
+        "name": "Example Multispeciality Hospital"
       },
       "doctor": {
         "id": "01a0ee28-8648-7251-b8f0-4b2b222f6f9c",
@@ -96,7 +96,7 @@
       "booking_ref": "LKSB-2609-00133",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-        "name": "Lakeshore Multispeciality Hospital"
+        "name": "Example Multispeciality Hospital"
       },
       "doctor": {
         "id": "01a0ee28-86bf-7ce0-91fb-9c66da9bd3bd",

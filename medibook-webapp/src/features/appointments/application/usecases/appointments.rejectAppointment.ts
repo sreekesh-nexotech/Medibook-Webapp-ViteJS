@@ -3,6 +3,10 @@ import type { Result } from '@/core/error/failure';
 import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
 import { appointmentsRepository } from '@/features/appointments/infrastructure/repositories/appointments.repository.impl';
 
-export function rejectAppointment(id: string, reason: string): Promise<Result<DeskAppointment>> {
-  return appointmentsRepository.reject(id, reason);
+export function rejectAppointment(
+  id: string,
+  reason: string,
+  replayKey: string,
+): Promise<Result<DeskAppointment>> {
+  return appointmentsRepository.reject(id, reason, replayKey);
 }

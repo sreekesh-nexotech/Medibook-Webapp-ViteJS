@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
-import { money } from '@/shared/lib/format';
+import { money, moneyFromPaise, parseHundredths, rupeesFromPaise } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -64,13 +64,20 @@ function PaymentForm({
 }) {
   const collect = useCollectPaymentMutation();
   const due = appt.totalRupees;
+  const duePaise = Math.round(due * PAISE_PER_RUPEE);
   const [lines, setLines] = useState<readonly Line[]>([
-    { key: 1, method: 'cash', amount: String(due), reference: '' },
+    { key: 1, method: 'cash', amount: rupeesFromPaise(duePaise), reference: '' },
   ]);
   const [error, setError] = useState<string | null>(null);
+  /** Set the moment Record is pressed, so a double click sends one request (DATA-11). */
+  const inFlight = useRef(false);
+  const busy = collect.isPending;
 
-  const entered = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
-  const remaining = Math.round((due - entered) * PAISE_PER_RUPEE) / PAISE_PER_RUPEE;
+  // Every line in integer paise, parsed from the digits typed; `null` when the
+  // text is not an amount with at most two decimals (DATA-09).
+  const parsed = lines.map((l) => ({ ...l, paise: parseHundredths(l.amount) }));
+  const enteredPaise = parsed.reduce((sum, l) => sum + (l.paise ?? 0), 0);
+  const remainingPaise = duePaise - enteredPaise;
 
   const update = (key: number, patch: Partial<Line>): void =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -81,33 +88,36 @@ function PaymentForm({
       {
         key: Math.max(...ls.map((l) => l.key)) + 1,
         method: 'upi',
-        amount: remaining > 0 ? String(remaining) : '',
+        amount: remainingPaise > 0 ? rupeesFromPaise(remainingPaise) : '',
         reference: '',
       },
     ]);
 
   const submit = (): void => {
-    if (lines.some((l) => !(Number(l.amount) > 0))) {
-      setError('Every line needs an amount greater than zero.');
+    if (inFlight.current) return;
+    const valid = parsed.flatMap((l) =>
+      l.paise !== null && l.paise > 0
+        ? [{ method: l.method, amountPaise: l.paise, reference: l.reference.trim() }]
+        : [],
+    );
+    if (valid.length !== parsed.length) {
+      setError('Every line needs an amount greater than zero, with at most two decimals.');
       return;
     }
-    if (remaining !== 0) {
+    if (remainingPaise !== 0) {
       setError(
-        `The lines must add up to ${money(due)} — ${money(Math.abs(remaining))} ${remaining > 0 ? 'still to collect' : 'too much'}.`,
+        `The lines must add up to ${money(due)} — ${moneyFromPaise(Math.abs(remainingPaise))} ${remainingPaise > 0 ? 'still to collect' : 'too much'}.`,
       );
       return;
     }
     setError(null);
+    inFlight.current = true;
     collect.mutate(
+      { id: appt.id, lines: valid },
       {
-        id: appt.id,
-        lines: lines.map((l) => ({
-          method: l.method,
-          amountRupees: Number(l.amount),
-          reference: l.reference.trim(),
-        })),
-      },
-      {
+        onSettled: () => {
+          inFlight.current = false;
+        },
         onSuccess: (receipt) => {
           toast(`Payment of ${money(due)} recorded`, 'success');
           onPaid(receipt);
@@ -129,14 +139,15 @@ function PaymentForm({
     <Modal
       open
       onClose={onClose}
+      dismissible={!busy}
       title="Collect Payment"
       width={560}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={collect.isPending}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button icon="indian-rupee" onClick={submit} busy={collect.isPending}>
+          <Button icon="indian-rupee" onClick={submit} busy={busy}>
             Record {money(due)}
           </Button>
         </>
@@ -191,7 +202,7 @@ function PaymentForm({
           Split payment
         </Button>
         <span className="text-body text-text-muted tabular-nums">
-          Due {money(due)} · entered {money(entered)}
+          Due {money(due)} · entered {moneyFromPaise(enteredPaise)}
         </span>
       </div>
       {error && (

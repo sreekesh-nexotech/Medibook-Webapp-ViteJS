@@ -115,7 +115,7 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
 
   const placeholder = query.isLoading
     ? 'Loading accounts…'
-    : query.isError
+    : query.isLoadingError
       ? 'Accounts could not be loaded — switch type to retry'
       : options.length === 0
         ? isPatient

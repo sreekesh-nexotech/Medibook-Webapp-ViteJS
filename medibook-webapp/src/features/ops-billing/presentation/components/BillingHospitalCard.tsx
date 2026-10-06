@@ -30,7 +30,8 @@ const PAYMENT_COLUMNS = ['Invoice', 'Attempted', 'Method', 'Amount', 'Status'] a
 
 interface ListState {
   readonly isPending: boolean;
-  readonly isError: boolean;
+  /** Failed with nothing to show; a failed refresh keeps the rows (RUN-04). */
+  readonly isLoadingError: boolean;
   readonly refetch: () => unknown;
 }
 
@@ -40,7 +41,7 @@ function tableState(
   emptyTitle: string,
 ): TableStateSpec | undefined {
   if (query.isPending) return { kind: 'loading', rows: 3 };
-  if (query.isError) return { kind: 'error', onRetry: () => void query.refetch() };
+  if (query.isLoadingError) return { kind: 'error', onRetry: () => void query.refetch() };
   if (rows === 0) return { kind: 'empty', icon: 'file-text', title: emptyTitle };
   return undefined;
 }

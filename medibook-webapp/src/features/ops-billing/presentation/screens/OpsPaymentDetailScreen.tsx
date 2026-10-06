@@ -85,7 +85,7 @@ export function OpsPaymentDetailScreen() {
   const pay = paymentsQuery.data?.items.find((p) => p.id === id);
 
   if (paymentsQuery.isPending) return <SkeletonCards count={1} lines={4} pad={24} />;
-  if (paymentsQuery.isError) {
+  if (paymentsQuery.isLoadingError) {
     return (
       <Card pad={32}>
         <ErrorState

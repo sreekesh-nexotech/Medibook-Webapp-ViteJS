@@ -6,7 +6,7 @@
         "id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
         "first_name": "Anita",
         "last_name": "Menon",
-        "email": "anita.menon@lakeshore.medibook.example.com",
+        "email": "anita.menon@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-10-06T07:50:41.516215Z"
       },
@@ -29,7 +29,7 @@
         "id": "01a0ee28-8a3c-7d91-9672-c599b8159456",
         "first_name": "Vineeth",
         "last_name": "Kumar",
-        "email": "vineeth.kumar@lakeshore.medibook.example.com",
+        "email": "vineeth.kumar@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-10-06T06:38:46.948899Z"
       },
@@ -52,7 +52,7 @@
         "id": "01a0ee28-8b60-76e1-bd9e-56b7744ff289",
         "first_name": "Shalini",
         "last_name": "Thomas",
-        "email": "shalini.thomas@lakeshore.medibook.example.com",
+        "email": "shalini.thomas@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.049994Z"
       },
@@ -75,7 +75,7 @@
         "id": "01a0ee28-8c89-7360-ad91-09fdc9a72588",
         "first_name": "Joseph",
         "last_name": "Kurian",
-        "email": "joseph.kurian@lakeshore.medibook.example.com",
+        "email": "joseph.kurian@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.336515Z"
       },
@@ -98,7 +98,7 @@
         "id": "01a0ee28-8da1-7ac0-a00f-7556c7059c79",
         "first_name": "Nimmy",
         "last_name": "George",
-        "email": "nimmy.george@lakeshore.medibook.example.com",
+        "email": "nimmy.george@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.614714Z"
       },

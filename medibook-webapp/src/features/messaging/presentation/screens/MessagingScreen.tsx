@@ -263,7 +263,7 @@ export function MessagingScreen() {
 
   const outboxTableState: TableStateSpec | undefined = outboxQuery.isLoading
     ? { kind: 'loading', rows: OUTBOX_PAGE_SIZE }
-    : outboxQuery.isError
+    : outboxQuery.isLoadingError
       ? {
           kind: 'error',
           title: "The outbox didn't load.",
@@ -330,7 +330,7 @@ export function MessagingScreen() {
 
           {templatesQuery.isLoading ? (
             <SkeletonCards count={2} lines={4} />
-          ) : templatesQuery.isError ? (
+          ) : templatesQuery.isLoadingError ? (
             <Card>
               <ErrorState
                 inline

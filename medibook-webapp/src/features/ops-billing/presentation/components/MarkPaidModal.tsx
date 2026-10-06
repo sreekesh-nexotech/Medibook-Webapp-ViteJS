@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { todayISO } from '@/shared/lib/format';
+import { calendarInstant, todayISO } from '@/shared/lib/format';
 import { notFutureDate, positiveAmount } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
@@ -22,6 +22,9 @@ import {
   outstandingPaise,
   rupees,
 } from '@/features/ops-billing/presentation/components/billingView';
+
+/** Time of day recorded for a payment entered by date alone. */
+const MIDDAY = '12:00:00';
 
 const PAISE_PER_RUPEE = 100;
 const REFERENCE_MAX_LENGTH = 200;
@@ -92,8 +95,9 @@ export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
           input: {
             method,
             reference: values.reference.trim() || null,
-            // Local midnight of the chosen day, as an ISO date-time.
-            paidAt: new Date(`${values.dateIso}T00:00:00`).toISOString(),
+            // Only the day is known, so record noon on the hospital's calendar: that
+            // instant falls on the chosen day in both IST and UTC (DATA-03).
+            paidAt: calendarInstant(values.dateIso, MIDDAY),
             amountPaise,
           },
         });

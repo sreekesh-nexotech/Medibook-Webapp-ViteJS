@@ -32,3 +32,14 @@ export function SessionError({
     </div>
   );
 }
+
+/** The session check is waiting for the network (RUN-03): say so instead of spinning. */
+export function OfflineSession({ onLogout }: { onLogout: () => void }) {
+  return (
+    <SessionError
+      title="You're offline"
+      message="Medibook opens as soon as the connection is back. Nothing has been lost."
+      onLogout={onLogout}
+    />
+  );
+}

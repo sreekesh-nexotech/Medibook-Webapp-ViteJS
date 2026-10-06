@@ -6,26 +6,37 @@ Each entry says what fails, the evidence, what the backend needs to change, and 
 the web app does in the meantime.
 
 Found on 6 Oct 2026 against the shared test backend while fixing the Day-one
-workflows (`claude/core-day-one`) and the release items (`claude/rel-sec-hardening`).
+workflows (`claude/core-day-one`), the release and security items
+(`claude/rel-sec-hardening`), and the patient-data, money and reliability items
+(`claude/privacy-data-runtime`).
 Paths under `backend:` are in the Django repository.
 
 ## Summary
 
-| ID        | Problem                                                       | Severity | Web app status                         |
-| --------- | ------------------------------------------------------------- | -------- | -------------------------------------- |
-| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available |
-| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only             |
-| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision   |
-| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`   |
-| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself         |
-| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs    |
-| CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                          |
-| ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates     |
-| CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)      |
-| ENV-01    | Email links are relative when the frontend URLs are unset     | High     | Deployment setting                     |
-| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                |
-| ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing     |
-| API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible       |
+| ID        | Problem                                                        | Severity | Web app status                         |
+| --------- | -------------------------------------------------------------- | -------- | -------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)  | Blocker  | Needs backend; admin stopgap available |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT     | High     | Read-only smoke tests only             |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)             | High     | Needs backend and a product decision   |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit             | High     | App retries once after `Retry-After`   |
+| SEC-01-B  | Background polls keep a server session from going idle         | Medium   | App signs idle tabs out itself         |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session       | Medium   | App coordinates refresh across tabs    |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation     | High     | Needs backend                          |
+| ROLE-01   | Only admins can refund cash at the desk                        | Medium   | Product decision on role templates     |
+| CORE-03-B | Go-live does not open the hospital to patients atomically      | Medium   | Web app works around it (2 calls)      |
+| ENV-01    | Email links are relative when the frontend URLs are unset      | High     | Deployment setting                     |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays          | Medium   | Web app fixed (CORE-01)                |
+| ENV-02    | Test backend signs file links for an unreachable host          | Medium   | Blocks end-to-end download testing     |
+| API-01    | No way to read a hospital's commission history                 | Low      | Future-dated rates are invisible       |
+| PHI-01-B  | Reads, exports and downloads are not audited; nothing expires  | High     | Needs backend and a DPDP assessment    |
+| PHI-06-B  | SMS and WhatsApp templates are not registered                  | High     | Needs DLT and WhatsApp approval        |
+| PHI-03-B  | The message outbox export is built in the browser, unaudited   | Medium   | Admin-only; needs a server export      |
+| PHI-05-B  | Seeded test hospitals copy real hospitals' names and places    | Medium   | Committed fixtures scrubbed            |
+| PHI-07-B  | Patient search terms travel in the URL (`?q=`)                 | Low      | MRNs out of URLs; search needs backend |
+| DATA-01-B | The server's invoice document prints the UTC issue date        | Medium   | App shows the IST date                 |
+| DATA-05-B | `schema.yml` omits the required `If-Match` on department edits | Low      | App now sends it                       |
+| RUN-07-B  | Live-update sockets check sign-in only when they connect       | Medium   | App closes sockets on sign-out         |
+| RUN-09-B  | Token-queue load at peak is untested                           | Medium   | App refetches less; test needs ENV-03  |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -273,3 +284,132 @@ scheduled change is invisible until it applies.
 
 **What the backend needs.** `GET /platform/hospitals/{id}/commission-history`, newest
 first. The Commercial Terms card will list upcoming and past rates.
+
+## PHI-01-B — Reads, exports and downloads are not audited; nothing expires
+
+**What fails.** Every successful write leaves an audit row, but safe methods are
+skipped (backend: `core/api.py:98-125`), so opening a patient, exporting a list or
+downloading a file leaves no trace. The retention sweep only records what is due for
+archival and never deletes (backend: `audit/tasks.py:20-25`, Q122).
+
+**Why it matters.** The DPDP Act 2023 assessment (checklist PHI-01) has to show who
+read or exported personal data, and how long each kind of data is kept.
+
+**What the backend should do.** Audit reads of patient records and every export and
+file download (actor, record or filter, time). Agree retention periods with
+compliance, then make the sweep delete or anonymise after them. The web app needs
+no change for either.
+
+## PHI-03-B — The message outbox export is built in the browser
+
+**What fails.** Messaging → Send & Outbox → Export CSV pages through
+`GET /hospital/messaging/deliveries` in the browser and writes the file there. On the
+test backend that was 9 requests and 820 rows of patients' phone numbers and email
+addresses, with no audit row (6 Oct). Only admins can open Messaging, and listing
+deliveries needs `hospital_settings.view`.
+
+**What the backend should do.** Add a server-side export (for example
+`GET /hospital/messaging/deliveries/export?format=csv` with the list's filters) that
+requires a permission, guards spreadsheet formulas like the settlement export, and
+writes an audit row with the actor and the filters. The web app then switches the
+button to it.
+
+**Meanwhile.** Every CSV the web app builds now neutralises spreadsheet formulas
+(PHI-04).
+
+## PHI-05-B — Seeded test hospitals copy real hospitals
+
+**What fails.** The test backend's seed names hospitals after real ones: one
+seeded hospital's name and street address match a real hospital in Kochi, and another
+echoes a real hospital chain in Pune. The names reach every screenshot, demo and
+recorded fixture. (They are not repeated here, for the same reason.)
+
+**What the backend should do.** Rename the seeded hospitals, companies, street
+addresses and email domains to clearly fictional ones.
+
+**Meanwhile.** The fixture recorder replaces these names, street addresses and exact
+coordinates before writing, and the committed fixtures are scrubbed
+(`node scripts/record-api-fixtures.mjs --rescrub`).
+
+## PHI-06-B — SMS and WhatsApp templates are not registered
+
+**What fails.** Every SMS must carry a DLT template id registered with the operator,
+set per event in `MSG91_DLT_TEMPLATE_IDS`; the operator permanently rejects an
+unregistered one (backend: `integrations/msg91/client.py:1-37`). WhatsApp business
+messages need approved templates as well. Until both are registered, patients get no
+confirmation or reminder by SMS or WhatsApp.
+
+**What is needed.** Register every patient-facing template (confirmation, reminder,
+cancellation, refund, one-time code) on the DLT portal and with WhatsApp, set the ids
+in production configuration, and check on staging that one appointment confirmation
+arrives by SMS, WhatsApp and email.
+
+## PHI-07-B — Patient search terms travel in the URL
+
+**What fails.** Patient search sends what staff type (names, phone numbers, MR
+numbers) as `GET /hospital/patients?q=…`, so it lands in proxy and server access logs.
+
+**What the web app now does.** Patient pages use the record id instead of the MR
+number, and opening a patient reads `/patients/{id}` without a search. Old MR-number
+links still work and are replaced by the record-id address.
+
+**What is needed.** Either the backend accepts the search in a POST body, or the
+reverse proxy leaves query strings out of access-log lines for
+`/api/v1/hospital/patients`. Confirm with a production log sample.
+
+## DATA-01-B — The server's invoice document prints the UTC issue date
+
+**What fails.** The invoice HTML/PDF prints `inv.issued_at.date()`, which is the UTC date
+(backend: `subscriptions/services/invoicing.py:272-273`). Invoices are generated at 00:30
+IST, the previous day in UTC, so every scheduled invoice document shows the day before
+its real issue date.
+
+**What the backend should do.** Convert to India Standard Time (or the hospital's zone)
+before taking the date, in the document and in any server-side CSV.
+
+**Meanwhile.** The web app shows and prints the IST date, and writes it to its own CSVs
+(DATA-01): the invoice issued at 00:30 IST on 3 Oct now reads "Issued 03 Oct 2026".
+
+## DATA-05-B — `schema.yml` does not say department edits need `If-Match`
+
+**What fails.** `PATCH /hospital/departments/{id}` refuses an edit without `If-Match`
+(backend: `catalog/services/departments.py:35`, `require_version`), but `schema.yml` does
+not list the header. The web app did not send it, so every department edit failed with
+400 "If-Match: This header is required" (confirmed 6 Oct). Holiday edits failed the same
+way; for those the contract does document the header.
+
+**What the backend should do.** Document `If-Match` on the department PATCH, and check
+every other PATCH that calls `require_version` for the same gap.
+
+**Meanwhile.** The web app now sends `If-Match` on department and holiday edits, and on
+leave, date-exception, tax-rate and coupon deletes (DATA-05).
+
+## RUN-07-B — Live-update sockets check sign-in only when they connect
+
+**What fails.** The socket consumers authorise the token once, at connect
+(backend: `core/ws.py:36-46`). A session revoked afterwards (sign-out everywhere, a
+blocked account) keeps receiving pushes until the socket drops. A bad token is
+refused by closing before accepting, which browsers report only as an abnormal close
+(1006), so a client cannot tell "signed out" from "network down".
+
+**What the backend should do.** Accept, then close with 4401 when the token is bad,
+and close a session's sockets when the session is revoked (or re-check the session on
+each push).
+
+**What the web app now does.** It closes every socket when its session ends in any
+tab, drops a line that stops answering pings, and after repeated refusals refreshes
+the token once and then shows "Live updates off" instead of reconnecting forever
+(RUN-07).
+
+## RUN-09-B — Token-queue load at peak is untested
+
+**What fails.** Every queue push reaches every open terminal, and each terminal used to
+refetch every page of every cached appointment list per push, so load grew with
+terminals × pages × token calls.
+
+**What the web app now does.** A push refreshes only lists that include today, at most
+once per two-second burst, and only the lists on screen (RUN-09).
+
+**What is needed.** A load test on staging (ENV-03): ten terminals and fifty doctors
+calling tokens at peak, with API response times and rate limits measured. Pushes that
+carry the changed appointment would let terminals update without refetching at all.

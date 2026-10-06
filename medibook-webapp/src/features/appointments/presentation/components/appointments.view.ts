@@ -1,4 +1,5 @@
 import type { PermissionKey } from '@/shared/hooks/usePermission';
+import { formatInstant } from '@/shared/lib/format';
 import type { IconName } from '@/shared/ui/icon-registry';
 
 import type {
@@ -91,17 +92,17 @@ export function isInQueue(a: DeskAppointment): boolean {
 
 /* ------------------------------------------------------------------- times */
 
-const TIME_FORMAT = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' });
-const DATE_FORMAT = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+const TIME_FORMAT: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+/** A bare `yyyy-mm-dd` is a calendar day: formatted as it is, never shifted by a zone. */
+const CALENDAR_DAY_FORMAT = new Intl.DateTimeFormat('en-IN', { ...DATE_FORMAT, timeZone: 'UTC' });
 
-function format(fmt: Intl.DateTimeFormat, iso: string | null): string {
+/** An instant on the hospital's clock (DATA-02). */
+function format(options: Intl.DateTimeFormatOptions, iso: string | null): string {
   if (!iso) return '—';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : fmt.format(date);
+  return Number.isNaN(date.getTime()) ? '—' : formatInstant(date, options);
 }
 
 /** "9:30 am" from an instant. */
@@ -111,7 +112,9 @@ export function timeOf(iso: string): string {
 
 /** "13 Jun" from an instant or a `yyyy-mm-dd`. */
 export function dayOf(isoOrDay: string): string {
-  return format(DATE_FORMAT, isoOrDay.length === ISO_DAY_LENGTH ? `${isoOrDay}T00:00` : isoOrDay);
+  if (isoOrDay.length !== ISO_DAY_LENGTH) return format(DATE_FORMAT, isoOrDay);
+  const day = new Date(`${isoOrDay}T00:00:00Z`);
+  return Number.isNaN(day.getTime()) ? '—' : CALENDAR_DAY_FORMAT.format(day);
 }
 
 /** "13 Jun 2026, 9:30 am". */

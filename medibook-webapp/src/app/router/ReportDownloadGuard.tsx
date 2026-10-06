@@ -43,7 +43,7 @@ export function ReportDownloadGuard({ surface }: ReportDownloadGuardProps) {
   const platform = surface === 'platform' ? platformSessionOf(session.data) : null;
 
   if (!hospital && !platform) {
-    if (session.isError) {
+    if (session.isLoadingError) {
       if (isFailure(session.error) && session.error.kind === 'unauthorized') {
         return <Navigate to={loginReturningTo(pathname)} replace />;
       }

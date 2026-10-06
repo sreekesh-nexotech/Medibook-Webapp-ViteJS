@@ -136,7 +136,7 @@ export function LoginHistoryCard() {
 
   const tableState: TableStateSpec | undefined = loginsQuery.isLoading
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : loginsQuery.isError
+    : loginsQuery.isLoadingError
       ? {
           kind: 'error',
           title: "Sign-in history didn't load.",

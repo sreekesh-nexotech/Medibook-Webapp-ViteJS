@@ -32,7 +32,7 @@ export function LogsHospitalActivityCard({ hospitalId }: LogsHospitalActivityCar
 
   let state: TableStateSpec | undefined;
   if (logs.isPending) state = { kind: 'loading', rows: 4 };
-  else if (logs.isError) state = { kind: 'error', onRetry: () => void logs.refetch() };
+  else if (logs.isLoadingError) state = { kind: 'error', onRetry: () => void logs.refetch() };
   else if (rows.length === 0)
     state = {
       kind: 'empty',

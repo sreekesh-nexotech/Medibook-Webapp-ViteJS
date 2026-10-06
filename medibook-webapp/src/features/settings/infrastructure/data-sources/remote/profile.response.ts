@@ -24,6 +24,7 @@ export const holidayResponseSchema = z.object({
   date_to: z.string(),
   department_id: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  version: z.number().int(),
 });
 
 /** `GET /holidays` answers with the page envelope, not the bare array `schema.yml` shows. */
@@ -39,6 +40,7 @@ export function toHoliday(dto: HolidayResponse): Holiday {
     to: dto.date_to,
     departmentId: dto.department_id ?? null,
     note: dto.note ?? null,
+    version: dto.version,
   };
 }
 

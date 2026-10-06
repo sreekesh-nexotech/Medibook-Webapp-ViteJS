@@ -101,7 +101,7 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
         <div className="text-text-muted flex justify-center py-12">
           <Spinner size={28} label="Loading the appointment" />
         </div>
-      ) : appt.isError ? (
+      ) : appt.isLoadingError ? (
         <ErrorState
           inline
           title="Could not load this appointment"

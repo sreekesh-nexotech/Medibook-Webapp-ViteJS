@@ -3,7 +3,7 @@
     {
       "id": "01a0ee28-8342-7f80-82ac-59f01bbebff6",
       "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
-      "hospital_name": "Deccan Heart Institute",
+      "hospital_name": "Demo Heart Institute",
       "hospital_status": "onboarding",
       "stage": "documents_pending",
       "assigned_to_id": null,
@@ -19,7 +19,7 @@
     {
       "id": "01a0ee28-828b-7393-a8af-9bbdeaa0cebf",
       "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
-      "hospital_name": "Nilgiri Family Clinic",
+      "hospital_name": "Model Family Clinic",
       "hospital_status": "active",
       "stage": "live",
       "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
@@ -35,7 +35,7 @@
     {
       "id": "01a0ee28-81d5-7352-b39e-954677c1963f",
       "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
-      "hospital_name": "Sahyadri City Hospital",
+      "hospital_name": "Sample City Hospital",
       "hospital_status": "active",
       "stage": "live",
       "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
@@ -51,7 +51,7 @@
     {
       "id": "01a0ee28-8127-7102-9b69-de126a0b9556",
       "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-      "hospital_name": "Lakeshore Multispeciality Hospital",
+      "hospital_name": "Example Multispeciality Hospital",
       "hospital_status": "active",
       "stage": "live",
       "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",

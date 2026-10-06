@@ -124,7 +124,7 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
             onChange={(v) => form.setField('name', v)}
             onBlur={() => form.blurField('name')}
             placeholder="e.g. Asha Verma"
-            autoComplete="name"
+            autoComplete="off"
           />
         </Field>
         <Field label="Role" required error={form.errorFor('roleId')}>
@@ -146,7 +146,7 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
             placeholder="name@hospital.med"
             type="email"
             inputMode="email"
-            autoComplete="email"
+            autoComplete="off"
           />
         </Field>
         <Field label="Phone" error={form.errorFor('phone')} hint="10-digit mobile, optional">
@@ -156,7 +156,7 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
             onBlur={() => form.blurField('phone')}
             placeholder="Mobile number"
             inputMode="tel"
-            autoComplete="tel"
+            autoComplete="off"
           />
         </Field>
         <Field label="Username" hint="Staff sign in with their email">
@@ -164,7 +164,7 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
             value={form.values.username}
             onChange={(v) => form.setField('username', v)}
             placeholder="Not used"
-            autoComplete="username"
+            autoComplete="off"
             disabled
           />
         </Field>

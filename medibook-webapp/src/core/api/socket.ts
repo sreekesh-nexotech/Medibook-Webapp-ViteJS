@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { refreshAccessToken } from '@/core/api/http';
 import type { ApiSurface } from '@/core/api/surface';
-import { getAccessToken } from '@/core/api/tokens';
+import { getAccessToken, onSessionExpired } from '@/core/api/tokens';
 import {
   WS_BEARER_SUBPROTOCOL,
   WS_CLOSE_NORMAL,
@@ -25,6 +25,14 @@ import { WS_BASE_URL } from '@/core/config/env';
  *   `pong` frames and anything malformed are dropped.
  * - On an unexpected close it reconnects with exponential backoff. A 4401
  *   (bad token) refreshes the token first; if that fails, it stops.
+ * - Two pings with nothing back mean the line is dead even without a close
+ *   event: the socket is dropped and reopened (RUN-07).
+ * - The server refuses a bad token before accepting, which the browser only
+ *   reports as an abnormal close. Three refusals in a row while online
+ *   refresh the token once; if they continue, the status is `unauthorized`
+ *   ("Live updates off") instead of reconnecting forever.
+ * - The socket closes when its session ends, and retries at once when the
+ *   browser comes back online.
  * - Every real operation stays REST — the only frame sent is `ping`.
  */
 
@@ -55,6 +63,12 @@ export interface SocketHandle {
 
 const PING_FRAME = JSON.stringify({ type: 'ping' });
 const PONG_TYPE = 'pong';
+/** Pings in a row that got nothing back before the line counts as dead. */
+const MAX_MISSED_PONGS = 2;
+/** Handshakes in a row refused before opening, while online, before the token is suspected. */
+const MAX_FAILED_OPENS = 3;
+/** Close code for a socket the client gives up on as dead (4000–4999 is the application range). */
+const WS_CLOSE_STALE = 4000;
 
 function socketUrl(path: string): string {
   const origin =
@@ -84,6 +98,8 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
   let attempt = 0;
   let isClosedByUser = false;
   let hasRetriedAuth = false;
+  let missedPongs = 0;
+  let failedOpens = 0;
 
   const stopPing = () => {
     if (pingTimer !== null) clearInterval(pingTimer);
@@ -95,9 +111,28 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
     attempt += 1;
     onStatus?.('reconnecting');
     retryTimer = setTimeout(() => {
+      retryTimer = null;
       void connect();
     }, delay);
   };
+
+  /** Drop a socket without waiting for its close event, which a dead line may never send. */
+  const abandon = (ws: WebSocket) => {
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onclose = null;
+    ws.close(WS_CLOSE_STALE);
+  };
+
+  /** Back online: retry now instead of waiting out the backoff. */
+  const onOnline = () => {
+    if (retryTimer === null || isClosedByUser) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    attempt = 0;
+    void connect();
+  };
+  window.addEventListener('online', onOnline);
 
   const handleUnauthorized = async () => {
     if (hasRetriedAuth) {
@@ -126,17 +161,34 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
     onStatus?.('connecting');
     const ws = new WebSocket(socketUrl(path), [WS_BEARER_SUBPROTOCOL, token]);
     socket = ws;
+    let opened = false;
 
     ws.onopen = () => {
+      opened = true;
       attempt = 0;
+      failedOpens = 0;
+      missedPongs = 0;
       hasRetriedAuth = false;
       onStatus?.('open');
-      pingTimer = setInterval(() => ws.send(PING_FRAME), WS_PING_INTERVAL_MS);
+      pingTimer = setInterval(() => {
+        if (missedPongs >= MAX_MISSED_PONGS) {
+          stopPing();
+          abandon(ws);
+          socket = null;
+          scheduleReconnect();
+          return;
+        }
+        missedPongs += 1;
+        ws.send(PING_FRAME);
+      }, WS_PING_INTERVAL_MS);
     };
 
     ws.onmessage = (event: MessageEvent<unknown>) => {
       const frame = parseFrame(event.data);
-      if (frame && frame.type !== PONG_TYPE) onFrame(frame);
+      if (!frame) return;
+      // Any frame proves the line is alive, not only a pong.
+      missedPongs = 0;
+      if (frame.type !== PONG_TYPE) onFrame(frame);
     };
 
     ws.onclose = (event: CloseEvent) => {
@@ -150,19 +202,35 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
         void handleUnauthorized();
         return;
       }
+      if (!opened && navigator.onLine) {
+        failedOpens += 1;
+        if (failedOpens >= MAX_FAILED_OPENS) {
+          failedOpens = 0;
+          void handleUnauthorized();
+          return;
+        }
+      }
       scheduleReconnect();
     };
   }
 
+  const close = () => {
+    if (isClosedByUser) return;
+    isClosedByUser = true;
+    stopPing();
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    window.removeEventListener('online', onOnline);
+    stopListening();
+    socket?.close(WS_CLOSE_NORMAL);
+    onStatus?.('closed');
+  };
+
+  // Signed out or revoked, here or in another tab: no socket outlives its session.
+  const stopListening = onSessionExpired((ended) => {
+    if (ended === surface) close();
+  });
+
   void connect();
 
-  return {
-    close: () => {
-      isClosedByUser = true;
-      stopPing();
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      socket?.close(WS_CLOSE_NORMAL);
-      onStatus?.('closed');
-    },
-  };
+  return { close };
 }

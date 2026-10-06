@@ -3,7 +3,7 @@
  * channel names the existing preview component speaks, and the placeholder
  * samples the read-only template preview renders with. Pure functions only.
  */
-import { fmtDate, toLocalISO } from '@/shared/lib/format';
+import { fmtDate, formatInstant, toLocalISO } from '@/shared/lib/format';
 
 import {
   PLACEHOLDERS,
@@ -93,7 +93,7 @@ const PLATFORM_PLACEHOLDERS: readonly PlaceholderDef[] = [
   {
     token: '{{hospitalName}}',
     label: 'Your hospital, as patients see it',
-    sample: 'Apollo Hospital',
+    sample: 'Example Hospital',
   },
   { token: '{{name}}', label: "The recipient's first name", sample: 'Ellen' },
   { token: '{{amount}}', label: 'Amount paid or refunded', sample: 'Rs 500.00' },
@@ -115,9 +115,9 @@ export function messagingSampleValues(): Readonly<Record<string, string>> {
   return out;
 }
 
-/** Local wall-clock time of an ISO date-time, e.g. "10:30 am". */
+/** Wall-clock time of an ISO date-time on the hospital's clock, e.g. "10:30 am". */
 export function fmtLocalTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  return formatInstant(iso, { hour: 'numeric', minute: '2-digit' });
 }
 
 /** "20 Jun 2026 · 10:30 am" in the viewer's local time. */

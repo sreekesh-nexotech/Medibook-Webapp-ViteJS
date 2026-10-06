@@ -9,8 +9,8 @@ import { deleteDepartment } from '@/features/doctors/application/usecases/delete
 import { updateDepartment } from '@/features/doctors/application/usecases/updateDepartment';
 
 interface SaveDepartmentInput {
-  /** Absent → create. */
-  readonly id?: string;
+  /** Absent → create; otherwise the department at the version shown (`If-Match`). */
+  readonly existing?: { readonly id: string; readonly version: number };
   readonly input: DepartmentInput;
 }
 
@@ -18,8 +18,12 @@ interface SaveDepartmentInput {
 export function useSaveDepartmentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, input }: SaveDepartmentInput) =>
-      unwrap(await (id ? updateDepartment(id, input) : createDepartment(input))),
+    mutationFn: async ({ existing, input }: SaveDepartmentInput) =>
+      unwrap(
+        await (existing
+          ? updateDepartment(existing.id, input, existing.version)
+          : createDepartment(input)),
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() });
     },

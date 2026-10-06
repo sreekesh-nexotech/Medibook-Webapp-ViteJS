@@ -146,8 +146,9 @@ export async function patchTaxRate(
   return taxRateResponseSchema.parse(response.data);
 }
 
-export async function deleteTaxRate(id: string): Promise<void> {
-  await hospitalApi.delete(`/tax-rates/${encodeURIComponent(id)}`);
+/** With the version shown, so a rate a colleague just changed is not removed (DATA-05). */
+export async function deleteTaxRate(id: string, version: number): Promise<void> {
+  await hospitalApi.delete(`/tax-rates/${encodeURIComponent(id)}`, { headers: ifMatch(version) });
 }
 
 /* ------------------------------------------------------------------- coupons */
@@ -203,6 +204,7 @@ export async function patchCoupon(
   return couponResponseSchema.parse(response.data);
 }
 
-export async function deleteCoupon(id: string): Promise<void> {
-  await hospitalApi.delete(`/coupons/${encodeURIComponent(id)}`);
+/** With the version shown, so a coupon a colleague just changed is not removed (DATA-05). */
+export async function deleteCoupon(id: string, version: number): Promise<void> {
+  await hospitalApi.delete(`/coupons/${encodeURIComponent(id)}`, { headers: ifMatch(version) });
 }

@@ -205,7 +205,7 @@ export function AuditTrailScreen() {
 
   const tableState: TableStateSpec | undefined = logQuery.isPending
     ? { kind: 'loading', rows: AUDIT_PAGE_SIZE }
-    : logQuery.isError
+    : logQuery.isLoadingError
       ? {
           kind: 'error',
           message: isFailure(loadError) ? loadError.message : undefined,

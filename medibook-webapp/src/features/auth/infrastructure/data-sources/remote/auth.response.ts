@@ -36,6 +36,7 @@ export const hospitalMeResponseSchema = z.object({
     id: z.string(),
     name: z.string(),
     status: z.enum(['draft', 'onboarding', 'active', 'suspended', 'closed']),
+    timezone: z.string(),
     read_only: z.boolean(),
   }),
   default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
@@ -86,6 +87,7 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
       id: dto.hospital.id,
       name: dto.hospital.name,
       status: dto.hospital.status,
+      timezone: dto.hospital.timezone,
       readOnly: dto.hospital.read_only,
     },
   };

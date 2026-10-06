@@ -6,25 +6,25 @@
   "results": [
     {
       "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-      "name": "Lakeshore Multispeciality Hospital",
+      "name": "Example Multispeciality Hospital",
       "bookings": 151,
       "revenue_paise": 6835000
     },
     {
       "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
-      "name": "Sahyadri City Hospital",
+      "name": "Sample City Hospital",
       "bookings": 120,
       "revenue_paise": 6268125
     },
     {
       "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
-      "name": "Nilgiri Family Clinic",
+      "name": "Model Family Clinic",
       "bookings": 83,
       "revenue_paise": 2360600
     },
     {
       "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
-      "name": "Deccan Heart Institute",
+      "name": "Demo Heart Institute",
       "bookings": 0,
       "revenue_paise": 0
     }

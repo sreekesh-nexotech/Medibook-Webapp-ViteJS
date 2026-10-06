@@ -7,6 +7,7 @@ export function deleteDateException(
   doctorId: string,
   exceptionId: string,
   confirm: boolean,
+  version: number,
 ): Promise<Result<ScheduleChange>> {
-  return doctorsRepository.deleteDateException(doctorId, exceptionId, confirm);
+  return doctorsRepository.deleteDateException(doctorId, exceptionId, confirm, version);
 }

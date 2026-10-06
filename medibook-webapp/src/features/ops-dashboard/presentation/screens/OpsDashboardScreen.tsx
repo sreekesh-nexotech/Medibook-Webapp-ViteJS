@@ -96,7 +96,7 @@ export function OpsDashboardScreen() {
     );
   }
 
-  if (dashboardQuery.isError) {
+  if (dashboardQuery.isLoadingError) {
     return (
       <Card>
         <ErrorState

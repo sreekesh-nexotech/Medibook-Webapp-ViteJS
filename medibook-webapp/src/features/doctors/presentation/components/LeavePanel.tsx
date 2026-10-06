@@ -179,7 +179,12 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
     setRemoving(null);
     void confirm.run({
       attempt: (isConfirmed) =>
-        remove.mutateAsync({ doctorId, leaveId: target.id, confirm: isConfirmed }),
+        remove.mutateAsync({
+          doctorId,
+          leaveId: target.id,
+          version: target.version,
+          confirm: isConfirmed,
+        }),
       onApplied: () => toast('Leave removed', 'info'),
       onError: (error) => toast(failureText(error, 'Could not remove the leave.'), 'error'),
     });

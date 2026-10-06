@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatInstant } from '@/shared/lib/format';
 
 import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
@@ -117,7 +118,7 @@ export function OpsLogsScreen() {
   const tableState: TableStateSpec | undefined =
     logsQuery.isPending || refreshing
       ? { kind: 'loading', rows: OPS_LOG_PAGE }
-      : logsQuery.isError
+      : logsQuery.isLoadingError
         ? {
             kind: 'error',
             message: isFailure(logsQuery.error) ? logsQuery.error.message : undefined,
@@ -189,7 +190,7 @@ export function OpsLogsScreen() {
           <span className="text-caption text-text-muted">
             Retention: 365 days · updated{' '}
             {logsQuery.dataUpdatedAt
-              ? new Date(logsQuery.dataUpdatedAt).toLocaleTimeString('en-IN', {
+              ? formatInstant(logsQuery.dataUpdatedAt, {
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit',

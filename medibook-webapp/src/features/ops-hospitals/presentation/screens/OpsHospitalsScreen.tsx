@@ -177,7 +177,7 @@ export function OpsHospitalsScreen() {
 
   const listError = isPlanResolved ? hospitals.error : plansQuery.error;
   const tableState: TableStateSpec | undefined =
-    (isPlanResolved && hospitals.isError) || (!isPlanResolved && plansQuery.isError)
+    (isPlanResolved && hospitals.isLoadingError) || (!isPlanResolved && plansQuery.isLoadingError)
       ? {
           kind: 'error',
           title: "The hospital registry didn't load",

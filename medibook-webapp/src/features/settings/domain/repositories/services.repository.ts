@@ -21,10 +21,10 @@ export interface ServicesRepository {
   listTaxRates(): Promise<Result<readonly ServiceTaxRate[]>>;
   createTaxRate(input: TaxRateInput): Promise<Result<ServiceTaxRate>>;
   updateTaxRate(id: string, input: TaxRateInput, version: number): Promise<Result<ServiceTaxRate>>;
-  deleteTaxRate(id: string): Promise<Result<null>>;
+  deleteTaxRate(id: string, version: number): Promise<Result<null>>;
 
   listCoupons(): Promise<Result<readonly HospitalCoupon[]>>;
   createCoupon(input: CouponInput): Promise<Result<HospitalCoupon>>;
   updateCoupon(id: string, input: CouponInput, version: number): Promise<Result<HospitalCoupon>>;
-  deleteCoupon(id: string): Promise<Result<null>>;
+  deleteCoupon(id: string, version: number): Promise<Result<null>>;
 }

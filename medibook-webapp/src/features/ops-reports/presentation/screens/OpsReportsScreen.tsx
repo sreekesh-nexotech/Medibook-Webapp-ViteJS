@@ -29,7 +29,7 @@ export function OpsReportsScreen() {
     );
   }
 
-  if (reports.isError) {
+  if (reports.isLoadingError) {
     return (
       <ErrorState
         title="Reports didn't load"

@@ -168,7 +168,7 @@ export function ConfigChangesCard() {
 
   const tableState: TableStateSpec | undefined = changesQuery.isLoading
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : changesQuery.isError
+    : changesQuery.isLoadingError
       ? {
           kind: 'error',
           title: "Configuration changes didn't load.",

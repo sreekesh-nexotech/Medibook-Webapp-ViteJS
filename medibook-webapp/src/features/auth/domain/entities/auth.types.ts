@@ -49,6 +49,8 @@ export interface HospitalSession {
     readonly id: string;
     readonly name: string;
     readonly status: HospitalStatus;
+    /** IANA zone of the hospital's calendar: "today" and every date shown follow it. */
+    readonly timezone: string;
     /** Subscription lapsed: reads work, writes are refused (D-30). */
     readonly readOnly: boolean;
   };

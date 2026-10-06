@@ -151,7 +151,7 @@ export function AddOpsUserModal({
           <TextInput
             value={f.name}
             name="name"
-            autoComplete="name"
+            autoComplete="off"
             readOnly={editing}
             onChange={(v) => {
               setF({ ...f, name: v });
@@ -167,7 +167,7 @@ export function AddOpsUserModal({
             name="email"
             type="email"
             inputMode="email"
-            autoComplete="email"
+            autoComplete="off"
             readOnly={editing}
             onChange={(v) => {
               setF({ ...f, email: v });

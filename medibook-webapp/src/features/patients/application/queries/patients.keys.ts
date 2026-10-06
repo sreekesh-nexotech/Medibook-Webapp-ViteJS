@@ -6,6 +6,7 @@ export const patientsKeys = {
   lists: () => [...patientsKeys.all, 'list'] as const,
   list: (params: PatientListParams) => [...patientsKeys.lists(), params] as const,
   byMrn: (mrn: string) => [...patientsKeys.all, 'mrn', mrn] as const,
+  detail: (id: string) => [...patientsKeys.all, 'detail', id] as const,
   appointments: (id: string, limit: number) =>
     [...patientsKeys.all, 'appointments', id, limit] as const,
 };

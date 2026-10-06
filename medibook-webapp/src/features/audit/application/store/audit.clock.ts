@@ -1,33 +1,26 @@
+import { calendarDate, calendarTimeHm, todayISO } from '@/shared/lib/format';
+
 /**
- * The one local clock every trail-stamped action reads.
- *
- * Dates in this app are **local-calendar** values. `new Date().toISOString()`
- * on a local-midnight Date shifts the day backwards for every user east of
- * UTC — the root cause of the app's yesterday-date defect — so every ISO
- * string here is assembled from `getFullYear()/getMonth()/getDate()` and
- * nothing in these helpers ever calls `toISOString()`.
+ * The one clock every trail-stamped action reads: the hospital's, whatever the
+ * device is set to (DATA-02). `toISOString()` is never used, because it gives
+ * the UTC day, which is the previous day for the first hours of an IST day.
  *
  * Pure functions, no React and no store: safe to call from any layer.
  */
 
-/** Zero-pad a date/time part to two digits. */
-function pad2(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-/** Local calendar date as `yyyy-mm-dd`. */
+/** A moment's date as `yyyy-mm-dd` on the hospital's calendar. */
 export function localDateIso(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  return calendarDate(d);
 }
 
-/** Local wall-clock time as 24h `HH:MM`. */
+/** A moment's wall-clock time as 24h `HH:MM` on the hospital's clock. */
 export function localTimeHm(d: Date = new Date()): string {
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return calendarTimeHm(d);
 }
 
-/** Today as `yyyy-mm-dd` in the user's own calendar. */
+/** Today as `yyyy-mm-dd` on the hospital's calendar. */
 export function todayIso(): string {
-  return localDateIso();
+  return todayISO();
 }
 
 /** Weekday index of an ISO date, 0 = Monday … 6 = Sunday. */

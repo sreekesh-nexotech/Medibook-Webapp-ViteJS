@@ -42,15 +42,15 @@
   "hospital_snapshot": {
     "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
     "city": "Kochi",
-    "name": "Lakeshore Multispeciality Hospital",
+    "name": "Example Multispeciality Hospital",
     "gstin": "00AAAAA0000A0A0",
     "state": "Kerala",
     "pincode": "682040",
-    "legal_name": "Lakeshore Healthcare Pvt Ltd",
+    "legal_name": "Example Healthcare Pvt Ltd",
     "phone_e164": "+910000000000",
     "logo_file_id": null,
-    "address_line1": "NH 66 Bypass, Maradu",
-    "address_line2": "Near Vyttila Hub",
+    "address_line1": "1 Example Road",
+    "address_line2": "1 Example Road",
     "address_line3": null,
     "stamp_file_id": null
   },
@@ -60,7 +60,7 @@
     "state": "Kerala",
     "pincode": "682042",
     "legal_name": "Medibook Health Technologies Pvt Ltd",
-    "address_line1": "4th Floor, Infopark Phase 2",
+    "address_line1": "1 Example Road",
     "address_line2": null,
     "address_line3": null
   },

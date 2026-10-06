@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { todayISO } from '@/shared/lib/format';
 import { useSearchParams } from 'react-router-dom';
 
 import { useNow } from '@/shared/hooks/useNow';
@@ -39,11 +40,6 @@ const LONG_WAIT_MINUTES = 20;
 const ALL_DEPTS = 'All Departments';
 const ALL_DOCTORS = 'All Doctors';
 
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 /**
  * Live token queue (design `TokenCounters`) on the hospital API: one card per
  * doctor **session** today (the backend's queue unit), kept live over the
@@ -52,7 +48,7 @@ function localToday(): string {
  * strip, and loading / error / empty states.
  */
 export function TokenCountersScreen() {
-  const today = localToday();
+  const today = todayISO();
   const sessionsQuery = useQueueSessionsQuery(today);
   const doctorsQuery = useDoctorsQuery();
   const departmentsQuery = useDepartmentsQuery();
@@ -75,7 +71,7 @@ export function TokenCountersScreen() {
     [departmentsQuery.data],
   );
   const departments = (departmentsQuery.data ?? []).map((d) => d.name);
-  const appointments = appointmentsQuery.data ?? [];
+  const appointments = appointmentsQuery.data?.items ?? [];
 
   const sessions = sessionsQuery.data ?? [];
   const doctorNamesInDept = Array.from(
@@ -128,8 +124,22 @@ export function TokenCountersScreen() {
     await Promise.all([sessionsQuery.refetch(), appointmentsQuery.refetch()]);
   };
 
+  // RUN-07: say when live updates are off, not "Reconnecting" for ever.
+  const live =
+    socketStatus === 'open'
+      ? { label: 'Live', dot: 'bg-g-600', title: 'Live updates on' }
+      : socketStatus === 'unauthorized'
+        ? {
+            label: 'Live updates off',
+            dot: 'bg-d-500',
+            title: 'Live updates are off; the queue still refreshes every minute',
+          }
+        : { label: 'Reconnecting', dot: 'bg-y-700', title: 'Live updates reconnecting' };
   const isLoading = sessionsQuery.isPending || doctorsQuery.isPending;
-  const loadError = sessionsQuery.error ?? doctorsQuery.error;
+  // Only a failed first load hides the queue; a failed refresh keeps the cards (RUN-04).
+  const loadError =
+    (sessionsQuery.isLoadingError ? sessionsQuery.error : null) ??
+    (doctorsQuery.isLoadingError ? doctorsQuery.error : null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -171,12 +181,10 @@ export function TokenCountersScreen() {
         </div>
         <span
           className="text-caption text-text-muted inline-flex items-center gap-1.5 whitespace-nowrap"
-          title={socketStatus === 'open' ? 'Live updates on' : 'Live updates reconnecting'}
+          title={live.title}
         >
-          <span
-            className={cn('size-2 rounded-full', socketStatus === 'open' ? 'bg-g-600' : 'bg-y-700')}
-          />
-          {socketStatus === 'open' ? 'Live' : 'Reconnecting'} · Updated{' '}
+          <span className={cn('size-2 rounded-full', live.dot)} />
+          {live.label} · Updated{' '}
           {sessionsQuery.dataUpdatedAt ? formatUpdatedAt(sessionsQuery.dataUpdatedAt) : '—'}
         </span>
       </Card>

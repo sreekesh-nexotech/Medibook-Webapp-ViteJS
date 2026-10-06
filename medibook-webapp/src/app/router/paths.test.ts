@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  hospitalBookForPatientPath,
+  hospitalPatientPath,
   hospitalViewFromPath,
   isOpsReturnPath,
+  isRecordId,
   loginReturningTo,
   opsViewFromPath,
   returnPathAfterLogin,
@@ -69,5 +72,21 @@ describe('view ids from paths', () => {
     expect(opsViewFromPath(`/ops/hospitals/${FILE_ID}`)).toBe('hospital-detail');
     expect(opsViewFromPath('/ops/billing/invoices/inv-1')).toBe('invoice-detail');
     expect(opsViewFromPath('/ops/nowhere')).toBe('dashboard');
+  });
+});
+
+describe('patient URLs carry the record id, not the MRN (PHI-07)', () => {
+  const id = '01a1061d-f850-72d2-9684-a119c346d805';
+
+  it('builds the patient page and booking hand-off from the record id', () => {
+    expect(hospitalPatientPath('admin', id)).toBe(`/admin/patients/${id}`);
+    expect(hospitalBookForPatientPath('receptionist', id)).toBe(
+      `/receptionist/appointments/new?patient=${id}`,
+    );
+  });
+
+  it('tells a record id from an older MRN link', () => {
+    expect(isRecordId(id)).toBe(true);
+    expect(isRecordId('LKSM000043')).toBe(false);
   });
 });

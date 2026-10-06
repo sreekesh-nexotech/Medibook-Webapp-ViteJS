@@ -65,7 +65,7 @@ export function ProfileSessionsCard({ surface, onSignedOut }: ProfileSessionsCar
         <Spinner size={24} label="Loading your devices" />
       </div>
     );
-  } else if (sessions.isError) {
+  } else if (sessions.isLoadingError) {
     body = (
       <ErrorState
         inline

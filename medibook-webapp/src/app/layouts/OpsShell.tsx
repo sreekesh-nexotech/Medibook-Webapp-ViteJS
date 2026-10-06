@@ -19,6 +19,7 @@ import { useOpsSettingsQuery } from '@/features/ops-settings/application/queries
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { IdleWarningModal } from './IdleWarningModal';
+import { ConnectionNotice } from './ConnectionNotice';
 import { OPS_DETAIL_PARENT, opsDocumentTitleFor } from './ops-nav';
 import { OpsSidebar } from './OpsSidebar';
 import { OpsTopbar } from './OpsTopbar';
@@ -134,6 +135,7 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
           onBack={onBack}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
+        <ConnectionNotice />
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary
             key={view}

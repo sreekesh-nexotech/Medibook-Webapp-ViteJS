@@ -50,13 +50,13 @@ export function HospitalSettingsScreen() {
   }
 
   const core = [profile, rules, hours, tokenPolicy];
-  if (core.some((q) => q.isError)) {
+  if (core.some((q) => q.isLoadingError)) {
     return (
       <ErrorState
         title="Hospital settings did not load"
         message="Nothing has changed. Retry to load the settings again."
         onRetry={() => {
-          for (const q of core) if (q.isError) void q.refetch();
+          for (const q of core) if (q.isLoadingError) void q.refetch();
         }}
       />
     );
@@ -75,7 +75,7 @@ export function HospitalSettingsScreen() {
 
   const bank: BankAccountsState = !canViewBank
     ? { status: 'hidden' }
-    : bankAccounts.isError
+    : bankAccounts.isLoadingError
       ? { status: 'error', retry: () => void bankAccounts.refetch() }
       : bankAccounts.data
         ? { status: 'ready', account: payoutAccountOf(bankAccounts.data) }

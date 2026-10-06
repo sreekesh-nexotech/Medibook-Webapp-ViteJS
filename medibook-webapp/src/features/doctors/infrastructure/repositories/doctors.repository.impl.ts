@@ -34,8 +34,8 @@ function toDoctorChange(dto: ScheduleChangeResponse): ScheduleChange<DoctorProfi
 export const doctorsRepository: DoctorsRepository = {
   listDepartments: () => attempt(async () => (await api.getDepartments()).map(toDepartment)),
   createDepartment: (input) => attempt(async () => toDepartment(await api.postDepartment(input))),
-  updateDepartment: (id, input) =>
-    attempt(async () => toDepartment(await api.patchDepartment(id, input))),
+  updateDepartment: (id, input, version) =>
+    attempt(async () => toDepartment(await api.patchDepartment(id, input, version))),
   deleteDepartment: (id) =>
     attempt(async () => {
       await api.deleteDepartment(id);
@@ -64,8 +64,8 @@ export const doctorsRepository: DoctorsRepository = {
     attempt(async () => toChange(await api.postLeave(doctorId, input, confirm))),
   updateLeave: (doctorId, leaveId, input, version, confirm) =>
     attempt(async () => toChange(await api.patchLeave(doctorId, leaveId, input, version, confirm))),
-  deleteLeave: (doctorId, leaveId, confirm) =>
-    attempt(async () => toChange(await api.deleteLeave(doctorId, leaveId, confirm))),
+  deleteLeave: (doctorId, leaveId, confirm, version) =>
+    attempt(async () => toChange(await api.deleteLeave(doctorId, leaveId, confirm, version))),
 
   createDateException: (doctorId, input, confirm) =>
     attempt(async () => toChange(await api.postDateException(doctorId, input, confirm))),
@@ -73,6 +73,8 @@ export const doctorsRepository: DoctorsRepository = {
     attempt(async () =>
       toChange(await api.patchDateException(doctorId, exceptionId, input, version, confirm)),
     ),
-  deleteDateException: (doctorId, exceptionId, confirm) =>
-    attempt(async () => toChange(await api.deleteDateException(doctorId, exceptionId, confirm))),
+  deleteDateException: (doctorId, exceptionId, confirm, version) =>
+    attempt(async () =>
+      toChange(await api.deleteDateException(doctorId, exceptionId, confirm, version)),
+    ),
 };

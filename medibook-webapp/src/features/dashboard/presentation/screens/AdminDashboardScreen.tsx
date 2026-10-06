@@ -168,8 +168,8 @@ export function AdminDashboardScreen() {
     {
       icon: 'stethoscope',
       label: 'Active Doctors',
-      value: doctors.isError ? '—' : String(activeDocs),
-      sub: doctors.isError ? 'Doctor roster unavailable' : `of ${roster.length} on roster`,
+      value: doctors.isLoadingError ? '—' : String(activeDocs),
+      sub: doctors.isLoadingError ? 'Doctor roster unavailable' : `of ${roster.length} on roster`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
     },
@@ -177,7 +177,9 @@ export function AdminDashboardScreen() {
       icon: 'users',
       label: 'Total Patients',
       value: patientsQuery.data ? patientsQuery.data.total.toLocaleString('en-IN') : '—',
-      sub: patientsQuery.isError ? 'Patient records unavailable' : 'Registered patient records',
+      sub: patientsQuery.isLoadingError
+        ? 'Patient records unavailable'
+        : 'Registered patient records',
       iconClass: 'bg-p-100 text-p-500',
       valueClass: 'text-p-500',
     },
@@ -265,7 +267,7 @@ export function AdminDashboardScreen() {
       onAction: () => go('doctors'),
     };
 
-  if (dashboard.isError && !data) {
+  if (dashboard.isLoadingError && !data) {
     return (
       <ErrorState
         title="The dashboard could not load"

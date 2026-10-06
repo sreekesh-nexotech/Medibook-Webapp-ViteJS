@@ -3,6 +3,7 @@ import type {
   PricedService,
   ServiceTaxRate,
 } from '@/features/settings/domain/entities/services.entities';
+import { addDaysISO, calendarDate, calendarInstant } from '@/shared/lib/format';
 
 /**
  * Pure pricing rules, mirroring the backend's fee engine
@@ -49,35 +50,29 @@ export function serviceTaxOptions(rates: readonly ServiceTaxRate[]): readonly Se
 /** Derived availability of a coupon on a given local day. */
 export type CouponState = 'Active' | 'Scheduled' | 'Expired' | 'Exhausted' | 'Paused';
 
-/** ISO date-time → the local calendar day `yyyy-mm-dd`. */
+/** ISO date-time → the day `yyyy-mm-dd` it falls on in the hospital's calendar. */
 export function localDay(isoDateTime: string): string {
   const date = new Date(isoDateTime);
-  if (Number.isNaN(date.getTime())) return '';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return Number.isNaN(date.getTime()) ? '' : calendarDate(date);
 }
 
 /** One millisecond — `valid_to` is exclusive, so its last valid instant is just before it. */
 const ONE_MS = 1;
 
-/** The last local day a coupon is valid on (`valid_to` is an exclusive instant). */
+/** The last hospital day a coupon is valid on (`valid_to` is an exclusive instant). */
 export function lastValidDay(validTo: string): string {
   const end = Date.parse(validTo);
-  return Number.isNaN(end) ? '' : localDay(new Date(end - ONE_MS).toISOString());
+  return Number.isNaN(end) ? '' : calendarDate(end - ONE_MS);
 }
 
-/** Local `yyyy-mm-dd` → the instant that day starts, as ISO (UTC). */
+/** `yyyy-mm-dd` → the instant that day starts in the hospital's zone (DATA-03). */
 export function dayStartIso(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d).toISOString();
+  return calendarInstant(day);
 }
 
-/** Local `yyyy-mm-dd` → the exclusive end instant of that day (next local midnight), as ISO. */
+/** `yyyy-mm-dd` → the exclusive end of that day: the hospital's next midnight. */
 export function dayEndExclusiveIso(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d + 1).toISOString();
+  return calendarInstant(addDaysISO(day, 1));
 }
 
 export function couponState(coupon: HospitalCoupon, today: string): CouponState {
@@ -88,17 +83,37 @@ export function couponState(coupon: HospitalCoupon, today: string): CouponState 
   return 'Active';
 }
 
-/** Discount a coupon takes off `orderValue`, whole rupees, never negative. */
+const PAISE_PER_RUPEE = 100;
+const BP_PER_PERCENT = 100;
+const BP_DENOMINATOR = 10_000;
+
+function toPaise(rupees: number): number {
+  return Math.round(rupees * PAISE_PER_RUPEE);
+}
+
+/**
+ * Discount a coupon takes off `orderValue` (rupees), worked out in paise exactly
+ * as the bill is (backend `catalog/services/fees.py`, `core/money.apply_bp`): a
+ * percent coupon rounds half-up to the paisa and stops at its cap, and no
+ * coupon takes more than the order (DATA-10).
+ */
 export function couponDiscount(
-  coupon: Pick<HospitalCoupon, 'kind' | 'value' | 'minOrderRupees'>,
+  coupon: Pick<HospitalCoupon, 'kind' | 'value' | 'minOrderRupees'> &
+    Partial<Pick<HospitalCoupon, 'maxDiscountRupees'>>,
   orderValue: number,
 ): number {
-  if (orderValue < coupon.minOrderRupees) return 0;
-  const raw =
-    coupon.kind === 'percent'
-      ? Math.floor((orderValue * Math.min(coupon.value, MAX_PERCENT_COUPON)) / PERCENT)
-      : coupon.value;
-  return Math.max(0, Math.min(raw, orderValue));
+  const orderPaise = toPaise(orderValue);
+  if (orderPaise < toPaise(coupon.minOrderRupees)) return 0;
+  let discount: number;
+  if (coupon.kind === 'percent') {
+    const rateBp = Math.round(Math.min(coupon.value, MAX_PERCENT_COUPON) * BP_PER_PERCENT);
+    discount = Math.floor((orderPaise * rateBp + BP_DENOMINATOR / 2) / BP_DENOMINATOR);
+    const cap = coupon.maxDiscountRupees;
+    if (cap != null) discount = Math.min(discount, toPaise(cap));
+  } else {
+    discount = toPaise(coupon.value);
+  }
+  return Math.max(0, Math.min(discount, orderPaise)) / PAISE_PER_RUPEE;
 }
 
 /**

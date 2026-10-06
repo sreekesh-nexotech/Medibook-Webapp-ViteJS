@@ -2,24 +2,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   addDaysISO,
+  calendarInstant,
+  calendarDate,
+  calendarTimeHm,
+  calendarTimeZone,
   daysFromTodayISO,
+  DEFAULT_CALENDAR_ZONE,
   fmtDate,
   formatToken,
-  isPastISO,
   isoToRel,
+  isPastISO,
+  minutesOfDay,
   money,
+  rupeesFromPaise,
+  rupeesFixed,
+  moneyFromPaise,
   moneyShort,
   parseHundredths,
   relToISO,
+  setCalendarZone,
   timeToMinutes,
-  toLocalISO,
   todayISO,
+  toLocalISO,
 } from '@/shared/lib/format';
 
 describe('money', () => {
   it('groups rupees the Indian way', () => {
-    expect(money(1234567)).toBe('₹ 12,34,567');
-    expect(money(0)).toBe('₹ 0');
+    expect(money(1234567)).toBe('₹ 12,34,567.00');
+    expect(money(0)).toBe('₹ 0.00');
   });
 
   it('shows a dash when there is no amount', () => {
@@ -152,5 +162,71 @@ describe('parseHundredths', () => {
     expect(parseHundredths('.5')).toBeNull();
     expect(parseHundredths('12.345')).toBeNull();
     expect(parseHundredths('1234567890')).toBeNull();
+  });
+});
+
+describe('hospital calendar (DATA-01, DATA-02)', () => {
+  afterEach(() => {
+    setCalendarZone(null);
+    vi.useRealTimers();
+  });
+
+  it('dates an invoice issued at 00:30 IST on its Indian day, not the UTC one', () => {
+    expect(calendarDate('2026-10-02T19:00:01Z')).toBe('2026-10-03');
+  });
+
+  it("follows the hospital's zone, and falls back to IST for an unknown one", () => {
+    setCalendarZone('Pacific/Kiritimati');
+    expect(calendarDate('2026-10-06T11:00:00Z')).toBe('2026-10-07');
+    setCalendarZone('Not/AZone');
+    expect(calendarTimeZone()).toBe(DEFAULT_CALENDAR_ZONE);
+  });
+
+  it('takes today from the hospital calendar', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-06T20:30:00Z'));
+    expect(todayISO()).toBe('2026-10-07');
+    expect(daysFromTodayISO('2026-10-06')).toBe(-1);
+    expect(isoToRel('2026-10-08')).toBe('Tomorrow');
+  });
+
+  it("shows times on the hospital's clock", () => {
+    expect(calendarTimeHm('2026-10-06T20:30:00Z')).toBe('02:00');
+    expect(minutesOfDay('2026-10-06T20:30:00Z')).toBe(120);
+  });
+
+  it('adds days across month and year ends', () => {
+    expect(addDaysISO('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addDaysISO('2026-03-01', -1)).toBe('2026-02-28');
+  });
+});
+
+describe('calendarInstant (DATA-03)', () => {
+  afterEach(() => setCalendarZone(null));
+
+  it("builds the hospital's midnight with its offset, whatever the device zone", () => {
+    expect(calendarInstant('2026-10-06')).toBe('2026-10-06T00:00:00+05:30');
+    expect(calendarInstant('2026-10-06', '23:59:59')).toBe('2026-10-06T23:59:59+05:30');
+    expect(calendarDate(calendarInstant('2026-10-06', '12:00:00'))).toBe('2026-10-06');
+  });
+
+  it('uses +00:00 for a hospital on UTC', () => {
+    setCalendarZone('UTC');
+    expect(calendarInstant('2026-10-06')).toBe('2026-10-06T00:00:00+00:00');
+  });
+});
+
+describe('money always shows two decimals from integer paise (DATA-06)', () => {
+  it('pads, rounds to the paisa and keeps the sign', () => {
+    expect(money(90.5)).toBe('₹ 90.50');
+    expect(money(0.1 + 0.2)).toBe('₹ 0.30');
+    expect(money(-500)).toBe('₹ -500.00');
+    expect(moneyFromPaise(10240050)).toBe('₹ 1,02,400.50');
+  });
+
+  it('writes export figures without grouping or symbol', () => {
+    expect(rupeesFromPaise(9050)).toBe('90.50');
+    expect(rupeesFromPaise(-5)).toBe('-0.05');
+    expect(rupeesFixed(124.875)).toBe('124.88');
   });
 });

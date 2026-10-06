@@ -381,7 +381,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                   <TextInput
                     value={values.name}
                     placeholder="e.g. Dr. Asha Verma"
-                    autoComplete="name"
+                    autoComplete="off"
                     onChange={(v) => form.setField('name', v)}
                     onBlur={() => form.blurField('name')}
                   />
@@ -536,7 +536,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     <span className="text-body text-text-body">Online appointment booking</span>
                     {onlineBooking === undefined ? (
                       <span className="text-body text-text-muted">
-                        {profileQuery.isError ? 'Unavailable' : 'Loading…'}
+                        {profileQuery.isLoadingError ? 'Unavailable' : 'Loading…'}
                       </span>
                     ) : (
                       <Badge status={onlineBooking ? 'Enabled' : 'Blocked'}>
@@ -662,7 +662,7 @@ export function DoctorDetailPageScreen() {
   const departmentsQuery = useDepartmentsQuery();
   const toList = () => navigate(hospitalPath(role, 'doctors'));
 
-  const failed = [doctorQuery, scheduleQuery, departmentsQuery].find((q) => q.isError);
+  const failed = [doctorQuery, scheduleQuery, departmentsQuery].find((q) => q.isLoadingError);
   if (failed) {
     if (
       isFailure(failed.error) &&

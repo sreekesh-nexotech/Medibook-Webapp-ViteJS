@@ -1,6 +1,6 @@
 import { isFailure } from '@/core/error/failure';
 
-import { fmtDate, money } from '@/shared/lib/format';
+import { calendarDate, fmtDate, money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -50,7 +50,7 @@ export function PaymentsVisitReceiptsModal({
       </div>
       {receipts.isPending ? (
         <SkeletonCards count={1} lines={3} />
-      ) : receipts.isError ? (
+      ) : receipts.isLoadingError ? (
         <ErrorState
           inline
           title="The receipts didn't load"
@@ -73,7 +73,7 @@ export function PaymentsVisitReceiptsModal({
               <div className="min-w-0 flex-1">
                 <div className="text-body text-text-strong font-medium">{r.receiptNo}</div>
                 <div className="text-caption text-text-muted">
-                  {fmtDate(r.issuedAt.slice(0, 10))} · {money(r.totalRupees)}
+                  {fmtDate(calendarDate(r.issuedAt))} · {money(r.totalRupees)}
                 </div>
               </div>
               {r.appointmentId && (

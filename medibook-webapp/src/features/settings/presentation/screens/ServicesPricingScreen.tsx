@@ -6,7 +6,7 @@ import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate, money, todayISO } from '@/shared/lib/format';
+import { fmtDate, money, rupeesFixed, todayISO } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -172,6 +172,8 @@ const COUPON_SORT_KEYS: Readonly<Record<string, string>> = {
 interface DeleteTarget {
   readonly kind: PricingTab;
   readonly id: string;
+  /** Row version for `If-Match` on tax-rate and coupon deletes (services take none). */
+  readonly version: number;
   readonly label: string;
 }
 
@@ -430,8 +432,8 @@ export function ServicesPricingScreen() {
         s.name,
         deptName(s.departmentId),
         s.durationMinutes,
-        s.priceRupees,
-        priceService(s.priceRupees, taxOf(s)).total,
+        rupeesFixed(s.priceRupees),
+        rupeesFixed(priceService(s.priceRupees, taxOf(s)).total),
         s.isActive ? 'Yes' : 'No',
         s.description,
       ]),
@@ -457,12 +459,12 @@ export function ServicesPricingScreen() {
       ...orderedCoupons.map((c) => [
         c.code,
         c.kind === 'percent' ? 'Percent' : 'Flat',
-        c.value,
+        c.kind === 'percent' ? c.value : rupeesFixed(c.value),
         localDay(c.validFrom),
         lastValidDay(c.validTo),
         c.usageCap ?? 'Unlimited',
         c.usedCount,
-        c.minOrderRupees,
+        rupeesFixed(c.minOrderRupees),
         c.departmentIds.map((id) => deptName(id)).join(' | '),
         c.serviceIds.map((id) => services.find((x) => x.id === id)?.name ?? id).join(' | '),
         couponState(c, today),
@@ -475,13 +477,14 @@ export function ServicesPricingScreen() {
     if (!toDelete) return;
     const target = toDelete;
     setToDelete(null);
+    const row = { id: target.id, version: target.version };
     const run =
       target.kind === 'Services'
-        ? deleteService.mutateAsync
+        ? deleteService.mutateAsync(target.id)
         : target.kind === 'Taxes'
-          ? deleteTax.mutateAsync
-          : deleteCoupon.mutateAsync;
-    run(target.id)
+          ? deleteTax.mutateAsync(row)
+          : deleteCoupon.mutateAsync(row);
+    run
       .then(() => toast(`“${target.label}” deleted`, 'info'))
       .catch((error: unknown) => toast(failureText(error, 'Could not delete it.'), 'error'));
   };
@@ -500,7 +503,7 @@ export function ServicesPricingScreen() {
 
   const serviceTableState: TableStateSpec | undefined = servicesQuery.isPending
     ? { kind: 'loading', rows: SERVICE_PAGE_SIZE }
-    : servicesQuery.isError
+    : servicesQuery.isLoadingError
       ? {
           kind: 'error',
           title: 'Could not load services',
@@ -526,7 +529,7 @@ export function ServicesPricingScreen() {
 
   const couponTableState: TableStateSpec | undefined = couponsQuery.isPending
     ? { kind: 'loading', rows: COUPON_PAGE_SIZE }
-    : couponsQuery.isError
+    : couponsQuery.isLoadingError
       ? {
           kind: 'error',
           title: 'Could not load coupons',
@@ -717,7 +720,12 @@ export function ServicesPricingScreen() {
                               size={15}
                               color="var(--color-d-500)"
                               onClick={() =>
-                                setToDelete({ kind: 'Services', id: s.id, label: s.name })
+                                setToDelete({
+                                  kind: 'Services',
+                                  id: s.id,
+                                  version: s.version,
+                                  label: s.name,
+                                })
                               }
                             />
                           </Can>
@@ -820,7 +828,12 @@ export function ServicesPricingScreen() {
                               size={15}
                               color="var(--color-d-500)"
                               onClick={() =>
-                                setToDelete({ kind: 'Coupons', id: c.id, label: c.code })
+                                setToDelete({
+                                  kind: 'Coupons',
+                                  id: c.id,
+                                  version: c.version,
+                                  label: c.code,
+                                })
                               }
                             />
                           </Can>
@@ -853,7 +866,7 @@ export function ServicesPricingScreen() {
             </div>
             {taxRatesQuery.isPending ? (
               <SkeletonTable rows={2} cols={4} card={false} />
-            ) : taxRatesQuery.isError ? (
+            ) : taxRatesQuery.isLoadingError ? (
               <ErrorState
                 inline
                 title="Could not load tax rates"
@@ -945,7 +958,14 @@ export function ServicesPricingScreen() {
                             box={36}
                             size={15}
                             color="var(--color-d-500)"
-                            onClick={() => setToDelete({ kind: 'Taxes', id: t.id, label: t.name })}
+                            onClick={() =>
+                              setToDelete({
+                                kind: 'Taxes',
+                                id: t.id,
+                                version: t.version,
+                                label: t.name,
+                              })
+                            }
                           />
                         </Can>
                       </>

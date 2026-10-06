@@ -64,7 +64,7 @@ export function PaymentsCashReconcile() {
   const rows = list.data ?? [];
   const state: TableStateSpec | undefined = list.isPending
     ? { kind: 'loading', rows: 3 }
-    : list.isError
+    : list.isLoadingError
       ? {
           kind: 'error',
           title: 'Cash drawers didn’t load',

@@ -162,12 +162,16 @@ export function PaymentsScreen() {
     q: '',
   });
 
-  const appts = apptsQuery.data ?? [];
+  const appts = apptsQuery.data?.items ?? [];
   const apptById = new Map(appts.map((a) => [a.id, a]));
-  const totals = totalsOf(totalsQuery.data ?? []);
+  const totals = totalsOf(totalsQuery.data?.lines ?? []);
+  // The page walk stopped early: say the totals cover the first lines only (DATA-07).
+  const partial = totalsQuery.data?.truncated
+    ? ` · first ${totalsQuery.data.lines.length} payments only`
+    : '';
   const isUnpaid = (a: DeskAppointment): boolean =>
     a.paymentStatus === 'unpaid' && a.status !== 'cancelled' && a.status !== 'no_show';
-  const pendingToday = (todayApptsQuery.data ?? []).filter(isUnpaid).length;
+  const pendingToday = (todayApptsQuery.data?.items ?? []).filter(isUnpaid).length;
 
   const ql = q.trim().toLowerCase();
   const pendingRows = appts.filter(
@@ -211,7 +215,7 @@ export function PaymentsScreen() {
       icon: 'indian-rupee',
       label: 'Collected at Desk',
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
-      sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} today · as collected`,
+      sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} today · as collected${partial}`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
     },
@@ -219,7 +223,7 @@ export function PaymentsScreen() {
       icon: 'banknote',
       label: 'Desk Cash',
       value: totalsQuery.data ? money(totals.deskCash) : '—',
-      sub: 'Cash at the counter today',
+      sub: `Cash at the counter today${partial}`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
     },
@@ -227,7 +231,7 @@ export function PaymentsScreen() {
       icon: 'smartphone',
       label: 'Prepaid Online',
       value: totalsQuery.data ? money(totals.onlineTotal) : '—',
-      sub: 'via Medibook · settled later',
+      sub: `via Medibook · settled later${partial}`,
       iconClass: 'bg-y-100 text-y-600',
       valueClass: 'text-y-600',
     },
@@ -330,7 +334,8 @@ export function PaymentsScreen() {
   const loading =
     (showsLines && linesQuery.isPending) ||
     (tab !== 'Paid' && tab !== 'Refunded' && apptsQuery.isPending);
-  const failed = (showsLines && linesQuery.isError) || (!showsLines && apptsQuery.isError);
+  const failed =
+    (showsLines && linesQuery.isLoadingError) || (!showsLines && apptsQuery.isLoadingError);
   const tableState: TableStateSpec | undefined = loading
     ? { kind: 'loading', rows: PAY_PAGE }
     : failed

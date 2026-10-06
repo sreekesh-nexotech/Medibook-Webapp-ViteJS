@@ -76,7 +76,7 @@
 ## 2.1 The three applications
 
 1. **Patient Mobile App ("Medibook")** — an Android/iOS app (Flutter) for patients: sign in, find a department or doctor, book an appointment for themselves or a family member, see their queue token, reschedule or cancel, view lab records, and manage their profile. Built as 16 screens on sample data.
-2. **Hospital Web App ("mbAdmin")** — a browser application (React) used inside one hospital by the front desk (Receptionist) and management (Administrator): appointments and walk-ins, the live token queue, desk payments and receipts, patients, doctors and departments, staff logins and roles, reports, settlements from Medibook, and hospital settings. Built as 14 views on sample data for one sample hospital (Apollo Hospital, Bengaluru).
+2. **Hospital Web App ("mbAdmin")** — a browser application (React) used inside one hospital by the front desk (Receptionist) and management (Administrator): appointments and walk-ins, the live token queue, desk payments and receipts, patients, doctors and departments, staff logins and roles, reports, settlements from Medibook, and hospital settings. Built as 14 views on sample data for one sample hospital (Example Hospital, Bengaluru).
 3. **Operations Console (Medibook Super Admin)** — the same browser application under `/ops`, used by Medibook's own staff: onboard and verify hospitals, manage subscription plans and billing, record settlement payouts, watch usage analytics, generate reports, read the compliance log, manage internal staff, look up patient accounts, publish banners and push notifications, and set platform-wide settings. Built as 16 views on sample data for 13 sample hospitals.
 4. **What does not exist yet:** any backend. There is no server, database, API, authentication, payment gateway, messaging provider, file storage or scheduler. Every screen runs on in-memory sample data that resets when the app restarts or the browser reloads (the only exception is the hospital settings form, which the browser remembers locally). The FRD/Agreement scope for the backend (Django + PostgreSQL) is therefore entirely open and must be designed from this document.
 
@@ -282,12 +282,12 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 3. **How matching works.**
    1. Results update on every keystroke (no minimum length, no delay, no search button; the keyboard's Search key does nothing extra).
    2. Matching is case-insensitive "contains" on: department name + department descriptor (for example "Dermatology Skin specialists"); doctor name + specialty + department name + department descriptor. So typing "skin" finds both the Dermatology department and Dr. Sara Ali.
-   3. The hospital name is displayed under each doctor but is **not searchable** (typing "Apollo" finds nothing). Fees, experience, ratings and bios are not searchable either.
+   3. The hospital name is displayed under each doctor but is **not searchable** (typing "Example Hospital" finds nothing). Fees, experience, ratings and bios are not searchable either.
    4. With an empty box, all 4 departments and all 6 doctors are listed.
    5. No ranking, sorting, paging, recent searches or suggestions.
 4. **Result rows.**
    1. Department row: department icon, name, descriptor, and a **Book** link → opens booking at step 2 for that department.
-   2. Doctor row: avatar, name, "specialty · hospital" (for example "Cardiologist · Apollo Hospital"), and a **View** link → opens Doctor Details; Back from there returns to Search.
+   2. Doctor row: avatar, name, "specialty · hospital" (for example "Cardiologist · Example Hospital"), and a **View** link → opens Doctor Details; Back from there returns to Search.
 5. **Empty state.** A search icon with the text: No matches for "<what was typed>".
 
 ## 3.5 Notifications
@@ -406,7 +406,7 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 1. **What you see.** Title "Records" with a bell button; heading "Recent Records"; one card per record.
 2. **Record card.** Title (for example "Blood Test Report"); date; a status badge — **Completed** (green) or **Pending** (red); three rows: **Patient Name**, **Center/Hospital**, **Consulted Doctor**; two buttons: **View Report** and **Download**.
 3. **What you can do.** **[Prototype-only]** **View Report** shows the toast "<title> — preview stubbed in this demo"; **Download** shows the toast "Downloading <title>…". Nothing is viewed or downloaded; both buttons are shown even for Pending records.
-4. **Rules.** There is no filtering, search, sorting, grouping, paging, record detail screen, upload, or link to an appointment. Records are fixed sample data: Blood Test Report (10 Jul 2026, Completed, Alexandra, Apollo Hospital, Dr. Anil Kumar); Full Body Checkup (02 Jul 2026, Pending, Michael, Apollo Hospital, Dr. Meera Nair); Lipid Profile (21 Jun 2026, Completed, Alexandra, City Care Clinic, Dr. Rohan Kapoor).
+4. **Rules.** There is no filtering, search, sorting, grouping, paging, record detail screen, upload, or link to an appointment. Records are fixed sample data: Blood Test Report (10 Jul 2026, Completed, Alexandra, Example Hospital, Dr. Anil Kumar); Full Body Checkup (02 Jul 2026, Pending, Michael, Example Hospital, Dr. Meera Nair); Lipid Profile (21 Jun 2026, Completed, Alexandra, City Care Clinic, Dr. Rohan Kapoor).
 5. **Gap note.** The contract's Documents Library (uploads of prescriptions, lab reports, imaging, discharge summaries with title/type/patient/date/notes, links to appointments, secure expiring links, sharing) and the Insurance Locker do not exist in the app. See Section 10.
 
 ## 3.13 Profile tab
@@ -414,7 +414,7 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 1. **What you see.**
    1. Title "Profile".
    2. Identity card: avatar, name "Alexandra Johnson", email, and an **edit** pencil button.
-   3. "Personal Information" card with an **Edit** link and rows: **Phone** (+91 98456 58525), **Date of Birth** (15/05/1997), **Gender** (Female), **Blood Group** (O+).
+   3. "Personal Information" card with an **Edit** link and rows: **Phone** (+91 90000 00000), **Date of Birth** (15/05/1997), **Gender** (Female), **Blood Group** (O+).
    4. "Available for Donation" card with the helper text "Hospitals can contact you for rare blood needs." and a switch (on by default).
    5. Account card with **Logout** and **Delete account** (red).
 2. **What you can do.**
@@ -435,7 +435,7 @@ This section describes the Medibook patient app exactly as the Flutter code beha
 
 # 4. Hospital Web App (mbAdmin) — Functional Specification (as built)
 
-The hospital web application ("mbAdmin") is the desk-and-management tool for one hospital. Everything below was read from the React source code. The prototype is configured for a single sample hospital, **Apollo Hospital** (tenant number 13 in the Operations console), whose name, GSTIN and bank details it also shares with the Operations console.
+The hospital web application ("mbAdmin") is the desk-and-management tool for one hospital. Everything below was read from the React source code. The prototype is configured for a single sample hospital, **Example Hospital** (tenant number 13 in the Operations console), whose name, GSTIN and bank details it also shares with the Operations console.
 
 ## 4.1 Access, roles and navigation
 
@@ -475,7 +475,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 2. **Validation and messages:** empty email or password → "Enter your email and password to continue."; malformed email → "Enter a valid email address."
 3. **Suspension rule:** if the Operations console has suspended this hospital (within the same browser session), hospital login is refused with "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate."
 4. **Outcome:** Hospital tab → Administrator dashboard; Operations tab → Operations dashboard.
-5. **[Prototype-only]** No password is checked (any non-blank password works); the email is pre-filled (`s.nair@apollo.med` / `a.rao@medibook.com`) and the password field is pre-filled with bullet characters; "Remember me" does nothing; pressing Enter does not submit; no lockout, throttling or two-factor exists.
+5. **[Prototype-only]** No password is checked (any non-blank password works); the email is pre-filled (`s.nair@hospital.example` / `a.rao@medibook.com`) and the password field is pre-filled with bullet characters; "Remember me" does nothing; pressing Enter does not submit; no lockout, throttling or two-factor exists.
 6. **Gap:** the FRD requires login with mobile number or email plus password, OTP verification and password reset via OTP for hospital admins (see Section 10).
 
 ### 4.2.2 Forgot Password
@@ -592,10 +592,10 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ### 4.4.10 Receipt & Token print view
 
 1. Opened from Receipt buttons and automatically after recording a payment. Buttons: **Print** (opens the browser print dialog; only the receipt and slip print) and **Done**.
-2. **Receipt block:** the hospital logo and the name "Apollo Hospital" (hard-coded, not taken from Hospital Settings **[Prototype-only]**); caption "Payment Receipt · Prepaid via Medibook" (online) or "Payment Receipt · Collected at Desk" (walk-in); a "Paid" badge; fields Receipt No. · Date (the appointment slot, not the payment time) · Patient · MR Number · Payment Mode (online receipts print "Cash" because no mode is recorded for them **[Observation]**) · Reference; one line "Consultation — <doctor> (<department>)" with the amount; "Total Paid"; and a footer sentence about the receipt being computer-generated.
+2. **Receipt block:** the hospital logo and the name "Example Hospital" (hard-coded, not taken from Hospital Settings **[Prototype-only]**); caption "Payment Receipt · Prepaid via Medibook" (online) or "Payment Receipt · Collected at Desk" (walk-in); a "Paid" badge; fields Receipt No. · Date (the appointment slot, not the payment time) · Patient · MR Number · Payment Mode (online receipts print "Cash" because no mode is recorded for them **[Observation]**) · Reference; one line "Consultation — <doctor> (<department>)" with the amount; "Total Paid"; and a footer sentence about the receipt being computer-generated.
 3. **Receipt number rule (as built):** "RCPT-" + the last five characters of the MR number + "-" + today's day of the month (for example RCPT-47202-10). **[Observation]** It is generated at display time, never stored, and is not unique (the same patient on the 10th of any month, two consultations on one day, or a reprint all give the same number). A real receipt series must be designed server-side.
 4. **What is missing for the contract:** GST/tax lines, hospital GSTIN, patient GST details, receipt series, digital download/PDF, refund receipts.
-5. **Token slip block:** "Apollo Hospital", "Queue Token", the token in large type (blank when no token, for example a future-dated online booking), Patient, Doctor, Dept, Time, and "Please wait for your token to be called." No room number, QR code or issue time.
+5. **Token slip block:** "Example Hospital", "Queue Token", the token in large type (blank when no token, for example a future-dated online booking), Patient, Doctor, Dept, Time, and "Please wait for your token to be called." No room number, QR code or issue time.
 
 ### 4.4.11 New Appointment (walk-in booking or registering an online arrival)
 
@@ -747,7 +747,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
    4. **[Observation]** There is no free-text field in any of these dialogs; the hospital cannot describe a dispute, attach evidence, or withdraw a request.
 7. **Export CSV** downloads `medibook-settlements.csv` with the filtered rows: Statement, Period, Gross, Commission %, Commission, Net Payable, Expected, Status, Transfer Ref, Received On; message "Exported medibook-settlements.csv". No statement PDF exists.
 8. **Rules observed in the sample data (not generated by code):** statement numbers are platform-wide "MB-ST-####"; periods are weekly, Wednesday to Tuesday; the expected date is the period end plus four days; commission = 10% of gross rounded, net = gross − commission; a statement whose expected date equals today is Overdue. **[Observation]** No code creates statements, computes commission, detects overdue or records payout failures; these must be backend jobs.
-9. **Sample ledger:** 14 statements for Apollo Hospital (MB-ST-2393 to MB-ST-2406), gross ₹13,50,800, commission ₹1,35,080, net ₹12,15,720; one Pending (MB-ST-2406, ₹92,160 net, expected 20 Jun 2026), one Overdue (MB-ST-2405, ₹88,740, expected 13 Jun 2026), one Released (MB-ST-2404, ₹97,380, UTR26-2404K, remark "Released in full after bank re-verification."), eleven Received.
+9. **Sample ledger:** 14 statements for Example Hospital (MB-ST-2393 to MB-ST-2406), gross ₹13,50,800, commission ₹1,35,080, net ₹12,15,720; one Pending (MB-ST-2406, ₹92,160 net, expected 20 Jun 2026), one Overdue (MB-ST-2405, ₹88,740, expected 13 Jun 2026), one Released (MB-ST-2404, ₹97,380, UTR26-2404K, remark "Released in full after bank re-verification."), eleven Received.
 
 ### 4.8.3 Plan & Billing tab
 
@@ -756,7 +756,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 3. **Billing cycle** "Monthly · invoiced on the 1st"; **Next invoice** "01 Jul 2026" (fixed); **Status** Active.
 4. Footer: "Plan tiers and pricing are managed by Medibook operations." and **Request Plan Change** (or, once requested, the pill "Change to <plan> requested · pending Medibook review").
 5. **Request Plan Change dialog:** "Current plan: <plan>. Medibook operations reviews and applies plan changes — you'll see the result here." with **Requested Plan** (every other plan in the catalogue, including other hospitals' custom plans **[Observation]**). **Send Request** → validation "Pick the plan you want"; then a Pending plan-change record and an open **Plan** request are created for the Operations console; message "Plan change request sent to Medibook". The hospital receives no notification of the outcome; the pill simply disappears when operations approves or declines.
-6. **Plan Invoices:** caption "Billed to GSTIN <hospital GSTIN> · Medibook GSTIN 27AABCM9407L1ZK · 18% GST included"; three fixed sample invoices (INV-2026-0244 01 Jun 2026, INV-2026-0219 01 May 2026, INV-2026-0198 01 Apr 2026; Growth · Monthly; ₹24,999; Paid) with a "PDF" link that does nothing **[Prototype-only]**. There is no pay-now, upgrade, card on file, GST breakdown or invoice status other than Paid.
+6. **Plan Invoices:** caption "Billed to GSTIN <hospital GSTIN> · Medibook GSTIN 27AAAAA0000A1Z5 · 18% GST included"; three fixed sample invoices (INV-2026-0244 01 Jun 2026, INV-2026-0219 01 May 2026, INV-2026-0198 01 Apr 2026; Growth · Monthly; ₹24,999; Paid) with a "PDF" link that does nothing **[Prototype-only]**. There is no pay-now, upgrade, card on file, GST breakdown or invoice status other than Paid.
 
 ## 4.9 Doctors & Departments (Administrator)
 
@@ -806,7 +806,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 1. **KPI cards:** Total Users · Active · Roles · Pending Invites (sample: 7, 6, 4, 1).
 2. **Search** "Search users by name, email or username"; **filters** Role (All Roles + role names) · Status (All Status · Active · Inactive) · Clear all. Button **Add User**.
 3. **Columns:** User (avatar, name, email) · Username · Role (coloured dot + name; blank if the role was deleted) · Last Active (fixed text such as "5 min ago" **[Prototype-only]**) · Status (Active / Inactive) · Action (eye "View" → user panel; key "Reset password"). No paging. Empty state "No users match your filters."
-4. **Sample users:** Dr. S. Nair (Administrator); Riya Menon and Karthik Rao (Reception / Billing); Sunita Joseph (Department Front Desk); Mahesh Pillai (Department Front Desk, invite **Pending**); Anand Pillai (Accountant); Fatima Sheikh (Department Front Desk, **Inactive**). Emails use the hospital's domain (`@apollo.med`).
+4. **Sample users:** Dr. S. Nair (Administrator); Riya Menon and Karthik Rao (Reception / Billing); Sunita Joseph (Department Front Desk); Mahesh Pillai (Department Front Desk, invite **Pending**); Anand Pillai (Accountant); Fatima Sheikh (Department Front Desk, **Inactive**). Emails use the hospital's domain (`@hospital.example`).
 
 ### 4.10.3 Add User dialog
 
@@ -867,10 +867,10 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 
 ### 4.12.2 General
 
-1. **Hospital Profile** ("Your logo, name and details appear on the hospital's profile in the Medibook patient app."): Logo (Change Logo; "PNG or JPG, up to 1MB" — not enforced; logos over about 400,000 characters are not persisted) · Hospital Name · Registration No. · GSTIN · Phone · Email · About. Sample: Apollo Hospital, KA-HOSP-20194, 29AAACA4033H1Z5, 080 4567 8900, contact@apollo.med.
+1. **Hospital Profile** ("Your logo, name and details appear on the hospital's profile in the Medibook patient app."): Logo (Change Logo; "PNG or JPG, up to 1MB" — not enforced; logos over about 400,000 characters are not persisted) · Hospital Name · Registration No. · GSTIN · Phone · Email · About. Sample: Example Hospital, KA-HOSP-00000, 29AAAAA0000A1Z5, 080 0000 0000, contact@hospital.example.
 2. **Photo Gallery** ("These photos show in your hospital's gallery when patients browse in the Medibook app."): Cover photo (1280×720), Reception, Add photo. **[Prototype-only]** Uploads only show messages and nothing is stored.
-3. **Location** ("Patients see your location and get directions in the Medibook app. Click the map to drop the pin."): Address, Latitude, Longitude, and a decorative map where clicking drops a pin and derives coordinates from the click position (a formula covering south Bengaluru only) **[Prototype-only]**. Sample: 154 Bannerghatta Road, Bengaluru 560076; 12.9088, 77.5975.
-4. **Bank & Payouts** ("Medibook releases online-booking settlements to this account. Operations sees these details (masked) on your hospital profile."): Account Holder Name · Bank · Account Number · IFSC Code · Settlement UPI ID (optional); note "Settlement payouts pause if these details are missing or invalid — keep them current." (not enforced for this hospital). Sample: Apollo Hospital Pvt Ltd, HDFC Bank, 50200048112233, HDFC0001234, apollohospital@hdfcbank.
+3. **Location** ("Patients see your location and get directions in the Medibook app. Click the map to drop the pin."): Address, Latitude, Longitude, and a decorative map where clicking drops a pin and derives coordinates from the click position (a formula covering south Bengaluru only) **[Prototype-only]**. Sample: 1 Example Road, Bengaluru 560001; 12.97, 77.59.
+4. **Bank & Payouts** ("Medibook releases online-booking settlements to this account. Operations sees these details (masked) on your hospital profile."): Account Holder Name · Bank · Account Number · IFSC Code · Settlement UPI ID (optional); note "Settlement payouts pause if these details are missing or invalid — keep them current." (not enforced for this hospital). Sample: Example Hospital Pvt Ltd, Example Bank, XXXXXXXXXX1234, ABCD0123456, hospital@upi.
 5. Buttons **Cancel** / **Save Changes**.
 
 ### 4.12.3 Management
@@ -915,7 +915,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 5. **[Prototype-only]** Every screen change shows a grey loading skeleton for about half a second to simulate server latency, and most actions complete after a simulated 0.7-second delay followed by a green success message.
 6. **Notification bell (operations):** lists every **open hospital request** (support ticket, plan-change request, settlement request) with the hospital name and date; every **critical alert** from the dashboard (danger alerts count as unread); and, when any settlement is awaiting release, "n settlements awaiting release — Next payout run: 20 Jun 2026" (fixed date). Clicking an item opens the related screen or hospital. There is no mark-as-read and no empty-state text.
 7. **Demo clock.** The console's "today" is fixed at **13 June 2026**; every date it stamps (onboarding dates, request dates, received dates, banner schedules) uses that date. The hospital app, by contrast, uses relative labels and the real browser date. The backend must replace both with real server time in the Asia/Kolkata timezone.
-8. **Tenant link.** The hospital app's data is joined to the console as hospital number **13 (Apollo Hospital)**. For that one hospital the console reads live data from the hospital app (name, GSTIN, bank details, departments, doctors, recent bookings, settlements); every other hospital in the console is fixed sample data.
+8. **Tenant link.** The hospital app's data is joined to the console as hospital number **13 (Example Hospital)**. For that one hospital the console reads live data from the hospital app (name, GSTIN, bank details, departments, doctors, recent bookings, settlements); every other hospital in the console is fixed sample data.
 
 ## 5.2 Operations Dashboard
 
@@ -949,16 +949,16 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 3. **Overview tab:**
    1. Details: Admin Email · Phone · Location · Plan · Onboarded · Instance ID (derived "MB-HOSP-01nn") · GSTIN ("Not on file" when absent) · Payout Account (bank name and last four digits, or "Not added — hospital adds it in Hospital Settings") · IFSC · Settlement UPI · Rejection Reason (when rejected).
    2. **Verification & KYC:** four document tiles — Registration certificate · GST certificate · Medical licence · Bank account proof — each Missing ("Not received"), Submitted ("Received · awaiting review") or Verified ("Verified at approval"); a badge "Ready for review" or "Documents incomplete" while pending. **[Observation]** There is no way to upload, request or verify an individual document; documents only become Verified all at once on approval, so a hospital with a missing document can never be approved in the prototype.
-   3. **KPI tiles:** Bookings This Month (the registry figure; for Apollo a fixed 3,120, not the live count) · Monthly Revenue (bookings × ₹45, an invented constant **[Prototype-only]**) · Active Staff (derived **[Prototype-only]**) · Booking Quota ("x% — n of limit bookings used"; orange at 90% or more; limit from the plan, default 1,500).
-   4. **Recent Bookings:** five rows (Patient, Department, Date, Status) — live from the hospital app for Apollo ("Live from the hospital instance"), generated sample rows for every other hospital.
-4. **Departments tab** (read-only): Department · Doctors · Base Fee · Working Hours · Status, with "n departments · n doctors on the roster". Live from Apollo's catalogue; generated for others.
+   3. **KPI tiles:** Bookings This Month (the registry figure; for Example Hospital a fixed 3,120, not the live count) · Monthly Revenue (bookings × ₹45, an invented constant **[Prototype-only]**) · Active Staff (derived **[Prototype-only]**) · Booking Quota ("x% — n of limit bookings used"; orange at 90% or more; limit from the plan, default 1,500).
+   4. **Recent Bookings:** five rows (Patient, Department, Date, Status) — live from the hospital app for Example Hospital ("Live from the hospital instance"), generated sample rows for every other hospital.
+4. **Departments tab** (read-only): Department · Doctors · Base Fee · Working Hours · Status, with "n departments · n doctors on the roster". Live from Example Hospital's catalogue; generated for others.
 5. **Doctors tab** (read-only): department filter; columns Doctor (name, specialty) · Department · Room · Fee · Rating · Availability ("n days/wk", "On leave <from> – <to>") · Status (Active / On Leave / Inactive).
-6. **Billing & Settlements tab:** plan card ("<plan> · ₹x/mo", "n of limit monthly bookings used (x%)", **Plan Catalog**); Invoices (Invoice, Amount, Issued, Due, Status; "Open Billing"; empty "No invoices issued to this hospital yet."); Payment Transactions (Transaction, Invoice, Method, Amount, Date, Status); Settlements (Statement + period, Net Payable, Expected, Status + UTR; "Open Hospital Settlements"; empty "No settlement statements for this hospital yet."). For hospitals other than Apollo, net is recomputed from the commission rate in Platform Settings.
+6. **Billing & Settlements tab:** plan card ("<plan> · ₹x/mo", "n of limit monthly bookings used (x%)", **Plan Catalog**); Invoices (Invoice, Amount, Issued, Due, Status; "Open Billing"; empty "No invoices issued to this hospital yet."); Payment Transactions (Transaction, Invoice, Method, Amount, Date, Status); Settlements (Statement + period, Net Payable, Expected, Status + UTR; "Open Hospital Settlements"; empty "No settlement statements for this hospital yet."). For hospitals other than Example Hospital, net is recomputed from the commission rate in Platform Settings.
 7. **Activity tab:** the last eight audit-log entries referencing this hospital (Action + actor, Module, Timestamp, Severity) with "Open Compliance Logs"; empty "No logged actions reference <name> yet. Approvals, suspensions and settlement releases will appear here."
 8. **Lifecycle actions and dialogs:**
    1. **Approve** — allowed only when no KYC document is Missing; otherwise the message "Cannot approve — <documents> not received." Dialog "Approve this hospital?" / "<name> goes live immediately and can start taking bookings on Medibook." → status Active, all documents Verified, rejection reason cleared; message "<name> approved and live."; log "Hospital approved — <name>" (Info).
    2. **Reject** (Pending only) — dialog "Reject this hospital?" with a required **Reason for rejection**: Incomplete KYC documents · Invalid GST or licence details · Failed physical verification · Duplicate registration; text "<name> is notified by email and cannot take bookings. This decision is final." → status Rejected with the reason; message "<name> rejected. The hospital has been notified." (no email is sent **[Prototype-only]**); log "Hospital rejected — <name>" (Critical). **[Observation]** Despite "This decision is final", a rejected hospital can later be approved via Re-review & Approve.
-   3. **Suspend** — "Suspend this hospital?" / "<name> staff lose access immediately. Existing bookings are kept, but no new bookings can be made until reactivation." → status Suspended; log (Critical). For Apollo this blocks the hospital login; nothing else is enforced.
+   3. **Suspend** — "Suspend this hospital?" / "<name> staff lose access immediately. Existing bookings are kept, but no new bookings can be made until reactivation." → status Suspended; log (Critical). For Example Hospital this blocks the hospital login; nothing else is enforced.
    4. **Reactivate** — "Reactivate this hospital?" / "<name> regains access immediately and can take new bookings right away." → status Active; log (Critical).
 9. **Not available:** editing hospital details, deleting a hospital, changing the plan directly, impersonating/logging in as the hospital, inviting or resetting the hospital admin, per-document KYC actions, quota alerts.
 
@@ -997,12 +997,12 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 4. **By Payout Run view:** statements are grouped by expected date into "Payout run · <date>" cards ("n statements · net ₹x", plus "k not releasable (no payout account)"); a run whose date is on or before today is marked "— due"; a **Release Run (n · ₹x)** button when at least one statement can be released; a table per run: Statement (hospital, number · period, remark) · Gross · Commission (10%) · Net Payable ("released ₹x" when partial) · Status (UTR beneath; "Requested by hospital" when the hospital asked) · Action.
 5. **Flat List view:** the same columns plus Expected date, sortable, 7 per page ("statements").
 6. **Row actions:** Pending or Overdue → **Release**; Payout failed → **Retry**; Released → "Awaiting hospital confirmation"; Received → tick and date.
-7. **Sample queue:** 22 statements across nine hospitals (the 14 Apollo statements plus 8 others), for example Meridian City Hospital MB-ST-2408 gross ₹1,86,000 net ₹1,67,400 Pending; Sunrise Multispeciality MB-ST-2410 Released with a partial release of ₹80,000 and the remark "Part release — balance held pending dispute #418."; Charak Institute MB-ST-2413 Payout failed; Kaveri General MB-ST-2415 Pending with no payout account.
+7. **Sample queue:** 22 statements across nine hospitals (the 14 Example Hospital statements plus 8 others), for example Meridian City Hospital MB-ST-2408 gross ₹1,86,000 net ₹1,67,400 Pending; Sunrise Multispeciality MB-ST-2410 Released with a partial release of ₹80,000 and the remark "Part release — balance held pending dispute #418."; Charak Institute MB-ST-2413 Payout failed; Kaveri General MB-ST-2415 Pending with no payout account.
 
 ### 5.6.3 Rules (as implemented)
 
 1. A statement can be released when its status is Pending or Overdue **and** the hospital has a payout account on file; otherwise the message "No payout account on file for <hospital> — the hospital adds it under Hospital Settings." (The Retry path for failed payouts skips this check **[Observation]**.)
-2. Commission for non-Apollo statements is computed live from the **Platform Commission (%)** setting (default 10); Apollo's statements keep the 10% stored in the hospital ledger, so changing the platform rate re-prices some rows and not others **[Observation]**. The rate must be snapshotted per statement in the backend.
+2. Commission for non-Example Hospital statements is computed live from the **Platform Commission (%)** setting (default 10); Example Hospital's statements keep the 10% stored in the hospital ledger, so changing the platform rate re-prices some rows and not others **[Observation]**. The rate must be snapshotted per statement in the backend.
 3. Payout runs are buckets by expected date, not by statement period; a run is "due" when its date is on or before the demo date 13 June 2026.
 4. **Record Settlement Release dialog:** shows Statement, Hospital, Period, Net Payable, Destination (bank and last four digits); note "The transfer itself happens outside Medibook (bank / NEFT / UPI). This records it on the shared ledger — the reference and remark are visible to the hospital."; fields **Amount Released (₹)** (required, digits only, must be greater than zero; pre-filled with the net; no upper limit) · **Transfer Reference (UTR)** (required, pre-filled "UTR26-<last four>R"; no format check) · **Remark (visible to the hospital)** (optional). **Record Release** → status Released, UTR/amount/remark stored, any hospital request for this statement closed; message "Release recorded — visible to <hospital>."; audit log "Settlement release recorded — <statement> · ₹x to <hospital>". A partial amount still sets the status to Released and no balance is tracked **[Observation]**. There is no release-date field.
 5. **Record Run Release dialog:** lists every releasable statement in the run with hospital, number, destination and UTR, "Total to release ₹x", a warning "Skipped — no payout account on file: <hospitals>. Release them individually once the hospital adds bank details.", and a **Remark for this run (optional · visible to every hospital in it)**. **Record n Release(s)** releases each statement for its full net with an auto-generated UTR; message "Payout run recorded — n settlement(s) released."; one audit log "Payout run recorded — <date> · n statements · ₹x".
@@ -1031,7 +1031,7 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 
 1. **Toolbar:** search "Search action or user" (action text or actor); Severity filter (Info · Warning · Critical); Module filter (Hospitals · Settlements · Billing · Subscription Plans · Users & Roles · Platform Users · Reports · Settings · Auth · Media — note "Notifications" is missing although notification actions are logged **[Observation]**); From/To dates; Clear all; caption "Retention: 365 days" (text only); inert refresh icon.
 2. **Columns:** Action (with the actor beneath) · Module · IP Address · Timestamp · Severity (Info blue, Warning amber, Critical red). Sortable except Action; 7 per page ("log entries"); empty state "No results match your filters."; no hospital column, no detail view, no export.
-3. **Sample entries** illustrate intended event types: "Hospital suspended — Nirmal Ortho & Spine" (Critical), "Settlement released — ₹ 1,28,250", "Role permissions changed — Finance Admin" (Critical), "Failed login attempt (3x)" (Auth, Warning), "Invoice regenerated — INV-2026-0234", "Platform user deleted — dev.trivedi@gmail.com" (Critical), "Data export — bookings FY 2025-26" (Warning), "Media purged — 214 orphaned files" (system), "API key rotated — payments gateway", "Settings updated — payout schedule".
+3. **Sample entries** illustrate intended event types: "Hospital suspended — Nirmal Ortho & Spine" (Critical), "Settlement released — ₹ 1,28,250", "Role permissions changed — Finance Admin" (Critical), "Failed login attempt (3x)" (Auth, Warning), "Invoice regenerated — INV-2026-0234", "Platform user deleted — dev.trivedi@example.com" (Critical), "Data export — bookings FY 2025-26" (Warning), "Media purged — 214 orphaned files" (system), "API key rotated — payments gateway", "Settings updated — payout schedule".
 4. **Events actually written by the prototype** (all with the fixed actor riya.sharma@medibook.in, IP 10.42.8.11 and time "Just now" **[Prototype-only]**): the 23 event templates in Appendix C — hospital onboarded/approved/rejected/suspended/reactivated; plan created/updated/deleted; plan change applied/declined; platform settings updated; banner added/updated/deleted/paused/resumed and default banner updated; push sent/scheduled/cancelled; patient account viewed/blocked/unblocked; settlement release recorded; payout run recorded.
 5. **Sensitive actions not logged today:** API-key rotation, report downloads, invoice downloads, internal user add/delete, alert resolution, every hospital-side action (mark received, requests, settings and bank changes), login/logout. The FRD requires access logs, configuration-change logs, booking state transitions and outbound-message attempts (see Section 10).
 
@@ -1086,11 +1086,11 @@ The hospital web application ("mbAdmin") is the desk-and-management tool for one
 ## 5.13 Platform Settings
 
 1. **Organisation:** Platform Name (Medibook) · Support Email (format checked — "Enter a valid email address."; sample support@medibook.in) · Helpline Number (1800 220 440).
-2. **Payouts & Billing:** Payout Schedule (Weekly / Fortnightly / Monthly; default Weekly) · Platform Commission (%) (0–100 — "Enter a value between 0 and 100."; default 10) · GST Number (the platform's 15-character GSTIN — "GST number must be 15 characters."; default 27AABCM9407L1ZK). **[Observation]** This is a GSTIN, not a tax rate; the invoice tax rate (9% CGST + 9% SGST) is fixed in code.
+2. **Payouts & Billing:** Payout Schedule (Weekly / Fortnightly / Monthly; default Weekly) · Platform Commission (%) (0–100 — "Enter a value between 0 and 100."; default 10) · GST Number (the platform's 15-character GSTIN — "GST number must be 15 characters."; default 27AAAAA0000A1Z5). **[Observation]** This is a GSTIN, not a tax rate; the invoice tax rate (9% CGST + 9% SGST) is fixed in code.
 3. **Notifications:** Settlement alerts ("Notify when a payout fails or is on hold.", on) · Compliance alerts ("Notify on critical audit events in real time.", on) · Weekly digest ("Platform summary every Monday at 09:00.", off).
 4. **Security:** Require 2FA for all admins ("Admins without 2FA are prompted at next sign-in.", on) · Session Timeout (15 / 30 / 60 min; default 30) · API Key (masked `mb_live_9f42••••••••7d1c`) with **Rotate Key** → only the message "API key rotated. Update your gateway config." **[Prototype-only]**.
 5. **Footer:** "Unsaved changes" / "All changes saved" status; **Discard**; **Save Changes** → "Settings saved."; audit "Settings updated — platform preferences".
-6. **Which settings have an effect today:** the commission rate is used to compute commission and net for non-Apollo statements on the Hospital Settlements and Hospital Profile screens; the payout schedule only changes a caption; the GSTIN prints on invoices. Organisation fields, notification toggles, 2FA requirement and session timeout are stored but never read **[Observation]**.
+6. **Which settings have an effect today:** the commission rate is used to compute commission and net for non-Example Hospital statements on the Hospital Settlements and Hospital Profile screens; the payout schedule only changes a caption; the GSTIN prints on invoices. Organisation fields, notification toggles, 2FA requirement and session timeout are stored but never read **[Observation]**.
 
 # 6. Business Rules Catalogue (consolidated)
 
@@ -1148,7 +1148,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 2. **BR-051** Online bookings are created Paid (prepaid in the app); walk-ins are created Pending and become Paid only when the desk records Cash/UPI/Card with an optional reference. — Implemented.
 3. **BR-052** Payments with no recorded mode are treated as Cash in every total. — Implemented.
 4. **BR-053** Receipt number = "RCPT-" + last five characters of the MR number + "-" + day of month; generated at display time, not stored, not unique. — Implemented (must be replaced by a server-side receipt series).
-5. **BR-054** Receipts and token slips print the hospital name "Apollo Hospital" and logo regardless of settings; receipts contain one line item and no tax. — Implemented (placeholder).
+5. **BR-054** Receipts and token slips print the hospital name "Example Hospital" and logo regardless of settings; receipts contain one line item and no tax. — Implemented (placeholder).
 6. **BR-055** Fee components before payment: consultation fee, taxes, convenience fee, coupons; GST details on receipts. — Absent.
 7. **BR-056** Desk refund: full fee, only when cancelling a paid walk-in, recorded as Refunded via Desk. Online refunds are handled by Medibook "per its slab policy" and the appointment stays Paid. — Implemented / Copy only.
 8. **BR-057** Cancellation window: patient cancellation allowed/not allowed; cut-off 1/2/4/24 hours before; reschedule "up to 2 hours before your slot". — Setting only / Copy only.
@@ -1157,7 +1157,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 
 ## 6.6 Commission, settlements and payouts
 
-1. **BR-060** Platform commission = 10% of gross online fees (Platform Settings, 0–100%); commission = round(gross × rate); net = gross − commission. — Implemented for non-Apollo statements; Apollo statements carry a stored 10%.
+1. **BR-060** Platform commission = 10% of gross online fees (Platform Settings, 0–100%); commission = round(gross × rate); net = gross − commission. — Implemented for non-Example Hospital statements; Example Hospital statements carry a stored 10%.
 2. **BR-061** Statements are weekly (sample: Wednesday–Tuesday), numbered platform-wide "MB-ST-####", with an expected date four days after the period ends; fees become payable only after the appointment is completed. — Sample only / Copy only.
 3. **BR-062** A statement whose expected date has passed without release is Overdue; a failed bank transfer is Payout failed and "Medibook is retrying". — Sample only.
 4. **BR-063** Release requires status Pending or Overdue and a payout account on file; a release records amount (>0), UTR (required) and remark; a payout run releases every eligible statement with the same expected date for its full net. — Implemented.
@@ -1209,7 +1209,7 @@ Every rule below was read from the code. **Status** tells the backend team how f
 4. **DEMO-04** Fixed KPI numbers, charts, reach figures and "vs last week" captions on dashboards, analytics, billing, platform users and reports.
 5. **DEMO-05** Role switcher in the hospital top bar; hospital login always lands on Administrator.
 6. **DEMO-06** Audit entries always attributed to riya.sharma@medibook.in / 10.42.8.11 / "Just now".
-7. **DEMO-07** Hard-coded "Apollo Hospital" on receipts and slips; tenant constant 13; hospital settings stored in the browser.
+7. **DEMO-07** Hard-coded "Example Hospital" on receipts and slips; tenant constant 13; hospital settings stored in the browser.
 8. **DEMO-08** Token counter seeds (A-26, T-008), MR/appointment/plan ids minted in the browser, unknown ids falling back to the first record instead of "not found".
 9. **DEMO-09** Mobile platform identity (`com.example.my_app`, "My App"), debug signing, missing release internet permission.
 
@@ -1320,7 +1320,7 @@ This section lists every business entity the three front ends display or edit, w
 
 ## 8.1 Tenancy and platform
 
-1. **E-01 Hospital (tenant).** Fields seen: id (console number; Apollo = 13), name, admin email, phone, GSTIN, plan (by plan name), city, state (2-letter), bookings this month, onboarded date ("April 12, 2025"), status (Active / Pending verification / Suspended / Rejected), KYC record (registration certificate, GST certificate, medical licence, bank account proof — each Missing / Submitted / Verified), payout bank (bank, account number, IFSC, UPI), rejection reason, derived instance ID ("MB-HOSP-0113"). From Hospital Settings the same tenant also owns: registration number, about, logo, gallery photos, address, latitude, longitude, map pin, working hours (open, close, open days), account holder name, rules and notification preferences (see E-04). _Backend must add:_ branch support (FRD), holidays, creation/verification timestamps, verified-by, KYC document files and per-document review history, subscription history.
+1. **E-01 Hospital (tenant).** Fields seen: id (console number; Example Hospital = 13), name, admin email, phone, GSTIN, plan (by plan name), city, state (2-letter), bookings this month, onboarded date ("April 12, 2025"), status (Active / Pending verification / Suspended / Rejected), KYC record (registration certificate, GST certificate, medical licence, bank account proof — each Missing / Submitted / Verified), payout bank (bank, account number, IFSC, UPI), rejection reason, derived instance ID ("MB-HOSP-0113"). From Hospital Settings the same tenant also owns: registration number, about, logo, gallery photos, address, latitude, longitude, map pin, working hours (open, close, open days), account holder name, rules and notification preferences (see E-04). _Backend must add:_ branch support (FRD), holidays, creation/verification timestamps, verified-by, KYC document files and per-document review history, subscription history.
 2. **E-02 Subscription plan.** id, name (unique), monthly price (₹, GST-inclusive as displayed), bookings per month, staff-account tier ("Up to 25 staff accounts" / "Up to 120 staff accounts" / "Unlimited staff accounts"), support tier ("Email support" / "Priority support" / "Dedicated success manager"), extra feature line, most-popular flag (exclusive), hospital-specific flag. _Backend must add:_ yearly billing option, limits for doctors/branches/storage/message credits (FRD), effective dates, price history.
 3. **E-03 Plan-change request.** id, hospital, hospital email, change text ("Growth → Enterprise"), requested date, status (Pending / Completed / Cancelled). _Add:_ from-plan and to-plan ids, decided by/at, effective date.
 4. **E-04 Hospital settings (per tenant).** Booking rules: default consultation duration (10/15/20/30 mins), online booking on/off, max appointments per slot (5/10/15/20), buffer (0/5/10/15 mins), allow patient cancellation, cancellation cut-off (1/2/4/24 hours), auto no-show after (30 mins/1 hour/2 hours), token generation (Auto/Manual), show token to patient, allow hold token, hold timeout (15/30/45 mins), grace period (15/30/45 mins), after grace (Auto Mark No-show / Keep waiting), OP consultation fee, fee validity days, apply to all departments. Notification preferences: appointment confirmation, visit reminder, settlement received, settlement overdue, plan quota low. _Add:_ reschedule window, cancellation fee/refund slab, token numbering scheme, message templates, banner placements (all FRD policies).
@@ -1339,12 +1339,12 @@ This section lists every business entity the three front ends display or edit, w
 8. **E-17 Hospital staff user.** id ("u1"), name, email, phone, username, role id, status (Active / Inactive), last active label, invite status (Accepted / Pending). _Add:_ credentials, hospital id, invite tokens, real timestamps.
 9. **E-18 Hospital role.** id ("r-admin", "r-new-1"), name, colour, description, system flag, permission grid (ten modules × view/add/edit/delete). _Add:_ hospital id; enforcement mapping to API endpoints.
 10. **E-19 Settlement statement (hospital view).** Statement number ("MB-ST-2406"), period text ("10 – 16 Jun 2026"), gross, commission, net, expected date (ISO), status (Pending / Overdue / Released / Received / Payout failed), UTR, remark, received-on date, released amount, requested flag and date. _Add:_ hospital id, period start/end dates, commission rate snapshot, the list of appointments/payments the statement covers, release history, outstanding balance for partial releases.
-11. **E-20 Support ticket / hospital request.** id, type (Support / Plan / Settlement), hospital, subject ("Technical issue — Apollo Hospital", "Plan change requested — Enterprise", "Settlement release requested — MB-ST-2406"), detail (message or statement number), date, status (Open / Closed). _Add:_ raised-by user, replies, assignment, resolution timestamps, closure of support tickets.
+11. **E-20 Support ticket / hospital request.** id, type (Support / Plan / Settlement), hospital, subject ("Technical issue — Example Hospital", "Plan change requested — Enterprise", "Settlement release requested — MB-ST-2406"), detail (message or statement number), date, status (Open / Closed). _Add:_ raised-by user, replies, assignment, resolution timestamps, closure of support tickets.
 12. **E-21 Report definition (hospital).** id, name, brief, category (Operations / Finance / People), applicable filters (date, department, doctor, status, mode, source, user), four KPI tiles. _Backend must define_ the dataset and columns of each of the 14 reports (Section 10.1).
 
 ## 8.3 Patient side
 
-1. **E-30 Patient account.** From the mobile app: name, email, phone ("+91 98456 58525"), date of birth ("15/05/1997"), gender, blood group, blood-donation consent, password. From the console: id, name, email, phone, city, bookings count, joined date, status (Active / Blocked), avatar. _Add:_ mobile-number verification state, address (FRD), emergency contacts (FRD), push registration tokens, terms acceptance, deletion/retention state.
+1. **E-30 Patient account.** From the mobile app: name, email, phone ("+91 90000 00000"), date of birth ("15/05/1997"), gender, blood group, blood-donation consent, password. From the console: id, name, email, phone, city, bookings count, joined date, status (Active / Blocked), avatar. _Add:_ mobile-number verification state, address (FRD), emergency contacts (FRD), push registration tokens, terms acceptance, deletion/retention state.
 2. **E-31 Dependent / family member.** name, relationship (Self / Husband / Daughter in the app; Spouse / Son / Daughter / Father / Mother in the console), age (or date of birth), gender. _Add:_ optional blood group and allergies (FRD), id, link to the account.
 3. **E-32 Appointment (mobile view).** id ("1", "b26"), doctor id, patient name, date ("Today" / "12 Aug 2026"), time ("10:30 AM"), token ("A-25"), status (Confirmed / Completed / Cancelled), list bucket (Upcoming / Past). _Add:_ hospital, booking id, payment status and receipt (FRD), fee breakdown, documents, cancellation/refund status, real timestamps.
 4. **E-33 Doctor (mobile view).** id slug ("anya"), name, department, specialty, title, experience ("12 yrs"), patients treated ("6,000+"), rating, fee ("₹900"), hospital name, about, photo. _Backend:_ these are the hospital catalogue doctors (E-11) exposed to patients with numeric fields.
@@ -1358,7 +1358,7 @@ This section lists every business entity the three front ends display or edit, w
 
 1. **E-40 Invoice.** id, number ("INV-2026-0231"), hospital, amount (GST-inclusive), issued date, due date, status (Completed / Pending / Overdue / Payment failed); displayed but not stored: billing period, plan, subtotal, CGST 9%, SGST 9%. _Add:_ line items, tax breakdown stored at issue time, plan snapshot, PDF.
 2. **E-41 Subscription payment.** id, transaction id ("TXN-88412"), invoice number, hospital, method (UPI / Card / NetBanking), amount, date, status (Success / Pending / Payment failed); displayed but derived: gateway reference, status timeline. _Add:_ gateway payload, attempts, refunds.
-3. **E-42 Settlement statement (console view).** Same as E-19 plus hospital id and, for non-Apollo rows, commission/net computed from the platform rate.
+3. **E-42 Settlement statement (console view).** Same as E-19 plus hospital id and, for non-Example Hospital rows, commission/net computed from the platform rate.
 4. **E-43 Payout run.** Derived grouping of statements by expected date with totals; recorded run remark. _Add:_ run id, executed-by/at, bank batch reference.
 5. **E-44 Compliance log entry.** id, hospital id (optional), action text, actor, module (Hospitals / Settlements / Billing / Subscription Plans / Users & Roles / Platform Users / Reports / Settings / Auth / Media / Notifications), IP address, timestamp, severity (Info / Warning / Critical). _Add:_ structured event type (Appendix C), target entity id, before/after values for configuration changes.
 6. **E-45 Dashboard alert.** id, severity (danger / warning), title, sub-text, target (settlements / logs / hospital:id). _Add:_ generation rules (payout failure, quota, log gap, message-delivery failures, payment-callback failures).
@@ -1392,7 +1392,7 @@ This section lists every business entity the three front ends display or edit, w
 
 ## 9.3 Multi-tenancy and data isolation
 
-1. One hospital app instance corresponds to one tenant; the console reads live data of one tenant (Apollo, id 13) and sample data for the rest. The backend must scope every hospital record by tenant id and expose only the tenant's own data to its staff, while the console reads across tenants with per-role limits.
+1. One hospital app instance corresponds to one tenant; the console reads live data of one tenant (Example Hospital, id 13) and sample data for the rest. The backend must scope every hospital record by tenant id and expose only the tenant's own data to its staff, while the console reads across tenants with per-role limits.
 2. Patient accounts are platform-wide (a patient books across hospitals); their appointments, documents and notifications must be linked to both the patient and the hospital.
 
 ## 9.4 Security expectations from the contract (none implemented in the UI)
@@ -1536,13 +1536,13 @@ The Agreement states that design elements outside the Final/Preliminary FRD are 
 
 1. **Departments.** Mobile: General, Cardiology, Orthopedics, Dermatology. Hospital app: Cardiology, Orthopedics, Pediatrics, Neurology, ENT, Dermatology (Dermatology inactive in the catalogue but bookable). Console sample pools add General Medicine, Gynaecology, Ophthalmology.
 2. **Doctors and fees.** Mobile: six doctors across two hospitals with per-doctor fees (₹450–₹900). Hospital app: seven doctors with per-department fees (₹500–₹1,000) in booking and per-doctor fees in the catalogue.
-3. **Hospitals.** Mobile: "Apollo Hospital" and "City Care Clinic" as labels. Hospital app: Apollo Hospital only. Console: 13 hospitals, Apollo = 13.
+3. **Hospitals.** Mobile: "Example Hospital" and "City Care Clinic" as labels. Hospital app: Example Hospital only. Console: 13 hospitals, Example Hospital = 13.
 4. **Statuses.** Mobile: Confirmed / Completed / Cancelled. Web: Scheduled / In Queue / Completed / Cancelled / No-show plus payment Paid / Pending / Refunded.
 5. **Patient identity.** Mobile: patients by name with a relationship. Web: MR numbers per hospital. Console: platform user ids with family members. A patient booking across hospitals needs one platform identity mapped to per-hospital MR numbers.
 6. **Time slots.** Mobile: six fixed labels. Web: 10 or 11 fixed half-hour labels; sample data uses 15-minute times in neither list.
 7. **Dates.** Mobile stores the word "Today"; web stores relative labels; console stores long dates and ISO dates on a fixed demo day.
 8. **Banners and notifications.** Console manages banners and pushes; the mobile app has its own fixed banners and notifications.
-9. **Commission rate.** Hospital app fixed at 10%; console editable; Apollo statements keep a stored 10% while others follow the setting.
+9. **Commission rate.** Hospital app fixed at 10%; console editable; Example Hospital statements keep a stored 10% while others follow the setting.
 
 ## 10.5 Defects observed in the prototypes (must not be carried into production)
 
@@ -1693,19 +1693,19 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 
 ## B.1 Patient mobile app
 
-1. **Account holder:** Alexandra Johnson · alexandra.johnson@example.com · +91 98456 58525 · born 15/05/1997 · Female · blood group O+ · donation consent on.
+1. **Account holder:** Alexandra Johnson · alexandra.johnson@example.com · +91 90000 00000 · born 15/05/1997 · Female · blood group O+ · donation consent on.
 2. **Family:** Alexandra Johnson (29 years · Female · Self), Michael Johnson (34 years · Male · Husband), Ava Johnson (6 years · Female · Daughter).
 3. **Departments:** General ("Primary healthcare"), Cardiology ("Heart specialists"), Orthopedics ("Bone & joint care"), Dermatology ("Skin specialists").
-4. **Doctors:** Dr. Anya Sharma (Cardiology, Head of Cardiology, 12 yrs, 6,000+ patients, 4.8, ₹900, Apollo Hospital, photo); Dr. Rohan Kapoor (Cardiology, 8 yrs, 3,200+, 4.6, ₹700, City Care Clinic); Dr. Anil Kumar (General, Senior General Physician, 15 yrs, 9,500+, 4.7, ₹500, Apollo Hospital); Dr. Meera Nair (General, 6 yrs, 2,100+, 4.5, ₹450, City Care Clinic); Dr. Priya Mehta (Orthopedics, Lead, Day-care Orthopedics, 10 yrs, 4,800+, 4.9, ₹800, Apollo Hospital); Dr. Sara Ali (Dermatology, 7 yrs, 2,900+, 4.6, ₹650, City Care Clinic).
+4. **Doctors:** Dr. Anya Sharma (Cardiology, Head of Cardiology, 12 yrs, 6,000+ patients, 4.8, ₹900, Example Hospital, photo); Dr. Rohan Kapoor (Cardiology, 8 yrs, 3,200+, 4.6, ₹700, City Care Clinic); Dr. Anil Kumar (General, Senior General Physician, 15 yrs, 9,500+, 4.7, ₹500, Example Hospital); Dr. Meera Nair (General, 6 yrs, 2,100+, 4.5, ₹450, City Care Clinic); Dr. Priya Mehta (Orthopedics, Lead, Day-care Orthopedics, 10 yrs, 4,800+, 4.9, ₹800, Example Hospital); Dr. Sara Ali (Dermatology, 7 yrs, 2,900+, 4.6, ₹650, City Care Clinic).
 5. **Time slots:** 09:00 AM, 10:00 AM, 11:30 AM, 12:15 PM, 02:00 PM, 04:30 PM.
 6. **Appointments:** Today 10:30 AM Dr. Priya Mehta for Alexandra, token A-25, Confirmed; 12 Aug 2026 09:00 AM Dr. Anil Kumar for Michael, A-12, Confirmed; 21 Jul 2026 11:30 AM Dr. Anya Sharma for Alexandra, A-08, Completed; 02 Jun 2026 02:00 PM Dr. Anil Kumar for Ava, A-19, Cancelled. Next token A-26.
-7. **Records:** Blood Test Report (10 Jul 2026, Completed, Alexandra, Apollo Hospital, Dr. Anil Kumar); Full Body Checkup (02 Jul 2026, Pending, Michael, Apollo Hospital, Dr. Meera Nair); Lipid Profile (21 Jun 2026, Completed, Alexandra, City Care Clinic, Dr. Rohan Kapoor).
+7. **Records:** Blood Test Report (10 Jul 2026, Completed, Alexandra, Example Hospital, Dr. Anil Kumar); Full Body Checkup (02 Jul 2026, Pending, Michael, Example Hospital, Dr. Meera Nair); Lipid Profile (21 Jun 2026, Completed, Alexandra, City Care Clinic, Dr. Rohan Kapoor).
 8. **Notifications:** Fasting Reminder; Appointment Reminder (Dr. Priya Mehta, today 10:30 AM); Prescription Ready (Dr. Anil Kumar); Vaccination Due (Ava).
 9. **Banners:** "Want to see a doctor today?" / "Schedule your appointment in just a tap."; "Lab tests at home" / "Book a sample collection slot now."
 
-## B.2 Hospital web app (Apollo Hospital, Bengaluru; tenant 13)
+## B.2 Hospital web app (Example Hospital, Bengaluru; tenant 13)
 
-1. **Hospital:** Apollo Hospital · KA-HOSP-20194 · GSTIN 29AAACA4033H1Z5 · 080 4567 8900 · contact@apollo.med · 154 Bannerghatta Road, Bengaluru 560076 (12.9088, 77.5975) · HDFC Bank 50200048112233 / HDFC0001234 / apollohospital@hdfcbank · open 8:00 am–8:00 pm Mon–Sat · plan Growth.
+1. **Hospital:** Example Hospital · KA-HOSP-00000 · GSTIN 29AAAAA0000A1Z5 · 080 0000 0000 · contact@hospital.example · 1 Example Road, Bengaluru 560001 (12.97, 77.59) · Example Bank XXXXXXXXXX1234 / ABCD0123456 / hospital@upi · open 8:00 am–8:00 pm Mon–Sat · plan Growth.
 2. **Booking roster (fixed):** Cardiology ₹800 — Dr. Thomas K. (room 101), Dr. Anil R. (102); Orthopedics ₹700 — Dr. Geetha R. (201); Pediatrics ₹600 — Dr. Kumar V. (301); Neurology ₹1,000 — Dr. Maya S. (401); ENT ₹500 — Dr. Arun B. (501); Dermatology ₹650 — Dr. Leela P. (601).
 3. **Catalogue departments:** the same six, with Dermatology Inactive; hours "Mon–Sat · 9am–6pm" style texts.
 4. **Catalogue doctors:** the same seven with ratings 4.4–4.9, reviews 38–142, Dr. Kumar V. On Leave (10–16 Jun "Medical leave"), leaves for Dr. Thomas K. (18–20 Jun "Conference") and Dr. Geetha R. (25 Jun "Personal").
@@ -1717,16 +1717,16 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 
 ## B.3 Operations console
 
-1. **Hospitals (13):** 1 Sunrise Multispeciality (Pune, Growth, 4,280 bookings, Active); 2 Lotus Heart Institute (Chennai, Enterprise, 6,120, Pending verification); 3 Kaveri General Hospital (Mysuru, Starter, 1,240, Active, no bank); 4 Nirmal Ortho & Spine (Indore, Growth, 2,860, Suspended); 5 Ashwini Children's Care (Kochi, Starter, 980, Pending verification, GST certificate missing); 6 Meridian City Hospital (Mumbai, Enterprise, 7,450, Active); 7 Vasudha Medical Centre (Hyderabad, Growth, 3,320, Active); 8 Trinity Care & Research (Bengaluru, Custom — Trinity Care, 5,210, Active); 9 Girnar Multispeciality (Rajkot, Starter, 860, Suspended); 10 Padma Eye Foundation (Vijayawada, Starter, 640, Rejected — "Incomplete KYC documents"); 11 Himgiri Wellness Hospital (Dehradun, Growth, 1,980, Active); 12 Charak Institute of Medicine (Lucknow, Enterprise, 4,890, Pending verification); 13 Apollo Hospital (Bengaluru, Growth, 3,120, Active, onboarded April 12, 2025).
+1. **Hospitals (13):** 1 Sunrise Multispeciality (Pune, Growth, 4,280 bookings, Active); 2 Lotus Heart Institute (Chennai, Enterprise, 6,120, Pending verification); 3 Kaveri General Hospital (Mysuru, Starter, 1,240, Active, no bank); 4 Nirmal Ortho & Spine (Indore, Growth, 2,860, Suspended); 5 Ashwini Children's Care (Kochi, Starter, 980, Pending verification, GST certificate missing); 6 Meridian City Hospital (Mumbai, Enterprise, 7,450, Active); 7 Vasudha Medical Centre (Hyderabad, Growth, 3,320, Active); 8 Trinity Care & Research (Bengaluru, Custom — Trinity Care, 5,210, Active); 9 Girnar Multispeciality (Rajkot, Starter, 860, Suspended); 10 Padma Eye Foundation (Vijayawada, Starter, 640, Rejected — "Incomplete KYC documents"); 11 Himgiri Wellness Hospital (Dehradun, Growth, 1,980, Active); 12 Charak Institute of Medicine (Lucknow, Enterprise, 4,890, Pending verification); 13 Example Hospital (Bengaluru, Growth, 3,120, Active, onboarded April 12, 2025).
 2. **Plans (4):** Starter ₹9,999 / 1,500; Growth ₹24,999 / 5,000 (Most Popular); Enterprise ₹49,999 / 8,000; Custom — Trinity Care ₹59,999 / 10,000.
 3. **Plan changes (4):** Vasudha Starter → Growth (Completed); Charak Growth → Enterprise (Pending); Padma Growth → Starter (Completed); Girnar Starter → Growth (Cancelled).
-4. **Invoices (15):** INV-2026-0231 to 0244 plus Apollo's 0198 and 0219; 9 Completed, 3 Pending, 2 Overdue, 1 Payment failed. **Payments (11):** TXN-88077 to TXN-88501; 7 Success, 2 Pending, 2 Payment failed; methods UPI / Card / NetBanking.
-5. **Console settlements (8, non-Apollo):** MB-ST-2408 Meridian, 2409 Trinity, 2411 Lotus, 2415 Kaveri (Pending, expected 20 Jun); 2410 Sunrise (Released, partial ₹80,000, "Part release — balance held pending dispute #418."); 2413 Charak (Payout failed); 2412 Vasudha and 2414 Himgiri (Received).
+4. **Invoices (15):** INV-2026-0231 to 0244 plus Example Hospital's 0198 and 0219; 9 Completed, 3 Pending, 2 Overdue, 1 Payment failed. **Payments (11):** TXN-88077 to TXN-88501; 7 Success, 2 Pending, 2 Payment failed; methods UPI / Card / NetBanking.
+5. **Console settlements (8, non-Example Hospital):** MB-ST-2408 Meridian, 2409 Trinity, 2411 Lotus, 2415 Kaveri (Pending, expected 20 Jun); 2410 Sunrise (Released, partial ₹80,000, "Part release — balance held pending dispute #418."); 2413 Charak (Payout failed); 2412 Vasudha and 2414 Himgiri (Received).
 6. **Alerts (3):** Settlement failure — Lotus Heart Institute; Plan limit reached — Kaveri General; Compliance log gap — Nirmal Ortho. **Requests (1):** Support ticket from Sunrise Multispeciality — "unable to update doctor schedule".
 7. **Internal users (7):** Riya Sharma, Anil Kapoor (Super Admin); Meera Pillai, Nisha Verma (Finance Admin); Dev Trivedi, Kavya Reddy (Support); Sameer Joshi (Auditor).
 8. **Patient accounts (8):** Aarav Mehta (Mumbai; family Rhea, Kabir, Suresh Mehta), Sana Qureshi (Hyderabad; Imran Qureshi), Vikram Rao (Bengaluru; Lakshmi Rao + one more), Meera Nair (Kochi, Blocked), Rohit Bansal (Delhi), Ananya Iyer (Chennai), Farhan Sheikh (Pune, Blocked), Divya Kulkarni (Nagpur).
 9. **Banners:** default "Book trusted doctors near you — Medibook"; Monsoon Health Camp (Live); Free tele-consult week (Scheduled); World Yoga Day (Paused); Summer vaccination drive (Expired). **Pushes:** "20% off health checkups" (Sent); "Live queue updates are here" (Sent, Android); "Father's Day heart camp" (Scheduled 21 Jun 2026).
-10. **Compliance log (10 seed entries):** see Appendix C.2. **Platform settings:** Medibook · support@medibook.in · 1800 220 440 · Weekly payouts · 10% commission · GSTIN 27AABCM9407L1ZK · 2FA required · 30-minute session.
+10. **Compliance log (10 seed entries):** see Appendix C.2. **Platform settings:** Medibook · support@medibook.in · 1800 220 440 · Weekly payouts · 10% commission · GSTIN 27AAAAA0000A1Z5 · 2FA required · 30-minute session.
 
 # Appendix C. Audit-Event Catalogue
 
@@ -1761,9 +1761,9 @@ The sample data defines the vocabulary the client has already seen in demos. It 
 ## C.2 Event types present only in sample data (no code writes them)
 
 1. Users & Roles — "Role permissions changed — Finance Admin" (Critical).
-2. Auth — "Failed login attempt (3x)" (Warning, actor "unknown@23.94.61.2").
+2. Auth — "Failed login attempt (3x)" (Warning, actor "unknown@203.0.113.24").
 3. Billing — "Invoice regenerated — INV-2026-0234" (Info).
-4. Platform Users — "Platform user deleted — dev.trivedi@gmail.com" (Critical).
+4. Platform Users — "Platform user deleted — dev.trivedi@example.com" (Critical).
 5. Reports — "Data export — bookings FY 2025-26" (Warning).
 6. Media — "Media purged — 214 orphaned files" (Warning, actor system@medibook.in).
 7. Settings — "API key rotated — payments gateway" (Info); "Settings updated — payout schedule" (Info).

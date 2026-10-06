@@ -18,6 +18,7 @@ import type { HospitalSession } from '@/features/auth/domain/entities/auth.types
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { IdleWarningModal } from './IdleWarningModal';
+import { ConnectionNotice } from './ConnectionNotice';
 import {
   documentTitleFor,
   moduleForView,
@@ -129,6 +130,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           onNavigate={handleNavigate}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
+        <ConnectionNotice />
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary
             key={view}

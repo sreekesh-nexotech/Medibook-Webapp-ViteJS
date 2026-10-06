@@ -42,7 +42,7 @@ export function AppointmentSlotSelect({
 
   const placeholder = grid.isPending
     ? 'Loading slots…'
-    : grid.isError
+    : grid.isLoadingError
       ? 'Could not load slots — reselect the doctor to retry'
       : open.length === 0
         ? 'No open slots this day'

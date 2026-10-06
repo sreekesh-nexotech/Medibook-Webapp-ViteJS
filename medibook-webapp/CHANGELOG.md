@@ -21,6 +21,11 @@ All notable changes to the Medibook web app. The format follows
   tests for every screen, and a CI workflow that runs the QA gate, the tests and
   `npm audit` on every pull request.
 
+- An offline banner, and a notice with Retry when data on screen could not refresh;
+  the rows stay instead of being replaced by an error.
+- A branded error page with Reload and Log out for any crash outside a screen.
+- Appointment lists that include today refresh every minute.
+
 ### Fixed
 
 - Bank accounts, holidays, banners, the onboarding document catalogue and active
@@ -30,6 +35,23 @@ All notable changes to the Medibook web app. The format follows
   versions are numbers, so the config never loaded.
 - A tab left open across a deploy now reloads itself once instead of showing a
   screen that can never load.
+
+- Dates and "today" follow the hospital's time zone, whatever the device is set to:
+  invoices issued just after midnight show the right day, and each date entered
+  is sent as the hospital's day.
+- Every amount shows two decimals worked out from paise, on screen and in CSVs;
+  split payments are added up in paise, and the coupon preview matches the bill.
+- Holiday and department edits no longer fail: they send the record version, as
+  do leave, date-exception, tax-rate and coupon deletes.
+- A retried booking, payment, refund or holiday save reuses its idempotency key,
+  and a double click sends one request.
+- Payment totals and appointment lists say when only the first part is shown.
+- Live updates reconnect when the line goes quiet, say "Live updates off" when
+  refused, and close at sign-out.
+- An unknown address shows the not-found page instead of redirecting.
+- The Held slot style drew 300px top and bottom borders, stretching the Slots &
+  Availability legend card; its yellow outline now comes from a token Tailwind
+  cannot read as a border width.
 
 ### Security
 
@@ -49,3 +71,8 @@ All notable changes to the Medibook web app. The format follows
 - File links must be https on the file-storage host, and ids in API paths are
   URL-encoded.
 - Buttons disabled for lack of permission cannot be reached with the keyboard.
+- Patient and staff forms no longer let the browser remember other people's
+  details, patient pages carry the record id instead of the MR number, and CSV
+  cells that a spreadsheet would run as a formula are neutralised.
+- Real hospital names, identifiers and images are gone from the app, its docs and
+  its test fixtures.

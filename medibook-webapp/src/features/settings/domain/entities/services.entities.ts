@@ -56,6 +56,8 @@ export interface HospitalCoupon {
   readonly usedCount: number;
   /** Minimum order value in whole rupees. */
   readonly minOrderRupees: number;
+  /** Most a percent coupon takes off one booking, in rupees; `null` = no cap. */
+  readonly maxDiscountRupees: number | null;
   /** Department scope (empty = every department). */
   readonly departmentIds: readonly string[];
   /** Service scope (empty = every service). */

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useSort } from '@/shared/hooks/useSort';
-import { money } from '@/shared/lib/format';
+import { money, todayISO } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -40,7 +40,6 @@ import { AppointmentReceiptModal } from '@/features/appointments/presentation/co
 import {
   DATE_WINDOWS,
   isInQueue,
-  localIso,
   needsApproval,
   needsPayment,
   PAYMENT_LABEL,
@@ -110,10 +109,10 @@ export function AppointmentsScreen() {
   const [pay, setPay] = useState<DeskAppointment | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
 
-  const today = localIso(new Date());
+  const today = todayISO();
   const range = rangeFor(dateF, exact, today);
   const query = useAppointmentsQuery(range);
-  const appts = useMemo(() => query.data ?? [], [query.data]);
+  const appts = useMemo(() => query.data?.items ?? [], [query.data]);
   const approve = useApproveMutation();
   const checkIn = useCheckInMutation();
   // Department and doctor filters follow the hospital's own catalogue (H1).
@@ -215,7 +214,7 @@ export function AppointmentsScreen() {
   /** Loading / empty / error live inside the table body so the header stays put. */
   const tableState: TableStateSpec | undefined = query.isPending
     ? { kind: 'loading', rows: APPT_PAGE }
-    : query.isError
+    : query.isLoadingError
       ? {
           kind: 'error',
           message: failureText(query.error, 'Could not load appointments.'),
@@ -306,6 +305,7 @@ export function AppointmentsScreen() {
           </span>
         </div>
         <TableShell
+          busy={query.isPlaceholderData}
           columns={COLUMNS}
           sortKeys={SORT_KEYS}
           sort={sort}
@@ -408,6 +408,12 @@ export function AppointmentsScreen() {
           onPage={setPage}
           noun="appointments"
         />
+        {query.data?.truncated && (
+          <p className="text-caption text-text-muted m-0 mt-3">
+            Showing the first {appts.length.toLocaleString('en-IN')} appointments in this window.
+            Pick a shorter window to see the rest.
+          </p>
+        )}
       </Card>
       <AppointmentDrawer
         id={drawer}

@@ -2,7 +2,7 @@
   "id": "01a0ee2f-af58-7490-9b09-73a8e1d19fa6",
   "invoice_no": "INV-2026-0008",
   "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "hospital_name": "Example Multispeciality Hospital",
   "subscription_id": "01a0ee28-8144-7650-8b73-866f4422ba0d",
   "period_start": "2026-09-29",
   "period_end": "2026-10-17",
@@ -42,15 +42,15 @@
   ],
   "hospital_snapshot": {
     "city": "Kochi",
-    "name": "Lakeshore Multispeciality Hospital",
-    "email": "contact@lakeshore.medibook.example.com",
+    "name": "Example Multispeciality Hospital",
+    "email": "contact@example.medibook.example.com",
     "gstin": "00AAAAA0000A0A0",
     "state": "Kerala",
     "pincode": "682040",
-    "legal_name": "Lakeshore Healthcare Pvt Ltd",
+    "legal_name": "Example Healthcare Pvt Ltd",
     "phone_e164": "+910000000000",
-    "address_line1": "NH 66 Bypass, Maradu",
-    "address_line2": "Near Vyttila Hub",
+    "address_line1": "1 Example Road",
+    "address_line2": "1 Example Road",
     "address_line3": null
   },
   "platform_snapshot": {
@@ -60,7 +60,7 @@
     "pincode": "682042",
     "legal_name": "Medibook Health Technologies Pvt Ltd",
     "phone_e164": "+910000000000",
-    "address_line1": "4th Floor, Infopark Phase 2",
+    "address_line1": "1 Example Road",
     "address_line2": null,
     "address_line3": null
   }

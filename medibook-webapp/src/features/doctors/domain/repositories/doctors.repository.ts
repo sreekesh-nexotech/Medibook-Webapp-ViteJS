@@ -21,7 +21,11 @@ import type {
 export interface DoctorsRepository {
   listDepartments(): Promise<Result<readonly Department[]>>;
   createDepartment(input: DepartmentInput): Promise<Result<Department>>;
-  updateDepartment(id: string, input: DepartmentInput): Promise<Result<Department>>;
+  updateDepartment(
+    id: string,
+    input: DepartmentInput,
+    version: number,
+  ): Promise<Result<Department>>;
   /** Refused with `DEPARTMENT_IN_USE` while doctors are assigned. */
   deleteDepartment(id: string): Promise<Result<null>>;
 
@@ -60,7 +64,12 @@ export interface DoctorsRepository {
     version: number,
     confirm: boolean,
   ): Promise<Result<ScheduleChange>>;
-  deleteLeave(doctorId: string, leaveId: string, confirm: boolean): Promise<Result<ScheduleChange>>;
+  deleteLeave(
+    doctorId: string,
+    leaveId: string,
+    confirm: boolean,
+    version: number,
+  ): Promise<Result<ScheduleChange>>;
 
   createDateException(
     doctorId: string,
@@ -78,5 +87,6 @@ export interface DoctorsRepository {
     doctorId: string,
     exceptionId: string,
     confirm: boolean,
+    version: number,
   ): Promise<Result<ScheduleChange>>;
 }

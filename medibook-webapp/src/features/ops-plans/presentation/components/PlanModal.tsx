@@ -229,7 +229,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
         {values.custom && (
           <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
             <Icon name="info" size={14} className="mt-px flex-none" /> Hospital-specific plans are
-            negotiated per tenant — put the hospital in the name (e.g. &quot;Custom — Apollo
+            negotiated per tenant — put the hospital in the name (e.g. &quot;Custom — Example
             Hospital&quot;) so it&apos;s recognisable everywhere plans appear.
           </div>
         )}
@@ -241,7 +241,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
               form.setField('name', v);
             }}
             onBlur={() => form.blurField('name')}
-            placeholder={values.custom ? 'e.g. Custom — Apollo Hospital' : 'e.g. Growth'}
+            placeholder={values.custom ? 'e.g. Custom — Example Hospital' : 'e.g. Growth'}
             height={48}
           />
         </OpsField>

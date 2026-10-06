@@ -1,6 +1,12 @@
 import { isFailure } from '@/core/error/failure';
 import { downloadFromUrl } from '@/shared/lib/download';
-import { addDaysISO, daysFromTodayISO, money } from '@/shared/lib/format';
+import {
+  addDaysISO,
+  calendarDate,
+  daysFromTodayISO,
+  formatInstant,
+  money,
+} from '@/shared/lib/format';
 
 import {
   UNPAID_INVOICE_STATUSES,
@@ -51,7 +57,7 @@ export function fmtDateTime(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-IN', {
+  return formatInstant(d, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -60,9 +66,13 @@ export function fmtDateTime(iso: string | null): string {
   });
 }
 
-/** The local calendar date of an ISO date-time, for date-only columns. */
+/**
+ * The calendar date of an ISO date-time on the hospital's calendar, for
+ * date-only columns. Never the UTC date: an invoice generated at 00:30 IST is
+ * dated that Indian day, not the day before (DATA-01).
+ */
 export function dateOf(iso: string): string {
-  return iso.slice(0, 10);
+  return calendarDate(iso);
 }
 
 export const INVOICE_STATUS_BADGES: Readonly<Record<InvoiceStatus, BadgeSpec>> = {

@@ -23,7 +23,7 @@ export function OpsSettingsScreen() {
   let form;
   if (settings.isPending) {
     form = <SkeletonCards count={SETTINGS_SECTIONS} className="flex-col gap-5" />;
-  } else if (settings.isError) {
+  } else if (settings.isLoadingError) {
     form = (
       <ErrorState
         title="Could not load platform settings"

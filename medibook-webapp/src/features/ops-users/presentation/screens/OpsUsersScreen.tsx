@@ -116,7 +116,7 @@ export function OpsUsersScreen() {
 
   const tableState: TableStateSpec | undefined = staffQuery.isPending
     ? { kind: 'loading' }
-    : staffQuery.isError
+    : staffQuery.isLoadingError
       ? {
           kind: 'error',
           title: "Internal users didn't load",
@@ -141,7 +141,7 @@ export function OpsUsersScreen() {
             }
           : undefined;
 
-  const rolesError = rolesQuery.isError || permissionsQuery.isError;
+  const rolesError = rolesQuery.isLoadingError || permissionsQuery.isLoadingError;
   const rolesState: TableStateSpec | undefined =
     rolesQuery.isPending || permissionsQuery.isPending
       ? { kind: 'loading', rows: 4 }

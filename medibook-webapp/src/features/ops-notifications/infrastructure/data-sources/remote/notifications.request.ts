@@ -2,6 +2,7 @@ import type {
   BannerFields,
   BannerPatch,
 } from '@/features/ops-notifications/domain/entities/notifications.entities';
+import { calendarInstant } from '@/shared/lib/format';
 
 /**
  * `ConfigBannerRequest` / `PatchedConfigBannerRequest` (`schema.yml`). The
@@ -17,32 +18,17 @@ export interface BannerWriteRequest {
   is_enabled?: boolean;
 }
 
-const LAST_HOUR = 23;
-const LAST_MINUTE = 59;
-const LAST_SECOND = 59;
-const LAST_MS = 999;
+/** The last instant of a day, so a one-day campaign still has `ends_at > starts_at`. */
+const LAST_INSTANT = '23:59:59.999';
 
-/** Parse a local `yyyy-mm-dd` into its numeric parts. */
-function dayParts(day: string): [number, number, number] {
-  const [y, m, d] = day.split('-').map(Number);
-  return [y, m - 1, d];
-}
-
-/** Local midnight that starts `day`, as a UTC timestamp. */
+/** Midnight that starts `day` in India Standard Time (DATA-03). */
 function startOfDay(day: string | null): string | null {
-  if (!day) return null;
-  const [y, m, d] = dayParts(day);
-  return new Date(y, m, d).toISOString();
+  return day ? calendarInstant(day) : null;
 }
 
-/**
- * The last instant of local `day`, as a UTC timestamp — so a one-day
- * campaign (`from === to`) still satisfies the backend's `ends_at > starts_at`.
- */
+/** The last instant of `day` in India Standard Time. */
 function endOfDay(day: string | null): string | null {
-  if (!day) return null;
-  const [y, m, d] = dayParts(day);
-  return new Date(y, m, d, LAST_HOUR, LAST_MINUTE, LAST_SECOND, LAST_MS).toISOString();
+  return day ? calendarInstant(day, LAST_INSTANT) : null;
 }
 
 export function toCreateRequest(fields: BannerFields, sortOrder: number): BannerWriteRequest {

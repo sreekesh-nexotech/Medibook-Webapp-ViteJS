@@ -61,7 +61,7 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
   let content;
   if (file.isPending) {
     content = <Spinner size={32} label="Finding your report" />;
-  } else if (file.isError) {
+  } else if (file.isLoadingError) {
     const gone = isFailure(file.error) && file.error.status === NOT_FOUND_STATUS;
     content = gone ? (
       <ErrorState

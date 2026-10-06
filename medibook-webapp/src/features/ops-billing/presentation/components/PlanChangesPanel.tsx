@@ -66,7 +66,7 @@ export function PlanChangesPanel() {
   const rows = query.data?.items ?? [];
   const tableState: TableStateSpec | undefined = query.isPending
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : query.isError
+    : query.isLoadingError
       ? {
           kind: 'error',
           message: failureText(query.error, DECIDE_FAILED),

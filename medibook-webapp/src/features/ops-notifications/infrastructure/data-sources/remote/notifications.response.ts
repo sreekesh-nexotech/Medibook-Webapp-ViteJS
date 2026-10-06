@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { paginatedSchema } from '@/core/api/pagination';
-import { toLocalISO } from '@/shared/lib/format';
+import { calendarDate } from '@/shared/lib/format';
 
 import type { CampaignBanner } from '@/features/ops-notifications/domain/entities/notifications.entities';
 
@@ -25,9 +25,9 @@ export const bannersPageResponseSchema = paginatedSchema(bannerResponseSchema);
 export type BannerResponse = z.infer<typeof bannerResponseSchema>;
 export type BannersPageResponse = z.infer<typeof bannersPageResponseSchema>;
 
-/** A UTC timestamp as the local calendar day it falls on. */
+/** A UTC timestamp as the day it falls on in India Standard Time. */
 function toLocalDay(iso: string | null): string | null {
-  return iso ? toLocalISO(new Date(iso)) : null;
+  return iso ? calendarDate(iso) : null;
 }
 
 export function toCampaignBanner(dto: BannerResponse): CampaignBanner {

@@ -152,7 +152,7 @@ export function PlanBilling() {
 
   const subscriptionCard = subscriptionQuery.isPending ? (
     <SkeletonCards count={1} lines={4} />
-  ) : subscriptionQuery.isError ? (
+  ) : subscriptionQuery.isLoadingError ? (
     isFailure(subscriptionQuery.error) && subscriptionQuery.error.kind === NOT_FOUND_KIND ? (
       <Card>
         <EmptyState
@@ -255,7 +255,7 @@ export function PlanBilling() {
       </div>
       {usageQuery.isPending ? (
         <SkeletonCards count={1} lines={3} />
-      ) : usageQuery.isError ? (
+      ) : usageQuery.isLoadingError ? (
         <ErrorState
           inline
           title="Usage didn't load"
@@ -304,7 +304,7 @@ export function PlanBilling() {
   const invoices = invoicesQuery.data?.items ?? [];
   const invoiceState: TableStateSpec | undefined = invoicesQuery.isPending
     ? { kind: 'loading', rows: 3 }
-    : invoicesQuery.isError
+    : invoicesQuery.isLoadingError
       ? {
           kind: 'error',
           message: isFailure(invoicesQuery.error) ? invoicesQuery.error.message : undefined,
@@ -381,14 +381,14 @@ export function PlanBilling() {
         width={460}
         submitLabel="Send Request"
         busy={form.submitting || requestMutation.isPending}
-        disabled={plansQuery.isPending || plansQuery.isError}
+        disabled={plansQuery.isPending || plansQuery.isLoadingError}
         onSubmit={form.handleSubmit}
       >
         <p className="text-body-lg text-text-body m-0 mb-3.5">
           Current plan: <b>{sub?.plan.name ?? '—'}</b>.{' '}
           {"Medibook operations reviews and applies plan changes — you'll see the result here."}
         </p>
-        {plansQuery.isError ? (
+        {plansQuery.isLoadingError ? (
           <ErrorState
             inline
             title="Plans didn't load"

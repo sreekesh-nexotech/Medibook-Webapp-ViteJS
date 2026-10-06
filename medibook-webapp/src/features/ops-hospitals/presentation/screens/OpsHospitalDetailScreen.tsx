@@ -22,7 +22,7 @@ export function OpsHospitalDetailScreen() {
 
   if (hospital.isPending) return <OpsSkeleton />;
 
-  if (hospital.isError) {
+  if (hospital.isLoadingError) {
     const isNotFound = isFailure(hospital.error) && hospital.error.kind === 'notFound';
     return (
       <ErrorState

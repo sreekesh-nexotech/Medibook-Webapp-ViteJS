@@ -123,7 +123,8 @@ export interface TokenSlipData {
 
 export interface PaymentLineInput {
   readonly method: PaymentMethod;
-  readonly amountRupees: number;
+  /** Integer paise, parsed from what was typed; never a rupee float. */
+  readonly amountPaise: number;
   readonly reference: string;
 }
 
@@ -163,4 +164,11 @@ export interface WalkInResult {
 export interface AppointmentRange {
   readonly dateFrom: string;
   readonly dateTo: string;
+}
+
+/** A window's appointments, and whether the window held more than were read. */
+export interface AppointmentList {
+  readonly items: readonly DeskAppointment[];
+  /** The page walk stopped before the end: only the first `items` are shown. */
+  readonly truncated: boolean;
 }

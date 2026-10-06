@@ -61,7 +61,7 @@ export function OpsSettingsTaxRatesCard() {
   let state: TableStateSpec | undefined;
   if (rates.isPending) {
     state = { kind: 'loading', rows: 3 };
-  } else if (rates.isError) {
+  } else if (rates.isLoadingError) {
     state = {
       kind: 'error',
       title: 'Could not load tax rates',

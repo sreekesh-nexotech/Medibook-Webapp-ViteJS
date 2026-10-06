@@ -66,10 +66,16 @@ export function useSaveTaxRateMutation() {
   });
 }
 
+/** A row at the version the screen showed, for `If-Match` (DATA-05). */
+interface VersionedRow {
+  readonly id: string;
+  readonly version: number;
+}
+
 export function useDeleteTaxRateMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => unwrap(await deleteTaxRate(id)),
+    mutationFn: async ({ id, version }: VersionedRow) => unwrap(await deleteTaxRate(id, version)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: servicesKeys.taxRates() });
       // Services pointing at the rate become exempt.
@@ -94,7 +100,7 @@ export function useSaveCouponMutation() {
 export function useDeleteCouponMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => unwrap(await deleteCoupon(id)),
+    mutationFn: async ({ id, version }: VersionedRow) => unwrap(await deleteCoupon(id, version)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: servicesKeys.coupons() });
     },

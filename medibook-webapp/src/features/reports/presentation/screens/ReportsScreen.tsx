@@ -60,7 +60,7 @@ export function ReportsScreen() {
     );
   }
 
-  if (catalog.isError) {
+  if (catalog.isLoadingError) {
     return (
       <ErrorState
         title="Reports didn't load"

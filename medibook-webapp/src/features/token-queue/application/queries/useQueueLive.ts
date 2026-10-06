@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { SocketFrame } from '@/core/api/socket';
 import { useSocket } from '@/shared/hooks/useSocket';
 
-import { appointmentsKeys } from '@/features/appointments/application/queries/appointments.keys';
+import { refreshTodayAppointmentLists } from '@/features/appointments/application/queries/appointments.refresh';
 import { applySession } from '@/features/token-queue/application/queries/tokenQueue.cache';
 import { tokenQueueKeys } from '@/features/token-queue/application/queries/tokenQueue.keys';
 import { readPushedSession } from '@/features/token-queue/application/usecases/tokenQueue.readPushedSession';
@@ -29,7 +29,7 @@ export function useQueueLive() {
       }
       if (frame.type === 'appointment.created') {
         void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.sessions() });
-        void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
+        refreshTodayAppointmentLists(queryClient);
       }
     },
     [queryClient],

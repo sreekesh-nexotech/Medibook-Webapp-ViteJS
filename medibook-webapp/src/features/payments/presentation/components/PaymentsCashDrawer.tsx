@@ -83,7 +83,7 @@ export function PaymentsCashDrawer() {
           <SkeletonLine w="40%" h={14} />
           <SkeletonLine w="65%" />
         </div>
-      ) : drawer.isError ? (
+      ) : drawer.isLoadingError ? (
         <ErrorState
           inline
           title="Your cash drawer didn’t load"

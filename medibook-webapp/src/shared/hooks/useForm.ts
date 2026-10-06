@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import type { ValidationError } from '@/shared/lib/validate';
 
@@ -78,6 +78,11 @@ export function useForm<T extends object>({
   const [touched, setTouched] = useState<TouchedMap<T>>(() => ({}) as TouchedMap<T>);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * Set synchronously on submit. `submitting` only shows on the next render, so
+   * without this a fast double click would send the request twice (DATA-11).
+   */
+  const inFlight = useRef(false);
 
   // The baseline `isDirty` compares against; `reset(next)` moves it. Held as
   // state rather than a ref so `isDirty` can be derived during render.
@@ -128,12 +133,17 @@ export function useForm<T extends object>({
     submitted || touched[key] ? errors[key] : undefined;
 
   const handleSubmit = (): void => {
+    if (inFlight.current) return;
     setSubmitted(true);
     if (!isValid || !onSubmit) return;
     const result = onSubmit(values);
     if (result instanceof Promise) {
+      inFlight.current = true;
       setSubmitting(true);
-      result.finally(() => setSubmitting(false));
+      void result.finally(() => {
+        inFlight.current = false;
+        setSubmitting(false);
+      });
     }
   };
 
@@ -144,6 +154,7 @@ export function useForm<T extends object>({
     setTouched({} as TouchedMap<T>);
     setSubmitted(false);
     setSubmitting(false);
+    inFlight.current = false;
   };
 
   return {

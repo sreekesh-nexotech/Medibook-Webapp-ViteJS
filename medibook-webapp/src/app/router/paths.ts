@@ -139,7 +139,7 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   appointments: 'appointments',
   create: 'appointments/new',
   patients: 'patients',
-  'patient-detail': 'patients/:mrn',
+  'patient-detail': 'patients/:patientId',
   token: 'token',
   payments: 'payments',
   settlements: 'settlements',
@@ -182,15 +182,36 @@ export function hospitalPath(role: HospitalRole, view: HospitalStaticView): stri
   return `/${role}/${HOSPITAL_VIEW_SEGMENT[view]}`;
 }
 
-/** Query param carrying the patient MRN from the patients screens to New Appointment. */
-export const BOOK_FOR_MRN_PARAM = 'mrn';
+/**
+ * Query param carrying the patient's record id from the patients screens to New
+ * Appointment. Patient URLs carry the record id, never the MRN, so MR numbers
+ * stay out of browser history and server access logs (PHI-07).
+ */
+export const BOOK_FOR_PATIENT_PARAM = 'patient';
 
 /** Query param carrying a department name from the front desk to Token Management. */
 export const TOKEN_DEPT_PARAM = 'dept';
 
-/** New Appointment, pre-selecting the patient with this MRN. */
-export function hospitalBookForPatientPath(role: HospitalRole, mrn: string): string {
-  return `${hospitalPath(role, 'create')}?${new URLSearchParams({ [BOOK_FOR_MRN_PARAM]: mrn })}`;
+/** New Appointment, pre-selecting the patient with this record id. */
+export function hospitalBookForPatientPath(role: HospitalRole, patientId: string): string {
+  const query = new URLSearchParams({ [BOOK_FOR_PATIENT_PARAM]: patientId });
+  return `${hospitalPath(role, 'create')}?${query}`;
+}
+
+/** One patient's page, by record id (never the MRN — see `BOOK_FOR_PATIENT_PARAM`). */
+export function hospitalPatientPath(role: HospitalRole, patientId: string): string {
+  const segment = HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(
+    ':patientId',
+    encodeURIComponent(patientId),
+  );
+  return `/${role}/${segment}`;
+}
+
+/** Backend record ids are UUIDs; any other patient URL is an older MRN link. */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isRecordId(value: string): boolean {
+  return RECORD_ID.test(value);
 }
 
 /** Token Management, filtered to one department. */

@@ -7,6 +7,7 @@ export function deleteLeave(
   doctorId: string,
   leaveId: string,
   confirm: boolean,
+  version: number,
 ): Promise<Result<ScheduleChange>> {
-  return doctorsRepository.deleteLeave(doctorId, leaveId, confirm);
+  return doctorsRepository.deleteLeave(doctorId, leaveId, confirm, version);
 }

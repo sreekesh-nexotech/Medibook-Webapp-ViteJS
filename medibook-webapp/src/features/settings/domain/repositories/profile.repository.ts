@@ -5,6 +5,7 @@ import type {
   BannerInput,
   Holiday,
   HolidayInput,
+  HolidayTarget,
   HospitalBanner,
   ScheduleChange,
 } from '@/features/settings/domain/entities/profile.entities';
@@ -13,16 +14,22 @@ import type {
 export interface ProfileRepository {
   listHolidays(): Promise<Result<readonly Holiday[]>>;
   /**
-   * Create (`id === null`) or update a closure. With `confirm: false` nothing
-   * is applied — the result lists the bookings confirming would cancel.
+   * Create (`target === null`) or update a closure. With `confirm: false`
+   * nothing is applied — the result lists the bookings confirming would
+   * cancel. `replayKey` is the caller's idempotency key for this step.
    */
   saveHoliday(
-    id: string | null,
+    target: HolidayTarget | null,
     input: HolidayInput,
     confirm: boolean,
+    replayKey: string,
   ): Promise<Result<ScheduleChange>>;
   /** Remove a closure; dry run unless `confirm`. */
-  removeHoliday(id: string, confirm: boolean): Promise<Result<ScheduleChange>>;
+  removeHoliday(
+    target: HolidayTarget,
+    confirm: boolean,
+    replayKey: string,
+  ): Promise<Result<ScheduleChange>>;
 
   listBanners(): Promise<Result<readonly HospitalBanner[]>>;
   createBanner(input: BannerInput, sortOrder: number): Promise<Result<HospitalBanner>>;

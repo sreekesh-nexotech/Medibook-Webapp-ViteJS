@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
@@ -18,10 +18,17 @@ import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import { hospitalBookForPatientPath, hospitalPath, isHospitalRole } from '@/app/router/paths';
+import {
+  hospitalBookForPatientPath,
+  hospitalPatientPath,
+  hospitalPath,
+  isHospitalRole,
+  isRecordId,
+} from '@/app/router/paths';
 
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
+import { usePatientQuery } from '@/features/patients/application/queries/usePatientQuery';
 import type {
   AppointmentPaymentStatus,
   AppointmentStatus,
@@ -44,8 +51,9 @@ import {
 
 /**
  * Patient Detail (no medical data) — identity, contact, booking history and a
- * billing summary. The MRN comes from the URL (`:mrn`) and is resolved to the
- * hospital's record through the API.
+ * billing summary. The record id comes from the URL (`:patientId`); the MRN is
+ * kept out of the address so it never reaches browser history or access logs
+ * (PHI-07). Older links that carried the MRN are resolved once and replaced.
  */
 
 const HISTORY_COLUMNS = ['Date', 'Doctor / Dept', 'Source', 'Payment', 'Token', 'Status'];
@@ -61,19 +69,26 @@ function sumPaise(list: readonly PatientAppointment[], keep: (a: PatientAppointm
 
 export function PatientDetailScreen() {
   const navigate = useNavigate();
-  const { role, mrn } = useParams();
+  const { role, patientId } = useParams();
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
 
-  // Booking still runs on the appointments store until H7 lands.
-
-  const patientQuery = usePatientByMrnQuery(mrn);
+  const legacyMrn = patientId && !isRecordId(patientId) ? patientId : undefined;
+  const byId = usePatientQuery(legacyMrn ? undefined : patientId);
+  const byMrn = usePatientByMrnQuery(legacyMrn);
+  const patientQuery = legacyMrn ? byMrn : byId;
   const rec = patientQuery.data;
   const historyQuery = usePatientAppointmentsQuery(rec?.id);
+
+  useEffect(() => {
+    if (legacyMrn && byMrn.data) {
+      navigate(hospitalPatientPath(hospitalRole, byMrn.data.id), { replace: true });
+    }
+  }, [legacyMrn, byMrn.data, hospitalRole, navigate]);
 
   const [edit, setEdit] = useState(false);
   const backToList = () => navigate(hospitalPath(hospitalRole, 'patients'));
 
-  if (!mrn) {
+  if (!patientId) {
     return (
       <Card pad={32}>
         <EmptyState
@@ -89,7 +104,7 @@ export function PatientDetailScreen() {
 
   if (patientQuery.isPending) return <SkeletonCards count={1} lines={4} pad={22} />;
 
-  if (patientQuery.isError) {
+  if (patientQuery.isLoadingError) {
     const isMissing = isFailure(patientQuery.error) && patientQuery.error.kind === 'notFound';
     return (
       <Card pad={32}>
@@ -97,7 +112,11 @@ export function PatientDetailScreen() {
           <EmptyState
             icon="user-x"
             title="Patient not found."
-            message={`No record with MR number ${mrn} exists at this hospital.`}
+            message={
+              legacyMrn
+                ? `No record with MR number ${legacyMrn} exists at this hospital.`
+                : 'This patient record does not exist at this hospital.'
+            }
             actionLabel="Back to patients"
             onAction={backToList}
           />
@@ -137,12 +156,12 @@ export function PatientDetailScreen() {
   );
 
   const book = () => {
-    navigate(hospitalBookForPatientPath(hospitalRole, p.mrn));
+    navigate(hospitalBookForPatientPath(hospitalRole, p.id));
   };
 
   const historyState: TableStateSpec | undefined = historyQuery.isPending
     ? { kind: 'loading', rows: HISTORY_LOADING_ROWS }
-    : historyQuery.isError
+    : historyQuery.isLoadingError
       ? {
           kind: 'error',
           message: historyQuery.error.message,

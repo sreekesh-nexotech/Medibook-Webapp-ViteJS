@@ -104,3 +104,10 @@ export interface CashSession {
   readonly status: CashSessionStatus;
   readonly reconciledAt: string | null;
 }
+
+/** The payment lines a total is built from, and whether the list went on past them. */
+export interface PaymentLineSet {
+  readonly lines: readonly PaymentLine[];
+  /** The page walk stopped before the end: the totals cover the first lines only. */
+  readonly truncated: boolean;
+}

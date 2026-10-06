@@ -47,7 +47,7 @@ export function OpsSettingsFlagsCard() {
         ))}
       </div>
     );
-  } else if (flags.isError) {
+  } else if (flags.isLoadingError) {
     body = (
       <ErrorState
         inline

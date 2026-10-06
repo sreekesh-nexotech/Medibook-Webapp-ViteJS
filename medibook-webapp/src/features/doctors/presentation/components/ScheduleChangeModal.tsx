@@ -1,4 +1,5 @@
 import { Button } from '@/shared/ui/Button';
+import { formatInstant } from '@/shared/lib/format';
 import { Modal } from '@/shared/ui/Modal';
 
 import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors.types';
@@ -6,14 +7,11 @@ import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors
 /** How many affected bookings to name before summarising the rest. */
 const LISTED_BOOKINGS = 5;
 
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 function when(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : DATE_TIME_FORMAT.format(date);
+  return Number.isNaN(date.getTime()) ? iso : formatInstant(date, DATE_TIME_FORMAT);
 }
 
 interface ScheduleChangeModalProps {

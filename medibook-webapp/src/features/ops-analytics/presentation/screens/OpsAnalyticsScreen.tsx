@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
 import { downloadCsv, type CsvCell } from '@/shared/lib/download';
-import { money } from '@/shared/lib/format';
+import { money, rupeesFixed } from '@/shared/lib/format';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { SkeletonCards, SkeletonKpiStrip } from '@/shared/ui/Skeleton';
@@ -51,15 +51,15 @@ const ONE_DECIMAL = 10;
 const LOAD_FAILED = 'Analytics could not be loaded. Please try again.';
 
 /** Overview metrics in the bookings CSV, in reading order. */
-const OVERVIEW_CSV: readonly (readonly [string, (o: AnalyticsOverview) => number])[] = [
+const OVERVIEW_CSV: readonly (readonly [string, (o: AnalyticsOverview) => CsvCell])[] = [
   ['Total bookings', (o) => o.bookingsTotal],
   ['Online bookings', (o) => o.bookingsOnline],
   ['Walk-in bookings', (o) => o.bookingsWalkIn],
   ['Completed', (o) => o.completed],
   ['Cancellations', (o) => o.cancellations],
   ['No-shows', (o) => o.noShows],
-  ['Revenue (INR)', (o) => o.revenueRupees],
-  ['Refunds (INR)', (o) => o.refundsRupees],
+  ['Revenue (INR)', (o) => rupeesFixed(o.revenueRupees)],
+  ['Refunds (INR)', (o) => rupeesFixed(o.refundsRupees)],
   ['New patients', (o) => o.newPatients],
 ];
 
@@ -295,7 +295,7 @@ export function OpsAnalyticsScreen() {
     : isProviders
       ? [providers]
       : [providers, apiErrors];
-  const failed = active.find((q) => q.isError);
+  const failed = active.find((q) => q.isLoadingError);
   const isLoading = active.some((q) => q.isPending);
 
   const bookings: BookingsView | null =
@@ -342,7 +342,7 @@ export function OpsAnalyticsScreen() {
   };
 
   const retry = (): void => {
-    for (const q of active) if (q.isError) void q.refetch();
+    for (const q of active) if (q.isLoadingError) void q.refetch();
   };
 
   const header = (

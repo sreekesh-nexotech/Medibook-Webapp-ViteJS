@@ -34,7 +34,7 @@ export function MyAccountScreen({ surface }: MyAccountScreenProps) {
       </div>
     );
   }
-  if (session.isError) {
+  if (session.isLoadingError) {
     return (
       <ErrorState
         title="Could not load your account"

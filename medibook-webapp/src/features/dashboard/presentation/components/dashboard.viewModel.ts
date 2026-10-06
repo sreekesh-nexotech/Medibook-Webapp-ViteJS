@@ -1,4 +1,5 @@
 import type { BarChartDatum } from '@/shared/ui/BarChart';
+import { formatInstant } from '@/shared/lib/format';
 
 import type {
   AppointmentBrief,
@@ -77,5 +78,5 @@ const TIME_FORMAT: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-di
 
 /** ISO date-time → "10:30 am". */
 export function clockTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-IN', TIME_FORMAT);
+  return formatInstant(iso, TIME_FORMAT);
 }

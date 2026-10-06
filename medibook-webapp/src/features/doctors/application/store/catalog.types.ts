@@ -114,7 +114,7 @@ export interface Doctor {
   readonly week: readonly WeekDay[];
   readonly leave: readonly DoctorLeave[];
   readonly list: readonly DoctorReview[];
-  /** Canonical hospital id this doctor practises at (`apollo`, `citycare`, …). */
+  /** Canonical hospital id this doctor practises at (`example`, `citycare`, …). */
   readonly hospital: string;
   /** Per-date overrides of the weekly pattern. */
   readonly exceptions: readonly DateException[];

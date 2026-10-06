@@ -53,7 +53,7 @@ export function HospitalSidebar({
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <img src="/assets/apollo-logo.png" alt="logo" className="size-8.5 flex-none" />
+        <img src="/assets/medibook-mark.svg" alt="" className="size-8.5 flex-none" />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg truncate font-bold text-black">{hospitalName}</div>

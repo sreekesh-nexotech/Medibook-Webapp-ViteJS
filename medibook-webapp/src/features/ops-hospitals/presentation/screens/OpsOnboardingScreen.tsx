@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { isFailure } from '@/core/error/failure';
 
 import { cn } from '@/shared/lib/cn';
-import { fmtDate } from '@/shared/lib/format';
+import { calendarDate, fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { ClearChip } from '@/shared/ui/ClearChip';
@@ -32,7 +32,7 @@ const ALL_STAGES = 'Stage: All';
 
 /** ISO timestamp → "12 Oct 2026"; empty for none. */
 function dateCopy(iso: string | null): string {
-  return iso ? fmtDate(iso.slice(0, 10)) : '';
+  return iso ? fmtDate(calendarDate(iso)) : '';
 }
 
 /**
@@ -144,7 +144,7 @@ export function OpsOnboardingScreen() {
 
       {pipeline.isPending ? (
         <SkeletonCards count={3} lines={4} />
-      ) : pipeline.isError ? (
+      ) : pipeline.isLoadingError ? (
         <ErrorState
           title="The onboarding pipeline didn't load"
           message={isFailure(pipeline.error) ? pipeline.error.message : undefined}

@@ -4,6 +4,7 @@ import { unwrap } from '@/core/error/failure';
 
 import type { AppointmentRange } from '@/features/appointments/domain/entities/appointments.entities';
 import { appointmentsKeys } from '@/features/appointments/application/queries/appointments.keys';
+import { includesToday } from '@/features/appointments/application/queries/appointments.refresh';
 import { fetchAppointment } from '@/features/appointments/application/usecases/appointments.fetchAppointment';
 import { fetchAppointmentEvents } from '@/features/appointments/application/usecases/appointments.fetchAppointmentEvents';
 import { fetchAppointments } from '@/features/appointments/application/usecases/appointments.fetchAppointments';
@@ -12,6 +13,9 @@ import { fetchTokenSlip } from '@/features/appointments/application/usecases/app
 
 /** The desk list moves all day (check-ins, payments); keep it fresh. */
 const LIST_STALE_TIME_MS = 15_000;
+
+/** A window that includes today re-reads itself this often, so online bookings appear (RUN-08). */
+const TODAY_REFETCH_MS = 60_000;
 
 /** A receipt never changes once issued. */
 const RECEIPT_STALE_TIME_MS = 10 * 60_000;
@@ -23,6 +27,7 @@ export function useAppointmentsQuery(range: AppointmentRange) {
     queryFn: async () => unwrap(await fetchAppointments(range)),
     placeholderData: keepPreviousData,
     staleTime: LIST_STALE_TIME_MS,
+    refetchInterval: includesToday(range) ? TODAY_REFETCH_MS : false,
   });
 }
 

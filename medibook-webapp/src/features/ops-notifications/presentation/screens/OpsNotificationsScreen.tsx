@@ -155,7 +155,7 @@ export function OpsNotificationsScreen() {
 
       {tab === 'App Banners' && bannersQuery.isPending ? (
         <SkeletonCards count={1} lines={5} />
-      ) : tab === 'App Banners' && bannersQuery.isError ? (
+      ) : tab === 'App Banners' && bannersQuery.isLoadingError ? (
         <ErrorState
           title="Banners didn't load"
           message={failureMessage(

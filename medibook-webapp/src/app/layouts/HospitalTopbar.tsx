@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
+import { Button } from '@/shared/ui/Button';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
@@ -160,9 +161,17 @@ export function HospitalTopbar({
   // Live counts: today's dashboard alerts (H10), refreshed on every booking
   // push, and — for admins — the latest settlement periods (H11).
   useDashboardAlertsLive();
-  const alerts = useAdminDashboardQuery('today').data?.alerts;
-  const periods = useSettlementPeriodsQuery(LATEST_PERIODS, isAdmin).data?.items ?? [];
+  const alertsQuery = useAdminDashboardQuery('today');
+  const periodsQuery = useSettlementPeriodsQuery(LATEST_PERIODS, isAdmin);
+  const alerts = alertsQuery.data?.alerts;
+  const periods = periodsQuery.data?.items ?? [];
   const notifs = buildNotifs(isAdmin, alerts, periods);
+  // A source that never loaded must not read as "all caught up" (RUN-05).
+  const notifsFailed = alertsQuery.isLoadingError || (isAdmin && periodsQuery.isLoadingError);
+  const retryNotifs = (): void => {
+    void alertsQuery.refetch();
+    if (isAdmin) void periodsQuery.refetch();
+  };
   const unread = notifs.filter((n) => n.unread).length;
   return (
     <header className="min-h-topbar border-border relative z-20 flex flex-none flex-wrap items-center justify-between gap-y-2 border-b bg-white px-4 py-2 lg:px-7 lg:py-0">
@@ -193,6 +202,7 @@ export function HospitalTopbar({
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
+          aria-label="Notifications"
           onClick={() => {
             setNotif((n) => !n);
             setMenu(false);
@@ -228,7 +238,14 @@ export function HospitalTopbar({
                 )}
               </div>
               <div className="max-h-90 overflow-y-auto">
-                {notifs.length === 0 ? (
+                {notifs.length === 0 && notifsFailed ? (
+                  <div className="text-body text-text-muted flex flex-col items-center gap-2 py-7 text-center">
+                    {"Notifications couldn't load."}
+                    <Button size="sm" variant="secondary" onClick={retryNotifs}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : notifs.length === 0 ? (
                   <div className="text-text-faint text-body py-7 text-center">
                     {"You're all caught up."}
                   </div>

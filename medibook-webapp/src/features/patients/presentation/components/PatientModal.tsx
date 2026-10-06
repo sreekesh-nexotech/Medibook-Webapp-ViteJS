@@ -31,8 +31,8 @@ interface PatientModalProps {
   /** Absent = "Add Patient" (new); present = "Edit Patient". */
   patient?: PatientRecord;
   onClose: () => void;
-  /** Called with the MRN of the saved (or already-registered) record. */
-  onSaved?: (mrn: string) => void;
+  /** Called with the record id of the saved (or already-registered) record. */
+  onSaved?: (patientId: string) => void;
 }
 
 interface PatientForm {
@@ -111,7 +111,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
           isExisting ? `Already registered as ${saved.mrn} — opened that record` : 'Patient added',
           isExisting ? 'info' : 'success',
         );
-        onSaved?.(saved.mrn);
+        onSaved?.(saved.id);
         onClose();
         return;
       }
@@ -131,7 +131,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
           : 'Changes sent to an admin for approval',
         outcome.status === 'applied' ? 'success' : 'info',
       );
-      onSaved?.(patient.mrn);
+      onSaved?.(patient.id);
       onClose();
     } catch (error) {
       toast(saveErrorMessage(error, SAVE_FAILED), 'error');
@@ -160,7 +160,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             value={form.values.name}
             onChange={(v) => form.setField('name', v)}
             onBlur={() => form.blurField('name')}
-            autoComplete="name"
+            autoComplete="off"
             placeholder="Patient name"
           />
         </Field>
@@ -170,7 +170,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             onChange={(v) => form.setField('phone', v)}
             onBlur={() => form.blurField('phone')}
             inputMode="tel"
-            autoComplete="tel"
+            autoComplete="off"
             maxLength={10}
             placeholder="10-digit mobile"
           />
@@ -181,7 +181,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             value={form.values.dob}
             onChange={(v) => form.setField('dob', v)}
             onBlur={() => form.blurField('dob')}
-            autoComplete="bday"
+            autoComplete="off"
             max={todayISO()}
           />
         </Field>
@@ -199,7 +199,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             onBlur={() => form.blurField('email')}
             type="email"
             inputMode="email"
-            autoComplete="email"
+            autoComplete="off"
             placeholder="name@mail.com"
           />
         </Field>
@@ -207,7 +207,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
           <TextInput
             value={form.values.address}
             onChange={(v) => form.setField('address', v)}
-            autoComplete="street-address"
+            autoComplete="off"
             placeholder="House, street, area"
           />
         </Field>

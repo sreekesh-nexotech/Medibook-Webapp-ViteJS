@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatInstant } from '@/shared/lib/format';
 
 import { TIME_OPTS } from '@/features/doctors/domain/calendar';
 import {
@@ -80,7 +81,7 @@ function plural(n: number, noun: string): string {
 }
 
 function bookingLine(b: AffectedBooking): string {
-  const time = new Date(b.scheduledStartAt).toLocaleString('en-IN', {
+  const time = formatInstant(b.scheduledStartAt, {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
@@ -207,7 +208,7 @@ export function BulkSlotModal({
     ? 'Fix the highlighted fields to see how many slots this covers.'
     : preview.isPending
       ? 'Counting the slots in that range…'
-      : preview.isError
+      : preview.isLoadingError
         ? isFailure(preview.error)
           ? preview.error.message
           : APPLY_FAILED
@@ -341,7 +342,7 @@ export function BulkSlotModal({
           >
             <Icon
               name={
-                preview.isError || bookings.length > 0
+                preview.isLoadingError || bookings.length > 0
                   ? 'triangle-alert'
                   : isReady
                     ? 'layers'
@@ -351,7 +352,7 @@ export function BulkSlotModal({
               className={cn('flex-none', bookings.length > 0 && 'text-d-500')}
             />
             <span>{hint}</span>
-            {preview.isError && (
+            {preview.isLoadingError && (
               <button
                 type="button"
                 onClick={() => void preview.refetch()}

@@ -53,7 +53,7 @@ export function OpsPlatformUserDetailScreen() {
       </div>
     );
   }
-  if (user.isError) {
+  if (user.isLoadingError) {
     const notFound = isFailure(user.error) && user.error.kind === 'notFound';
     return (
       <ErrorState

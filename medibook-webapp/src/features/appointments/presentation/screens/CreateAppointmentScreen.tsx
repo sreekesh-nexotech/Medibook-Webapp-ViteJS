@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { money } from '@/shared/lib/format';
+import { money, todayISO } from '@/shared/lib/format';
 import { phoneIN, required } from '@/shared/lib/validate';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Button } from '@/shared/ui/Button';
@@ -20,7 +20,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import {
-  BOOK_FOR_MRN_PARAM,
+  BOOK_FOR_PATIENT_PARAM,
   hospitalPath,
   isHospitalRole,
   type HospitalRole,
@@ -33,13 +33,10 @@ import type {
 import { useBookWalkInMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import { AppointmentBookedModal } from '@/features/appointments/presentation/components/AppointmentBookedModal';
 import { AppointmentSlotSelect } from '@/features/appointments/presentation/components/AppointmentSlotSelect';
-import {
-  localIso,
-  toE164,
-} from '@/features/appointments/presentation/components/appointments.view';
+import { toE164 } from '@/features/appointments/presentation/components/appointments.view';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
-import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
+import { usePatientQuery } from '@/features/patients/application/queries/usePatientQuery';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import type { PatientRecord } from '@/features/patients/domain/entities/patients.entities';
 
@@ -99,13 +96,13 @@ const VALIDATORS: FormValidators<BookingForm> = {
   iso: (value) => {
     const raw = value.trim();
     if (raw === '' || !ISO_DATE_PATTERN.test(raw)) return 'Pick a date for the appointment.';
-    if (raw < localIso(new Date())) return 'The appointment date cannot be in the past.';
+    if (raw < todayISO()) return 'The appointment date cannot be in the past.';
     return undefined;
   },
   firstName: (value, values) => (values.hasPicked ? undefined : required(value, 'First name')),
   phone: (value, values) => (values.hasPicked ? undefined : phoneIN(value)),
   dob: (value, values) =>
-    values.hasPicked || value === '' || value <= localIso(new Date())
+    values.hasPicked || value === '' || value <= todayISO()
       ? undefined
       : 'Date of birth cannot be in the future.',
 };
@@ -135,10 +132,10 @@ export function CreateAppointmentScreen() {
   const doctorsQuery = useDoctorsQuery();
   const book = useBookWalkInMutation();
 
-  /** The MRN handed over by "Book Appointment" on the patients screens (`?mrn=`). */
+  /** The patient handed over by "Book Appointment" on the patients screens (`?patient=`). */
   const [searchParams] = useSearchParams();
-  const handoffMrn = searchParams.get(BOOK_FOR_MRN_PARAM);
-  const handoff = usePatientByMrnQuery(handoffMrn ?? undefined);
+  const handoffId = searchParams.get(BOOK_FOR_PATIENT_PARAM);
+  const handoff = usePatientQuery(handoffId ?? undefined);
 
   /** `undefined` = "use the hand-off patient, if any"; `null` = none picked. */
   const [selection, setSelection] = useState<PatientRecord | null | undefined>(undefined);
@@ -164,7 +161,7 @@ export function CreateAppointmentScreen() {
 
   const form = useForm<BookingForm>({
     initial: {
-      iso: localIso(new Date()),
+      iso: todayISO(),
       remark: '',
       firstName: '',
       lastName: '',
@@ -268,7 +265,9 @@ export function CreateAppointmentScreen() {
   };
 
   const isCatalogueLoading = departmentsQuery.isPending || doctorsQuery.isPending;
-  const catalogueError = departmentsQuery.error ?? doctorsQuery.error;
+  const catalogueError =
+    (departmentsQuery.isLoadingError ? departmentsQuery.error : null) ??
+    (doctorsQuery.isLoadingError ? doctorsQuery.error : null);
 
   return (
     <Form onSubmit={submit} className="flex max-w-250 flex-col gap-5">
@@ -276,7 +275,7 @@ export function CreateAppointmentScreen() {
         <div className="border-border-soft mb-4.5 border-b pb-3">
           <h3 className="text-h3 text-text-navy m-0">Patient details</h3>
         </div>
-        {handoffMrn && selection === undefined && handoff.isPending ? (
+        {handoffId && selection === undefined && handoff.isPending ? (
           <div className="text-text-muted flex justify-center py-4">
             <Spinner size={22} label="Loading the patient" />
           </div>
@@ -317,7 +316,7 @@ export function CreateAppointmentScreen() {
                   onChange={(v) => form.setField('phone', v)}
                   onBlur={() => form.blurField('phone')}
                   inputMode="tel"
-                  autoComplete="tel"
+                  autoComplete="off"
                   maxLength={10}
                   placeholder="10-digit mobile"
                 />
@@ -328,7 +327,7 @@ export function CreateAppointmentScreen() {
                     type="date"
                     id={field.id}
                     value={form.values.dob}
-                    max={localIso(new Date())}
+                    max={todayISO()}
                     onChange={(e) => form.setField('dob', e.target.value)}
                     onBlur={() => form.blurField('dob')}
                     className={dateInputClass}
@@ -378,7 +377,7 @@ export function CreateAppointmentScreen() {
                   <div className="border-border shadow-pop absolute top-14.5 right-0 left-0 z-20 overflow-hidden rounded-md border bg-white">
                     {search.isPending ? (
                       <div className="text-caption text-text-muted px-3.5 py-3">Searching…</div>
-                    ) : search.isError ? (
+                    ) : search.isLoadingError ? (
                       <div className="text-caption text-danger px-3.5 py-3">
                         {failureText(search.error, 'Search failed.')}
                       </div>
@@ -432,7 +431,7 @@ export function CreateAppointmentScreen() {
                 type="date"
                 id={field.id}
                 value={form.values.iso}
-                min={localIso(new Date())}
+                min={todayISO()}
                 aria-describedby={field.describedById}
                 aria-invalid={field.invalid || undefined}
                 onChange={(e) => setDate(e.target.value)}

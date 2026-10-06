@@ -28,7 +28,7 @@ function toPaise(rupees: number): number {
 }
 
 /**
- * Derive the plan code from its name ("Custom — Apollo" → `custom-apollo`).
+ * Derive the plan code from its name ("Custom — Example Hospital" → `custom-example-hospital`).
  * The form has no code field; the code is set once on create and never
  * changed, so renaming a plan keeps its code stable.
  */

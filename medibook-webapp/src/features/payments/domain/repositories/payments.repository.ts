@@ -5,6 +5,7 @@ import type {
   CashSession,
   PaymentFilters,
   PaymentLine,
+  PaymentLineSet,
   PaymentPageQuery,
   PaymentRefund,
   VisitReceipt,
@@ -14,7 +15,7 @@ import type {
 export interface PaymentsRepository {
   listPayments(query: PaymentPageQuery): Promise<Result<Page<PaymentLine>>>;
   /** Every line matching `filters` (all pages, capped) — for the day's totals. */
-  listAllPayments(filters: PaymentFilters): Promise<Result<readonly PaymentLine[]>>;
+  listAllPayments(filters: PaymentFilters): Promise<Result<PaymentLineSet>>;
   /** The refunds issued against one payment line. */
   listPaymentRefunds(paymentId: string): Promise<Result<readonly PaymentRefund[]>>;
   listVisitReceipts(visitId: string): Promise<Result<readonly VisitReceipt[]>>;

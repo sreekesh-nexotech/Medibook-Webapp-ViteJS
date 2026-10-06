@@ -8,7 +8,7 @@ import { isFailure } from '@/core/error/failure';
 import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
-import { fmtDate } from '@/shared/lib/format';
+import { calendarDate, fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -65,7 +65,7 @@ function errorCopy(error: unknown): string {
 
 /** ISO timestamp → "12 Oct 2026"; empty for none. */
 function dateCopy(iso: string | null): string {
-  return iso ? fmtDate(iso.slice(0, 10)) : '';
+  return iso ? fmtDate(calendarDate(iso)) : '';
 }
 
 /** What happens next for a checklist row, in one line. */
@@ -124,7 +124,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
 
   if (caseQuery.isPending) return <SkeletonCards count={3} lines={4} />;
 
-  if (caseQuery.isError) {
+  if (caseQuery.isLoadingError) {
     return (
       <ErrorState
         title="This application didn't load"
@@ -250,7 +250,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             <span className="text-caption text-text-muted">
               {hospital
                 ? `${hospital.email} · ${hospital.city}${hospital.state ? `, ${hospital.state}` : ''} · plan ${planCode}`
-                : hospitalQuery.isError
+                : hospitalQuery.isLoadingError
                   ? 'Hospital details unavailable'
                   : 'Loading hospital details…'}
               {detail.submittedAt ? ` · applied ${dateCopy(detail.submittedAt)}` : ''}

@@ -1,4 +1,5 @@
 import { isFailure } from '@/core/error/failure';
+import { formatInstant, todayISO } from '@/shared/lib/format';
 
 import type {
   AppointmentPaymentStatus,
@@ -38,8 +39,14 @@ export function displayPhone(e164: string | null): string {
   return e164.startsWith(PHONE_COUNTRY_CODE) ? e164.slice(PHONE_COUNTRY_CODE.length) : e164;
 }
 
+/** Today on the hospital's calendar, as a local-midnight `Date` for date-part maths. */
+function hospitalToday(): Date {
+  const [y, m, d] = todayISO().split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /** Whole years from an ISO date of birth to today, or `null` when unknown. */
-export function ageFromDob(dob: string | null, today: Date = new Date()): number | null {
+export function ageFromDob(dob: string | null, today: Date = hospitalToday()): number | null {
   if (!dob) return null;
   const born = new Date(`${dob}T00:00:00`);
   if (Number.isNaN(born.getTime())) return null;
@@ -150,7 +157,7 @@ export function paiseToRupees(paise: number): number {
 export function formatTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  return formatInstant(d, { hour: '2-digit', minute: '2-digit' });
 }
 
 const FIELD_LABELS: Readonly<Record<string, string>> = {

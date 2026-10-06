@@ -42,30 +42,39 @@ export async function listHolidays(): Promise<readonly HolidayResponse[]> {
 export async function postHoliday(
   body: HolidayWriteRequest,
   confirm: boolean,
+  replayKey: string,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.post(HOLIDAYS_PATH, body, {
     params: confirmParams(confirm),
-    headers: idempotencyKey(),
+    headers: idempotencyKey(replayKey),
   });
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
+/** `If-Match` is mandatory here: a stale screen gets 409 instead of overwriting (DATA-05). */
 export async function patchHoliday(
   id: string,
   body: HolidayWriteRequest,
   confirm: boolean,
+  version: number,
+  replayKey: string,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, body, {
     params: confirmParams(confirm),
-    headers: idempotencyKey(),
+    headers: { ...ifMatch(version), ...idempotencyKey(replayKey) },
   });
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
-export async function deleteHoliday(id: string, confirm: boolean): Promise<ScheduleChangeResponse> {
+export async function deleteHoliday(
+  id: string,
+  confirm: boolean,
+  version: number,
+  replayKey: string,
+): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.delete(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, {
     params: confirmParams(confirm),
-    headers: idempotencyKey(),
+    headers: { ...ifMatch(version), ...idempotencyKey(replayKey) },
   });
   return scheduleChangeResponseSchema.parse(response.data);
 }

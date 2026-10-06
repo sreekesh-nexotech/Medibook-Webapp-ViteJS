@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE, fetchAllPages } from '@/core/api/pagination';
+import {
+  MAX_PAGE_SIZE,
+  fetchAllPages,
+  fetchCappedPages,
+  type CappedRows,
+} from '@/core/api/pagination';
 
 import type {
   PaymentFilters,
@@ -50,17 +55,14 @@ export async function listPayments(query: PaymentPageQuery) {
   return paymentPageResponseSchema.parse(response.data);
 }
 
-export async function listAllPayments(filters: PaymentFilters): Promise<PaymentLineResponse[]> {
-  const out: PaymentLineResponse[] = [];
-  for (let page = 1; page <= MAX_TOTAL_PAGES; page += 1) {
+/** Every line for the totals, up to `MAX_TOTAL_PAGES` pages; `truncated` says it went on. */
+export function listAllPayments(filters: PaymentFilters): Promise<CappedRows<PaymentLineResponse>> {
+  return fetchCappedPages(async (page) => {
     const response = await hospitalApi.get(PAYMENTS_PATH, {
       params: { ...filterParams(filters), page, page_size: MAX_PAGE_SIZE },
     });
-    const parsed = paymentPageResponseSchema.parse(response.data);
-    out.push(...parsed.results);
-    if (!parsed.has_next) break;
-  }
-  return out;
+    return paymentPageResponseSchema.parse(response.data);
+  }, MAX_TOTAL_PAGES);
 }
 
 export async function getPaymentDetail(paymentId: string): Promise<PaymentDetailResponse> {

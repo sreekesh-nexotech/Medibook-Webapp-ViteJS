@@ -98,7 +98,7 @@ export function OpsPlansScreen() {
 
       {plansQuery.isLoading ? (
         <SkeletonCards count={3} lines={6} />
-      ) : plansQuery.isError || !plans ? (
+      ) : plansQuery.isLoadingError || !plans ? (
         <Card>
           <ErrorState
             inline

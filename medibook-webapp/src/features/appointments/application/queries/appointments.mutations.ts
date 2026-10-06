@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
+import { useReplayKeys } from '@/shared/hooks/useReplayKeys';
 
 import type {
   DeskAppointment,
@@ -36,20 +37,31 @@ function invalidateAppointment(queryClient: QueryClient, id: string, touchesSlot
   }
 }
 
-/** An action that returns the updated appointment: cache it, then refresh the rest. */
+/**
+ * An action that returns the updated appointment: cache it, then refresh the
+ * rest. `run` gets the replay key for this action on this appointment, which
+ * stays the same across retries until the action succeeds (DATA-04).
+ */
 function useAppointmentAction<V extends { readonly id: string }>(
-  run: (variables: V) => Promise<DeskAppointment>,
+  action: string,
+  run: (variables: V, replayKey: string) => Promise<DeskAppointment>,
   touchesSlots = false,
 ) {
   const queryClient = useQueryClient();
+  const replay = useReplayKeys();
+  const intent = (variables: V): string => `${action}:${variables.id}`;
   return useMutation({
-    mutationFn: run,
-    onSuccess: (appt) => {
+    mutationFn: (variables: V) => run(variables, replay.keyFor(intent(variables))),
+    onSuccess: (appt, variables) => {
+      replay.done(intent(variables));
       queryClient.setQueryData(appointmentsKeys.detail(appt.id), appt);
       invalidateAppointment(queryClient, appt.id, touchesSlots);
     },
   });
 }
+
+/** The booking form is one intent until it succeeds. */
+const WALK_IN_INTENT = 'walk-in';
 
 interface IdOnly {
   readonly id: string;
@@ -60,27 +72,35 @@ interface WithReason extends IdOnly {
 }
 
 export function useApproveMutation() {
-  return useAppointmentAction(async ({ id }: IdOnly) => unwrap(await approveAppointment(id)));
+  return useAppointmentAction('approve', async ({ id }: IdOnly) =>
+    unwrap(await approveAppointment(id)),
+  );
 }
 
 export function useRejectMutation() {
   return useAppointmentAction(
-    async ({ id, reason }: WithReason) => unwrap(await rejectAppointment(id, reason)),
+    'reject',
+    async ({ id, reason }: WithReason, replayKey) =>
+      unwrap(await rejectAppointment(id, reason, replayKey)),
     true,
   );
 }
 
 export function useCheckInMutation() {
-  return useAppointmentAction(async ({ id }: IdOnly) => unwrap(await checkInAppointment(id)));
+  return useAppointmentAction('check-in', async ({ id }: IdOnly, replayKey) =>
+    unwrap(await checkInAppointment(id, replayKey)),
+  );
 }
 
 export function useNoShowMutation() {
-  return useAppointmentAction(async ({ id }: IdOnly) => unwrap(await markNoShow(id)));
+  return useAppointmentAction('no-show', async ({ id }: IdOnly) => unwrap(await markNoShow(id)));
 }
 
 export function useCancelMutation() {
   return useAppointmentAction(
-    async ({ id, reason }: WithReason) => unwrap(await cancelAppointment(id, reason)),
+    'cancel',
+    async ({ id, reason }: WithReason, replayKey) =>
+      unwrap(await cancelAppointment(id, reason, replayKey)),
     true,
   );
 }
@@ -91,17 +111,23 @@ interface RemarkInput extends IdOnly {
 }
 
 export function useRemarkMutation() {
-  return useAppointmentAction(async ({ id, remark, version }: RemarkInput) =>
+  return useAppointmentAction('remark', async ({ id, remark, version }: RemarkInput) =>
     unwrap(await updateRemark(id, remark, version)),
   );
 }
 
-/** Book a walk-in visit; every booked appointment and its slot change. */
+/**
+ * Book a walk-in visit; every booked appointment and its slot change. One
+ * replay key per booking form, kept until the booking succeeds (DATA-04).
+ */
 export function useBookWalkInMutation() {
   const queryClient = useQueryClient();
+  const replay = useReplayKeys();
   return useMutation({
-    mutationFn: async (input: WalkInInput) => unwrap(await bookWalkIn(input)),
+    mutationFn: async (input: WalkInInput) =>
+      unwrap(await bookWalkIn(input, replay.keyFor(WALK_IN_INTENT))),
     onSuccess: () => {
+      replay.done(WALK_IN_INTENT);
       void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: slotsKeys.all });
       void queryClient.invalidateQueries({ queryKey: patientsKeys.all });
@@ -116,9 +142,12 @@ interface PaymentInput extends IdOnly {
 /** Collect a walk-in's fee; the issued receipt is cached for the receipt modal. */
 export function useCollectPaymentMutation() {
   const queryClient = useQueryClient();
+  const replay = useReplayKeys();
   return useMutation({
-    mutationFn: async ({ id, lines }: PaymentInput) => unwrap(await collectPayment(id, lines)),
+    mutationFn: async ({ id, lines }: PaymentInput) =>
+      unwrap(await collectPayment(id, lines, replay.keyFor(`pay:${id}`))),
     onSuccess: (receipt, { id }) => {
+      replay.done(`pay:${id}`);
       queryClient.setQueryData(appointmentsKeys.receipt(id), receipt);
       invalidateAppointment(queryClient, id);
     },
@@ -127,9 +156,14 @@ export function useCollectPaymentMutation() {
 
 export function useRefundMutation() {
   const queryClient = useQueryClient();
+  const replay = useReplayKeys();
   return useMutation({
-    mutationFn: async ({ id, reason }: WithReason) => unwrap(await refundAppointment(id, reason)),
-    onSuccess: (_data, { id }) => invalidateAppointment(queryClient, id),
+    mutationFn: async ({ id, reason }: WithReason) =>
+      unwrap(await refundAppointment(id, reason, replay.keyFor(`refund:${id}`))),
+    onSuccess: (_data, { id }) => {
+      replay.done(`refund:${id}`);
+      invalidateAppointment(queryClient, id);
+    },
   });
 }
 

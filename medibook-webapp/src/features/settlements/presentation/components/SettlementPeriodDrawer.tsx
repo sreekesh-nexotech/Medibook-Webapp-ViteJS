@@ -109,7 +109,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
         ))}
       </div>
     );
-  } else if (detailQuery.isError || !detail) {
+  } else if (detailQuery.isLoadingError || !detail) {
     body = (
       <ErrorState
         inline
@@ -220,7 +220,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
           <span className="text-caption text-text-muted">
             {statementQuery.isPending
               ? 'Looking for the statement…'
-              : statementQuery.isError
+              : statementQuery.isLoadingError
                 ? 'The statement could not be looked up.'
                 : 'No statement has been issued for this period yet.'}
           </span>

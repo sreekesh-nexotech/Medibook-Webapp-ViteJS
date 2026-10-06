@@ -25,7 +25,10 @@ export const paymentsRepository: PaymentsRepository = {
   listPayments: (query) => attempt(async () => toPage(await listPayments(query), toPaymentLine)),
 
   listAllPayments: (filters) =>
-    attempt(async () => (await listAllPayments(filters)).map(toPaymentLine)),
+    attempt(async () => {
+      const { rows, truncated } = await listAllPayments(filters);
+      return { lines: rows.map(toPaymentLine), truncated };
+    }),
 
   listPaymentRefunds: (paymentId) =>
     attempt(async () => toPaymentRefunds(await getPaymentDetail(paymentId))),

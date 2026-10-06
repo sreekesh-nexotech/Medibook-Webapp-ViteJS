@@ -51,7 +51,7 @@ export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTok
         <div className="text-text-muted flex justify-center py-10">
           <Spinner size={28} label="Loading the token slip" />
         </div>
-      ) : slip.isError ? (
+      ) : slip.isLoadingError ? (
         <ErrorState
           inline
           title="No token slip"

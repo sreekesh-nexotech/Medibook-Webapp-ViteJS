@@ -2,7 +2,7 @@
   "results": [
     {
       "id": "01a0ee28-8e7d-7fb3-8918-5303ac518e3e",
-      "email": "pending.invitee@lakeshore.medibook.example.com",
+      "email": "pending.invitee@example.medibook.example.com",
       "first_name": "Pending",
       "last_name": "Invitee",
       "phone_e164": null,
@@ -17,7 +17,7 @@
     },
     {
       "id": "01a0ee28-8d53-7b50-83e4-19f42eed0364",
-      "email": "nimmy.george@lakeshore.medibook.example.com",
+      "email": "nimmy.george@example.medibook.example.com",
       "first_name": "Nimmy",
       "last_name": "George",
       "phone_e164": "+910000000000",
@@ -32,7 +32,7 @@
     },
     {
       "id": "01a0ee28-8c2e-7aa1-90e4-110c559e6c80",
-      "email": "joseph.kurian@lakeshore.medibook.example.com",
+      "email": "joseph.kurian@example.medibook.example.com",
       "first_name": "Joseph",
       "last_name": "Kurian",
       "phone_e164": "+910000000000",
@@ -47,7 +47,7 @@
     },
     {
       "id": "01a0ee28-8afc-7c51-9250-bd90ffb9856a",
-      "email": "shalini.thomas@lakeshore.medibook.example.com",
+      "email": "shalini.thomas@example.medibook.example.com",
       "first_name": "Shalini",
       "last_name": "Thomas",
       "phone_e164": "+910000000000",
@@ -62,7 +62,7 @@
     },
     {
       "id": "01a0ee28-89ea-7100-9e0c-a2d1cdbf8abb",
-      "email": "vineeth.kumar@lakeshore.medibook.example.com",
+      "email": "vineeth.kumar@example.medibook.example.com",
       "first_name": "Vineeth",
       "last_name": "Kumar",
       "phone_e164": "+910000000000",

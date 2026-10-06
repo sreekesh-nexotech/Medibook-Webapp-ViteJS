@@ -39,6 +39,11 @@ interface TableShellProps {
    */
   state?: TableStateSpec;
   /**
+   * The rows on show belong to the previous view and the next one is loading:
+   * they are dimmed and cannot be clicked or tabbed to (RUN-06).
+   */
+  busy?: boolean;
+  /**
    * Accessible name for the horizontal scroll region, so a keyboard user who
    * tabs into it is told what they are scrolling. Default "Table".
    */
@@ -60,6 +65,7 @@ export function TableShell({
   sort,
   onSort,
   state,
+  busy = false,
   scrollLabel = 'Table',
 }: TableShellProps) {
   const needsMinWidth = columns.length >= MIN_WIDTH_COLUMN_THRESHOLD;
@@ -87,7 +93,13 @@ export function TableShell({
               ))}
             </tr>
           </thead>
-          <tbody>{state ? <TableState colSpan={columns.length} {...state} /> : children}</tbody>
+          <tbody
+            inert={busy}
+            aria-busy={busy || undefined}
+            className={cn(busy && 'opacity-50 transition-opacity')}
+          >
+            {state ? <TableState colSpan={columns.length} {...state} /> : children}
+          </tbody>
         </table>
       </div>
     </div>

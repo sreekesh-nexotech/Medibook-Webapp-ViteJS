@@ -97,7 +97,8 @@ export interface DoctorScheduleData {
 export interface AffectedBooking {
   readonly appointmentId: string;
   readonly bookingRef: string;
-  readonly tokenLabel: string;
+  /** `null` when the booking has no token yet. */
+  readonly tokenLabel: string | null;
   readonly patientName: string;
   readonly scheduledStartAt: string;
 }

@@ -1,3 +1,5 @@
+import { minutesOfDay, todayISO } from '@/shared/lib/format';
+
 /**
  * Pure local-calendar + clock-time helpers for the catalog and the slot grid.
  *
@@ -57,9 +59,9 @@ export function toIsoDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Today as a local ISO date. */
+/** Today on the hospital's calendar, not the device's (DATA-02). */
 export function todayIso(): string {
-  return toIsoDate(new Date());
+  return todayISO();
 }
 
 /** Parse ISO `yyyy-mm-dd` into a local-midnight `Date` (invalid input → null). */
@@ -72,7 +74,7 @@ export function parseIsoDate(iso: string): Date | null {
 
 /** `iso` shifted by `days` calendar days, still local (DST-safe). */
 export function addIsoDays(iso: string, days: number): string {
-  const base = parseIsoDate(iso) ?? new Date();
+  const base = parseIsoDate(iso) ?? parseIsoDate(todayISO()) ?? new Date();
   base.setDate(base.getDate() + days);
   return toIsoDate(base);
 }
@@ -149,8 +151,7 @@ export function minutesToTimeLabel(minutes: number): string {
   return `${hour12}:${String(mins).padStart(2, '0')} ${suffix}`;
 }
 
-/** Minutes since local midnight, right now — the "past slot" cutoff. */
+/** Minutes since midnight on the hospital's clock, right now — the "past slot" cutoff. */
 export function minutesNow(): number {
-  const now = new Date();
-  return now.getHours() * MINUTES_PER_HOUR + now.getMinutes();
+  return minutesOfDay();
 }

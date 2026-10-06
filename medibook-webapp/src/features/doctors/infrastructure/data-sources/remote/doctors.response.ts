@@ -98,7 +98,8 @@ export const scheduleResponseSchema = z.object({
 const affectedBookingSchema = z.object({
   appointment_id: z.string(),
   booking_ref: z.string(),
-  token_label: z.string(),
+  // Null for a booking that has no token yet (backend `Appointment.token_label`), DATA-12.
+  token_label: z.string().nullable(),
   patient_name: z.string(),
   scheduled_start_at: z.string(),
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
@@ -26,6 +26,9 @@ import {
   PAYMENT_LABEL,
   timeOf,
 } from '@/features/appointments/presentation/components/appointments.view';
+
+/** Rupee amounts are sent to the backend in integer paise. */
+const PAISE_PER_RUPEE = 100;
 
 /** The backend's answer when a cash line has no open cash session (D-28). */
 const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
@@ -66,6 +69,7 @@ function BookedVisit({
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reference, setReference] = useState('');
   const [isCollecting, setIsCollecting] = useState(false);
+  const collectingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptFor, setReceiptFor] = useState<string | null>(null);
   const [tokenFor, setTokenFor] = useState<string | null>(null);
@@ -75,6 +79,9 @@ function BookedVisit({
 
   /** One payment per appointment, in order; stops at the first refusal. */
   const collectAll = async (): Promise<void> => {
+    // A second click while collecting must not start a second run (DATA-11).
+    if (collectingRef.current) return;
+    collectingRef.current = true;
     setIsCollecting(true);
     setError(null);
     try {
@@ -82,7 +89,13 @@ function BookedVisit({
         if (a.totalRupees > 0) {
           await collect.mutateAsync({
             id: a.id,
-            lines: [{ method, amountRupees: a.totalRupees, reference: reference.trim() }],
+            lines: [
+              {
+                method,
+                amountPaise: Math.round(a.totalRupees * PAISE_PER_RUPEE),
+                reference: reference.trim(),
+              },
+            ],
           });
         }
         setPaidIds((ids) => [...ids, a.id]);
@@ -97,6 +110,7 @@ function BookedVisit({
             : 'Could not record the payment.',
       );
     } finally {
+      collectingRef.current = false;
       setIsCollecting(false);
     }
   };
@@ -106,6 +120,7 @@ function BookedVisit({
       <Modal
         open
         onClose={onDone}
+        dismissible={!isCollecting}
         title={`Booked for ${patientName}`}
         width={620}
         footer={

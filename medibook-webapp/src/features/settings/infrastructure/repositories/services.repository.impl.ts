@@ -23,9 +23,9 @@ export const servicesRepository: ServicesRepository = {
   createTaxRate: (input) => attempt(async () => toTaxRate(await api.postTaxRate(input))),
   updateTaxRate: (id, input, version) =>
     attempt(async () => toTaxRate(await api.patchTaxRate(id, input, version))),
-  deleteTaxRate: (id) =>
+  deleteTaxRate: (id, version) =>
     attempt(async () => {
-      await api.deleteTaxRate(id);
+      await api.deleteTaxRate(id, version);
       return null;
     }),
 
@@ -33,9 +33,9 @@ export const servicesRepository: ServicesRepository = {
   createCoupon: (input) => attempt(async () => toCoupon(await api.postCoupon(input))),
   updateCoupon: (id, input, version) =>
     attempt(async () => toCoupon(await api.patchCoupon(id, input, version))),
-  deleteCoupon: (id) =>
+  deleteCoupon: (id, version) =>
     attempt(async () => {
-      await api.deleteCoupon(id);
+      await api.deleteCoupon(id, version);
       return null;
     }),
 };

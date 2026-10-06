@@ -2,7 +2,7 @@
  * Presentation lookups and pure helpers for the Payments screen (H9): the
  * look-back date windows, method / status vocabulary, and the day's totals.
  */
-import { addDaysISO, parseHundredths, todayISO } from '@/shared/lib/format';
+import { addDaysISO, formatInstant, parseHundredths, todayISO } from '@/shared/lib/format';
 
 import type {
   PaymentLine,
@@ -85,7 +85,9 @@ export interface PaymentTotals {
 
 export function totalsOf(lines: readonly PaymentLine[]): PaymentTotals {
   const desk = lines.filter((l) => l.channel === 'desk');
-  const sum = (ls: readonly PaymentLine[]): number => ls.reduce((s, l) => s + l.amountRupees, 0);
+  // Added up in integer paise, so the totals are exact (DATA-09).
+  const sum = (ls: readonly PaymentLine[]): number =>
+    ls.reduce((s, l) => s + Math.round(l.amountRupees * PAISE_PER_RUPEE), 0) / PAISE_PER_RUPEE;
   return {
     deskTotal: sum(desk),
     deskCount: desk.length,
@@ -97,7 +99,7 @@ export function totalsOf(lines: readonly PaymentLine[]): PaymentTotals {
 /** "10:42 am" for the Updated stamp; empty before the first load. */
 export function updatedCopy(at: number): string {
   if (!at) return '—';
-  return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatInstant(at, { hour: 'numeric', minute: '2-digit' });
 }
 
 /* ------------------------------------------------------------- cash drawer */
@@ -125,8 +127,8 @@ export function drawerBalance(variancePaise: number): DrawerBalance {
   return variancePaise < 0 ? 'short' : 'over';
 }
 
-/** "9:14 am" in the device's clock, for when a drawer opened or closed. */
+/** "9:14 am" on the hospital's clock, for when a drawer opened or closed. */
 export function clockCopy(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatInstant(iso, { hour: 'numeric', minute: '2-digit' });
 }

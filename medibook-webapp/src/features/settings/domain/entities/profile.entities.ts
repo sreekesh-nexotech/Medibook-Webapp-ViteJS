@@ -13,7 +13,12 @@ export interface Holiday {
   readonly to: string;
   readonly departmentId: string | null;
   readonly note: string | null;
+  /** Row version, sent as `If-Match` on edit and delete (DATA-05). */
+  readonly version: number;
 }
+
+/** The closure an edit or removal is about, at the version the screen showed. */
+export type HolidayTarget = Pick<Holiday, 'id' | 'version'>;
 
 export interface HolidayInput {
   readonly name: string;

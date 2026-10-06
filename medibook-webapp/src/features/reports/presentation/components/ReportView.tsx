@@ -6,7 +6,6 @@ import { cn } from '@/shared/lib/cn';
 import { dateRange } from '@/shared/lib/validate';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
@@ -134,7 +133,7 @@ export function ReportView({ report }: ReportViewProps) {
         title: 'Fix the date range to see this report.',
         message: rangeError,
       }
-    : result.isError && !data
+    : result.isLoadingError && !data
       ? {
           kind: 'error',
           message: isFailure(result.error) ? result.error.message : REPORT_FAILED,
@@ -247,7 +246,7 @@ export function ReportView({ report }: ReportViewProps) {
             ))}
           </div>
         )
-      ) : result.isError || rangeError ? null : (
+      ) : result.isLoadingError || rangeError ? null : (
         <SkeletonKpiStrip count={3} />
       )}
 
@@ -256,26 +255,18 @@ export function ReportView({ report }: ReportViewProps) {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <SectionTitle>{report.title} rows</SectionTitle>
         </div>
-        {result.isError && data ? (
-          <ErrorState
-            inline
-            message={isFailure(result.error) ? result.error.message : REPORT_FAILED}
-            onRetry={() => void result.refetch()}
-          />
-        ) : (
-          <ReportDataTable
-            columns={data?.columns ?? definition.columns}
-            rows={data?.rows ?? []}
-            total={total}
-            sort={sort}
-            onSort={handleSort}
-            page={page}
-            onPage={setPage}
-            noun={report.noun}
-            state={tableState}
-            scrollLabel={`${report.title} rows`}
-          />
-        )}
+        <ReportDataTable
+          columns={data?.columns ?? definition.columns}
+          rows={data?.rows ?? []}
+          total={total}
+          sort={sort}
+          onSort={handleSort}
+          page={page}
+          onPage={setPage}
+          noun={report.noun}
+          state={tableState}
+          scrollLabel={`${report.title} rows`}
+        />
       </Card>
     </div>
   );

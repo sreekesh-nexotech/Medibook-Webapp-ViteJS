@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { SortState } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, formatInstant, rupeesFromPaise } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -48,7 +48,6 @@ import {
   fromLabel,
   isNotImplemented,
   isUnpaid,
-  paiseToRupees,
   plural,
   rupees,
   saveFile,
@@ -186,8 +185,8 @@ export function OpsBillingScreen() {
   const openCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, statuses: ['issued', 'overdue'] });
   const overdueCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, overdue: true });
   const failedCount = usePaymentsQuery({ ...BASE_PAYMENT_PARAMS, statuses: ['failed'] });
-  const countOf = (query: { data?: { total: number }; isError: boolean }) =>
-    query.data?.total ?? (query.isError ? '—' : '…');
+  const countOf = (query: { data?: { total: number }; isLoadingError: boolean }) =>
+    query.data?.total ?? (query.isLoadingError ? '—' : '…');
 
   const pdf = useInvoicePdfMutation();
   const exportInvoices = useExportInvoicesMutation();
@@ -317,7 +316,7 @@ export function OpsBillingScreen() {
             p.gatewayPaymentId ?? p.id,
             p.invoiceNo,
             METHOD_LABELS[p.method],
-            paiseToRupees(p.amountPaise),
+            rupeesFromPaise(p.amountPaise),
             p.attemptedAt,
             PAYMENT_STATUS_BADGES[p.status].label,
             p.attemptNo,
@@ -353,7 +352,7 @@ export function OpsBillingScreen() {
     icon: 'file-text' | 'indian-rupee',
   ): TableStateSpec | undefined => {
     if (activeQuery.isPending) return { kind: 'loading', rows: OPS_BILL_PAGE };
-    if (activeQuery.isError)
+    if (activeQuery.isLoadingError)
       return {
         kind: 'error',
         message: failureText(activeQuery.error, `The ${noun} could not be loaded.`),
@@ -453,10 +452,7 @@ export function OpsBillingScreen() {
               {activeQuery.dataUpdatedAt > 0 && (
                 <span className="text-caption text-text-muted">
                   Updated{' '}
-                  {new Date(activeQuery.dataUpdatedAt).toLocaleTimeString('en-IN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatInstant(activeQuery.dataUpdatedAt, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
               <Button

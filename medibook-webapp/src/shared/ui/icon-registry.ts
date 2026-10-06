@@ -102,6 +102,7 @@ import {
   Wallet,
   X,
   type LucideIcon,
+  WifiOff,
 } from 'lucide-react';
 
 export const ICONS = {
@@ -172,6 +173,7 @@ export const ICONS = {
   printer: Printer,
   receipt: Receipt,
   'refresh-cw': RefreshCw,
+  'wifi-off': WifiOff,
   repeat: Repeat,
   rocket: Rocket,
   'rotate-ccw': RotateCcw,

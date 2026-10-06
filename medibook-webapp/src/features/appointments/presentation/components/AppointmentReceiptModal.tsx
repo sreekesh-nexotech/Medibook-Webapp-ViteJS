@@ -89,7 +89,7 @@ export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentR
         <div className="text-text-muted flex justify-center py-10">
           <Spinner size={28} label="Loading the receipt" />
         </div>
-      ) : receipt.isError ? (
+      ) : receipt.isLoadingError ? (
         <ErrorState
           inline
           title="Could not load the receipt"

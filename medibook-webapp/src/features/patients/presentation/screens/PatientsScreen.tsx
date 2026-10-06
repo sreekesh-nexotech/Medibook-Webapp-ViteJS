@@ -16,8 +16,8 @@ import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import {
-  HOSPITAL_VIEW_SEGMENT,
   hospitalBookForPatientPath,
+  hospitalPatientPath,
   isHospitalRole,
 } from '@/app/router/paths';
 
@@ -101,10 +101,9 @@ export function PatientsScreen() {
   const total = patientsQuery.data?.total ?? 0;
   const visits = usePatientVisitCountsQuery(rows.map((p) => p.id));
 
-  const open = (mrn: string) =>
-    navigate(`/${hospitalRole}/${HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(':mrn', mrn)}`);
-  const book = (mrn: string) => {
-    navigate(hospitalBookForPatientPath(hospitalRole, mrn));
+  const open = (patientId: string) => navigate(hospitalPatientPath(hospitalRole, patientId));
+  const book = (patientId: string) => {
+    navigate(hospitalBookForPatientPath(hospitalRole, patientId));
   };
 
   const reset = (fn: (v: string) => void) => (v: string) => {
@@ -136,7 +135,7 @@ export function PatientsScreen() {
   /** Loading / empty / error live inside the table body so the header stays put. */
   const tableState: TableStateSpec | undefined = patientsQuery.isPending
     ? { kind: 'loading', rows: PAT_PAGE }
-    : patientsQuery.isError
+    : patientsQuery.isLoadingError
       ? {
           kind: 'error',
           message: patientsQuery.error.message,
@@ -226,7 +225,7 @@ export function PatientsScreen() {
             return (
               <tr
                 key={p.id}
-                onClick={() => open(p.mrn)}
+                onClick={() => open(p.id)}
                 className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
               >
                 <td className={tdClass}>{p.mrn}</td>
@@ -250,14 +249,14 @@ export function PatientsScreen() {
                       label="View patient"
                       box={36}
                       size={16}
-                      onClick={() => open(p.mrn)}
+                      onClick={() => open(p.id)}
                     />
                     <IconBtn
                       name="calendar-plus"
                       label="Book appointment"
                       box={36}
                       size={16}
-                      onClick={() => book(p.mrn)}
+                      onClick={() => book(p.id)}
                     />
                   </div>
                 </td>
@@ -270,9 +269,9 @@ export function PatientsScreen() {
       <PatientModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSaved={(mrn) => {
+        onSaved={(patientId) => {
           setAddOpen(false);
-          open(mrn);
+          open(patientId);
         }}
       />
     </div>

@@ -16,7 +16,7 @@
     {
       "id": "01a11031-7ee9-7cc3-9cb4-61480a1c3a0d",
       "user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
-      "identifier": "anita.menon@lakeshore.medibook.example.com",
+      "identifier": "anita.menon@example.medibook.example.com",
       "principal": "hospital",
       "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
       "result": "success",
@@ -42,7 +42,7 @@
     {
       "id": "01a1102f-80ee-7893-bf50-e703542f919e",
       "user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
-      "identifier": "anita.menon@lakeshore.medibook.example.com",
+      "identifier": "anita.menon@example.medibook.example.com",
       "principal": "hospital",
       "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
       "result": "success",

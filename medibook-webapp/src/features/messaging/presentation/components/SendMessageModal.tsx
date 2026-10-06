@@ -166,7 +166,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   const patientPlaceholder = patientsQuery.isLoading
     ? 'Loading patients…'
-    : patientsQuery.isError
+    : patientsQuery.isLoadingError
       ? 'Patients could not be loaded — close and try again'
       : patients.length === 0
         ? 'No patients match this search'
@@ -176,7 +176,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
     ? 'Pick a patient first'
     : appointmentsQuery.isLoading
       ? 'Loading appointments…'
-      : appointmentsQuery.isError
+      : appointmentsQuery.isLoadingError
         ? 'Appointments could not be loaded — pick the patient again'
         : appointments.length === 0
           ? 'No upcoming appointments for this patient'
@@ -268,7 +268,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           </Field>
         </div>
 
-        {templatesQuery.isError ? (
+        {templatesQuery.isLoadingError ? (
           <div className="text-body text-y-800 bg-y-100 flex items-start gap-2 rounded-md px-3.5 py-3">
             <Icon name="triangle-alert" size={16} className="mt-0.5 flex-none" />
             <span>

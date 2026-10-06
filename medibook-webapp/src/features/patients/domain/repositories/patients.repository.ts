@@ -16,6 +16,8 @@ export interface PatientsRepository {
   listPatients(params: PatientListParams): Promise<Result<Page<PatientRecord>>>;
   /** The record with exactly this MRN; a `notFound` failure when there is none. */
   getPatientByMrn(mrn: string): Promise<Result<PatientRecord>>;
+  /** The full record (incl. any pending change request) with this record id. */
+  getPatientById(id: string): Promise<Result<PatientRecord>>;
   /** Mints an MRN, or returns the existing record when the person is already registered. */
   createPatient(demographics: PatientDemographics): Promise<Result<PatientCreateOutcome>>;
   /** Applies at once, or becomes a change request when the hospital requires approval. */

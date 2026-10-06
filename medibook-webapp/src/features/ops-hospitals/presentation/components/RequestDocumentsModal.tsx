@@ -85,7 +85,7 @@ export function RequestDocumentsModal({
       <div className="flex flex-col gap-4.5">
         {requirements.isPending ? (
           <SkeletonCards count={1} lines={5} />
-        ) : requirements.isError ? (
+        ) : requirements.isLoadingError ? (
           <ErrorState
             inline
             title="The document catalogue did not load"

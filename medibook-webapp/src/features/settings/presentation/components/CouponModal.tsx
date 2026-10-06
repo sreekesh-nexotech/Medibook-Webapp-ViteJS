@@ -190,6 +190,8 @@ export function CouponModal({
             kind: form.values.type === 'Flat' ? 'flat' : 'percent',
             value,
             minOrderRupees: Number(form.values.minOrder || 0),
+            // The form does not edit the cap, so an edited coupon keeps its own.
+            maxDiscountRupees: coupon?.maxDiscountRupees ?? null,
           },
           sampleOrder,
         );
