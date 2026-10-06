@@ -21,6 +21,9 @@ import { OpsSettlementsHospitalCard } from '@/features/ops-settlements/presentat
 import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
 import { useReinstateHospitalMutation } from '@/features/ops-hospitals/application/queries/useReinstateHospitalMutation';
 import { useSuspendHospitalMutation } from '@/features/ops-hospitals/application/queries/useSuspendHospitalMutation';
+import { HospitalCommercialTermsCard } from '@/features/ops-hospitals/presentation/components/HospitalCommercialTermsCard';
+import { HospitalEditProfileModal } from '@/features/ops-hospitals/presentation/components/HospitalEditProfileModal';
+import { HospitalPatientAccessCard } from '@/features/ops-hospitals/presentation/components/HospitalPatientAccessCard';
 import { longDateFromTimestamp } from '@/features/ops-hospitals/presentation/components/hospitals.dates';
 import type {
   HospitalUsageMeter,
@@ -36,8 +39,8 @@ import {
   isHospitalPending,
 } from '@/features/ops-hospitals/presentation/components/hospitals.view';
 
-/** Which lifecycle dialog is open. */
-type DetailModal = 'suspend' | 'unsuspend' | null;
+/** Which dialog is open. */
+type DetailModal = 'suspend' | 'unsuspend' | 'edit' | null;
 
 const TABS = ['Overview', 'Billing & Settlements', 'Activity'] as const;
 
@@ -74,7 +77,10 @@ const gb = (bytes: number): string => `${(bytes / BYTES_PER_GB).toFixed(1)} GB`;
 /**
  * One hospital's platform profile (design `OpsHospitalDetail`): header and
  * lifecycle actions, suspension notice, profile, onboarding progress and plan
- * usage. Suspend / reactivate call their own action endpoints.
+ * usage. Suspend / reactivate call their own action endpoints. Edit Profile
+ * (`PATCH /platform/hospitals/{id}`), the patient-app switches
+ * (`set-visibility`, `online_booking_enabled`) and the commercial terms
+ * (`set-commission`, `set-convenience-fee`) keep a live hospital correct.
  *
  * Approve, reject and the KYC review belong to the onboarding pipeline (P3);
  * a pending hospital is sent there. Departments, doctors and bookings have no
@@ -204,7 +210,12 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
             </span>
           </div>
           <div className="flex-1"></div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            {h.status !== 'closed' && (
+              <Button variant="secondary" icon="pencil" onClick={() => setModal('edit')}>
+                Edit Profile
+              </Button>
+            )}
             {isPending ? (
               <Button icon="rocket" onClick={() => navigate(opsOnboardingPath())}>
                 Review in Onboarding
@@ -258,6 +269,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
       {tab === 'Overview' && (
         <>
           <InfoGrid items={infoItems} />
+          <HospitalPatientAccessCard h={h} />
           <Card>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5">
@@ -339,6 +351,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
               Plan Catalog
             </Button>
           </Card>
+          <HospitalCommercialTermsCard h={h} />
           <BillingHospitalCard hospitalId={h.id} />
           <OpsSettlementsHospitalCard hospitalId={h.id} />
         </>
@@ -346,6 +359,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
 
       {tab === 'Activity' && <LogsHospitalActivityCard hospitalId={h.id} />}
 
+      {modal === 'edit' && <HospitalEditProfileModal h={h} onClose={() => setModal(null)} />}
       <OpsConfirm
         open={modal === 'suspend'}
         onClose={() => setModal(null)}

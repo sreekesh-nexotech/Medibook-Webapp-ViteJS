@@ -6,10 +6,15 @@ import {
   countHospitals,
   getHospital,
   getHospitals,
+  patchHospital,
   postHospital,
   postReinstateHospital,
+  postSetCommission,
+  postSetConvenienceFee,
+  postSetVisibility,
   postSuspendHospital,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.api';
+import { toHospitalPatchRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import {
   toPlatformHospital,
   toPlatformHospitalDetail,
@@ -39,4 +44,18 @@ export const hospitalsRepository: HospitalsRepository = {
 
   reinstateHospital: (id) =>
     attempt(async () => toPlatformHospital(await postReinstateHospital(id))),
+
+  updateHospital: (id, changes, version) =>
+    attempt(async () =>
+      toPlatformHospitalDetail(await patchHospital(id, toHospitalPatchRequest(changes), version)),
+    ),
+
+  setVisibility: (id, visibility) =>
+    attempt(async () => toPlatformHospital(await postSetVisibility(id, visibility))),
+
+  setCommission: (id, change) =>
+    attempt(async () => toPlatformHospital(await postSetCommission(id, change))),
+
+  setConvenienceFee: (id, change) =>
+    attempt(async () => toPlatformHospital(await postSetConvenienceFee(id, change))),
 };

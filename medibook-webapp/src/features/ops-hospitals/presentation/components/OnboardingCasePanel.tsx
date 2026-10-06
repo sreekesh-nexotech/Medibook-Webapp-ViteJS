@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { opsPath } from '@/app/router/paths';
@@ -19,6 +19,7 @@ import { OpsConfirm } from '@/shared/ui/OpsConfirm';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
+import { Toggle } from '@/shared/ui/Toggle';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import type {
@@ -29,6 +30,7 @@ import type {
 import { useHospitalQuery } from '@/features/ops-hospitals/application/queries/useHospitalQuery';
 import { useApproveHospitalMutation } from '@/features/ops-hospitals/application/queries/useApproveHospitalMutation';
 import { useGoLiveMutation } from '@/features/ops-hospitals/application/queries/useGoLiveMutation';
+import { useOpenHospitalToPatientsMutation } from '@/features/ops-hospitals/application/queries/useOpenHospitalToPatientsMutation';
 import { useOnboardingCaseQuery } from '@/features/ops-hospitals/application/queries/useOnboardingCaseQuery';
 import { useRejectOnboardingCaseMutation } from '@/features/ops-hospitals/application/queries/useRejectOnboardingCaseMutation';
 import { useSetOnboardingStageMutation } from '@/features/ops-hospitals/application/queries/useSetOnboardingStageMutation';
@@ -105,9 +107,12 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const rejectCase = useRejectOnboardingCaseMutation();
   const approve = useApproveHospitalMutation();
   const goLive = useGoLiveMutation();
+  const openToPatients = useOpenHospitalToPatientsMutation();
   const downloadScan = useFileDownloadMutation();
 
   const [modal, setModal] = useState<PanelModal>(null);
+  const [openOnGoLive, setOpenOnGoLive] = useState(true);
+  const openOnGoLiveId = useId();
   const [sendingBack, setSendingBack] = useState<ChecklistItem | null>(null);
   const [uploadingCode, setUploadingCode] = useState<string | null>(null);
 
@@ -198,8 +203,24 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const confirmGoLive = (): void => {
     goLive.mutate(detail.hospitalId, {
       onSuccess: () => {
-        toast(`${detail.hospitalName} is live on Medibook.`, 'success');
         setModal(null);
+        if (!openOnGoLive) {
+          toast(
+            `${detail.hospitalName} is live. Patients cannot see it until you list it on its hospital page.`,
+            'success',
+          );
+          return;
+        }
+        // Go-live sets only the status; listing and online booking are separate switches.
+        openToPatients.mutate(detail.hospitalId, {
+          onSuccess: () =>
+            toast(`${detail.hospitalName} is live and taking online bookings.`, 'success'),
+          onError: (error) =>
+            toast(
+              `${detail.hospitalName} is live, but it could not be opened to patients: ${errorCopy(error)} Turn it on from its hospital page.`,
+              'error',
+            ),
+        });
       },
       onError: (error) => {
         toast(errorCopy(error), 'error');
@@ -559,16 +580,36 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
         icon="rocket"
         tone="success"
         title="Take this hospital live?"
-        body={`${detail.hospitalName} starts serving patients on Medibook immediately and its instance becomes Active.`}
+        body={
+          openOnGoLive
+            ? `${detail.hospitalName} becomes Active, appears in the patient app and starts taking online bookings.`
+            : `${detail.hospitalName} becomes Active. It stays hidden from patients until you list it on its hospital page.`
+        }
         summary={[
           { k: 'Checklist', v: `${settled} of ${total} verified or waived`, num: true },
           { k: 'Administrator', v: adminAccepted ? 'Accepted' : 'Not accepted' },
           { k: 'Plan', v: planCode },
         ]}
         confirmLabel={goLive.isPending ? 'Going live…' : 'Go Live'}
-        busy={goLive.isPending}
+        busy={goLive.isPending || openToPatients.isPending}
         onConfirm={confirmGoLive}
-      />
+      >
+        <div className="bg-bg-subtle border-border flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left">
+          <div className="min-w-0 flex-1">
+            <div id={openOnGoLiveId} className="text-body text-text-strong font-medium">
+              Open to patients now
+            </div>
+            <div className="text-caption text-text-muted">
+              List it in the patient app and turn on online booking. Leave off for a soft launch.
+            </div>
+          </div>
+          <Toggle
+            value={openOnGoLive}
+            onChange={setOpenOnGoLive}
+            aria-labelledby={openOnGoLiveId}
+          />
+        </div>
+      </OpsConfirm>
     </div>
   );
 }

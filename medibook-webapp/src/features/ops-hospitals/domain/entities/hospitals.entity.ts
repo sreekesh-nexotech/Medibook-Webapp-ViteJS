@@ -17,6 +17,9 @@ export type HospitalSuspendReason = Exclude<HospitalSuspensionReason, 'non_payme
 export type HospitalOnboardingStage =
   'application' | 'documents_pending' | 'review' | 'approved' | 'live' | 'rejected';
 
+/** Whether the hospital is listed in the patient app (Q67). */
+export type HospitalAppVisibility = 'visible' | 'hidden';
+
 /** Plan-limited usage metrics (backend `limits.METRICS`). */
 export type HospitalUsageMetric = 'users' | 'doctors' | 'storage';
 
@@ -31,9 +34,22 @@ export interface PlatformHospital {
   readonly email: string;
   /** E.164, e.g. `+919822044315`. */
   readonly phone: string;
+  readonly website: string | null;
+  readonly addressLine1: string;
+  readonly addressLine2: string | null;
+  readonly addressLine3: string | null;
   readonly city: string;
   readonly state: string;
+  readonly pincode: string;
   readonly status: HospitalLifecycle;
+  /** Listed in the patient app. A hospital is bookable online only when it is active, visible and has online booking on. */
+  readonly appVisibility: HospitalAppVisibility;
+  readonly onlineBookingEnabled: boolean;
+  /** Platform commission on online bookings, in basis points (450 = 4.5%). */
+  readonly commissionBp: number;
+  readonly convenienceFeeKind: ConvenienceFeeKind;
+  /** Paise when the fee is flat; basis points when it is a percentage. */
+  readonly convenienceFeeValue: number;
   /** ISO timestamp the instance went live, or `null` while onboarding. */
   readonly goLiveAt: string | null;
   readonly createdAt: string;
@@ -143,4 +159,37 @@ export interface HospitalCreateInput {
     readonly lastName: string | null;
     readonly phoneE164: string | null;
   };
+}
+
+/** Profile fields ops may correct after onboarding (`PatchedPlatformHospitalProfileRequest`). */
+export interface HospitalProfileChanges {
+  readonly name?: string;
+  readonly legalName?: string | null;
+  readonly gstin?: string | null;
+  readonly registrationNo?: string | null;
+  readonly email?: string;
+  /** E.164, e.g. `+914842701000`. */
+  readonly phone?: string;
+  readonly website?: string | null;
+  readonly addressLine1?: string;
+  readonly addressLine2?: string | null;
+  readonly city?: string;
+  readonly state?: string;
+  readonly pincode?: string;
+  readonly onlineBookingEnabled?: boolean;
+}
+
+/** A new platform commission rate and the day it takes effect (hospital-local). */
+export interface HospitalCommissionChange {
+  readonly commissionBp: number;
+  /** ISO date; today or later. */
+  readonly effectiveFrom: string;
+  readonly note: string | null;
+}
+
+/** A new convenience fee for future bookings. */
+export interface HospitalConvenienceFeeChange {
+  readonly kind: ConvenienceFeeKind;
+  /** Paise when flat; basis points (0–10000) when percent. */
+  readonly value: number;
 }

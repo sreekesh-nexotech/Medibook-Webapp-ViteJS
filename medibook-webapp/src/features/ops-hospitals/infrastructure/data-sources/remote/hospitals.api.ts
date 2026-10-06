@@ -1,11 +1,16 @@
+import { ifMatch } from '@/core/api/headers';
 import { platformApi } from '@/core/api/http';
 
 import type {
+  HospitalAppVisibility,
+  HospitalCommissionChange,
+  HospitalConvenienceFeeChange,
   HospitalCreateInput,
   HospitalLifecycle,
   HospitalListQuery,
   HospitalSuspendReason,
 } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
+import type { HospitalPatchRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import { toHospitalCreateRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import type {
   HospitalDetailResponse,
@@ -81,5 +86,53 @@ export async function postSuspendHospital(
 /** `POST /platform/hospitals/{id}/reinstate`. */
 export async function postReinstateHospital(id: string): Promise<HospitalResponse> {
   const response = await platformApi.post(`/hospitals/${encodeURIComponent(id)}/reinstate`);
+  return hospitalResponseSchema.parse(response.data);
+}
+
+/** `PATCH /platform/hospitals/{id}` (`If-Match`) — answers with the full detail. */
+export async function patchHospital(
+  id: string,
+  body: HospitalPatchRequest,
+  version: number,
+): Promise<HospitalDetailResponse> {
+  const response = await platformApi.patch(`/hospitals/${encodeURIComponent(id)}`, body, {
+    headers: ifMatch(version),
+  });
+  return hospitalDetailResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/hospitals/{id}/set-visibility {visibility}` (Q67). */
+export async function postSetVisibility(
+  id: string,
+  visibility: HospitalAppVisibility,
+): Promise<HospitalResponse> {
+  const response = await platformApi.post(`/hospitals/${encodeURIComponent(id)}/set-visibility`, {
+    visibility,
+  });
+  return hospitalResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/hospitals/{id}/set-commission` — appends to the commission history (Q9). */
+export async function postSetCommission(
+  id: string,
+  change: HospitalCommissionChange,
+): Promise<HospitalResponse> {
+  const response = await platformApi.post(`/hospitals/${encodeURIComponent(id)}/set-commission`, {
+    commission_bp: change.commissionBp,
+    effective_from: change.effectiveFrom,
+    note: change.note,
+  });
+  return hospitalResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/hospitals/{id}/set-convenience-fee {kind, value}` — new bookings only (Q4). */
+export async function postSetConvenienceFee(
+  id: string,
+  change: HospitalConvenienceFeeChange,
+): Promise<HospitalResponse> {
+  const response = await platformApi.post(
+    `/hospitals/${encodeURIComponent(id)}/set-convenience-fee`,
+    { kind: change.kind, value: change.value },
+  );
   return hospitalResponseSchema.parse(response.data);
 }

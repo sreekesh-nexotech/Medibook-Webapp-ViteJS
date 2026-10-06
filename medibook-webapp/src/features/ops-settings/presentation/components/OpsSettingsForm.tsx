@@ -226,7 +226,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
           </OpsField>
           <OpsField
             label="Platform Commission (%)"
-            hint="Set per hospital from its detail page; there is no platform-wide default yet."
+            hint="Set per hospital: open it under Hospitals, then Billing & Settlements › Commercial Terms. There is no platform-wide default."
           >
             <TextInput value="" name="commission" placeholder={UNAVAILABLE} disabled height={48} />
           </OpsField>
