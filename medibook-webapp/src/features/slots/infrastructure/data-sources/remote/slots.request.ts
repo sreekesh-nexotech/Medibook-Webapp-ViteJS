@@ -15,9 +15,14 @@ export interface SlotBulkRequestBody {
     readonly time_to: string;
   };
   readonly action: BulkSlotRequest['action'];
+  readonly reason?: string;
 }
 
-export function toSlotBulkRequestBody({ scope, action }: BulkSlotRequest): SlotBulkRequestBody {
+export function toSlotBulkRequestBody({
+  scope,
+  action,
+  reason,
+}: BulkSlotRequest): SlotBulkRequestBody {
   const days =
     scope.days.kind === 'date'
       ? { date: scope.days.date }
@@ -31,5 +36,6 @@ export function toSlotBulkRequestBody({ scope, action }: BulkSlotRequest): SlotB
       time_to: scope.timeTo,
     },
     action,
+    reason: action === 'block' && reason ? reason : undefined,
   };
 }

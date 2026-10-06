@@ -28,6 +28,8 @@ export interface HospitalProfile {
   readonly coverFileId: string | null;
   /** Platform-managed switch for booking from the patient app. */
   readonly onlineBookingEnabled: boolean;
+  /** IANA time zone (e.g. `Asia/Kolkata`); `null` from an older backend. */
+  readonly timezone: string | null;
   /** Row version, sent back as `If-Match`. */
   readonly version: number;
 }

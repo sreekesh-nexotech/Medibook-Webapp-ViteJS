@@ -14,6 +14,7 @@ import {
   timeLabelToMinutes,
   todayIso,
 } from '@/features/doctors/domain/calendar';
+import { useHolidaysQuery } from '@/features/settings/application/queries/useHolidaysQuery';
 import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
@@ -21,6 +22,7 @@ import { useLatestGenerationRunQuery } from '@/features/slots/application/querie
 import { useRegenerateSlotsMutation } from '@/features/slots/application/queries/useRegenerateSlotsMutation';
 import { useSlotGridQuery } from '@/features/slots/application/queries/useSlotGridQuery';
 import { useToggleSlotMutation } from '@/features/slots/application/queries/useToggleSlotMutation';
+import type { SlotGenerationRun } from '@/features/slots/domain/entities/slots.entities';
 import {
   toSlotGridView,
   type SlotCellView,
@@ -57,13 +59,35 @@ function errorText(error: unknown, fallback: string): string {
   return isFailure(error) ? error.message : fallback;
 }
 
-function runTime(iso: string): string {
+function runTime(iso: string, timeZone: string | null): string {
   return new Date(iso).toLocaleString('en-IN', {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: timeZone ?? undefined,
   });
+}
+
+/** How the last generation run is described, from the run record. */
+function runCopy(run: SlotGenerationRun, timeZone: string | null): string {
+  const when = runTime(run.startedAt, timeZone);
+  if (run.error) return `Slot generation on ${when} failed: ${run.error}`;
+  if (!run.finishedAt) return `Slots are being generated (started ${when})…`;
+  const how = run.trigger === 'nightly' ? 'nightly run' : `${run.trigger.replace(/_/g, ' ')} run`;
+  const range =
+    run.horizonFrom && run.horizonTo
+      ? ` · covers ${formatIsoDayLabel(run.horizonFrom)} – ${formatIsoDayLabel(run.horizonTo)}`
+      : '';
+  const changes = [
+    `${run.createdCount} created`,
+    run.updatedCount ? `${run.updatedCount} updated` : '',
+    run.closedCount ? `${run.closedCount} closed` : '',
+    run.preservedCount ? `${run.preservedCount} kept for bookings` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return `Slots last generated ${when} (${how})${range} · ${changes}`;
 }
 
 /** Slots & Availability — the hospital's slot grid, open/block and bulk update (HA-08). */
@@ -78,6 +102,8 @@ export function SlotsScreen() {
   const rulesQuery = useHospitalRuleSettingsQuery();
   const hoursQuery = useHospitalHoursQuery();
   const profileQuery = useHospitalProfileQuery();
+  const holidaysQuery = useHolidaysQuery();
+  const timeZone = profileQuery.data?.timezone ?? null;
   const canEdit = useCan('Doctors & Departments.edit');
 
   const [date, setDate] = useState(todayIso);
@@ -104,16 +130,24 @@ export function SlotsScreen() {
 
   const grid = useMemo(() => {
     if (!gridQuery.data) return null;
-    const deptNames = new Map(depts.map((d) => [d.id, d.name]));
-    const rooms = new Map(docs.map((d) => [d.id, d.room]));
-    return toSlotGridView(date, gridQuery.data.days, deptNames, rooms);
-  }, [gridQuery.data, depts, docs, date]);
+    return toSlotGridView(date, gridQuery.data.days, {
+      deptNames: new Map(depts.map((d) => [d.id, d.name])),
+      rooms: new Map(docs.map((d) => [d.id, d.room])),
+      timeZone,
+      holidays: holidaysQuery.data ?? [],
+    });
+  }, [gridQuery.data, depts, docs, date, timeZone, holidaysQuery.data]);
 
-  // Booking is open `horizonDays` calendar days ahead, counting today, so the
-  // last bookable date is today + (horizon - 1).
+  // The last date slots are generated for, as the backend states it
+  // (`derived.booking_window_end_date`); the day-count fallback only covers
+  // an older backend without it.
   const horizonDays = rulesQuery.data?.bookingWindowDays ?? null;
   const lastBookableIso =
-    horizonDays === null ? null : addIsoDays(todayIso(), Math.max(0, horizonDays - 1));
+    rulesQuery.data?.derived.bookingWindowEndDate ??
+    (horizonDays === null ? null : addIsoDays(todayIso(), Math.max(0, horizonDays - 1)));
+  const holiday = (holidaysQuery.data ?? []).find(
+    (h) => h.departmentId === null && h.from <= date && date <= h.to,
+  );
   const atHorizon = lastBookableIso !== null && daysBetweenIso(date, lastBookableIso) <= 0;
   const beyondHorizon = lastBookableIso !== null && daysBetweenIso(date, lastBookableIso) < 0;
   const dayHours = hoursQuery.data?.find((d) => d.weekday === isoWeekdayIndex(date));
@@ -229,7 +263,7 @@ export function SlotsScreen() {
               : hoursCopy
                 ? `Hospital hours ${hoursCopy}`
                 : 'Hospital hours not set'}
-            <InfoDot text="Opening hours come from Hospital Settings. Slot length is set per session in each doctor's weekly hours, and their leave and date exceptions narrow the slots further." />
+            <InfoDot text="Opening hours and holidays come from Hospital Settings. Each doctor's slot length and weekly sessions are set on their profile (Availability tab), and their leave and date exceptions narrow the slots further. Times are in the hospital's time zone." />
           </div>
           <div className="text-caption text-text-muted mt-1 flex flex-wrap items-center gap-1.5">
             <Icon name="refresh-cw" size={13} />
@@ -238,9 +272,7 @@ export function SlotsScreen() {
               : latestRun.isError
                 ? 'Could not read the last generation run.'
                 : latestRun.data
-                  ? `Slots last generated ${runTime(latestRun.data.startedAt)}${
-                      latestRun.data.error ? ' — that run failed' : ''
-                    }`
+                  ? runCopy(latestRun.data, timeZone)
                   : 'Slots have not been generated yet.'}
             {canEdit && (
               <button
@@ -261,6 +293,28 @@ export function SlotsScreen() {
         <span className="flex-1" />
         {grid && <SlotLegend counts={grid.counts} />}
       </Card>
+
+      {holiday && (
+        <Card pad={14} className="flex flex-wrap items-center gap-2">
+          <Icon name="calendar-x" size={16} className="text-y-700" />
+          <span className="text-body text-text-body">
+            {holiday.name} — the hospital is closed
+            {holiday.from === holiday.to
+              ? ' on this date'
+              : ` from ${formatIsoDayLabel(holiday.from)} to ${formatIsoDayLabel(holiday.to)}`}
+            {holiday.note ? ` (${holiday.note})` : ''}. No slots are generated for it.
+          </span>
+          <span className="flex-1" />
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="settings"
+            onClick={() => navigate(hospitalPath(role, 'settings'))}
+          >
+            Holidays in Hospital Settings
+          </Button>
+        </Card>
+      )}
 
       {onlineBookingOff && (
         <Card pad={14} className="flex flex-wrap items-center gap-2">

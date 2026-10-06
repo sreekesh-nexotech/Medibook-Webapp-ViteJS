@@ -39,6 +39,8 @@ export const hospitalProfileResponseSchema = z.object({
   logo_file_id: z.string().nullable(),
   cover_file_id: z.string().nullable(),
   online_booking_enabled: z.boolean(),
+  // IANA zone the hospital's dates and times are kept in; optional for older backends.
+  timezone: z.string().optional(),
   version: z.number().int(),
 });
 
@@ -64,6 +66,7 @@ export function toHospitalProfile(dto: HospitalProfileResponse): HospitalProfile
     logoFileId: dto.logo_file_id,
     coverFileId: dto.cover_file_id,
     onlineBookingEnabled: dto.online_booking_enabled,
+    timezone: dto.timezone ?? null,
     version: dto.version,
   };
 }

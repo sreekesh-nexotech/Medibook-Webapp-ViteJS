@@ -23,6 +23,7 @@ import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
+import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 /** What a bulk update covers. */
@@ -48,6 +49,7 @@ interface BulkForm {
   from: string;
   to: string;
   weeks: string;
+  reason: string;
 }
 
 const BULK_VALIDATORS: FormValidators<BulkForm> = {
@@ -137,6 +139,7 @@ export function BulkSlotModal({
       from: TIME_OPTS[0],
       to: TIME_OPTS[TIME_OPTS.length - 1],
       weeks: DEFAULT_WEEKS,
+      reason: '',
     },
     validate: BULK_VALIDATORS,
     onSubmit: () => setConfirmKey(crypto.randomUUID()),
@@ -225,7 +228,11 @@ export function BulkSlotModal({
   const handleApply = (): void => {
     if (!request || !confirmKey) return;
     apply.mutate(
-      { request, idempotencyKey: confirmKey },
+      // The reason only matters when applying; the preview ignores it.
+      {
+        request: { ...request, reason: values.reason.trim() || undefined },
+        idempotencyKey: confirmKey,
+      },
       {
         onSuccess: (done) => {
           const cancelled = done.affectedBookings.length;
@@ -330,6 +337,16 @@ export function BulkSlotModal({
               onChange={(v) => form.setField('action', v as BulkAction)}
             />
           </Field>
+          {values.action === 'Block' && (
+            <Field label="Reason" hint="Optional. Shown on each blocked slot in the grid.">
+              <TextInput
+                value={values.reason}
+                placeholder="e.g. Doctor in surgery"
+                maxLength={500}
+                onChange={(v) => form.setField('reason', v)}
+              />
+            </Field>
+          )}
           <div
             role="status"
             className={cn(
