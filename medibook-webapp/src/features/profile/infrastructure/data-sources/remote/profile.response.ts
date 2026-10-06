@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { paginatedSchema } from '@/core/api/pagination';
+
 import type { ActiveSession } from '@/features/profile/domain/entities/profile.types';
 
-/** `UserSession` (`schema.yml`) — `GET /<surface>/auth/sessions` returns a plain array. */
+/** `UserSession` (`schema.yml`). */
 export const activeSessionResponseSchema = z.object({
   id: z.string(),
   user_agent: z.string().nullable(),
@@ -12,7 +14,11 @@ export const activeSessionResponseSchema = z.object({
   current: z.boolean(),
 });
 
-export const activeSessionsResponseSchema = z.array(activeSessionResponseSchema);
+/**
+ * `GET /<surface>/auth/sessions` answers with the page envelope (`session_list.py`),
+ * not the bare array `schema.yml` shows.
+ */
+export const activeSessionsPageResponseSchema = paginatedSchema(activeSessionResponseSchema);
 
 export type ActiveSessionResponse = z.infer<typeof activeSessionResponseSchema>;
 

@@ -140,19 +140,22 @@ export function toCaseDetail(dto: CaseDetailResponse): OnboardingCaseDetail {
 
 /* ----------------------------------------------------- document catalogue */
 
-export const requirementListResponseSchema = z.array(
-  z.object({
-    code: z.string(),
-    name: z.string(),
-    description: z.string().nullable().optional(),
-    is_required_default: z.boolean().optional(),
-    sort_order: z.number().int().optional(),
-  }),
-);
+const requirementSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  is_required_default: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
 
-export type RequirementListResponse = z.infer<typeof requirementListResponseSchema>;
+/** `GET /onboarding/document-requirements` answers with the page envelope (`config_resource_list.py`). */
+export const requirementPageResponseSchema = paginatedSchema(requirementSchema);
 
-export function toRequirements(dto: RequirementListResponse): readonly DocumentRequirement[] {
+export type RequirementResponse = z.infer<typeof requirementSchema>;
+
+export function toRequirements(
+  dto: readonly RequirementResponse[],
+): readonly DocumentRequirement[] {
   return dto
     .map((r) => ({
       code: r.code,

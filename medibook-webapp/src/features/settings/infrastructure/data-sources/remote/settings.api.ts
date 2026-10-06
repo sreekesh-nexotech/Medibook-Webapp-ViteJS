@@ -1,5 +1,6 @@
 import { ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
+import { fetchAllPages } from '@/core/api/pagination';
 
 import type {
   BankAccountWriteRequest,
@@ -15,7 +16,7 @@ import type {
   TokenPolicyResponse,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
 import {
-  bankAccountListResponseSchema,
+  bankAccountPageResponseSchema,
   bankAccountResponseSchema,
   hospitalProfileResponseSchema,
   hospitalSettingsResponseSchema,
@@ -82,8 +83,10 @@ export async function putTokenPolicy(
 }
 
 export async function listBankAccounts(): Promise<readonly BankAccountResponse[]> {
-  const response = await hospitalApi.get(BANK_ACCOUNTS_PATH);
-  return bankAccountListResponseSchema.parse(response.data);
+  return fetchAllPages(async (params) => {
+    const response = await hospitalApi.get(BANK_ACCOUNTS_PATH, { params });
+    return bankAccountPageResponseSchema.parse(response.data);
+  });
 }
 
 export async function postBankAccount(body: BankAccountWriteRequest): Promise<BankAccountResponse> {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { paginatedSchema } from '@/core/api/pagination';
+
 import type {
   BankAccount,
   HospitalHoursDay,
@@ -180,7 +182,8 @@ export const bankAccountResponseSchema = z.object({
   version: z.number().int(),
 });
 
-export const bankAccountListResponseSchema = z.array(bankAccountResponseSchema);
+/** `GET /billing/bank-accounts` answers with the page envelope, not the bare array `schema.yml` shows. */
+export const bankAccountPageResponseSchema = paginatedSchema(bankAccountResponseSchema);
 
 export type BankAccountResponse = z.infer<typeof bankAccountResponseSchema>;
 

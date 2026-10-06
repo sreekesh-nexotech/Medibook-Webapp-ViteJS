@@ -1,5 +1,6 @@
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
+import { fetchAllPages } from '@/core/api/pagination';
 
 import type {
   BannerWriteRequest,
@@ -11,9 +12,9 @@ import type {
   ScheduleChangeResponse,
 } from '@/features/settings/infrastructure/data-sources/remote/profile.response';
 import {
-  bannerListResponseSchema,
+  bannerPageResponseSchema,
   bannerResponseSchema,
-  holidayListResponseSchema,
+  holidayPageResponseSchema,
   scheduleChangeResponseSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/profile.response';
 
@@ -32,8 +33,10 @@ function confirmParams(confirm: boolean): Readonly<Record<string, string>> {
 }
 
 export async function listHolidays(): Promise<readonly HolidayResponse[]> {
-  const response = await hospitalApi.get(HOLIDAYS_PATH);
-  return holidayListResponseSchema.parse(response.data);
+  return fetchAllPages(async (params) => {
+    const response = await hospitalApi.get(HOLIDAYS_PATH, { params });
+    return holidayPageResponseSchema.parse(response.data);
+  });
 }
 
 export async function postHoliday(
@@ -68,8 +71,10 @@ export async function deleteHoliday(id: string, confirm: boolean): Promise<Sched
 }
 
 export async function listBanners(): Promise<readonly BannerResponse[]> {
-  const response = await hospitalApi.get(BANNERS_PATH);
-  return bannerListResponseSchema.parse(response.data);
+  return fetchAllPages(async (params) => {
+    const response = await hospitalApi.get(BANNERS_PATH, { params });
+    return bannerPageResponseSchema.parse(response.data);
+  });
 }
 
 export async function postBanner(body: BannerWriteRequest): Promise<BannerResponse> {

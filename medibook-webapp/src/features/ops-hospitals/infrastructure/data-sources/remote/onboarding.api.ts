@@ -1,18 +1,18 @@
 import { platformApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, fetchAllPages } from '@/core/api/pagination';
 
 import type {
   CaseDetailResponse,
   CaseListResponse,
   ChecklistItemResponse,
-  RequirementListResponse,
+  RequirementResponse,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/onboarding.response';
 import {
   caseDetailResponseSchema,
   caseListResponseSchema,
   checklistItemResponseSchema,
   hospitalActionResponseSchema,
-  requirementListResponseSchema,
+  requirementPageResponseSchema,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/onboarding.response';
 
 /** Onboarding endpoints (`/api/v1/platform/…`). Every body is Zod-validated. */
@@ -60,9 +60,11 @@ export async function patchChecklistItem(
   return checklistItemResponseSchema.parse(response.data);
 }
 
-export async function listRequirements(): Promise<RequirementListResponse> {
-  const response = await platformApi.get(REQUIREMENTS_PATH);
-  return requirementListResponseSchema.parse(response.data);
+export async function listRequirements(): Promise<RequirementResponse[]> {
+  return fetchAllPages(async (params) => {
+    const response = await platformApi.get(REQUIREMENTS_PATH, { params });
+    return requirementPageResponseSchema.parse(response.data);
+  });
 }
 
 export async function postApprove(hospitalId: string): Promise<void> {

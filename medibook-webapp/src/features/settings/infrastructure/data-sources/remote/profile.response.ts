@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { paginatedSchema } from '@/core/api/pagination';
+
 import type {
   AffectedBooking,
   Holiday,
@@ -24,7 +26,8 @@ export const holidayResponseSchema = z.object({
   note: z.string().nullable().optional(),
 });
 
-export const holidayListResponseSchema = z.array(holidayResponseSchema);
+/** `GET /holidays` answers with the page envelope, not the bare array `schema.yml` shows. */
+export const holidayPageResponseSchema = paginatedSchema(holidayResponseSchema);
 
 export type HolidayResponse = z.infer<typeof holidayResponseSchema>;
 
@@ -83,7 +86,8 @@ export const bannerResponseSchema = z.object({
   version: z.number().int(),
 });
 
-export const bannerListResponseSchema = z.array(bannerResponseSchema);
+/** `GET /banners` answers with the page envelope, not the bare array `schema.yml` shows. */
+export const bannerPageResponseSchema = paginatedSchema(bannerResponseSchema);
 
 export type BannerResponse = z.infer<typeof bannerResponseSchema>;
 
