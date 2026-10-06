@@ -90,6 +90,12 @@ export interface DoctorDateException {
   readonly version: number;
 }
 
+/** A doctor's whole leave and date-exception record, past entries included. */
+export interface DoctorScheduleHistory {
+  readonly leaves: readonly DoctorLeaveEntry[];
+  readonly dateExceptions: readonly DoctorDateException[];
+}
+
 /** Everything the Availability tab edits, from one `GET /doctors/{id}/schedule`. */
 export interface DoctorScheduleData {
   readonly doctorId: string;

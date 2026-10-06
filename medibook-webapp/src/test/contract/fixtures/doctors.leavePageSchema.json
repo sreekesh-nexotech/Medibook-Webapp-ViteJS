@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-88dd-7310-9f07-4d770d7922fd",
+      "doctor_id": "01a0ee28-8526-7eb1-bb66-0f67c9c21951",
+      "leave_type": "conference",
+      "date_from": "2026-10-03",
+      "date_to": "2026-10-04",
+      "reason": "CME conference",
+      "created_by_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "created_at": "2026-08-06T04:30:01.378754Z",
+      "updated_at": "2026-08-06T04:30:01.378770Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total": 1,
+  "has_next": false
+}

@@ -34,6 +34,7 @@ function useScheduleWrite<V extends ScheduleWrite>(run: (variables: V) => Promis
     onSuccess: (change, { doctorId }) => {
       if (change.dryRun) return;
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.schedule(doctorId) });
+      void queryClient.invalidateQueries({ queryKey: doctorsKeys.scheduleHistory(doctorId) });
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.detail(doctorId) });
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.lists() });
     },

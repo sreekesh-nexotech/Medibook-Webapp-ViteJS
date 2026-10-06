@@ -17,8 +17,10 @@ import type {
   ScheduleResponse,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
 import {
+  dateExceptionSchema,
   departmentResponseSchema,
   doctorResponseSchema,
+  leaveSchema,
   PAISE_PER_RUPEE,
   scheduleChangeResponseSchema,
   scheduleResponseSchema,
@@ -33,6 +35,8 @@ import {
 
 export const departmentPageSchema = paginatedSchema(departmentResponseSchema);
 export const doctorPageSchema = paginatedSchema(doctorResponseSchema);
+export const leavePageSchema = paginatedSchema(leaveSchema);
+export const dateExceptionPageSchema = paginatedSchema(dateExceptionSchema);
 
 /** Non-alphanumeric runs collapse to one dash. */
 const SLUG_SEPARATOR_PATTERN = /[^a-z0-9]+/g;
@@ -186,6 +190,30 @@ export async function deleteDoctor(id: string, confirm: boolean): Promise<Schedu
 export async function getSchedule(doctorId: string): Promise<ScheduleResponse> {
   const response = await hospitalApi.get(`/doctors/${encodeURIComponent(doctorId)}/schedule`);
   return scheduleResponseSchema.parse(response.data);
+}
+
+/**
+ * Every leave entry of a doctor, past ones included (the schedule read returns
+ * only current and future leave), newest first.
+ */
+export function getLeaves(doctorId: string) {
+  return fetchAllPages(async (page) => {
+    const response = await hospitalApi.get(`/doctors/${encodeURIComponent(doctorId)}/leaves`, {
+      params: { page, page_size: MAX_PAGE_SIZE, sort: '-date_from' },
+    });
+    return leavePageSchema.parse(response.data);
+  });
+}
+
+/** Every date exception of a doctor, past ones included, newest first. */
+export function getDateExceptions(doctorId: string) {
+  return fetchAllPages(async (page) => {
+    const response = await hospitalApi.get(
+      `/doctors/${encodeURIComponent(doctorId)}/date-exceptions`,
+      { params: { page, page_size: MAX_PAGE_SIZE, sort: '-date' } },
+    );
+    return dateExceptionPageSchema.parse(response.data);
+  });
 }
 
 export async function putWeeklySessions(

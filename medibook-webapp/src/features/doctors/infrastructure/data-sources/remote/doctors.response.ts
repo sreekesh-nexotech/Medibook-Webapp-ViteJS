@@ -67,7 +67,7 @@ const weeklySessionSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-const leaveSchema = z.object({
+export const leaveSchema = z.object({
   id: z.string(),
   leave_type: z.enum(['casual', 'sick', 'conference', 'other']),
   date_from: z.string(),
@@ -83,7 +83,7 @@ const exceptionSessionSchema = z.object({
   ends_at: z.string(),
 });
 
-const dateExceptionSchema = z.object({
+export const dateExceptionSchema = z.object({
   id: z.string(),
   date: z.string(),
   kind: z.enum(['closed', 'custom_sessions']),
@@ -189,7 +189,7 @@ function toWeeklySession(dto: z.infer<typeof weeklySessionSchema>): WeeklySessio
   };
 }
 
-function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
+export function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
   return {
     id: dto.id,
     kind: dto.leave_type,
@@ -200,7 +200,7 @@ function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
   };
 }
 
-function toDateException(dto: z.infer<typeof dateExceptionSchema>): DoctorDateException {
+export function toDateException(dto: z.infer<typeof dateExceptionSchema>): DoctorDateException {
   return {
     id: dto.id,
     date: dto.date,

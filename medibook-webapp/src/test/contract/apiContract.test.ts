@@ -22,8 +22,10 @@ import {
   receptionDashboardResponseSchema,
 } from '@/features/dashboard/infrastructure/data-sources/remote/dashboard.response';
 import {
+  dateExceptionPageSchema,
   departmentPageSchema,
   doctorPageSchema,
+  leavePageSchema,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.api';
 import {
   doctorResponseSchema,
@@ -174,9 +176,11 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'core.storedFileResponseSchema': storedFileResponseSchema,
   'dashboard.adminDashboardResponseSchema': adminDashboardResponseSchema,
   'dashboard.receptionDashboardResponseSchema': receptionDashboardResponseSchema,
+  'doctors.dateExceptionPageSchema': dateExceptionPageSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,
+  'doctors.leavePageSchema': leavePageSchema,
   'doctors.scheduleResponseSchema': scheduleResponseSchema,
   'messaging.deliveryPageResponseSchema': deliveryPageResponseSchema,
   'messaging.templatePageResponseSchema': templatePageResponseSchema,

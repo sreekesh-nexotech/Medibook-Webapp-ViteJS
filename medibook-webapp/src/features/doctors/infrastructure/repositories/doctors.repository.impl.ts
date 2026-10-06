@@ -14,6 +14,8 @@ import {
   toAffectedBookings,
   toDepartment,
   toDoctor,
+  toDateException,
+  toLeave,
   toSchedule,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
 
@@ -55,6 +57,14 @@ export const doctorsRepository: DoctorsRepository = {
   },
 
   getSchedule: (doctorId) => attempt(async () => toSchedule(await api.getSchedule(doctorId))),
+  getScheduleHistory: (doctorId) =>
+    attempt(async () => {
+      const [leaves, exceptions] = await Promise.all([
+        api.getLeaves(doctorId),
+        api.getDateExceptions(doctorId),
+      ]);
+      return { leaves: leaves.map(toLeave), dateExceptions: exceptions.map(toDateException) };
+    }),
   replaceWeeklySessions: (doctorId, sessions, version, confirm) =>
     attempt(async () =>
       toChange(await api.putWeeklySessions(doctorId, sessions, version, confirm)),
