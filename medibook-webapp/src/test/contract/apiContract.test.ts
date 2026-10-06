@@ -114,6 +114,8 @@ import {
 } from '@/features/settings/infrastructure/data-sources/remote/profile.response';
 import {
   couponPageSchema,
+  couponRedemptionPageSchema,
+  doctorServicePageSchema,
   servicePageSchema,
   taxRatePageSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/services.api';
@@ -228,6 +230,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'settings.bankAccountPageResponseSchema': bankAccountPageResponseSchema,
   'settings.bannerPageResponseSchema': bannerPageResponseSchema,
   'settings.couponPageSchema': couponPageSchema,
+  'settings.couponRedemptionPageSchema': couponRedemptionPageSchema,
+  'settings.doctorServicePageSchema': doctorServicePageSchema,
   'settings.holidayPageResponseSchema': holidayPageResponseSchema,
   'settings.hospitalProfileResponseSchema': hospitalProfileResponseSchema,
   'settings.hospitalSettingsResponseSchema': hospitalSettingsResponseSchema,

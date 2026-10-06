@@ -45,6 +45,7 @@ Paths under `backend:` are in the Django repository.
 | SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS        |
 | DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                      |
 | SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings              |
+| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged            |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -605,3 +606,25 @@ last bookable date:
 **What the web app does meanwhile.** Slots & Availability uses
 `booking_window_end_date` from settings (it used to compute its own, one day shorter,
 and hid the last generated day's slots).
+
+## SVC-01 — Switching a tax rate off doesn't stop it being charged on services
+
+**New finding (live check of Services & Pricing, 6 Oct 2026).**
+
+**What fails.** A service is billed with the one tax rate linked to it
+(`services.tax_rate_id`). The fee engine (`catalog/services/fees.py` `quote`) uses that
+rate without checking `is_active`, so switching a rate off on the Taxes tab changes
+nothing for the services already linked to it — they keep being charged. Meanwhile
+saving a service (`catalog/services/medical_services.py`) accepts only an **active**
+rate, so re-sending the linked rate after it is switched off is refused
+(`VALIDATION_ERROR` on `tax_rate_id`).
+
+**What the backend needs.** Decide what "off" means for a service rate and apply it in
+one place: either stop charging it (treat the service as exempt, or refuse to switch
+off a rate that services still use and list them), and keep the save rule consistent
+with the fee engine.
+
+**What the web app does meanwhile.** Prices are shown as the backend will charge them:
+a service on a switched-off rate still shows the tax, marked "rate switched off, still
+charged", and the Taxes tab says how many services still use it. Saves no longer
+re-send an unchanged rate, so such a service can still be edited or toggled.

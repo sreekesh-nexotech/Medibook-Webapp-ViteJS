@@ -4,6 +4,8 @@ import type { ServicesRepository } from '@/features/settings/domain/repositories
 import * as api from '@/features/settings/infrastructure/data-sources/remote/services.api';
 import {
   toCoupon,
+  toCouponRedemption,
+  toDoctorServiceLink,
   toService,
   toTaxRate,
 } from '@/features/settings/infrastructure/data-sources/remote/services.response';
@@ -38,4 +40,9 @@ export const servicesRepository: ServicesRepository = {
       await api.deleteCoupon(id);
       return null;
     }),
+  listCouponRedemptions: (couponId) =>
+    attempt(async () => (await api.getCouponRedemptions(couponId)).map(toCouponRedemption)),
+
+  listDoctorServices: () =>
+    attempt(async () => (await api.getDoctorServices()).map(toDoctorServiceLink)),
 };
