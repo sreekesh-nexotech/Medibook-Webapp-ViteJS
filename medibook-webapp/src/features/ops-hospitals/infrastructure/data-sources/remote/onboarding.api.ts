@@ -36,7 +36,7 @@ export async function listCases(): Promise<CaseListResponse> {
 }
 
 export async function getCase(caseId: string): Promise<CaseDetailResponse> {
-  const response = await platformApi.get(`${CASES_PATH}/${caseId}`);
+  const response = await platformApi.get(`${CASES_PATH}/${encodeURIComponent(caseId)}`);
   return caseDetailResponseSchema.parse(response.data);
 }
 
@@ -44,7 +44,7 @@ export async function patchCase(
   caseId: string,
   body: Readonly<Record<string, string>>,
 ): Promise<CaseDetailResponse> {
-  const response = await platformApi.patch(`${CASES_PATH}/${caseId}`, body);
+  const response = await platformApi.patch(`${CASES_PATH}/${encodeURIComponent(caseId)}`, body);
   return caseDetailResponseSchema.parse(response.data);
 }
 
@@ -54,7 +54,7 @@ export async function patchChecklistItem(
   body: ChecklistWriteRequest,
 ): Promise<ChecklistItemResponse> {
   const response = await platformApi.patch(
-    `${CASES_PATH}/${caseId}/checklist/${encodeURIComponent(code)}`,
+    `${CASES_PATH}/${encodeURIComponent(caseId)}/checklist/${encodeURIComponent(code)}`,
     body,
   );
   return checklistItemResponseSchema.parse(response.data);
@@ -68,11 +68,15 @@ export async function listRequirements(): Promise<RequirementResponse[]> {
 }
 
 export async function postApprove(hospitalId: string): Promise<void> {
-  const response = await platformApi.post(`${HOSPITALS_PATH}/${hospitalId}/approve`);
+  const response = await platformApi.post(
+    `${HOSPITALS_PATH}/${encodeURIComponent(hospitalId)}/approve`,
+  );
   hospitalActionResponseSchema.parse(response.data);
 }
 
 export async function postGoLive(hospitalId: string): Promise<void> {
-  const response = await platformApi.post(`${HOSPITALS_PATH}/${hospitalId}/go-live`);
+  const response = await platformApi.post(
+    `${HOSPITALS_PATH}/${encodeURIComponent(hospitalId)}/go-live`,
+  );
   hospitalActionResponseSchema.parse(response.data);
 }

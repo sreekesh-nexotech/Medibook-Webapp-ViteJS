@@ -1,0 +1,17 @@
+{
+  "period": "30d",
+  "date_from": "2026-09-06",
+  "date_to": "2026-10-05",
+  "hospital_id": null,
+  "metrics": {
+    "bookings_online": 259,
+    "bookings_walk_in": 95,
+    "cancellations": 103,
+    "no_shows": 24,
+    "completed": 201,
+    "revenue_paise": 15463725,
+    "refunds_paise": 3214450,
+    "new_patients": 61,
+    "bookings_total": 354
+  }
+}

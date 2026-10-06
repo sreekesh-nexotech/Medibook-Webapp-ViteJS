@@ -64,12 +64,12 @@ export async function listAllPayments(filters: PaymentFilters): Promise<PaymentL
 }
 
 export async function getPaymentDetail(paymentId: string): Promise<PaymentDetailResponse> {
-  const response = await hospitalApi.get(`${PAYMENTS_PATH}/${paymentId}`);
+  const response = await hospitalApi.get(`${PAYMENTS_PATH}/${encodeURIComponent(paymentId)}`);
   return paymentDetailResponseSchema.parse(response.data);
 }
 
 export async function listVisitReceipts(visitId: string): Promise<VisitReceiptPageResponse> {
-  const response = await hospitalApi.get(`/visits/${visitId}/receipts`, {
+  const response = await hospitalApi.get(`/visits/${encodeURIComponent(visitId)}/receipts`, {
     params: { page_size: MAX_PAGE_SIZE },
   });
   return visitReceiptPageResponseSchema.parse(response.data);

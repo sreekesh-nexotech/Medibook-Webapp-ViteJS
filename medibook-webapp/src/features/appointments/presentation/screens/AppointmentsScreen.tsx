@@ -6,6 +6,7 @@ import { money } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -43,6 +44,7 @@ import {
   needsApproval,
   needsPayment,
   PAYMENT_LABEL,
+  PRIMARY_ACTION_PERMISSION,
   primaryAction,
   rangeFor,
   SOURCE_LABEL,
@@ -362,22 +364,27 @@ export function AppointmentsScreen() {
                 <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2">
                     {p && p.key !== 'queue' ? (
-                      <Button
-                        size="sm"
-                        variant={p.variant}
-                        icon={p.icon}
-                        busy={
-                          (p.key === 'approve' &&
-                            approve.isPending &&
-                            approve.variables.id === a.id) ||
-                          (p.key === 'checkin' &&
-                            checkIn.isPending &&
-                            checkIn.variables.id === a.id)
-                        }
-                        onClick={() => doPrimary(a)}
+                      <Can
+                        perm={PRIMARY_ACTION_PERMISSION[p.key]}
+                        fallback={<span className="w-1"></span>}
                       >
-                        {p.label}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant={p.variant}
+                          icon={p.icon}
+                          busy={
+                            (p.key === 'approve' &&
+                              approve.isPending &&
+                              approve.variables.id === a.id) ||
+                            (p.key === 'checkin' &&
+                              checkIn.isPending &&
+                              checkIn.variables.id === a.id)
+                          }
+                          onClick={() => doPrimary(a)}
+                        >
+                          {p.label}
+                        </Button>
+                      </Can>
                     ) : (
                       <span className="w-1"></span>
                     )}

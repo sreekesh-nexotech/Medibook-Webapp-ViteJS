@@ -1,0 +1,23 @@
+{
+  "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+  "scope": "doctor",
+  "reset": "session",
+  "format": "{SRC}{SEQ:3}",
+  "prefix": "T",
+  "online_marker": "A",
+  "offline_marker": "W",
+  "separate_ranges": false,
+  "online_range_start": null,
+  "online_range_end": null,
+  "offline_range_start": null,
+  "offline_range_end": null,
+  "reuse_cancelled": true,
+  "print_template_id": "01a0ee28-8119-7be2-a42b-95c7060bc0f3",
+  "pending": null,
+  "in_force_today": {
+    "scope": "doctor",
+    "reset": "session"
+  },
+  "version": 2,
+  "updated_at": "2026-08-06T04:30:01.556961Z"
+}

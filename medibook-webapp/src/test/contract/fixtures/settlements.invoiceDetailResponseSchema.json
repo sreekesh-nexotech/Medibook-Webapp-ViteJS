@@ -1,0 +1,67 @@
+{
+  "id": "01a0ee2f-af58-7490-9b09-73a8e1d19fa6",
+  "invoice_no": "INV-2026-0008",
+  "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "subscription_id": "01a0ee28-8144-7650-8b73-866f4422ba0d",
+  "period_start": "2026-09-29",
+  "period_end": "2026-10-17",
+  "issued_at": "2026-09-29T17:21:37.605657Z",
+  "due_at": "2026-10-06",
+  "subtotal_paise": 760000,
+  "gst_paise": 136800,
+  "total_paise": 896800,
+  "amount_paid_paise": 0,
+  "status": "issued",
+  "paid_at": null,
+  "grace_ends_at": null,
+  "reminders_sent": 1,
+  "last_reminder_at": "2026-10-06T03:30:00.041876Z",
+  "version": 2,
+  "lines": [
+    {
+      "id": "01a0ee2f-af5b-7e11-9bf2-4ff0e48145d9",
+      "line_type": "proration",
+      "description": "Unused 19 of 30 days — Growth (monthly)",
+      "quantity": 1,
+      "unit_paise": -506603,
+      "amount_paise": -506603,
+      "tax_rate_bp": 1800,
+      "tax_paise": -91200
+    },
+    {
+      "id": "01a0ee2f-af5b-7e11-9bf2-50042d83f520",
+      "line_type": "proration",
+      "description": "Remaining 19 of 30 days — Enterprise (monthly)",
+      "quantity": 1,
+      "unit_paise": 1266603,
+      "amount_paise": 1266603,
+      "tax_rate_bp": 1800,
+      "tax_paise": 228000
+    }
+  ],
+  "hospital_snapshot": {
+    "city": "Kochi",
+    "name": "Lakeshore Multispeciality Hospital",
+    "email": "contact@lakeshore.medibook.example.com",
+    "gstin": "00AAAAA0000A0A0",
+    "state": "Kerala",
+    "pincode": "682040",
+    "legal_name": "Lakeshore Healthcare Pvt Ltd",
+    "phone_e164": "+910000000000",
+    "address_line1": "NH 66 Bypass, Maradu",
+    "address_line2": "Near Vyttila Hub",
+    "address_line3": null
+  },
+  "platform_snapshot": {
+    "city": "Kochi",
+    "gstin": "00AAAAA0000A0A0",
+    "state": "Kerala",
+    "pincode": "682042",
+    "legal_name": "Medibook Health Technologies Pvt Ltd",
+    "phone_e164": "+910000000000",
+    "address_line1": "4th Floor, Infopark Phase 2",
+    "address_line2": null,
+    "address_line3": null
+  }
+}

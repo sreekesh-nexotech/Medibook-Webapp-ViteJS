@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-87cb-7e11-9163-391a7c9cd583",
+      "department_id": null,
+      "name": "Local festival",
+      "date_from": "2026-09-10",
+      "date_to": "2026-09-10",
+      "note": null,
+      "created_at": "2026-08-06T04:30:01.105185Z",
+      "updated_at": "2026-08-06T04:30:01.105200Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-8821-7121-9a0e-7c6bc045ad95",
+      "department_id": null,
+      "name": "Foundation day",
+      "date_from": "2026-10-08",
+      "date_to": "2026-10-08",
+      "note": null,
+      "created_at": "2026-08-06T04:30:01.190785Z",
+      "updated_at": "2026-08-06T04:30:01.190803Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

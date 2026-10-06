@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "id": "01a10fe5-e0d6-7a31-8bc9-e38ffc93f556",
+      "scope": "hospital",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "setting_key": "convenience_fee",
+      "before_value": {
+        "kind": "flat",
+        "value": 3000
+      },
+      "after_value": {
+        "kind": "flat",
+        "value": 2500
+      },
+      "actor_user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "request_id": "1b3c6574827435a131746b7f0aab75a3",
+      "occurred_at": "2026-10-06T06:28:05.974674Z"
+    },
+    {
+      "id": "01a10fe5-c338-7b83-8bec-f3c29431e84b",
+      "scope": "hospital",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "setting_key": "commission_bp",
+      "before_value": 600,
+      "after_value": 550,
+      "actor_user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "request_id": "c14a28f6c614ca95bf84570bf7bce8ec",
+      "occurred_at": "2026-10-06T06:27:58.392233Z"
+    },
+    {
+      "id": "01a10fe5-c322-7343-a3cf-8be6bf52ef51",
+      "scope": "hospital",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "setting_key": "commission_history",
+      "before_value": null,
+      "after_value": {
+        "commission_bp": 550,
+        "effective_from": "2026-10-06"
+      },
+      "actor_user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "request_id": "c14a28f6c614ca95bf84570bf7bce8ec",
+      "occurred_at": "2026-10-06T06:27:58.370445Z"
+    },
+    {
+      "id": "01a10fe5-7015-7dd2-91bc-81ae74c0ff2e",
+      "scope": "hospital",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "setting_key": "app_visibility",
+      "before_value": "visible",
+      "after_value": "hidden",
+      "actor_user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "request_id": "81080f26d047e09cea9fdab2292fdc79",
+      "occurred_at": "2026-10-06T06:27:37.109627Z"
+    },
+    {
+      "id": "01a10fe4-b716-7522-81f8-3333e3e09c74",
+      "scope": "hospital",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "setting_key": "convenience_fee",
+      "before_value": {
+        "kind": "flat",
+        "value": 2500
+      },
+      "after_value": {
+        "kind": "flat",
+        "value": 3000
+      },
+      "actor_user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "request_id": "a6c683e5db3c210973cc15c4632e9b2b",
+      "occurred_at": "2026-10-06T06:26:49.750371Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 51,
+  "has_next": true
+}

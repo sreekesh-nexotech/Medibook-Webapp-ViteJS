@@ -1,0 +1,34 @@
+{
+  "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+  "booking_window_days": 30,
+  "online_requires_approval": false,
+  "hold_timeout_seconds": 300,
+  "cancellation_cutoff_hours": 4,
+  "refund_before_cutoff_bp": 10000,
+  "refund_after_cutoff_bp": 0,
+  "refund_includes_convenience_fee": false,
+  "follow_up_window_days": 7,
+  "no_show_call_attempts": 3,
+  "token_cancel_limit_min": null,
+  "expected_consult_minutes": 10,
+  "patient_notes_enabled": true,
+  "receipt_paper": "A5",
+  "receipt_show_staff": true,
+  "patient_edit_requires_approval": true,
+  "display_show_full_name": false,
+  "version": 1,
+  "updated_at": "2026-08-04T04:30:00.017724Z",
+  "derived": {
+    "today": "2026-10-06",
+    "booking_window_end_date": "2026-11-05",
+    "hold_timeout_minutes": 5,
+    "cancellation_example": "For a 10:00 appointment, cancelling up to 4 h before (06:00) refunds 100% (excluding the convenience fee); later cancellations refund 0%. A hospital cancellation always refunds 100% including the fee (Q11).",
+    "slots_per_session_estimate": {
+      "min": 6,
+      "max": 18,
+      "avg": 10.9
+    },
+    "estimated_wait_per_token_minutes": 10,
+    "token_cancel_rule": "Tokens can be cancelled until they are called."
+  }
+}

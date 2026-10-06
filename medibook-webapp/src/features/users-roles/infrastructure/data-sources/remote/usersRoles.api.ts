@@ -80,12 +80,16 @@ export async function postInvitation(
 }
 
 export async function postInvitationResend(invitationId: string): Promise<InvitationResponse> {
-  const response = await hospitalApi.post(`/staff/invitations/${invitationId}/resend`);
+  const response = await hospitalApi.post(
+    `/staff/invitations/${encodeURIComponent(invitationId)}/resend`,
+  );
   return invitationResponseSchema.parse(response.data);
 }
 
 export async function deleteInvitation(invitationId: string): Promise<InvitationResponse> {
-  const response = await hospitalApi.delete(`/staff/invitations/${invitationId}`);
+  const response = await hospitalApi.delete(
+    `/staff/invitations/${encodeURIComponent(invitationId)}`,
+  );
   return invitationResponseSchema.parse(response.data);
 }
 
@@ -93,7 +97,10 @@ export async function postStaffAction(
   staffId: string,
   action: StaffAction,
 ): Promise<StaffResponse> {
-  const response = await hospitalApi.post(`/staff/${staffId}/${action}`, {});
+  const response = await hospitalApi.post(
+    `/staff/${encodeURIComponent(staffId)}/${encodeURIComponent(action)}`,
+    {},
+  );
   return staffResponseSchema.parse(response.data);
 }
 
@@ -102,7 +109,7 @@ export async function patchStaff(
   body: StaffRolePatchRequest,
   version: number,
 ): Promise<StaffResponse> {
-  const response = await hospitalApi.patch(`/staff/${staffId}`, body, {
+  const response = await hospitalApi.patch(`/staff/${encodeURIComponent(staffId)}`, body, {
     headers: ifMatch(version),
   });
   return staffResponseSchema.parse(response.data);
@@ -116,11 +123,14 @@ export async function patchRolePermissions(
   roleCode: StaffRoleCode,
   body: RolePermissionsPatchRequest,
 ): Promise<RoleResponse> {
-  const response = await hospitalApi.patch(`/roles/${roleCode}/permissions`, body);
+  const response = await hospitalApi.patch(
+    `/roles/${encodeURIComponent(roleCode)}/permissions`,
+    body,
+  );
   return roleResponseSchema.parse(response.data);
 }
 
 export async function getRolePreview(roleCode: StaffRoleCode): Promise<RolePreviewResponse> {
-  const response = await hospitalApi.get(`/roles/${roleCode}/preview`);
+  const response = await hospitalApi.get(`/roles/${encodeURIComponent(roleCode)}/preview`);
   return rolePreviewResponseSchema.parse(response.data);
 }

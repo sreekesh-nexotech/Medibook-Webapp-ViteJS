@@ -1,0 +1,16 @@
+{
+  "id": "01a0ee28-a797-79a0-a88d-b9f19c5bcbb9",
+  "purpose": "kyc",
+  "owner_kind": "platform",
+  "hospital_id": null,
+  "original_name": "nilgiri-family-clinic-coimbatore-registration.pdf",
+  "mime": "application/pdf",
+  "size_bytes": 242,
+  "sha256": "7f2b8eaf53dd7b000502ce7045017f3708f4621d39cfbea1e1a29e0a6c5f20be",
+  "status": "clean",
+  "uploaded_at": "2026-08-09T09:50:00.023484Z",
+  "scanned_at": "2026-08-09T09:50:00.029771Z",
+  "expires_at": null,
+  "created_at": "2026-08-09T09:50:00.008581Z",
+  "version": 3
+}

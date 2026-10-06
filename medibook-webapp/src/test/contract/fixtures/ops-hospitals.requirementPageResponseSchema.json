@@ -1,0 +1,85 @@
+{
+  "results": [
+    {
+      "id": "01a0ee19-4f38-7d12-b389-8f3096d5c2fd",
+      "code": "reg_certificate",
+      "name": "Registration certificate",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 0,
+      "created_at": "2026-09-29T16:57:11.225056Z",
+      "updated_at": "2026-09-29T16:57:11.225068Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f43-7e13-8dfe-4a0d90f70ee2",
+      "code": "gst_certificate",
+      "name": "GST certificate",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 1,
+      "created_at": "2026-09-29T16:57:11.235359Z",
+      "updated_at": "2026-09-29T16:57:11.235368Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f49-7e93-91e8-b9c8b7c39a2e",
+      "code": "pan",
+      "name": "PAN",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 2,
+      "created_at": "2026-09-29T16:57:11.241351Z",
+      "updated_at": "2026-09-29T16:57:11.241369Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f4f-7d22-9c5c-c3954c8bbb03",
+      "code": "address_proof",
+      "name": "Address proof",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 3,
+      "created_at": "2026-09-29T16:57:11.247733Z",
+      "updated_at": "2026-09-29T16:57:11.247745Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f56-7de3-a6c1-9b22921f0960",
+      "code": "bank_proof",
+      "name": "Bank proof",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 4,
+      "created_at": "2026-09-29T16:57:11.254524Z",
+      "updated_at": "2026-09-29T16:57:11.254534Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f5b-7361-bad9-6d528a5399a5",
+      "code": "medical_licence",
+      "name": "Medical licence",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 5,
+      "created_at": "2026-09-29T16:57:11.259045Z",
+      "updated_at": "2026-09-29T16:57:11.259060Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee19-4f5e-7273-99e4-a3a34553afc6",
+      "code": "cancelled_cheque",
+      "name": "Cancelled cheque",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 6,
+      "created_at": "2026-09-29T16:57:11.262738Z",
+      "updated_at": "2026-09-29T16:57:11.262747Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total": 7,
+  "has_next": false
+}

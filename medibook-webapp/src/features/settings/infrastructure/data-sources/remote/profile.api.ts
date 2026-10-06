@@ -55,7 +55,7 @@ export async function patchHoliday(
   body: HolidayWriteRequest,
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.patch(`${HOLIDAYS_PATH}/${id}`, body, {
+  const response = await hospitalApi.patch(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, body, {
     params: confirmParams(confirm),
     headers: idempotencyKey(),
   });
@@ -63,7 +63,7 @@ export async function patchHoliday(
 }
 
 export async function deleteHoliday(id: string, confirm: boolean): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.delete(`${HOLIDAYS_PATH}/${id}`, {
+  const response = await hospitalApi.delete(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, {
     params: confirmParams(confirm),
     headers: idempotencyKey(),
   });
@@ -87,12 +87,14 @@ export async function patchBanner(
   body: BannerWriteRequest,
   version: number,
 ): Promise<BannerResponse> {
-  const response = await hospitalApi.patch(`${BANNERS_PATH}/${id}`, body, {
+  const response = await hospitalApi.patch(`${BANNERS_PATH}/${encodeURIComponent(id)}`, body, {
     headers: ifMatch(version),
   });
   return bannerResponseSchema.parse(response.data);
 }
 
 export async function deleteBanner(id: string, version: number): Promise<void> {
-  await hospitalApi.delete(`${BANNERS_PATH}/${id}`, { headers: ifMatch(version) });
+  await hospitalApi.delete(`${BANNERS_PATH}/${encodeURIComponent(id)}`, {
+    headers: ifMatch(version),
+  });
 }

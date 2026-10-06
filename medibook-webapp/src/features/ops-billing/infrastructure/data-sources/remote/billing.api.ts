@@ -63,13 +63,13 @@ export async function getInvoices(params: InvoiceListParams) {
 }
 
 export async function getInvoice(id: string) {
-  const response = await platformApi.get(`${INVOICES_PATH}/${id}`);
+  const response = await platformApi.get(`${INVOICES_PATH}/${encodeURIComponent(id)}`);
   return invoiceDetailSchema.parse(response.data);
 }
 
 /** The PDF bytes (`Content-Type: application/pdf`). */
 export async function getInvoicePdf(id: string): Promise<Blob> {
-  const response = await platformApi.get<Blob>(`${INVOICES_PATH}/${id}.pdf`, {
+  const response = await platformApi.get<Blob>(`${INVOICES_PATH}/${encodeURIComponent(id)}.pdf`, {
     responseType: 'blob',
   });
   return response.data;
@@ -85,14 +85,14 @@ export async function getInvoicesCsv(params: InvoiceListParams): Promise<Blob> {
 }
 
 export async function postReminder(id: string) {
-  const response = await platformApi.post(`${INVOICES_PATH}/${id}/reminders`);
+  const response = await platformApi.post(`${INVOICES_PATH}/${encodeURIComponent(id)}/reminders`);
   return invoiceSchema.parse(response.data);
 }
 
 /** Idempotency-Key is mandatory: a replayed submit must not record the money twice. */
 export async function postMarkPaid(id: string, input: MarkPaidInput, key: string) {
   const response = await platformApi.post(
-    `${INVOICES_PATH}/${id}/mark-paid`,
+    `${INVOICES_PATH}/${encodeURIComponent(id)}/mark-paid`,
     {
       method: input.method,
       reference: input.reference,
@@ -106,14 +106,16 @@ export async function postMarkPaid(id: string, input: MarkPaidInput, key: string
 
 /** PATCH (not POST — `schema.yml` and the view agree). */
 export async function patchGrace(id: string, graceEndsAt: string) {
-  const response = await platformApi.patch(`${INVOICES_PATH}/${id}/grace`, {
+  const response = await platformApi.patch(`${INVOICES_PATH}/${encodeURIComponent(id)}/grace`, {
     grace_ends_at: graceEndsAt,
   });
   return invoiceSchema.parse(response.data);
 }
 
 export async function postVoid(id: string, reason: string) {
-  const response = await platformApi.post(`${INVOICES_PATH}/${id}/void`, { reason });
+  const response = await platformApi.post(`${INVOICES_PATH}/${encodeURIComponent(id)}/void`, {
+    reason,
+  });
   return invoiceSchema.parse(response.data);
 }
 
@@ -140,7 +142,7 @@ export async function getReminderEvents(invoiceId: string) {
 }
 
 export async function getSubscription(id: string) {
-  const response = await platformApi.get(`${SUBSCRIPTIONS_PATH}/${id}`);
+  const response = await platformApi.get(`${SUBSCRIPTIONS_PATH}/${encodeURIComponent(id)}`);
   return subscriptionSchema.parse(response.data);
 }
 
@@ -153,11 +155,16 @@ export async function getPlanChanges(params: PlanChangeListParams) {
 
 /** `effective_at` is deprecated — omitted, so the change applies today. */
 export async function postApprovePlanChange(id: string) {
-  const response = await platformApi.post(`${PLAN_CHANGES_PATH}/${id}/approve`, {});
+  const response = await platformApi.post(
+    `${PLAN_CHANGES_PATH}/${encodeURIComponent(id)}/approve`,
+    {},
+  );
   return planChangeApproveSchema.parse(response.data).request;
 }
 
 export async function postRejectPlanChange(id: string, note: string | null) {
-  const response = await platformApi.post(`${PLAN_CHANGES_PATH}/${id}/reject`, { note });
+  const response = await platformApi.post(`${PLAN_CHANGES_PATH}/${encodeURIComponent(id)}/reject`, {
+    note,
+  });
   return planChangeSchema.parse(response.data);
 }

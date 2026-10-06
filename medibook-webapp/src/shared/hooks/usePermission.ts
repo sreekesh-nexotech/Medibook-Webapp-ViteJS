@@ -110,6 +110,33 @@ export interface UsePermissionResult {
   perms: PermsGrid | null;
 }
 
+/** The checks `usePermission` answers with, before the role's name is attached. */
+export type PermissionChecks = Omit<UsePermissionResult, 'roleId' | 'roleName'>;
+
+/**
+ * The permission checks for a hospital session's backend codes
+ * (`appointments.view`, …). `null` means there is no hospital session (the
+ * ops console): everything is allowed, because the route guards — not these
+ * checks — decide who reaches the console. A hospital screen never renders
+ * before its guard has the session.
+ */
+export function permissionChecks(codes: readonly string[] | null): PermissionChecks {
+  const perms = codes ? toGrid(codes) : null;
+  const can = (perm: PermissionKey): boolean => {
+    if (!perms) return true;
+    const parsed = parseKey(perm);
+    if (!parsed) return false;
+    return perms[parsed.module][parsed.action];
+  };
+  return {
+    can,
+    canAny: (...list) => list.length === 0 || list.some(can),
+    canAll: (...list) => list.every(can),
+    canViewModule: (module) => (perms ? perms[module].view : true),
+    perms,
+  };
+}
+
 export function usePermission(): UsePermissionResult {
   // The ops console is not governed by hospital RBAC; its routes are gated by
   // `OpsGuard`, so there is no hospital session to read there.
@@ -117,27 +144,14 @@ export function usePermission(): UsePermissionResult {
   const { data: session } = useSessionQuery('hospital', isHospital);
   const hospitalSession = isHospital && session?.surface === 'hospital' ? session : null;
 
-  return useMemo<UsePermissionResult>(() => {
-    // No hospital session (the ops console): fall back to "allowed", because
-    // the route guards — not this hook — decide who reaches the console. A
-    // hospital screen never renders before its guard has the session.
-    const perms = hospitalSession ? toGrid(hospitalSession.permissions) : null;
-    const can = (perm: PermissionKey): boolean => {
-      if (!perms) return true;
-      const parsed = parseKey(perm);
-      if (!parsed) return false;
-      return perms[parsed.module][parsed.action];
-    };
-    return {
-      can,
-      canAny: (...list) => list.length === 0 || list.some(can),
-      canAll: (...list) => list.every(can),
-      canViewModule: (module) => (perms ? perms[module].view : true),
+  return useMemo<UsePermissionResult>(
+    () => ({
+      ...permissionChecks(hospitalSession ? hospitalSession.permissions : null),
       roleId: hospitalSession?.role.code ?? null,
       roleName: hospitalSession?.role.name ?? null,
-      perms,
-    };
-  }, [hospitalSession]);
+    }),
+    [hospitalSession],
+  );
 }
 
 /** One-liner for a single check: `const mayRefund = useCan('Payments.del');` */

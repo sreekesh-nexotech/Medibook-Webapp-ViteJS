@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { isFailure } from '@/core/error/failure';
 import { cn } from '@/shared/lib/cn';
 import { Card } from '@/shared/ui/Card';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
@@ -119,7 +120,9 @@ export function HospitalPatientAccessCard({ h }: HospitalPatientAccessCardProps)
   const [change, setChange] = useState<AccessChange | null>(null);
 
   const busy = visibility.isPending || update.isPending;
-  const locked = h.status === 'closed';
+  // A closed hospital, or a role without hospitals.edit (SEC-05), cannot change these.
+  const canEdit = useOpsPermission().can('hospitals.edit');
+  const locked = h.status === 'closed' || !canEdit;
   const gaps = bookabilityGaps(h);
   const copy = change ? confirmCopy(change, h) : null;
 

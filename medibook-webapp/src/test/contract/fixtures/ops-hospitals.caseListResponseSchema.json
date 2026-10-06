@@ -1,0 +1,80 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-8342-7f80-82ac-59f01bbebff6",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "hospital_name": "Deccan Heart Institute",
+      "hospital_status": "onboarding",
+      "stage": "documents_pending",
+      "assigned_to_id": null,
+      "notes": "Awaiting GST and bank proof.",
+      "submitted_at": "2026-08-04T05:15:00.119118Z",
+      "approved_at": null,
+      "approved_by_id": null,
+      "rejected_at": null,
+      "rejection_reason": null,
+      "created_at": "2026-08-04T05:15:00.119217Z",
+      "updated_at": "2026-08-07T06:30:00.010188Z"
+    },
+    {
+      "id": "01a0ee28-828b-7393-a8af-9bbdeaa0cebf",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "hospital_name": "Nilgiri Family Clinic",
+      "hospital_status": "active",
+      "stage": "live",
+      "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
+      "notes": "All originals seen at site visit.",
+      "submitted_at": "2026-08-04T05:00:00.124947Z",
+      "approved_at": "2026-08-09T09:50:00.191359Z",
+      "approved_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "rejected_at": null,
+      "rejection_reason": null,
+      "created_at": "2026-08-04T05:00:00.125086Z",
+      "updated_at": "2026-08-09T09:50:00.216071Z"
+    },
+    {
+      "id": "01a0ee28-81d5-7352-b39e-954677c1963f",
+      "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+      "hospital_name": "Sahyadri City Hospital",
+      "hospital_status": "active",
+      "stage": "live",
+      "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
+      "notes": "All originals seen at site visit.",
+      "submitted_at": "2026-08-04T04:45:00.113632Z",
+      "approved_at": "2026-08-09T09:40:00.174389Z",
+      "approved_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "rejected_at": null,
+      "rejection_reason": null,
+      "created_at": "2026-08-04T04:45:00.113717Z",
+      "updated_at": "2026-08-09T09:40:00.196540Z"
+    },
+    {
+      "id": "01a0ee28-8127-7102-9b69-de126a0b9556",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "hospital_name": "Lakeshore Multispeciality Hospital",
+      "hospital_status": "active",
+      "stage": "live",
+      "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
+      "notes": "All originals seen at site visit.",
+      "submitted_at": "2026-08-04T04:30:00.128500Z",
+      "approved_at": "2026-08-09T09:30:00.209784Z",
+      "approved_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "rejected_at": null,
+      "rejection_reason": null,
+      "created_at": "2026-08-04T04:30:00.128670Z",
+      "updated_at": "2026-08-09T09:30:00.238580Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 4,
+  "has_next": false,
+  "counts": {
+    "application": 0,
+    "documents_pending": 1,
+    "review": 0,
+    "approved": 0,
+    "live": 3,
+    "rejected": 0
+  }
+}

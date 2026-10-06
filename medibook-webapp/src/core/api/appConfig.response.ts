@@ -14,8 +14,8 @@ export interface AppConfig {
   readonly otpLength: number;
   /** Platform support phone in E.164, when configured. */
   readonly supportPhoneE164: string | null;
-  /** Current version of each legal document, by slug. */
-  readonly legalVersions: Readonly<Record<string, string>>;
+  /** Current version number of each legal document, by slug. */
+  readonly legalVersions: Readonly<Record<string, number>>;
 }
 
 export const appConfigResponseSchema = z.object({
@@ -26,7 +26,8 @@ export const appConfigResponseSchema = z.object({
   feature_flags_public: z.record(z.string(), z.boolean()),
   otp_length: z.number().int().positive(),
   support_contacts: z.object({ phone_e164: z.string().optional() }),
-  legal_versions: z.record(z.string(), z.string()),
+  // `LegalDocument.version` is an integer column (backend `platform/models/legal_document.py`).
+  legal_versions: z.record(z.string(), z.number().int()),
 });
 
 export type AppConfigResponse = z.infer<typeof appConfigResponseSchema>;

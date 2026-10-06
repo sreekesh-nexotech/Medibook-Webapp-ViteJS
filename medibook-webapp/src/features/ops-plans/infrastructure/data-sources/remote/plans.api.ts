@@ -31,7 +31,7 @@ export async function getPlans(): Promise<PlanResponse[]> {
 
 /** `GET /platform/plans/{id}/subscribers` — the subscriber total only. */
 export async function getSubscriberCount(planId: string): Promise<number> {
-  const response = await platformApi.get(`/plans/${planId}/subscribers`, {
+  const response = await platformApi.get(`/plans/${encodeURIComponent(planId)}/subscribers`, {
     params: { page_size: COUNT_PAGE_SIZE },
   });
   return subscriberPageResponseSchema.parse(response.data).total;
@@ -47,17 +47,17 @@ export async function patchPlan(
   body: PlanWriteRequest,
   version: number,
 ): Promise<PlanResponse> {
-  const response = await platformApi.patch(`/plans/${planId}`, body, {
+  const response = await platformApi.patch(`/plans/${encodeURIComponent(planId)}`, body, {
     headers: ifMatch(version),
   });
   return planResponseSchema.parse(response.data);
 }
 
 export async function deletePlan(planId: string): Promise<void> {
-  await platformApi.delete(`/plans/${planId}`);
+  await platformApi.delete(`/plans/${encodeURIComponent(planId)}`);
 }
 
 export async function postPlanArchive(planId: string): Promise<PlanResponse> {
-  const response = await platformApi.post(`/plans/${planId}/archive`);
+  const response = await platformApi.post(`/plans/${encodeURIComponent(planId)}/archive`);
   return planResponseSchema.parse(response.data);
 }

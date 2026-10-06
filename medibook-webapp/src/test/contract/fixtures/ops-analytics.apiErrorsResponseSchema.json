@@ -1,0 +1,395 @@
+{
+  "period": "30d",
+  "date_from": "2026-09-06",
+  "date_to": "2026-10-05",
+  "hospital_id": null,
+  "results": [
+    {
+      "surface": "display",
+      "endpoint_group": "queue",
+      "requests": 18794,
+      "errors_4xx": 449,
+      "errors_5xx": 16,
+      "p95_ms_max": 406,
+      "error_rate_bp": 247
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "accounts",
+      "requests": 39,
+      "errors_4xx": 3,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 769
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "analytics",
+      "requests": 17,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "appointments",
+      "requests": 17795,
+      "errors_4xx": 516,
+      "errors_5xx": 20,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 301
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "audit",
+      "requests": 5,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "catalog",
+      "requests": 39,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 2500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "hospitals",
+      "requests": 34,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 2500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "messaging",
+      "requests": 15,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "patients",
+      "requests": 73,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "payments",
+      "requests": 10,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "queue",
+      "requests": 20273,
+      "errors_4xx": 474,
+      "errors_5xx": 13,
+      "p95_ms_max": 411,
+      "error_rate_bp": 240
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "rbac",
+      "requests": 18,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "reports",
+      "requests": 8,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "scheduling",
+      "requests": 12,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 2500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "settlements",
+      "requests": 13,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "subscriptions",
+      "requests": 9,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "hospital",
+      "endpoint_group": "tokens",
+      "requests": 11,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 2500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "accounts",
+      "requests": 852,
+      "errors_4xx": 86,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 1009
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "appointments",
+      "requests": 19368,
+      "errors_4xx": 492,
+      "errors_5xx": 26,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 267
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "audit",
+      "requests": 17,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "auth",
+      "requests": 19790,
+      "errors_4xx": 518,
+      "errors_5xx": 29,
+      "p95_ms_max": 416,
+      "error_rate_bp": 276
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "catalog",
+      "requests": 418,
+      "errors_4xx": 5,
+      "errors_5xx": 0,
+      "p95_ms_max": 2500,
+      "error_rate_bp": 119
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "documents",
+      "requests": 161,
+      "errors_4xx": 11,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 683
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "hospitals",
+      "requests": 799,
+      "errors_4xx": 7,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 87
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "messaging",
+      "requests": 10535,
+      "errors_4xx": 20,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 18
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "patients",
+      "requests": 680,
+      "errors_4xx": 22,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 323
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "payments",
+      "requests": 18,
+      "errors_4xx": 2,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 1111
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "platform",
+      "requests": 61,
+      "errors_4xx": 1,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 163
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "scheduling",
+      "requests": 129,
+      "errors_4xx": 1,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 77
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "support",
+      "requests": 44,
+      "errors_4xx": 3,
+      "errors_5xx": 0,
+      "p95_ms_max": 500,
+      "error_rate_bp": 681
+    },
+    {
+      "surface": "patient",
+      "endpoint_group": "unmatched",
+      "requests": 9,
+      "errors_4xx": 9,
+      "errors_5xx": 0,
+      "p95_ms_max": 100,
+      "error_rate_bp": 10000
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "accounts",
+      "requests": 52,
+      "errors_4xx": 3,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 576
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "analytics",
+      "requests": 47,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "audit",
+      "requests": 20,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "hospitals",
+      "requests": 19848,
+      "errors_4xx": 500,
+      "errors_5xx": 21,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 262
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "platform",
+      "requests": 62,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "reports",
+      "requests": 3,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 250,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "settlements",
+      "requests": 37,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "platform",
+      "endpoint_group": "subscriptions",
+      "requests": 123,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "shared",
+      "endpoint_group": "audit",
+      "requests": 2,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 250,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "shared",
+      "endpoint_group": "documents",
+      "requests": 79,
+      "errors_4xx": 11,
+      "errors_5xx": 0,
+      "p95_ms_max": 1000,
+      "error_rate_bp": 1392
+    },
+    {
+      "surface": "shared",
+      "endpoint_group": "platform",
+      "requests": 102478,
+      "errors_4xx": 0,
+      "errors_5xx": 0,
+      "p95_ms_max": 250,
+      "error_rate_bp": 0
+    },
+    {
+      "surface": "webhook",
+      "endpoint_group": "razorpay",
+      "requests": 17124,
+      "errors_4xx": 447,
+      "errors_5xx": 20,
+      "p95_ms_max": 411,
+      "error_rate_bp": 272
+    }
+  ]
+}

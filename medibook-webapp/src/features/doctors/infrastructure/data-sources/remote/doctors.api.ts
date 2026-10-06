@@ -31,8 +31,8 @@ import {
  * bookings carry a fresh `Idempotency-Key` per call and `?confirm=`.
  */
 
-const departmentPageSchema = paginatedSchema(departmentResponseSchema);
-const doctorPageSchema = paginatedSchema(doctorResponseSchema);
+export const departmentPageSchema = paginatedSchema(departmentResponseSchema);
+export const doctorPageSchema = paginatedSchema(doctorResponseSchema);
 
 /** Non-alphanumeric runs collapse to one dash. */
 const SLUG_SEPARATOR_PATTERN = /[^a-z0-9]+/g;
@@ -90,12 +90,15 @@ export async function patchDepartment(
   id: string,
   input: DepartmentInput,
 ): Promise<DepartmentResponse> {
-  const response = await hospitalApi.patch(`/departments/${id}`, departmentBody(input));
+  const response = await hospitalApi.patch(
+    `/departments/${encodeURIComponent(id)}`,
+    departmentBody(input),
+  );
   return departmentResponseSchema.parse(response.data);
 }
 
 export async function deleteDepartment(id: string): Promise<void> {
-  await hospitalApi.delete(`/departments/${id}`);
+  await hospitalApi.delete(`/departments/${encodeURIComponent(id)}`);
 }
 
 /* -------------------------------------------------------------------- doctors */
@@ -116,7 +119,7 @@ export function getDoctors(filters: DoctorFilters): Promise<DoctorResponse[]> {
 }
 
 export async function getDoctor(id: string): Promise<DoctorResponse> {
-  const response = await hospitalApi.get(`/doctors/${id}`);
+  const response = await hospitalApi.get(`/doctors/${encodeURIComponent(id)}`);
   return doctorResponseSchema.parse(response.data);
 }
 
@@ -150,15 +153,19 @@ export async function patchDoctor(
   version: number,
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.patch(`/doctors/${id}`, doctorBody(input), {
-    params: confirmParams(confirm),
-    headers: { ...ifMatch(version), ...idempotencyKey() },
-  });
+  const response = await hospitalApi.patch(
+    `/doctors/${encodeURIComponent(id)}`,
+    doctorBody(input),
+    {
+      params: confirmParams(confirm),
+      headers: { ...ifMatch(version), ...idempotencyKey() },
+    },
+  );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
 export async function deleteDoctor(id: string, confirm: boolean): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.delete(`/doctors/${id}`, {
+  const response = await hospitalApi.delete(`/doctors/${encodeURIComponent(id)}`, {
     params: confirmParams(confirm),
     headers: idempotencyKey(),
   });
@@ -168,7 +175,7 @@ export async function deleteDoctor(id: string, confirm: boolean): Promise<Schedu
 /* ------------------------------------------------------------------- schedule */
 
 export async function getSchedule(doctorId: string): Promise<ScheduleResponse> {
-  const response = await hospitalApi.get(`/doctors/${doctorId}/schedule`);
+  const response = await hospitalApi.get(`/doctors/${encodeURIComponent(doctorId)}/schedule`);
   return scheduleResponseSchema.parse(response.data);
 }
 
@@ -179,7 +186,7 @@ export async function putWeeklySessions(
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.put(
-    `/doctors/${doctorId}/weekly-sessions`,
+    `/doctors/${encodeURIComponent(doctorId)}/weekly-sessions`,
     {
       sessions: sessions.map((s) => ({
         weekday: s.weekday,
@@ -209,10 +216,14 @@ export async function postLeave(
   input: LeaveInput,
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.post(`/doctors/${doctorId}/leaves`, leaveBody(input), {
-    params: confirmParams(confirm),
-    headers: idempotencyKey(),
-  });
+  const response = await hospitalApi.post(
+    `/doctors/${encodeURIComponent(doctorId)}/leaves`,
+    leaveBody(input),
+    {
+      params: confirmParams(confirm),
+      headers: idempotencyKey(),
+    },
+  );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
@@ -224,7 +235,7 @@ export async function patchLeave(
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(
-    `/doctors/${doctorId}/leaves/${leaveId}`,
+    `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leaveId)}`,
     leaveBody(input),
     { params: confirmParams(confirm), headers: { ...ifMatch(version), ...idempotencyKey() } },
   );
@@ -236,10 +247,13 @@ export async function deleteLeave(
   leaveId: string,
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.delete(`/doctors/${doctorId}/leaves/${leaveId}`, {
-    params: confirmParams(confirm),
-    headers: idempotencyKey(),
-  });
+  const response = await hospitalApi.delete(
+    `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leaveId)}`,
+    {
+      params: confirmParams(confirm),
+      headers: idempotencyKey(),
+    },
+  );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
@@ -266,7 +280,7 @@ export async function postDateException(
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.post(
-    `/doctors/${doctorId}/date-exceptions`,
+    `/doctors/${encodeURIComponent(doctorId)}/date-exceptions`,
     exceptionBody(input),
     { params: confirmParams(confirm), headers: idempotencyKey() },
   );
@@ -281,7 +295,7 @@ export async function patchDateException(
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(
-    `/doctors/${doctorId}/date-exceptions/${exceptionId}`,
+    `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exceptionId)}`,
     exceptionBody(input),
     { params: confirmParams(confirm), headers: { ...ifMatch(version), ...idempotencyKey() } },
   );
@@ -293,9 +307,12 @@ export async function deleteDateException(
   exceptionId: string,
   confirm: boolean,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.delete(`/doctors/${doctorId}/date-exceptions/${exceptionId}`, {
-    params: confirmParams(confirm),
-    headers: idempotencyKey(),
-  });
+  const response = await hospitalApi.delete(
+    `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exceptionId)}`,
+    {
+      params: confirmParams(confirm),
+      headers: idempotencyKey(),
+    },
+  );
   return scheduleChangeResponseSchema.parse(response.data);
 }

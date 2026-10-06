@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "id": "01a11031-7e6c-75a2-b4d5-7079a7fd92f6",
+      "principal": "hospital",
+      "device_id": null,
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "ip": "203.0.113.10",
+      "created_at": "2026-10-06T07:50:41.516395Z",
+      "last_seen_at": "2026-10-06T07:50:41.516215Z",
+      "absolute_expires_at": "2026-10-06T19:50:41.516215Z",
+      "current": true
+    },
+    {
+      "id": "01a1102f-8038-7760-b313-abc95e8209f2",
+      "principal": "hospital",
+      "device_id": null,
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "ip": "203.0.113.10",
+      "created_at": "2026-10-06T07:48:30.904343Z",
+      "last_seen_at": "2026-10-06T07:48:30.902965Z",
+      "absolute_expires_at": "2026-10-06T19:48:30.902965Z",
+      "current": false
+    },
+    {
+      "id": "01a1102d-dd9a-7b91-b228-4dfbea3c3e98",
+      "principal": "hospital",
+      "device_id": null,
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "ip": "203.0.113.10",
+      "created_at": "2026-10-06T07:46:43.738992Z",
+      "last_seen_at": "2026-10-06T07:46:43.738810Z",
+      "absolute_expires_at": "2026-10-06T19:46:43.738810Z",
+      "current": false
+    },
+    {
+      "id": "01a1102b-f29d-7912-bea6-33996d686480",
+      "principal": "hospital",
+      "device_id": null,
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "ip": "203.0.113.10",
+      "created_at": "2026-10-06T07:44:38.045561Z",
+      "last_seen_at": "2026-10-06T07:44:38.045105Z",
+      "absolute_expires_at": "2026-10-06T19:44:38.045105Z",
+      "current": false
+    },
+    {
+      "id": "01a11029-8df0-7f63-a8fb-745502ee4414",
+      "principal": "hospital",
+      "device_id": null,
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "ip": "203.0.113.10",
+      "created_at": "2026-10-06T07:42:01.200752Z",
+      "last_seen_at": "2026-10-06T07:42:01.200570Z",
+      "absolute_expires_at": "2026-10-06T19:42:01.200570Z",
+      "current": false
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 39,
+  "has_next": true
+}

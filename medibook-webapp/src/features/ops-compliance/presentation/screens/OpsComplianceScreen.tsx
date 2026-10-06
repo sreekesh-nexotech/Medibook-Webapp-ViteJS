@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SegTabs } from '@/shared/ui/SegTabs';
@@ -123,10 +124,12 @@ export function OpsComplianceScreen() {
       {tab === 'Configuration Changes' && <ConfigChangesCard />}
       {tab === 'Export on Request' && (
         <>
-          <ExportRequestForm
-            busy={createExport.isPending || processingId != null}
-            onSubmit={handleExport}
-          />
+          <CanOps perm="compliance.add">
+            <ExportRequestForm
+              busy={createExport.isPending || processingId != null}
+              onSubmit={handleExport}
+            />
+          </CanOps>
           <ExportRequestsCard processingId={processingId} onProcess={prepare} />
         </>
       )}

@@ -1,0 +1,48 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-7f75-7753-b4b9-0fbc57defab1",
+      "code": "starter",
+      "name": "Starter",
+      "description": "Small clinics: up to 5 doctors.",
+      "price_monthly_paise": 299900,
+      "price_yearly_paise": 2999000,
+      "gst_rate_bp": 1800,
+      "trial_days": 14,
+      "limit_users": 8,
+      "limit_doctors": 6,
+      "limit_storage_gb": 5,
+      "hard_limits": ["doctors"],
+      "is_public": true,
+      "is_active": true,
+      "sort_order": 1,
+      "created_at": "2026-07-31T04:00:00.012899Z",
+      "updated_at": "2026-07-31T04:00:00.012923Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-7f7e-7ee1-9dda-da4f5b84abbd",
+      "code": "growth",
+      "name": "Growth",
+      "description": "Multi-department hospitals.",
+      "price_monthly_paise": 799900,
+      "price_yearly_paise": 7999000,
+      "gst_rate_bp": 1800,
+      "trial_days": 14,
+      "limit_users": 25,
+      "limit_doctors": 20,
+      "limit_storage_gb": 25,
+      "hard_limits": ["doctors", "users"],
+      "is_public": true,
+      "is_active": true,
+      "sort_order": 2,
+      "created_at": "2026-07-31T04:00:00.021985Z",
+      "updated_at": "2026-07-31T04:00:00.022003Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

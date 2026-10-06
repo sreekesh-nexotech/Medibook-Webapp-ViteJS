@@ -1,0 +1,72 @@
+{
+  "results": [
+    {
+      "id": "01a10f42-d564-7640-88a7-71fd3cb06267",
+      "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+      "invoice_id": "01a0ee2f-afb3-7210-aecc-654a5124153e",
+      "invoice_no": "INV-2026-0009",
+      "kind": "reminder_queued",
+      "actor_user_id": null,
+      "note": null,
+      "meta": {
+        "offset": 0
+      },
+      "occurred_at": "2026-10-06T03:30:00.041876Z"
+    },
+    {
+      "id": "01a10f42-d5d8-7512-9079-d26aa8aa37c2",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "invoice_id": "01a0ee2f-af58-7490-9b09-73a8e1d19fa6",
+      "invoice_no": "INV-2026-0008",
+      "kind": "reminder_queued",
+      "actor_user_id": null,
+      "note": null,
+      "meta": {
+        "offset": 0
+      },
+      "occurred_at": "2026-10-06T03:30:00.041876Z"
+    },
+    {
+      "id": "01a0faa9-6553-7ec1-ab25-a403d91c85aa",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "invoice_id": "01a0ee2d-1cdc-73d3-915c-1ab8046e53db",
+      "invoice_no": "INV-2026-0007",
+      "kind": "reminder_queued",
+      "actor_user_id": null,
+      "note": null,
+      "meta": {
+        "offset": 7
+      },
+      "occurred_at": "2026-10-02T03:30:00.031725Z"
+    },
+    {
+      "id": "01a0ee2f-6f1e-74e2-9b2f-bee61478dfa0",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "invoice_id": "01a0ee2d-1cdc-73d3-915c-1ab8046e53db",
+      "invoice_no": "INV-2026-0007",
+      "kind": "read_only",
+      "actor_user_id": null,
+      "note": null,
+      "meta": {},
+      "occurred_at": "2026-09-29T17:21:21.134006Z"
+    },
+    {
+      "id": "01a0ee2f-6ed5-7c63-80f2-2a96a4ea24d5",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "invoice_id": "01a0ee2d-1cdc-73d3-915c-1ab8046e53db",
+      "invoice_no": "INV-2026-0007",
+      "kind": "grace_extended",
+      "actor_user_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "note": null,
+      "meta": {
+        "to": "2026-09-25",
+        "from": "2026-10-02"
+      },
+      "occurred_at": "2026-09-29T17:21:21.109730Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 14,
+  "has_next": true
+}

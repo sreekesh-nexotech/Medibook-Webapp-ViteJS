@@ -5,6 +5,7 @@ import { money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
+import { CanOps } from '@/shared/ui/CanOps';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
 import { opsPath } from '@/app/router/paths';
@@ -118,35 +119,42 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
         >
           View Hospitals
         </Button>
-        <IconBtn
-          name="pencil"
-          label="Edit plan"
-          box={40}
-          size={16}
-          title={`Edit ${plan.name}`}
-          onClick={() => onEdit(plan)}
-        />
-        {plan.isActive && (
+        {/* SEC-05: editing and archiving need plans.edit; deleting needs plans.del. */}
+        <CanOps perm="plans.edit">
           <IconBtn
-            name="circle-slash"
-            label="Archive plan"
+            name="pencil"
+            label="Edit plan"
             box={40}
             size={16}
-            title="Archive plan — close it to new subscriptions"
-            onClick={() => onArchive(plan, knownCount)}
+            title={`Edit ${plan.name}`}
+            onClick={() => onEdit(plan)}
           />
+        </CanOps>
+        {plan.isActive && (
+          <CanOps perm="plans.edit">
+            <IconBtn
+              name="circle-slash"
+              label="Archive plan"
+              box={40}
+              size={16}
+              title="Archive plan — close it to new subscriptions"
+              onClick={() => onArchive(plan, knownCount)}
+            />
+          </CanOps>
         )}
-        <IconBtn
-          name="trash-2"
-          label="Delete plan"
-          box={40}
-          size={16}
-          color="var(--color-d-500)"
-          title={
-            knownCount !== null && knownCount > 0 ? 'Hospitals are on this plan' : 'Delete plan'
-          }
-          onClick={() => onDelete(plan, knownCount)}
-        />
+        <CanOps perm="plans.del">
+          <IconBtn
+            name="trash-2"
+            label="Delete plan"
+            box={40}
+            size={16}
+            color="var(--color-d-500)"
+            title={
+              knownCount !== null && knownCount > 0 ? 'Hospitals are on this plan' : 'Delete plan'
+            }
+            onClick={() => onDelete(plan, knownCount)}
+          />
+        </CanOps>
       </div>
     </div>
   );

@@ -1,0 +1,118 @@
+{
+  "results": [
+    {
+      "id": "01a11015-e30b-73b0-b499-0c4dce94d3c8",
+      "occurred_at": "2026-10-06T07:20:32.267354Z",
+      "request_id": "6dfd7e86f222b6205cf3b78c17d06629",
+      "principal": "hospital",
+      "actor_user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/cash-sessions/01a11010-79da-7741-95be-9597fb474fc1/close",
+      "action": "http.post",
+      "resource_type": "HospitalCashSessionCloseView",
+      "resource_id": "01a11010-79da-7741-95be-9597fb474fc1",
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/hospital/cash-sessions/<uuid:cash_session_id>/close",
+        "surface": "hospital"
+      }
+    },
+    {
+      "id": "01a11010-89d3-7162-977e-c91651cfcee7",
+      "occurred_at": "2026-10-06T07:14:41.747150Z",
+      "request_id": "709dba750fca91b7d0ff01fa6e4449fd",
+      "principal": "hospital",
+      "actor_user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/appointments/01a10fd4-1a93-7771-89f4-c99a61492e7c/refunds",
+      "action": "http.post",
+      "resource_type": "HospitalAppointmentRefundsView",
+      "resource_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 201,
+      "meta": {
+        "route": "api/v1/hospital/appointments/<uuid:appointment_id>/refunds",
+        "surface": "hospital"
+      }
+    },
+    {
+      "id": "01a11010-79e7-7c02-9786-be6dce96de45",
+      "occurred_at": "2026-10-06T07:14:37.671395Z",
+      "request_id": "391a5a9da2ff536ca0c1aafbaa3a6dbd",
+      "principal": "hospital",
+      "actor_user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/cash-sessions",
+      "action": "http.post",
+      "resource_type": "HospitalCashSessionListView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 201,
+      "meta": {
+        "route": "api/v1/hospital/cash-sessions",
+        "surface": "hospital"
+      }
+    },
+    {
+      "id": "01a10fd5-57e1-7213-9648-66c78bf0fd0c",
+      "occurred_at": "2026-10-06T06:10:02.337008Z",
+      "request_id": "28e1f590a00cb431603d871f3d2abc52",
+      "principal": "hospital",
+      "actor_user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/cash-sessions/01a0ee2f-5a81-71e1-a0ef-633c6e68b009/reconcile",
+      "action": "http.post",
+      "resource_type": "HospitalCashSessionReconcileView",
+      "resource_id": "01a0ee2f-5a81-71e1-a0ef-633c6e68b009",
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/hospital/cash-sessions/<uuid:cash_session_id>/reconcile",
+        "surface": "hospital"
+      }
+    },
+    {
+      "id": "01a10fd4-e9b9-7562-a387-f5d546c11d91",
+      "occurred_at": "2026-10-06T06:09:34.137716Z",
+      "request_id": "f094330f0663eff1a6a8b868a07a5eab",
+      "principal": "hospital",
+      "actor_user_id": "01a0ee28-8a3c-7d91-9672-c599b8159456",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/cash-sessions/01a10fd1-2acc-7213-9be2-a84a3c8a5075/close",
+      "action": "http.post",
+      "resource_type": "HospitalCashSessionCloseView",
+      "resource_id": "01a10fd1-2acc-7213-9be2-a84a3c8a5075",
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/hospital/cash-sessions/<uuid:cash_session_id>/close",
+        "surface": "hospital"
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 108,
+  "has_next": true
+}

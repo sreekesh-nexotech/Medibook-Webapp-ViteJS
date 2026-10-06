@@ -1,0 +1,107 @@
+{
+  "id": "01a0ee28-828b-7393-a8af-9bbdeaa0cebf",
+  "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+  "hospital_name": "Nilgiri Family Clinic",
+  "hospital_status": "active",
+  "stage": "live",
+  "assigned_to_id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
+  "notes": "All originals seen at site visit.",
+  "submitted_at": "2026-08-04T05:00:00.124947Z",
+  "approved_at": "2026-08-09T09:50:00.191359Z",
+  "approved_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+  "rejected_at": null,
+  "rejection_reason": null,
+  "created_at": "2026-08-04T05:00:00.125086Z",
+  "updated_at": "2026-08-09T09:50:00.216071Z",
+  "checklist": [
+    {
+      "id": "01a0ee28-8290-7f51-bc25-17f596bcdd14",
+      "code": "address_proof",
+      "name": "Address proof",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.069531Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.069531Z",
+      "file_id": null,
+      "note": "Scan attached",
+      "updated_at": "2026-08-09T09:50:00.069562Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-180c37cc2c98",
+      "code": "bank_proof",
+      "name": "Bank proof",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.084777Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.084777Z",
+      "file_id": null,
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.084812Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-182cc155bef4",
+      "code": "cancelled_cheque",
+      "name": "Cancelled cheque",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.101829Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.101829Z",
+      "file_id": null,
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.101873Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-17d7faf8ac51",
+      "code": "gst_certificate",
+      "name": "GST certificate",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.116212Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.116212Z",
+      "file_id": null,
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.116238Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-1810fbe23bfd",
+      "code": "medical_licence",
+      "name": "Medical licence",
+      "status": "waived",
+      "received_at": null,
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.133156Z",
+      "file_id": null,
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.133222Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-17e849779959",
+      "code": "pan",
+      "name": "PAN",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.147579Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.147579Z",
+      "file_id": null,
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.147641Z"
+    },
+    {
+      "id": "01a0ee28-8290-7f51-bc25-17c2675a7eb6",
+      "code": "reg_certificate",
+      "name": "Registration certificate",
+      "status": "verified",
+      "received_at": "2026-08-09T09:50:00.161608Z",
+      "verified_by_id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+      "verified_at": "2026-08-09T09:50:00.161608Z",
+      "file_id": "01a0ee28-a797-79a0-a88d-b9f19c5bcbb9",
+      "note": "Verified against original",
+      "updated_at": "2026-08-09T09:50:00.165257Z"
+    }
+  ],
+  "go_live_blockers": [
+    {
+      "code": "no_subscription"
+    }
+  ]
+}

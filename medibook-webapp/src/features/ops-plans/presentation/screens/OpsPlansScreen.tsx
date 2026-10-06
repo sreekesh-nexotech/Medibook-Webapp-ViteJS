@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/shared/ui/Button';
+import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -88,9 +89,11 @@ export function OpsPlansScreen() {
           {plans ? `${plans.length} plan tiers` : 'Plan tiers'} · standard plans are public;
           hospital-specific plans are negotiated per tenant
         </span>
-        <Button icon="plus" onClick={() => setModal('new')}>
-          Create Plan
-        </Button>
+        <CanOps perm="plans.add">
+          <Button icon="plus" onClick={() => setModal('new')}>
+            Create Plan
+          </Button>
+        </CanOps>
       </Card>
 
       {plansQuery.isLoading ? (

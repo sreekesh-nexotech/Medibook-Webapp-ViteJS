@@ -34,7 +34,7 @@ export async function patchBanner(
   version: number,
   body: BannerWriteRequest,
 ): Promise<BannerResponse> {
-  const response = await platformApi.patch(`${BANNERS_PATH}/${id}`, body, {
+  const response = await platformApi.patch(`${BANNERS_PATH}/${encodeURIComponent(id)}`, body, {
     headers: ifMatch(version),
   });
   return bannerResponseSchema.parse(response.data);
@@ -42,5 +42,7 @@ export async function patchBanner(
 
 /** `DELETE /platform/banners/{id}` — soft delete, guarded by `If-Match`. */
 export async function deleteBanner(id: string, version: number): Promise<void> {
-  await platformApi.delete(`${BANNERS_PATH}/${id}`, { headers: ifMatch(version) });
+  await platformApi.delete(`${BANNERS_PATH}/${encodeURIComponent(id)}`, {
+    headers: ifMatch(version),
+  });
 }

@@ -1,11 +1,12 @@
 # Backend blockers for go-live
 
-Issues from the go-live checklist's "Day-one workflows that fail today" that the web
-app cannot fix on its own, plus related backend gaps found while fixing the rest.
+Issues from the go-live checklist that the web app cannot fix on its own, plus
+related backend and environment gaps found while fixing the rest.
 Each entry says what fails, the evidence, what the backend needs to change, and what
 the web app does in the meantime.
 
-Found on 6 Oct 2026 against the shared test backend, branch `claude/core-day-one`.
+Found on 6 Oct 2026 against the shared test backend while fixing the Day-one
+workflows (`claude/core-day-one`) and the release items (`claude/rel-sec-hardening`).
 Paths under `backend:` are in the Django repository.
 
 ## Summary
@@ -13,6 +14,11 @@ Paths under `backend:` are in the Django repository.
 | ID        | Problem                                                       | Severity | Web app status                         |
 | --------- | ------------------------------------------------------------- | -------- | -------------------------------------- |
 | CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only             |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision   |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`   |
+| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself         |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs    |
 | CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                          |
 | ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates     |
 | CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)      |
@@ -27,9 +33,13 @@ Paths under `backend:` are in the Django repository.
 
 **What fails.** A receptionist opens New Appointment and the Consultations section shows
 "You do not have permission to perform this action." No doctor or slot can be chosen,
-so the front desk cannot book a walk-in in the app. The receptionist dashboard shows
-"Departments could not be loaded", and the Appointments list's department and doctor
-filters fail the same way.
+so the front desk cannot book a walk-in in the app. The browser smoke tests
+(`npm run e2e`) find the same 403s on five receptionist screens:
+
+- New Appointment: no doctors or slots to choose;
+- Dashboard: "Departments could not be loaded";
+- Token Management: the queue does not load ("didn't load");
+- Appointments and Payments: the department and doctor filters fail.
 
 **Evidence.**
 
@@ -56,6 +66,84 @@ filters fail the same way.
 select Receptionist, and tick Doctors & Departments → View. Only the admin role's grid
 is locked (backend: `rbac/services/role_admin.py:55`). Every hospital would have to do
 this by hand, so it is not a fix.
+
+## ENV-03 — No resettable staging backend for end-to-end tests and UAT
+
+**What fails.** The browser smoke tests and the API contract recorder only read.
+The flows the checklist wants tested end to end — walk-in booking, payment with
+receipt, refund, the token queue and go-live — all write, and the only backend
+available is shared by everyone testing, so automated runs would pile up records
+(and go-live cannot be undone). The shared backend is also not reachable from
+GitHub Actions, so the smoke tests cannot run in CI.
+
+**What is needed (DevOps + backend).**
+
+- A staging backend with a seed command that resets it to a known state, and a
+  public (or VPN-reachable) URL CI can use.
+- Accounts for one hospital admin, one receptionist and one platform owner, given to
+  CI as repository variables (`E2E_*`) and a secret (`E2E_PASSWORD`).
+- Real object storage there (see ENV-02), so downloads complete.
+
+Until then the smoke job in `.github/workflows/ci.yml` stays skipped, and UAT
+(`docs/UAT_SCRIPTS.md`) cannot start.
+
+## SEC-04 — No multi-factor sign-in
+
+**What fails.** `MFA_ENABLED` is false and the MFA endpoints are stubs that answer 501
+(backend: `settings/base.py:177`, `accounts/views/mfa_not_enabled.py`). The operations
+console can act on every hospital and every patient account with a password alone.
+
+**What is needed.** TOTP enrolment and verification for platform staff, and ideally
+hospital admins, then the web app's enrolment and sign-in steps. If MFA does not ship
+before go-live, a named owner signs a written risk acceptance.
+
+## SEC-07-B — Token refresh shares the per-address sign-in limit
+
+**What fails.** Sign-in, refresh and password reset share a limit of 10 a minute per IP
+address (backend: `core/ratelimit.py:34`), and a hospital usually reaches the internet
+through one address. At shift change, staff refreshing and signing in together get
+429s.
+
+**What the web app now does.** A rate-limited refresh no longer ends the session: the
+app waits for `Retry-After` (up to 10 seconds) and tries once more; if that is also
+limited, the user's action fails with "Too many attempts" and they stay signed in.
+
+**What the backend should do.** Exempt refresh from the per-address limit (it is
+already limited per session family, `accounts/views/token_refresh.py`), or raise it
+well above a hospital's staff count.
+
+## SEC-01-B — Background polls keep server sessions alive
+
+**What fails.** Any authenticated request moves the session's last-seen time forward
+(backend: `accounts/authentication.py:76-80`). The dashboard and token queue poll every
+60 seconds, so the server's 15-minute idle limit never ends a session left open on a
+front-desk screen.
+
+**What the web app now does.** Both consoles sign themselves out after 15 minutes with
+no keyboard, mouse or touch input, whatever the polls do, after a one-minute warning.
+
+**What the backend should do.**
+
+- Do not count background polls as activity: for example, skip the last-seen update for
+  requests marked with a header such as `X-Background-Poll: 1`, which the app can send.
+- Expose `session_timeout_min` to hospital staff (on `/hospital/me` or the app config).
+  The hospital app cannot read it today and uses the default of 15 minutes.
+
+## SEC-06-B — Reusing a just-rotated refresh token revokes the session
+
+**What fails.** A refresh token is single-use. If a second request arrives with the token
+that was just rotated out, the backend revokes the whole session family as a stolen
+token (backend: `accounts/services/sessions.py:107-111`). Duplicated or restored tabs
+used to do exactly that and sign the user out.
+
+**What the web app now does.** Tabs take turns to refresh (Web Locks), share every
+rotation over a BroadcastChannel, and adopt the new pair instead of refreshing again.
+Verified: two restored tabs refreshing at once used to end on the sign-in page; both now
+stay signed in.
+
+**What the backend should do.** Allow a short grace window (for example 30 seconds) in
+which the just-rotated token returns the same new pair instead of revoking. That covers
+browsers without these APIs and a message lost between tabs.
 
 ## CORE-04 — Ops cannot re-send an expired first-admin invitation
 
@@ -154,7 +242,10 @@ a bare array:
 - `hospital_auth_sessions_list` and `platform_auth_sessions_list` (`GET …/auth/sessions`)
 
 The web app followed the schema, and five screens failed to load against the real
-backend. That is fixed (CORE-01): all five now read every page of the envelope.
+backend. `GET /shared/app-config` is typed only as `object`; its `legal_versions`
+values turned out to be integers, which the app read as strings, so Help & Support
+showed a placeholder phone number (fixed in the app; found by the new contract
+tests). That is fixed (CORE-01): all five now read every page of the envelope.
 `GET /hospital/hours` really is a bare array; its schema is correct.
 
 **What the backend needs.** Annotate these views with the paginated serializer so the

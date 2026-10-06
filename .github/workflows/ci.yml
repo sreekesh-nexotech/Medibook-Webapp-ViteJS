@@ -1,0 +1,75 @@
+# The QA gate from docs/REACT_VITEJS_CODING_STANDARDS.md §9, plus tests and a
+# dependency audit. Make "QA gate" a required status check on main so a pull
+# request that fails it cannot be merged (checklist REL-02).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: medibook-webapp
+
+jobs:
+  qa:
+    name: QA gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: medibook-webapp/.nvmrc
+          cache: npm
+          cache-dependency-path: medibook-webapp/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Format
+        run: npm run format:check
+      - name: Unit and API contract tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  smoke:
+    name: Browser smoke tests
+    # Runs only once a staging app is configured: repository variables
+    # E2E_BASE_URL (and E2E_API_BASE if the API is on another origin),
+    # E2E_ADMIN_EMAIL, E2E_RECEPTION_EMAIL, E2E_PLATFORM_EMAIL, and the
+    # secret E2E_PASSWORD.
+    if: ${{ vars.E2E_BASE_URL != '' }}
+    needs: qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+      E2E_API_BASE: ${{ vars.E2E_API_BASE }}
+      E2E_ADMIN_EMAIL: ${{ vars.E2E_ADMIN_EMAIL }}
+      E2E_RECEPTION_EMAIL: ${{ vars.E2E_RECEPTION_EMAIL }}
+      E2E_PLATFORM_EMAIL: ${{ vars.E2E_PLATFORM_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: medibook-webapp/.nvmrc
+          cache: npm
+          cache-dependency-path: medibook-webapp/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e

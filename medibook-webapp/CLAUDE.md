@@ -31,7 +31,8 @@ for feature generation and bug fixes.
 - **Imports:** use the `@/` alias (wired in `vite.config.ts` + `tsconfig.app.json`),
   never `../../..` chains.
 - **QA gate (all must pass, zero errors/warnings):**
-  `npm run lint` · `npm run typecheck` · `npm run format:check` · `npm run build`.
+  `npm run lint` · `npm run typecheck` · `npm run format:check` · `npm test` · `npm run build`.
+  CI runs the same gate plus `npm audit` on every pull request.
   Bare `npx tsc --noEmit` **false-passes** here (solution-style root tsconfig) —
   always use `npm run typecheck`.
 

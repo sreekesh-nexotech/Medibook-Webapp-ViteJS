@@ -99,8 +99,12 @@ export async function patchBankAccount(
   body: BankAccountWriteRequest,
   version: number,
 ): Promise<BankAccountResponse> {
-  const response = await hospitalApi.patch(`${BANK_ACCOUNTS_PATH}/${id}`, body, {
-    headers: ifMatch(version),
-  });
+  const response = await hospitalApi.patch(
+    `${BANK_ACCOUNTS_PATH}/${encodeURIComponent(id)}`,
+    body,
+    {
+      headers: ifMatch(version),
+    },
+  );
   return bankAccountResponseSchema.parse(response.data);
 }

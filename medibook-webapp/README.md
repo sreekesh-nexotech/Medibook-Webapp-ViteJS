@@ -22,9 +22,15 @@ npm run dev
 | `npm run typecheck`    | Type-check only (`tsc -b`)                       |
 | `npm run format`       | Format with Prettier (sorts Tailwind classes)    |
 | `npm run format:check` | Verify formatting without writing                |
+| `npm test`             | Unit and API contract tests (Vitest)             |
+| `npm run test:watch`   | The same tests, re-run on save                   |
+| `npm run e2e`          | Browser smoke tests (Playwright; needs `E2E_*`)  |
 | `npm run preview`      | Preview the production build                     |
 
-All of `lint`, `typecheck`, `format:check`, and `build` must pass before merging.
+All of `lint`, `typecheck`, `format:check`, `test`, and `build` must pass before
+merging; CI (`.github/workflows/ci.yml`) runs them, plus `npm audit`, on every pull
+request. Releases, tests and fixtures are described in
+[`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## Documentation — read before writing code
 

@@ -1,0 +1,62 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-e88d-7be1-91f3-5fb390d62a5f",
+      "event_type": "created",
+      "actor_kind": "staff",
+      "actor_user_id": "01a0ee28-8b60-76e1-bd9e-56b7744ff289",
+      "from_status": null,
+      "to_status": "scheduled",
+      "data": {
+        "token_reused": false
+      },
+      "occurred_at": "2026-08-25T03:05:00.044965Z"
+    },
+    {
+      "id": "01a0ee28-e8b9-7bf0-88c5-9e6017bea45e",
+      "event_type": "payment_updated",
+      "actor_kind": "staff",
+      "actor_user_id": "01a0ee28-8b60-76e1-bd9e-56b7744ff289",
+      "from_status": "scheduled",
+      "to_status": "scheduled",
+      "data": {
+        "lines": [
+          {
+            "method": "upi",
+            "amount_paise": 45000
+          },
+          {
+            "method": "cash",
+            "amount_paise": 45000
+          }
+        ],
+        "order_id": "01a0ee28-e8ab-7e70-b384-e00ea91982f7"
+      },
+      "occurred_at": "2026-08-25T03:05:00.137604Z"
+    },
+    {
+      "id": "01a0ee28-ebd7-7832-9237-dd4106e636a6",
+      "event_type": "checked_in",
+      "actor_kind": "staff",
+      "actor_user_id": "01a0ee28-8a3c-7d91-9672-c599b8159456",
+      "from_status": "scheduled",
+      "to_status": "checked_in",
+      "data": {},
+      "occurred_at": "2026-08-25T03:32:00.030480Z"
+    },
+    {
+      "id": "01a0ee28-f217-7473-883e-a0e2a355f619",
+      "event_type": "no_show",
+      "actor_kind": "staff",
+      "actor_user_id": "01a0ee28-8da1-7ac0-a00f-7556c7059c79",
+      "from_status": "checked_in",
+      "to_status": "no_show",
+      "data": {},
+      "occurred_at": "2026-08-25T03:48:00.109027Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 25,
+  "total": 4,
+  "has_next": false
+}

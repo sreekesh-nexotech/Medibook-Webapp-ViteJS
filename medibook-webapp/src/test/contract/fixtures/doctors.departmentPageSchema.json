@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-84a8-76f2-82a6-97612c344980",
+      "code": "cardiology",
+      "name": "Cardiology",
+      "description": "Cardiology OPD",
+      "icon": null,
+      "sort_order": 0,
+      "is_active": true,
+      "version": 1,
+      "created_at": "2026-08-06T04:30:00.301950Z",
+      "updated_at": "2026-08-06T04:30:00.301964Z"
+    },
+    {
+      "id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+      "code": "general_medicine",
+      "name": "General Medicine",
+      "description": "General Medicine OPD",
+      "icon": null,
+      "sort_order": 0,
+      "is_active": true,
+      "version": 1,
+      "created_at": "2026-08-06T04:30:00.271735Z",
+      "updated_at": "2026-08-06T04:30:00.271753Z"
+    },
+    {
+      "id": "01a0ee28-84a0-79b1-b7a0-43b4162d0d9c",
+      "code": "orthopaedics",
+      "name": "Orthopaedics",
+      "description": "Orthopaedics OPD",
+      "icon": null,
+      "sort_order": 0,
+      "is_active": true,
+      "version": 1,
+      "created_at": "2026-08-06T04:30:00.293651Z",
+      "updated_at": "2026-08-06T04:30:00.293679Z"
+    },
+    {
+      "id": "01a0ee28-8494-7340-8907-128e1b77946b",
+      "code": "paediatrics",
+      "name": "Paediatrics",
+      "description": "Paediatrics OPD",
+      "icon": null,
+      "sort_order": 0,
+      "is_active": true,
+      "version": 1,
+      "created_at": "2026-08-06T04:30:00.282244Z",
+      "updated_at": "2026-08-06T04:30:00.282262Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 4,
+  "has_next": false
+}

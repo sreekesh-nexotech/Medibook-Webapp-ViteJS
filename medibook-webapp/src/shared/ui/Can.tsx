@@ -11,8 +11,8 @@ interface CanProps {
   /** Rendered when the role lacks the permission. Default: nothing. */
   fallback?: ReactNode;
   /**
-   * Instead of hiding the control, render it dimmed and inert with an
-   * explanatory `title`. Use this when hiding would be confusing — a row
+   * Instead of hiding the control, render it dimmed and inert (no mouse,
+   * keyboard or assistive-technology activation) with an explanatory `title`. Use this when hiding would be confusing — a row
    * action that exists for other users, say — and hiding otherwise, because a
    * control the role can never use is noise.
    */
@@ -51,13 +51,13 @@ export function Can({
   if (allowed) return <>{children}</>;
   if (!disableInstead) return <>{fallback}</>;
 
+  // `inert` keeps the control out of reach of the keyboard too, not only the
+  // mouse (SEC-11); the outer span still shows the explanation on hover.
   return (
-    <span
-      title={disabledTitle}
-      aria-disabled="true"
-      className="pointer-events-none inline-flex opacity-50"
-    >
-      {children}
+    <span title={disabledTitle} className="inline-flex cursor-not-allowed">
+      <span inert className="inline-flex opacity-50">
+        {children}
+      </span>
     </span>
   );
 }

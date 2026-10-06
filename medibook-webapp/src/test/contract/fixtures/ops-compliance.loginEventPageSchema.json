@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "id": "01a11031-830f-7873-ba1b-dc2293de9d1f",
+      "user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "identifier": "kavya.iyer@medibook.example.com",
+      "principal": "platform",
+      "hospital_id": null,
+      "result": "success",
+      "ip": "203.0.113.10",
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "device_id": null,
+      "session_id": "01a11031-8290-7240-921e-64c06f796679",
+      "occurred_at": "2026-10-06T07:50:42.703725Z"
+    },
+    {
+      "id": "01a11031-7ee9-7cc3-9cb4-61480a1c3a0d",
+      "user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "identifier": "anita.menon@lakeshore.medibook.example.com",
+      "principal": "hospital",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "result": "success",
+      "ip": "203.0.113.10",
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "device_id": null,
+      "session_id": "01a11031-7e6c-75a2-b4d5-7079a7fd92f6",
+      "occurred_at": "2026-10-06T07:50:41.641905Z"
+    },
+    {
+      "id": "01a1102f-8477-7191-a290-f0db5e921905",
+      "user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "identifier": "kavya.iyer@medibook.example.com",
+      "principal": "platform",
+      "hospital_id": null,
+      "result": "success",
+      "ip": "203.0.113.10",
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "device_id": null,
+      "session_id": "01a1102f-83fe-7912-b6f1-fbd90ffcabb8",
+      "occurred_at": "2026-10-06T07:48:31.991510Z"
+    },
+    {
+      "id": "01a1102f-80ee-7893-bf50-e703542f919e",
+      "user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "identifier": "anita.menon@lakeshore.medibook.example.com",
+      "principal": "hospital",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "result": "success",
+      "ip": "203.0.113.10",
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "device_id": null,
+      "session_id": "01a1102f-8038-7760-b313-abc95e8209f2",
+      "occurred_at": "2026-10-06T07:48:31.086649Z"
+    },
+    {
+      "id": "01a1102d-e239-72f2-a196-25bd4ff5afc1",
+      "user_id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "identifier": "kavya.iyer@medibook.example.com",
+      "principal": "platform",
+      "hospital_id": null,
+      "result": "success",
+      "ip": "203.0.113.10",
+      "user_agent": "Mozilla/5.0 (fixture)",
+      "device_id": null,
+      "session_id": "01a1102d-e1be-7211-8e5b-08253cbd1132",
+      "occurred_at": "2026-10-06T07:46:44.921508Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 510,
+  "has_next": true
+}

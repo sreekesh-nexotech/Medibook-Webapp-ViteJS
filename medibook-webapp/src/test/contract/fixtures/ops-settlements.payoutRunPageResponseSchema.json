@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "id": "01a0ee2f-a06e-7e42-8cb9-99f005c92c3e",
+      "run_no": "PR-2026-0002",
+      "status": "approved",
+      "period_start": "2026-09-01",
+      "period_end": "2026-09-15",
+      "initiated_by_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "approved_by_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "approved_at": "2026-09-29T17:21:33.850921Z",
+      "scheduled_for": null,
+      "released_at": null,
+      "total_paise": 3262580,
+      "hospital_count": 3,
+      "notes": "Mid-month payouts",
+      "created_at": "2026-09-29T17:21:33.806546Z",
+      "updated_at": "2026-09-29T17:21:33.850933Z"
+    },
+    {
+      "id": "01a0ee2f-9f82-7241-a96a-2f352395ec02",
+      "run_no": "PR-2026-0001",
+      "status": "processing",
+      "period_start": "2026-08-01",
+      "period_end": "2026-08-31",
+      "initiated_by_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "approved_by_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "approved_at": "2026-09-29T17:21:33.611034Z",
+      "scheduled_for": null,
+      "released_at": null,
+      "total_paise": 1858857,
+      "hospital_count": 3,
+      "notes": "Payouts for August 2026",
+      "created_at": "2026-09-29T17:21:33.570553Z",
+      "updated_at": "2026-09-29T17:21:33.704515Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

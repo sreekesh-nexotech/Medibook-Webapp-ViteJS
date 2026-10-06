@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -38,6 +40,7 @@ type ModalState = { kind: 'closed' } | { kind: 'add' } | { kind: 'edit'; rate: T
 export function OpsSettingsTaxRatesCard() {
   const rates = useOpsTaxRatesQuery();
   const remove = useDeleteOpsTaxRateMutation();
+  const canAdd = useOpsPermission().can('settings.add');
   const [modal, setModal] = useState<ModalState>({ kind: 'closed' });
   const [toDelete, setToDelete] = useState<TaxRate | null>(null);
 
@@ -71,8 +74,7 @@ export function OpsSettingsTaxRatesCard() {
       icon: 'percent',
       title: 'No tax rates yet',
       message: 'Add the platform default rates hospitals inherit.',
-      actionLabel: 'Add Tax Rate',
-      onAction: () => setModal({ kind: 'add' }),
+      ...(canAdd ? { actionLabel: 'Add Tax Rate', onAction: () => setModal({ kind: 'add' }) } : {}),
     };
   }
 
@@ -83,9 +85,11 @@ export function OpsSettingsTaxRatesCard() {
     <Card>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <SectionTitle>Tax Rates</SectionTitle>
-        <Button size="sm" icon="plus" onClick={() => setModal({ kind: 'add' })}>
-          Add Tax Rate
-        </Button>
+        <CanOps perm="settings.add">
+          <Button size="sm" icon="plus" onClick={() => setModal({ kind: 'add' })}>
+            Add Tax Rate
+          </Button>
+        </CanOps>
       </div>
       <TableShell columns={COLUMNS} rightCols={RIGHT_COLS} state={state} scrollLabel="Tax rates">
         {items.map((rate) => (
@@ -102,18 +106,22 @@ export function OpsSettingsTaxRatesCard() {
             </td>
             <td className={cn(tdClass, 'text-right')}>
               <div className="inline-flex gap-1">
-                <IconBtn
-                  name="pencil"
-                  label={`Edit ${rate.code}`}
-                  box={ACTION_BOX}
-                  onClick={() => setModal({ kind: 'edit', rate })}
-                />
-                <IconBtn
-                  name="trash-2"
-                  label={`Delete ${rate.code}`}
-                  box={ACTION_BOX}
-                  onClick={() => setToDelete(rate)}
-                />
+                <CanOps perm="settings.edit">
+                  <IconBtn
+                    name="pencil"
+                    label={`Edit ${rate.code}`}
+                    box={ACTION_BOX}
+                    onClick={() => setModal({ kind: 'edit', rate })}
+                  />
+                </CanOps>
+                <CanOps perm="settings.del">
+                  <IconBtn
+                    name="trash-2"
+                    label={`Delete ${rate.code}`}
+                    box={ACTION_BOX}
+                    onClick={() => setToDelete(rate)}
+                  />
+                </CanOps>
               </div>
             </td>
           </tr>

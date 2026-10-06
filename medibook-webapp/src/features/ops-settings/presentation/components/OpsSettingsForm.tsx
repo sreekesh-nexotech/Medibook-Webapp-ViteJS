@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { Button } from '@/shared/ui/Button';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { OpsField } from '@/shared/ui/OpsField';
@@ -138,6 +139,9 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
     setErr((p) => ({ ...p, [k]: null }));
   };
 
+  // SEC-05: roles that can read but not change platform settings get a read-only form.
+  const canEdit = useOpsPermission().can('settings.edit');
+
   const onSave = () => {
     const e: FormErrors = {
       legalName: vLegalName(f.legalName),
@@ -175,7 +179,12 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
   const idleMinutes = Number.parseInt(f.sessTimeout, 10);
 
   return (
-    <>
+    <fieldset disabled={!canEdit} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+      {!canEdit && (
+        <p className="text-caption text-text-muted bg-blue-soft-bg m-0 rounded-sm px-3 py-2.5">
+          Your role can view these settings but not change them.
+        </p>
+      )}
       <Card>
         <SectionTitle className="mb-4">Organisation</SectionTitle>
         <div className="grid grid-cols-3 gap-4">
@@ -297,7 +306,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
         </div>
       </Card>
 
-      <UnsavedBar dirty={dirty} busy={saving} onSave={onSave} onDiscard={onDiscard} />
+      {canEdit && <UnsavedBar dirty={dirty} busy={saving} onSave={onSave} onDiscard={onDiscard} />}
 
       <ConfirmModal
         open={blocked}
@@ -308,6 +317,6 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
         danger
         onConfirm={discard}
       />
-    </>
+    </fieldset>
   );
 }

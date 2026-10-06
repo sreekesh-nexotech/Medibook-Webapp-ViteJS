@@ -1,0 +1,47 @@
+{
+  "id": "01a10fd4-6c1a-7b80-9e9f-01bfc09b3444",
+  "order_id": "01a10fd4-6c09-7230-8353-e3ffcd335431",
+  "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+  "visit_id": null,
+  "channel": "desk",
+  "method": "cash",
+  "amount_paise": 50000,
+  "status": "refunded",
+  "gateway": null,
+  "gateway_payment_id": null,
+  "captured_at": "2026-10-06T06:09:01.961626Z",
+  "reference_note": null,
+  "collected_by_name": "Vineeth Kumar",
+  "counter_code": "C1",
+  "cash_session_id": "01a10fd1-2acc-7213-9be2-a84a3c8a5075",
+  "booking_refs": ["LKSB-2610-00211"],
+  "patient": {
+    "id": "01a1061d-f850-72d2-9684-a119c346d805",
+    "mrn": "LKSM000043",
+    "full_name": "Testbaby"
+  },
+  "created_at": "2026-10-06T06:09:01.978529Z",
+  "refunds": [
+    {
+      "id": "01a11010-8937-7240-9f9a-340493692d18",
+      "payment_id": "01a10fd4-6c1a-7b80-9e9f-01bfc09b3444",
+      "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+      "booking_ref": "LKSB-2610-00211",
+      "method": "cash",
+      "amount_paise": 50000,
+      "reason": "QA: cash refund verification",
+      "status": "processed",
+      "initiated_by_kind": "staff",
+      "requested_at": "2026-10-06T07:14:41.588505Z",
+      "processed_at": "2026-10-06T07:14:41.588505Z",
+      "failure_reason": null,
+      "cash_session_id": "01a11010-79da-7741-95be-9597fb474fc1",
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": true
+      },
+      "created_at": "2026-10-06T07:14:41.591234Z"
+    }
+  ]
+}

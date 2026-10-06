@@ -7,6 +7,7 @@ import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
 import { ClearChip } from '@/shared/ui/ClearChip';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
@@ -235,9 +236,11 @@ export function OpsHospitalsScreen() {
           <Button variant="secondary" icon="rocket" onClick={() => navigate(opsOnboardingPath())}>
             Onboarding Pipeline
           </Button>
-          <Button icon="plus" onClick={() => setOnboard(true)}>
-            Onboard Hospital
-          </Button>
+          <CanOps perm="hospitals.add">
+            <Button icon="plus" onClick={() => setOnboard(true)}>
+              Onboard Hospital
+            </Button>
+          </CanOps>
         </div>
       </Card>
       <Card>

@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "id": "01a0ee2d-a3e8-76a1-9396-aab78f6e8545",
+      "first_name": "Elizabeth",
+      "last_name": "Joy",
+      "phone_e164": "+910000000000",
+      "alternate_phone_e164": null,
+      "email": null,
+      "status": "pending_deletion",
+      "blocked_reason": null,
+      "deletion_requested_at": "2026-09-29T17:21:40.209955Z",
+      "last_login_at": "2026-09-21T01:00:00.172801Z",
+      "created_at": "2026-09-21T01:00:00.136809Z"
+    },
+    {
+      "id": "01a0ee2c-9f79-7e51-afe6-8b7d6bb8b09e",
+      "first_name": "Ravi",
+      "last_name": "Teja",
+      "phone_e164": "+910000000000",
+      "alternate_phone_e164": null,
+      "email": "ravi.teja@patients.medibook.example.com",
+      "status": "active",
+      "blocked_reason": null,
+      "deletion_requested_at": null,
+      "last_login_at": "2026-09-15T01:00:00.152884Z",
+      "created_at": "2026-09-15T01:00:00.110582Z"
+    },
+    {
+      "id": "01a0ee2b-5b5c-7891-afa2-b21663ad3a58",
+      "first_name": "Zoya",
+      "last_name": "Mirza",
+      "phone_e164": "+910000000000",
+      "alternate_phone_e164": null,
+      "email": null,
+      "status": "active",
+      "blocked_reason": null,
+      "deletion_requested_at": null,
+      "last_login_at": "2026-09-18T16:30:03.277361Z",
+      "created_at": "2026-09-09T01:00:00.120071Z"
+    },
+    {
+      "id": "01a0ee2a-83de-7a51-87e5-e6245e88d117",
+      "first_name": "Imran",
+      "last_name": "Sheikh",
+      "phone_e164": "+910000000000",
+      "alternate_phone_e164": null,
+      "email": "imran.sheikh@patients.medibook.example.com",
+      "status": "active",
+      "blocked_reason": null,
+      "deletion_requested_at": null,
+      "last_login_at": "2026-09-27T16:30:01.382572Z",
+      "created_at": "2026-09-03T01:00:00.186164Z"
+    },
+    {
+      "id": "01a0ee29-3aa8-7b20-a8f4-d626d656e34b",
+      "first_name": "Lavanya",
+      "last_name": "Mohan",
+      "phone_e164": "+910000000000",
+      "alternate_phone_e164": null,
+      "email": null,
+      "status": "active",
+      "blocked_reason": null,
+      "deletion_requested_at": null,
+      "last_login_at": "2026-09-21T16:30:01.079871Z",
+      "created_at": "2026-08-28T01:00:00.126192Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 26,
+  "has_next": true
+}

@@ -3,6 +3,10 @@ import { Icon } from '@/shared/ui/Icon';
 
 import type { OpsStaticView, OpsView } from '@/app/router/paths';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
+
+import { canOpenOpsView } from '@/app/router/opsAccess';
+
 import { OPS_NAV } from './ops-nav';
 import type { SidebarMode } from './useSidebarMode';
 
@@ -21,6 +25,12 @@ interface OpsSidebarProps {
 
 /** Ops console sidebar (design `OpsSidebar` in `Ops.jsx`). */
 export function OpsSidebar({ active, onNavigate, collapsed = false, mode }: OpsSidebarProps) {
+  // SEC-05: list only the screens this platform role can open.
+  const checks = useOpsPermission();
+  const sections = OPS_NAV.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => canOpenOpsView(item.id, checks)),
+  })).filter((section) => section.items.length > 0);
   const isRail = mode ? mode === 'rail' : collapsed;
   return (
     <aside
@@ -41,7 +51,7 @@ export function OpsSidebar({ active, onNavigate, collapsed = false, mode }: OpsS
         )}
       </div>
       <div className="bg-border mb-2 h-px" />
-      {OPS_NAV.map((s, si) => (
+      {sections.map((s, si) => (
         <div key={s.section} className={si === 0 ? 'mt-1' : 'mt-3'}>
           {isRail ? (
             si > 0 && <div className="bg-border-soft mx-4.5 mb-2.5 h-px" />

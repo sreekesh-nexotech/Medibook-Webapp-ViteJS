@@ -1,0 +1,123 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-83d8-7233-a222-01481ae6b5cf",
+      "user": {
+        "id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+        "first_name": "Anita",
+        "last_name": "Menon",
+        "email": "anita.menon@lakeshore.medibook.example.com",
+        "phone_e164": "+910000000000",
+        "last_login_at": "2026-10-06T07:50:41.516215Z"
+      },
+      "role": {
+        "code": "admin",
+        "name": "Admin"
+      },
+      "employee_code": "LKS-A1",
+      "designation": "Hospital Administrator",
+      "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
+      "status": "active",
+      "joined_at": "2026-08-06T04:30:00.077356Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "version": 2
+    },
+    {
+      "id": "01a0ee28-8a44-76d3-a982-9eb698c80124",
+      "user": {
+        "id": "01a0ee28-8a3c-7d91-9672-c599b8159456",
+        "first_name": "Vineeth",
+        "last_name": "Kumar",
+        "email": "vineeth.kumar@lakeshore.medibook.example.com",
+        "phone_e164": "+910000000000",
+        "last_login_at": "2026-10-06T06:38:46.948899Z"
+      },
+      "role": {
+        "code": "receptionist",
+        "name": "Receptionist"
+      },
+      "employee_code": "LKS-01",
+      "designation": null,
+      "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
+      "status": "active",
+      "joined_at": "2026-08-06T04:30:01.729342Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "version": 2
+    },
+    {
+      "id": "01a0ee28-8b6e-73f1-8371-ca939308a32d",
+      "user": {
+        "id": "01a0ee28-8b60-76e1-bd9e-56b7744ff289",
+        "first_name": "Shalini",
+        "last_name": "Thomas",
+        "email": "shalini.thomas@lakeshore.medibook.example.com",
+        "phone_e164": "+910000000000",
+        "last_login_at": "2026-08-06T04:30:02.049994Z"
+      },
+      "role": {
+        "code": "receptionist",
+        "name": "Receptionist"
+      },
+      "employee_code": "LKS-02",
+      "designation": null,
+      "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
+      "status": "active",
+      "joined_at": "2026-08-06T04:30:02.021009Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "version": 2
+    },
+    {
+      "id": "01a0ee28-8c92-7ee2-9d21-531a1ba989f0",
+      "user": {
+        "id": "01a0ee28-8c89-7360-ad91-09fdc9a72588",
+        "first_name": "Joseph",
+        "last_name": "Kurian",
+        "email": "joseph.kurian@lakeshore.medibook.example.com",
+        "phone_e164": "+910000000000",
+        "last_login_at": "2026-08-06T04:30:02.336515Z"
+      },
+      "role": {
+        "code": "accountant",
+        "name": "Accountant"
+      },
+      "employee_code": "LKS-03",
+      "designation": null,
+      "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
+      "status": "active",
+      "joined_at": "2026-08-06T04:30:02.318329Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "version": 2
+    },
+    {
+      "id": "01a0ee28-8da9-7751-87c5-e01222cca20d",
+      "user": {
+        "id": "01a0ee28-8da1-7ac0-a00f-7556c7059c79",
+        "first_name": "Nimmy",
+        "last_name": "George",
+        "email": "nimmy.george@lakeshore.medibook.example.com",
+        "phone_e164": "+910000000000",
+        "last_login_at": "2026-08-06T04:30:02.614714Z"
+      },
+      "role": {
+        "code": "dept_front_desk",
+        "name": "Department Front Desk"
+      },
+      "employee_code": "LKS-04",
+      "designation": null,
+      "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
+      "status": "active",
+      "joined_at": "2026-08-06T04:30:02.598360Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "version": 2
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 5,
+  "has_next": false
+}

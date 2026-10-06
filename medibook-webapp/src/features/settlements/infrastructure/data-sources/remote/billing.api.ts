@@ -34,15 +34,18 @@ export async function getInvoices(page: number, pageSize: number) {
 
 /** `GET /hospital/billing/invoices/{id}` — lines plus the frozen party snapshots. */
 export async function getInvoice(invoiceId: string) {
-  const response = await hospitalApi.get(`/billing/invoices/${invoiceId}`);
+  const response = await hospitalApi.get(`/billing/invoices/${encodeURIComponent(invoiceId)}`);
   return invoiceDetailResponseSchema.parse(response.data);
 }
 
 /** `GET /hospital/billing/invoices/{id}.pdf` — 501 when this server cannot render PDFs. */
 export async function getInvoicePdf(invoiceId: string): Promise<Blob> {
-  const response = await hospitalApi.get<Blob>(`/billing/invoices/${invoiceId}.pdf`, {
-    responseType: 'blob',
-  });
+  const response = await hospitalApi.get<Blob>(
+    `/billing/invoices/${encodeURIComponent(invoiceId)}.pdf`,
+    {
+      responseType: 'blob',
+    },
+  );
   return response.data;
 }
 

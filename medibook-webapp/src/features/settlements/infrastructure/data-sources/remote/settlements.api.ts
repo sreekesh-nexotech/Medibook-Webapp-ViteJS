@@ -25,7 +25,7 @@ export async function getSettlementPeriods(filters: SettlementPeriodFilters) {
 
 /** `GET /hospital/settlements/periods/{id}` — period + breakdown, adjustments, payout. */
 export async function getSettlementPeriod(periodId: string) {
-  const response = await hospitalApi.get(`/settlements/periods/${periodId}`);
+  const response = await hospitalApi.get(`/settlements/periods/${encodeURIComponent(periodId)}`);
   return settlementPeriodDetailResponseSchema.parse(response.data);
 }
 
@@ -42,8 +42,11 @@ export async function getStatementsStartingOn(periodStart: string) {
 
 /** `GET /hospital/statements/{id}.pdf` — renders on demand (501 when this server cannot). */
 export async function getStatementPdf(statementId: string): Promise<Blob> {
-  const response = await hospitalApi.get<Blob>(`/statements/${statementId}.pdf`, {
-    responseType: 'blob',
-  });
+  const response = await hospitalApi.get<Blob>(
+    `/statements/${encodeURIComponent(statementId)}.pdf`,
+    {
+      responseType: 'blob',
+    },
+  );
   return response.data;
 }

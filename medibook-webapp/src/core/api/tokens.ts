@@ -79,6 +79,18 @@ export function hasSession(surface: ApiSurface): boolean {
   return getAccessToken(surface) !== null || getRefreshToken(surface) !== null;
 }
 
+/**
+ * Take a pair another tab refreshed into, if this tab still holds the token it
+ * replaced (`previousRefresh`). A tab on a different session ignores it.
+ */
+export function adoptRotation(
+  surface: ApiSurface,
+  previousRefresh: string,
+  grant: TokenGrant,
+): void {
+  if (getRefreshToken(surface) === previousRefresh) setTokens(surface, grant);
+}
+
 /** Forget both tokens for `surface` (logout, or a refresh the server refused). */
 export function clearTokens(surface: ApiSurface): void {
   accessTokens.delete(surface);
@@ -104,7 +116,10 @@ export function onSessionExpired(listener: SessionExpiredListener): () => void {
   };
 }
 
-/** Clear `surface`'s tokens and notify listeners. Called by the HTTP client only. */
+/**
+ * Clear `surface`'s tokens and notify listeners. Called by the HTTP client,
+ * and by the session sync when another tab ends the session.
+ */
 export function expireSession(surface: ApiSurface): void {
   clearTokens(surface);
   for (const listener of expiredListeners) listener(surface);

@@ -1,4 +1,4 @@
-import { clearTokens } from '@/core/api/tokens';
+import { takeSession } from '@/core/api/http';
 import { attempt } from '@/core/error/attempt';
 
 import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
@@ -44,7 +44,8 @@ export const profileRepository: ProfileRepository = {
   logoutEverywhere: (surface) =>
     attempt(async () => {
       await postLogoutAll(surface);
-      clearTokens(surface);
+      // This browser's other tabs are signed out too (SEC-10).
+      takeSession(surface);
       return null;
     }),
 };

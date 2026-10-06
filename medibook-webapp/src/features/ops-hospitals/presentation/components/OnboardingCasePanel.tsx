@@ -6,6 +6,7 @@ import { opsPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
 
 import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
 import { fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
@@ -113,6 +114,11 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const [modal, setModal] = useState<PanelModal>(null);
   const [openOnGoLive, setOpenOnGoLive] = useState(true);
   const openOnGoLiveId = useId();
+  // SEC-05: reviewing the case needs onboarding.edit; approving and going
+  // live change the hospital, which needs hospitals.edit.
+  const ops = useOpsPermission();
+  const canReview = ops.can('onboarding.edit');
+  const canDecide = ops.can('hospitals.edit');
   const [sendingBack, setSendingBack] = useState<ChecklistItem | null>(null);
   const [uploadingCode, setUploadingCode] = useState<string | null>(null);
 
@@ -260,7 +266,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             >
               Hospital Profile
             </Button>
-            {isManualStage(stage) && (
+            {canReview && isManualStage(stage) && (
               <div className="w-48">
                 <Select
                   value={STAGE_LABEL[stage]}
@@ -282,7 +288,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                 />
               </div>
             )}
-            {!closed && stage !== 'approved' && (
+            {canDecide && !closed && stage !== 'approved' && (
               <Button
                 variant="secondary"
                 icon="circle-check"
@@ -292,12 +298,12 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                 Approve
               </Button>
             )}
-            {!closed && (
+            {canReview && !closed && (
               <Button variant="secondary" icon="circle-x" onClick={() => setModal('reject')}>
                 Reject
               </Button>
             )}
-            {!closed && (
+            {canDecide && !closed && (
               <span
                 title={
                   ready
@@ -391,7 +397,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
       <Card>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle>KYC Documents</SectionTitle>
-          {!closed && (
+          {canReview && !closed && (
             <Button size="sm" variant="secondary" icon="send" onClick={() => setModal('docs')}>
               Update Checklist
             </Button>
@@ -459,7 +465,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                   )}
                 </div>
                 <Badge status={CHECKLIST_PILL[item.status]}>{CHECKLIST_LABEL[item.status]}</Badge>
-                {!closed && (
+                {canReview && !closed && (
                   <div className="flex flex-none items-center gap-2">
                     <DocUploadButton
                       docLabel={item.name}

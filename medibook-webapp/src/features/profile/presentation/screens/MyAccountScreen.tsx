@@ -9,6 +9,7 @@ import { AUTH_LOGIN_PATH } from '@/app/router/paths';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { ProfileBuildInfo } from '@/features/profile/presentation/components/ProfileBuildInfo';
 import { ProfileNameCard } from '@/features/profile/presentation/components/ProfileNameCard';
 import { ProfilePasswordCard } from '@/features/profile/presentation/components/ProfilePasswordCard';
 import { ProfileSessionsCard } from '@/features/profile/presentation/components/ProfileSessionsCard';
@@ -19,7 +20,7 @@ interface MyAccountScreenProps {
 
 /**
  * My account (hospital `/:role/account`, ops `/ops/account`): the signed-in
- * user's name, password and signed-in devices. MFA is not offered — the
+ * user's name, password and signed-in devices, and which build is running. MFA is not offered — the
  * backend's MFA endpoints are honest 501 stubs (2FA is "not now", Q64).
  */
 export function MyAccountScreen({ surface }: MyAccountScreenProps) {
@@ -51,6 +52,7 @@ export function MyAccountScreen({ surface }: MyAccountScreenProps) {
         surface={surface}
         onSignedOut={() => navigate(AUTH_LOGIN_PATH, { replace: true })}
       />
+      <ProfileBuildInfo />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { NotFoundScreen } from '@/app/layouts/NotFoundScreen';
 import { DashboardSwitch } from '@/app/router/DashboardSwitch';
 import { HospitalGuard } from '@/app/router/HospitalGuard';
 import { OpsGuard } from '@/app/router/OpsGuard';
+import { OpsHome } from '@/app/router/OpsHome';
 import { ReportDownloadGuard } from '@/app/router/ReportDownloadGuard';
 import {
   AUTH_FORGOT_PATH,
@@ -19,6 +20,8 @@ import {
   ROOT_PATH,
 } from '@/app/router/paths';
 import { RequireAdmin } from '@/app/router/RequireAdmin';
+import { RequireOpsView } from '@/app/router/RequireOpsView';
+import { RequirePermission } from '@/app/router/RequirePermission';
 import { RootRedirect } from '@/app/router/RootRedirect';
 import {
   AppointmentsScreen,
@@ -98,12 +101,31 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to={HOSPITAL_VIEW_SEGMENT.dashboard} replace /> },
       { path: HOSPITAL_VIEW_SEGMENT.dashboard, element: <DashboardSwitch /> },
-      { path: HOSPITAL_VIEW_SEGMENT.appointments, element: <AppointmentsScreen /> },
-      { path: HOSPITAL_VIEW_SEGMENT.create, element: <CreateAppointmentScreen /> },
-      { path: HOSPITAL_VIEW_SEGMENT.patients, element: <PatientsScreen /> },
-      { path: HOSPITAL_VIEW_SEGMENT['patient-detail'], element: <PatientDetailScreen /> },
-      { path: HOSPITAL_VIEW_SEGMENT.token, element: <TokenCountersScreen /> },
-      { path: HOSPITAL_VIEW_SEGMENT.payments, element: <PaymentsScreen /> },
+      // SEC-09: a front-desk URL checks the role's permission itself; hiding
+      // the sidebar entry alone left the screen one typed URL away.
+      {
+        element: <RequirePermission perm="Appointments.view" />,
+        children: [{ path: HOSPITAL_VIEW_SEGMENT.appointments, element: <AppointmentsScreen /> }],
+      },
+      {
+        element: <RequirePermission perm="Appointments.add" />,
+        children: [{ path: HOSPITAL_VIEW_SEGMENT.create, element: <CreateAppointmentScreen /> }],
+      },
+      {
+        element: <RequirePermission perm="Patients.view" />,
+        children: [
+          { path: HOSPITAL_VIEW_SEGMENT.patients, element: <PatientsScreen /> },
+          { path: HOSPITAL_VIEW_SEGMENT['patient-detail'], element: <PatientDetailScreen /> },
+        ],
+      },
+      {
+        element: <RequirePermission perm="Token Management.view" />,
+        children: [{ path: HOSPITAL_VIEW_SEGMENT.token, element: <TokenCountersScreen /> }],
+      },
+      {
+        element: <RequirePermission perm="Payments.view" />,
+        children: [{ path: HOSPITAL_VIEW_SEGMENT.payments, element: <PaymentsScreen /> }],
+      },
       { path: HOSPITAL_VIEW_SEGMENT.help, element: <HelpSupportScreen /> },
       { path: HOSPITAL_VIEW_SEGMENT.account, element: <MyAccountScreen surface="hospital" /> },
       {
@@ -133,29 +155,36 @@ export const router = createBrowserRouter([
     path: OPS_BASE_PATH,
     element: <OpsGuard />,
     children: [
-      { index: true, element: <Navigate to={OPS_VIEW_SEGMENT.dashboard} replace /> },
-      { path: OPS_VIEW_SEGMENT.dashboard, element: <OpsDashboardScreen /> },
-      { path: OPS_VIEW_SEGMENT.hospitals, element: <OpsHospitalsScreen /> },
-      { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> },
-      { path: OPS_VIEW_SEGMENT['hospital-detail'], element: <OpsHospitalDetailScreen /> },
-      { path: OPS_VIEW_SEGMENT.plans, element: <OpsPlansScreen /> },
-      { path: OPS_VIEW_SEGMENT.billing, element: <OpsBillingScreen /> },
-      { path: OPS_VIEW_SEGMENT['invoice-detail'], element: <OpsInvoiceDetailScreen /> },
-      { path: OPS_VIEW_SEGMENT['payment-detail'], element: <OpsPaymentDetailScreen /> },
-      { path: OPS_VIEW_SEGMENT.settlements, element: <OpsSettlementsScreen /> },
-      { path: OPS_VIEW_SEGMENT.analytics, element: <OpsAnalyticsScreen /> },
-      { path: OPS_VIEW_SEGMENT.reports, element: <OpsReportsScreen /> },
-      { path: OPS_VIEW_SEGMENT.logs, element: <OpsLogsScreen /> },
-      { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> },
-      { path: OPS_VIEW_SEGMENT.users, element: <OpsUsersScreen /> },
-      { path: OPS_VIEW_SEGMENT['platform-users'], element: <OpsPlatformUsersScreen /> },
+      // Each role starts on the first screen it can open (SEC-05).
+      { index: true, element: <OpsHome /> },
       {
-        path: OPS_VIEW_SEGMENT['platform-user-detail'],
-        element: <OpsPlatformUserDetailScreen />,
+        // Every ops screen checks the platform role's permission for it.
+        element: <RequireOpsView />,
+        children: [
+          { path: OPS_VIEW_SEGMENT.dashboard, element: <OpsDashboardScreen /> },
+          { path: OPS_VIEW_SEGMENT.hospitals, element: <OpsHospitalsScreen /> },
+          { path: OPS_VIEW_SEGMENT.onboarding, element: <OpsOnboardingScreen /> },
+          { path: OPS_VIEW_SEGMENT['hospital-detail'], element: <OpsHospitalDetailScreen /> },
+          { path: OPS_VIEW_SEGMENT.plans, element: <OpsPlansScreen /> },
+          { path: OPS_VIEW_SEGMENT.billing, element: <OpsBillingScreen /> },
+          { path: OPS_VIEW_SEGMENT['invoice-detail'], element: <OpsInvoiceDetailScreen /> },
+          { path: OPS_VIEW_SEGMENT['payment-detail'], element: <OpsPaymentDetailScreen /> },
+          { path: OPS_VIEW_SEGMENT.settlements, element: <OpsSettlementsScreen /> },
+          { path: OPS_VIEW_SEGMENT.analytics, element: <OpsAnalyticsScreen /> },
+          { path: OPS_VIEW_SEGMENT.reports, element: <OpsReportsScreen /> },
+          { path: OPS_VIEW_SEGMENT.logs, element: <OpsLogsScreen /> },
+          { path: OPS_VIEW_SEGMENT.compliance, element: <OpsComplianceScreen /> },
+          { path: OPS_VIEW_SEGMENT.users, element: <OpsUsersScreen /> },
+          { path: OPS_VIEW_SEGMENT['platform-users'], element: <OpsPlatformUsersScreen /> },
+          {
+            path: OPS_VIEW_SEGMENT['platform-user-detail'],
+            element: <OpsPlatformUserDetailScreen />,
+          },
+          { path: OPS_VIEW_SEGMENT.notifications, element: <OpsNotificationsScreen /> },
+          { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
+          { path: OPS_VIEW_SEGMENT.account, element: <MyAccountScreen surface="platform" /> },
+        ],
       },
-      { path: OPS_VIEW_SEGMENT.notifications, element: <OpsNotificationsScreen /> },
-      { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
-      { path: OPS_VIEW_SEGMENT.account, element: <MyAccountScreen surface="platform" /> },
       { path: CATCH_ALL, element: <NotFoundScreen /> },
     ],
   },

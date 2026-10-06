@@ -1,0 +1,128 @@
+{
+  "results": [
+    {
+      "id": "01a10fd4-6c1a-7b80-9e9f-01bfc09b3444",
+      "order_id": "01a10fd4-6c09-7230-8353-e3ffcd335431",
+      "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+      "visit_id": null,
+      "channel": "desk",
+      "method": "cash",
+      "amount_paise": 50000,
+      "status": "refunded",
+      "gateway": null,
+      "gateway_payment_id": null,
+      "captured_at": "2026-10-06T06:09:01.961626Z",
+      "reference_note": null,
+      "collected_by_name": "Vineeth Kumar",
+      "counter_code": "C1",
+      "cash_session_id": "01a10fd1-2acc-7213-9be2-a84a3c8a5075",
+      "booking_refs": ["LKSB-2610-00211"],
+      "patient": {
+        "id": "01a1061d-f850-72d2-9684-a119c346d805",
+        "mrn": "LKSM000043",
+        "full_name": "Testbaby"
+      },
+      "created_at": "2026-10-06T06:09:01.978529Z"
+    },
+    {
+      "id": "01a0ee2f-8e77-72f0-a67a-b899290ca654",
+      "order_id": "01a0ee2f-8e49-7331-b880-cc7c71c42938",
+      "appointment_id": "01a0ee2f-8e44-72a3-8f14-1c7c9f6f89a7",
+      "visit_id": null,
+      "channel": "online",
+      "method": "wallet",
+      "amount_paise": 42400,
+      "status": "captured",
+      "gateway": "razorpay",
+      "gateway_payment_id": "pay_faked4bf91b3f0bb49",
+      "captured_at": "2026-09-29T17:21:29Z",
+      "reference_note": null,
+      "collected_by_name": null,
+      "counter_code": null,
+      "cash_session_id": null,
+      "booking_refs": ["LKSB-2609-00179"],
+      "patient": {
+        "id": "01a0ee29-0392-7b20-890f-c734c51972ef",
+        "mrn": "LKSM000006",
+        "full_name": "Priya Nair"
+      },
+      "created_at": "2026-09-29T17:21:29.207386Z"
+    },
+    {
+      "id": "01a0ee2f-8c53-76b1-9188-0b260b16eb47",
+      "order_id": "01a0ee2f-8ba3-7211-8790-33bf73d1d262",
+      "appointment_id": "01a0ee2f-8b5e-75a3-a66f-5f6df38e7d04",
+      "visit_id": null,
+      "channel": "online",
+      "method": "upi",
+      "amount_paise": 82400,
+      "status": "captured",
+      "gateway": "razorpay",
+      "gateway_payment_id": "pay_fakecb0d04e7b7a04c",
+      "captured_at": "2026-09-29T17:21:28Z",
+      "reference_note": null,
+      "collected_by_name": null,
+      "counter_code": null,
+      "cash_session_id": null,
+      "booking_refs": ["LKSB-2609-00178"],
+      "patient": {
+        "id": "01a0ee29-0f81-7461-b6dc-da2751b22ea8",
+        "mrn": "LKSM000007",
+        "full_name": "Jacob Mathew"
+      },
+      "created_at": "2026-09-29T17:21:28.660435Z"
+    },
+    {
+      "id": "01a0ee2f-88e1-7693-9605-8ff75850cd14",
+      "order_id": "01a0ee2f-884d-7b40-bf51-8aec4a09c06c",
+      "appointment_id": "01a0ee2f-8836-7892-bb6c-36b8839773f4",
+      "visit_id": null,
+      "channel": "online",
+      "method": "netbanking",
+      "amount_paise": 52400,
+      "status": "captured",
+      "gateway": "razorpay",
+      "gateway_payment_id": "pay_fakedff165ce448944",
+      "captured_at": "2026-09-29T17:21:27Z",
+      "reference_note": null,
+      "collected_by_name": null,
+      "counter_code": null,
+      "cash_session_id": null,
+      "booking_refs": ["LKSB-2609-00177"],
+      "patient": {
+        "id": "01a0ee2a-a70e-7171-9d52-e07d666e0abf",
+        "mrn": "LKSM000016",
+        "full_name": "Imran Sheikh"
+      },
+      "created_at": "2026-09-29T17:21:27.777915Z"
+    },
+    {
+      "id": "01a0ee2f-8691-7ab1-82f7-9712377e7664",
+      "order_id": "01a0ee2f-8658-7571-bd3f-b3fcae16ce6d",
+      "appointment_id": "01a0ee2f-8649-7b20-bb15-f7c9859f114c",
+      "visit_id": null,
+      "channel": "online",
+      "method": "wallet",
+      "amount_paise": 42400,
+      "status": "captured",
+      "gateway": "razorpay",
+      "gateway_payment_id": "pay_fake734c6432b7334f",
+      "captured_at": "2026-09-29T17:21:27Z",
+      "reference_note": null,
+      "collected_by_name": null,
+      "counter_code": null,
+      "cash_session_id": null,
+      "booking_refs": ["LKSB-2609-00176"],
+      "patient": {
+        "id": "01a0ee29-0392-7b20-890f-c734c51972ef",
+        "mrn": "LKSM000006",
+        "full_name": "Priya Nair"
+      },
+      "created_at": "2026-09-29T17:21:27.185541Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 178,
+  "has_next": true
+}

@@ -95,7 +95,10 @@ export async function postDataRequest(
 }
 
 export async function postProcessDataRequest(id: string): Promise<DataRequestResponse> {
-  const response = await platformApi.post(`${DATA_REQUESTS_PATH}/${id}/process`, {});
+  const response = await platformApi.post(
+    `${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}/process`,
+    {},
+  );
   return dataRequestResponseSchema.parse(response.data);
 }
 
@@ -103,6 +106,9 @@ export async function postRejectDataRequest(
   id: string,
   reason: string,
 ): Promise<DataRequestResponse> {
-  const response = await platformApi.post(`${DATA_REQUESTS_PATH}/${id}/reject`, { reason });
+  const response = await platformApi.post(
+    `${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}/reject`,
+    { reason },
+  );
   return dataRequestResponseSchema.parse(response.data);
 }

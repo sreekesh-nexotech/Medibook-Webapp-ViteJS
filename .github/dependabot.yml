@@ -1,0 +1,16 @@
+# Dependency updates arrive as pull requests, so each one is reviewed and runs
+# the CI gate (standards §11: upgrades are deliberate, reviewed changes).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /medibook-webapp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

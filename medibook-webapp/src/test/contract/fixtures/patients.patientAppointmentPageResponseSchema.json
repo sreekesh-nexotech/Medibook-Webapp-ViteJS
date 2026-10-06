@@ -1,0 +1,173 @@
+{
+  "results": [
+    {
+      "id": "01a1061d-f875-7f50-bf58-d7c724fbc6ec",
+      "booking_ref": "LKSB-2610-00191",
+      "status": "cancelled",
+      "status_reason": null,
+      "source": "online",
+      "patient": {
+        "id": "01a1061d-f850-72d2-9684-a119c346d805",
+        "mrn": "LKSM000043",
+        "full_name": "Testbaby",
+        "phone_e164": "+910000000000",
+        "gender": null,
+        "date_of_birth": "2026-10-04"
+      },
+      "hospital_patient_id": "01a1061d-f850-72d2-9684-a119c346d805",
+      "doctor": {
+        "id": "01a0ee28-85e5-7da3-9304-2a385af65a5a",
+        "name": "Dr. Meera Varghese",
+        "title": "Consultant",
+        "room": "OPD-02"
+      },
+      "department": {
+        "id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+        "code": "general_medicine",
+        "name": "General Medicine"
+      },
+      "session": {
+        "id": "01a0ee29-1852-7941-b28b-695b5f1a71e1",
+        "session_code": "morning",
+        "label": "Morning OPD",
+        "status": "scheduled"
+      },
+      "service_id": null,
+      "slot_id": "01a0ee29-1856-74f1-a8c8-b85cd82699bc",
+      "visit_id": null,
+      "scheduled_date": "2026-10-09",
+      "scheduled_start_at": "2026-10-09T04:40:00Z",
+      "scheduled_end_at": "2026-10-09T04:50:00Z",
+      "token_no": 1,
+      "token_label": "A001",
+      "token_source": "online",
+      "is_follow_up": false,
+      "patient_notes": null,
+      "remark": null,
+      "payment_status": "pending",
+      "booking_deadline_at": "2026-10-04T08:58:09.802900Z",
+      "approval_required": false,
+      "approved_at": null,
+      "consultation_fee_paise": 40000,
+      "service_fee_paise": 0,
+      "discount_paise": 0,
+      "convenience_fee_paise": 2000,
+      "tax_paise": 400,
+      "tax_lines": [
+        {
+          "code": "EXEMPT",
+          "line": "consultation",
+          "rate_bp": 0,
+          "supplier": "hospital",
+          "inclusive": false,
+          "tax_paise": 0,
+          "base_paise": 40000
+        },
+        {
+          "code": "CONVENIENCE_FEE_GST",
+          "line": "convenience_fee",
+          "rate_bp": 1800,
+          "supplier": "platform",
+          "inclusive": false,
+          "tax_paise": 400,
+          "base_paise": 2000
+        }
+      ],
+      "total_paise": 42400,
+      "currency": "INR",
+      "checked_in_at": null,
+      "called_at": null,
+      "consultation_started_at": null,
+      "completed_at": null,
+      "cancelled_at": "2026-10-04T08:56:14.836665Z",
+      "cancelled_by": "patient",
+      "cancellation_reason": "patient_request",
+      "no_show_at": null,
+      "no_show_attempts": 0,
+      "created_at": "2026-10-04T08:53:09.877588Z",
+      "version": 2
+    },
+    {
+      "id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+      "booking_ref": "LKSB-2610-00211",
+      "status": "scheduled",
+      "status_reason": null,
+      "source": "walk_in",
+      "patient": {
+        "id": "01a1061d-f850-72d2-9684-a119c346d805",
+        "mrn": "LKSM000043",
+        "full_name": "Testbaby",
+        "phone_e164": "+910000000000",
+        "gender": null,
+        "date_of_birth": "2026-10-04"
+      },
+      "hospital_patient_id": "01a1061d-f850-72d2-9684-a119c346d805",
+      "doctor": {
+        "id": "01a0ee28-8526-7eb1-bb66-0f67c9c21951",
+        "name": "Dr. Suresh Pillai",
+        "title": "Consultant",
+        "room": "OPD-01"
+      },
+      "department": {
+        "id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+        "code": "general_medicine",
+        "name": "General Medicine"
+      },
+      "session": {
+        "id": "01a0ee29-1e0b-77b0-920c-a7fb4ca26a7b",
+        "session_code": "morning",
+        "label": "Morning OPD",
+        "status": "scheduled"
+      },
+      "service_id": null,
+      "slot_id": "01a0ee29-1e14-76f1-8f42-8bda086ba70c",
+      "visit_id": "01a10fd4-1a4c-7050-98fb-5c861f9c9151",
+      "scheduled_date": "2026-10-06",
+      "scheduled_start_at": "2026-10-06T06:15:00Z",
+      "scheduled_end_at": "2026-10-06T06:30:00Z",
+      "token_no": 1,
+      "token_label": "W001",
+      "token_source": "offline",
+      "is_follow_up": false,
+      "patient_notes": null,
+      "remark": "QA: cash drawer verification",
+      "payment_status": "refunded",
+      "booking_deadline_at": null,
+      "approval_required": false,
+      "approved_at": null,
+      "consultation_fee_paise": 50000,
+      "service_fee_paise": 0,
+      "discount_paise": 0,
+      "convenience_fee_paise": 0,
+      "tax_paise": 0,
+      "tax_lines": [
+        {
+          "code": "EXEMPT",
+          "line": "consultation",
+          "rate_bp": 0,
+          "supplier": "hospital",
+          "inclusive": false,
+          "tax_paise": 0,
+          "base_paise": 50000
+        }
+      ],
+      "total_paise": 50000,
+      "currency": "INR",
+      "checked_in_at": null,
+      "called_at": null,
+      "consultation_started_at": null,
+      "completed_at": null,
+      "cancelled_at": null,
+      "cancelled_by": null,
+      "cancellation_reason": null,
+      "no_show_at": null,
+      "no_show_attempts": 0,
+      "created_at": "2026-10-06T06:08:41.107709Z",
+      "version": 3
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

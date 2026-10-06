@@ -1,0 +1,28 @@
+{
+  "plan": {
+    "id": "01a0ee28-7f86-7b52-8ee1-14bf237feca5",
+    "code": "enterprise",
+    "name": "Enterprise"
+  },
+  "period_start": "2026-09-18",
+  "metrics": {
+    "users": {
+      "current": 6,
+      "limit": null,
+      "hard": false,
+      "pct_bp": null
+    },
+    "doctors": {
+      "current": 5,
+      "limit": null,
+      "hard": false,
+      "pct_bp": null
+    },
+    "storage": {
+      "current": 1960809,
+      "limit": 107374182400,
+      "hard": false,
+      "pct_bp": 0
+    }
+  }
+}

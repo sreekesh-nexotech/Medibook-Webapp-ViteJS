@@ -2,6 +2,7 @@ import { cn } from '@/shared/lib/cn';
 import { fmtDate, money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { CanOps } from '@/shared/ui/CanOps';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { tdClass } from '@/shared/ui/TableShell';
@@ -66,15 +67,18 @@ export function SettlementQueueRow({
       </td>
       <td className={tdClass}>
         {s.releasable ? (
-          s.status === 'Payout failed' ? (
-            <Button size="sm" variant="secondary" icon="refresh-cw" onClick={() => onRelease(s)}>
-              Retry
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => onRelease(s)}>
-              Release
-            </Button>
-          )
+          // SEC-05: releasing money needs settlements.edit.
+          <CanOps perm="settlements.edit">
+            {s.status === 'Payout failed' ? (
+              <Button size="sm" variant="secondary" icon="refresh-cw" onClick={() => onRelease(s)}>
+                Retry
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => onRelease(s)}>
+                Release
+              </Button>
+            )}
+          </CanOps>
         ) : s.status === 'Released' ? (
           <span className="text-caption text-g-600 inline-flex items-center gap-1.25">
             <Icon name="check" size={15} /> {fmtDate(datePart(s.payout?.releasedAt ?? null))}

@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "id": "01a0ee19-9e45-7262-a3dc-c74104a617d8",
+      "event_code": "account.deletion_requested",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Account deletion requested",
+      "body": "Your account is scheduled for deletion. Log in before the cooling-off period ends to cancel.",
+      "whatsapp_template_name": null,
+      "version": 1,
+      "updated_at": "2026-09-29T16:57:31.461524Z"
+    },
+    {
+      "id": "01a0ee19-9e1a-7cc3-8289-bf9aa34ae50b",
+      "event_code": "account.deletion_requested",
+      "channel": "sms",
+      "locale": "en-IN",
+      "subject": null,
+      "body": "Medibook: We received a request to delete your Medibook account. Log in to the app before the cooling-off period ends to cancel it.",
+      "whatsapp_template_name": null,
+      "version": 1,
+      "updated_at": "2026-09-29T16:57:31.418626Z"
+    },
+    {
+      "id": "01a0ee19-982c-7bf1-93f3-1ccbfaa75537",
+      "event_code": "appointment.approved",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Appointment approved",
+      "body": "{{doctorName}}, {{hospitalName}} on {{date}} at {{time}}. Token {{token}}.",
+      "whatsapp_template_name": null,
+      "version": 1,
+      "updated_at": "2026-09-29T16:57:29.900758Z"
+    },
+    {
+      "id": "01a0ee19-9823-75c2-a5e0-8c9ec510eee9",
+      "event_code": "appointment.approved",
+      "channel": "sms",
+      "locale": "en-IN",
+      "subject": null,
+      "body": "Medibook: {{hospitalName}} approved your appointment with {{doctorName}} on {{date}} {{time}}. Token {{token}}. Ref {{bookingRef}}.",
+      "whatsapp_template_name": null,
+      "version": 1,
+      "updated_at": "2026-09-29T16:57:29.891701Z"
+    },
+    {
+      "id": "01a0ee19-9853-7800-b190-b9f925a172b6",
+      "event_code": "appointment.cancelled",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Appointment cancelled",
+      "body": "{{doctorName}} on {{date}} at {{time}} is cancelled. Ref {{bookingRef}}.{{rebookText}}",
+      "whatsapp_template_name": null,
+      "version": 1,
+      "updated_at": "2026-09-29T16:57:29.939837Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 43,
+  "has_next": true
+}

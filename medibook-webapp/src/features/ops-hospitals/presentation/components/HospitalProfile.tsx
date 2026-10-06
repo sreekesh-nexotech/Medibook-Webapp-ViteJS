@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { opsOnboardingPath, opsPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
 import { money } from '@/shared/lib/format';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { toast } from '@/shared/ui/toast/toast.store';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -96,6 +97,8 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
   const plansQuery = usePlansQuery();
   const suspendMutation = useSuspendHospitalMutation();
   const reinstateMutation = useReinstateHospitalMutation();
+  // SEC-05: suspending, reactivating and editing a hospital need hospitals.edit.
+  const canEditHospital = useOpsPermission().can('hospitals.edit');
 
   const [modal, setModal] = useState<DetailModal>(null);
   const [tab, setTab] = useState<string>('Overview');
@@ -211,7 +214,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
           </div>
           <div className="flex-1"></div>
           <div className="flex flex-wrap gap-3">
-            {h.status !== 'closed' && (
+            {h.status !== 'closed' && canEditHospital && (
               <Button variant="secondary" icon="pencil" onClick={() => setModal('edit')}>
                 Edit Profile
               </Button>
@@ -222,12 +225,14 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
               </Button>
             ) : h.status === 'closed' ? null : (
               <>
-                <Button
-                  variant={isSuspended ? 'secondary' : 'danger'}
-                  onClick={() => setModal(isSuspended ? 'unsuspend' : 'suspend')}
-                >
-                  {isSuspended ? 'Reactivate Instance' : 'Suspend Instance'}
-                </Button>
+                {canEditHospital && (
+                  <Button
+                    variant={isSuspended ? 'secondary' : 'danger'}
+                    onClick={() => setModal(isSuspended ? 'unsuspend' : 'suspend')}
+                  >
+                    {isSuspended ? 'Reactivate Instance' : 'Suspend Instance'}
+                  </Button>
+                )}
                 <Button onClick={() => navigate(opsPath('plans'))}>Manage Plan</Button>
               </>
             )}
@@ -255,9 +260,11 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
                 Staff cannot sign in and patients cannot book while this is in force.
               </div>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
-              Lift Suspension
-            </Button>
+            {canEditHospital && (
+              <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
+                Lift Suspension
+              </Button>
+            )}
           </div>
         </Card>
       )}

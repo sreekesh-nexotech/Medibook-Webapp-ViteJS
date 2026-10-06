@@ -1,0 +1,32 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-87b7-7340-a6f1-9d60e486964f",
+      "code": "LAKE10",
+      "kind": "percent",
+      "value": 1000,
+      "max_discount_paise": 20000,
+      "min_order_paise": 0,
+      "valid_from": "2026-08-05T18:30:00Z",
+      "valid_to": "2026-12-03T18:30:00Z",
+      "usage_cap": 200,
+      "per_user_cap": 2,
+      "used_count": 7,
+      "applies_to_online_only": true,
+      "is_active": true,
+      "scopes": [
+        {
+          "department_id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+          "service_id": null
+        }
+      ],
+      "created_at": "2026-08-06T04:30:01.084379Z",
+      "updated_at": "2026-09-27T02:27:00.187792Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

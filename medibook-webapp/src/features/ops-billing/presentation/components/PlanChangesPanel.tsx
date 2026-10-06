@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Badge } from '@/shared/ui/Badge';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { FormModal } from '@/shared/ui/FormModal';
+import { CanOps } from '@/shared/ui/CanOps';
 import { IconBtn } from '@/shared/ui/IconBtn';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
 import { OpsField } from '@/shared/ui/OpsField';
@@ -149,22 +150,27 @@ export function PlanChangesPanel() {
               </td>
               <td className={tdClass}>
                 {r.status === 'requested' ? (
-                  <div className="flex gap-2">
-                    <IconBtn
-                      name="circle-check"
-                      label="Approve plan change"
-                      box={36}
-                      size={16}
-                      onClick={() => setApproving(r)}
-                    />
-                    <IconBtn
-                      name="circle-x"
-                      label="Reject plan change"
-                      box={36}
-                      size={16}
-                      onClick={() => setRejecting(r)}
-                    />
-                  </div>
+                  <CanOps
+                    perm="billing.edit"
+                    fallback={<span className="text-caption text-text-muted">Awaiting review</span>}
+                  >
+                    <div className="flex gap-2">
+                      <IconBtn
+                        name="circle-check"
+                        label="Approve plan change"
+                        box={36}
+                        size={16}
+                        onClick={() => setApproving(r)}
+                      />
+                      <IconBtn
+                        name="circle-x"
+                        label="Reject plan change"
+                        box={36}
+                        size={16}
+                        onClick={() => setRejecting(r)}
+                      />
+                    </div>
+                  </CanOps>
                 ) : (
                   <span className="text-caption text-text-muted">
                     {r.reviewedAt ? `Reviewed ${fmtDateTime(r.reviewedAt)}` : '—'}

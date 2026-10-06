@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
@@ -83,6 +84,8 @@ interface ExportRequestsCardProps {
 export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCardProps) {
   const [page, setPage] = useState(0);
   const [rejecting, setRejecting] = useState<DataRequest | null>(null);
+  // SEC-05: preparing or rejecting a data request needs compliance.edit.
+  const canAct = useOpsPermission().can('compliance.edit');
   const requestsQuery = useComplianceDataRequestsQuery({ page: page + 1, pageSize: PAGE_SIZE });
   const rejectMutation = useRejectComplianceDataRequestMutation();
   const download = useFileDownloadMutation();
@@ -141,7 +144,7 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
       <TableShell columns={COLUMNS} scrollLabel="Recorded data-subject requests" state={tableState}>
         {requests.map((r) => {
           const look = DATA_REQUEST_LOOK[r.status];
-          const isOpen = OPEN_DATA_REQUEST_STATUSES.has(r.status);
+          const isOpen = canAct && OPEN_DATA_REQUEST_STATUSES.has(r.status);
           const canPrepare = isOpen && r.kind === 'export';
           return (
             <tr key={r.id}>

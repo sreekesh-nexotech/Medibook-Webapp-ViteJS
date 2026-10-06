@@ -14,6 +14,9 @@ export function useLogoutMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (surface: AuthSurface) => unwrap(await logoutStaff(surface)),
+    // Run offline too: TanStack pauses mutations while the browser is offline,
+    // which would leave a shared desk signed in (SEC-14).
+    networkMode: 'always',
     onSettled: () => {
       queryClient.clear();
     },

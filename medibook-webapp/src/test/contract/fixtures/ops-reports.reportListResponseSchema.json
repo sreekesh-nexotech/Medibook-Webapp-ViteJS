@@ -1,0 +1,1132 @@
+{
+  "results": [
+    {
+      "code": "bookings",
+      "title": "Bookings Report",
+      "filters": [
+        {
+          "key": "booking_date",
+          "label": "Booking date",
+          "kind": "date_range",
+          "params": ["booking_date_from", "booking_date_to"]
+        },
+        {
+          "key": "appointment_date",
+          "label": "Appointment date",
+          "kind": "date_range",
+          "params": ["appointment_date_from", "appointment_date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "uuid",
+          "params": ["doctor_id"]
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "choice",
+          "params": ["status"],
+          "choices": [
+            "pending_approval",
+            "scheduled",
+            "checked_in",
+            "in_consultation",
+            "completed",
+            "cancelled",
+            "no_show"
+          ]
+        },
+        {
+          "key": "booking_type",
+          "label": "Booking type",
+          "kind": "choice",
+          "params": ["booking_type"],
+          "choices": ["online", "walk_in"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "booking_date",
+          "label": "Booking Date",
+          "kind": "date"
+        },
+        {
+          "key": "appointment_date",
+          "label": "Appointment Date",
+          "kind": "date"
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "str"
+        },
+        {
+          "key": "department",
+          "label": "Department",
+          "kind": "str"
+        },
+        {
+          "key": "patient",
+          "label": "Patient",
+          "kind": "str"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "booking_type",
+          "label": "Booking Type",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+        "Each date filter is a range: <name>_from / <name>_to (YYYY-MM-DD, inclusive); a single day is from = to.",
+        "Patient = the hospital patient's name with a masked phone number.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone.",
+        "Booking Type: App = online booking, Walk-in = desk booking."
+      ]
+    },
+    {
+      "code": "payment_collection",
+      "title": "Payment Collection Report",
+      "filters": [
+        {
+          "key": "payment_date",
+          "label": "Payment date",
+          "kind": "date_range",
+          "params": ["payment_date_from", "payment_date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "payment_status",
+          "label": "Payment status",
+          "kind": "choice",
+          "params": ["payment_status"],
+          "choices": ["captured", "failed", "refunded"]
+        },
+        {
+          "key": "method",
+          "label": "Method",
+          "kind": "choice",
+          "params": ["method"],
+          "choices": [
+            "upi",
+            "card",
+            "netbanking",
+            "wallet",
+            "emi",
+            "paylater",
+            "cash",
+            "pos",
+            "other"
+          ]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "payment_date",
+          "label": "Payment Date",
+          "kind": "date"
+        },
+        {
+          "key": "amount_paise",
+          "label": "Amount",
+          "kind": "paise"
+        },
+        {
+          "key": "method",
+          "label": "Method",
+          "kind": "str"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "user",
+          "label": "User",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Each date filter is a range: <name>_from / <name>_to (YYYY-MM-DD, inclusive); a single day is from = to.",
+        "User = the booking account (name, masked phone); a desk payment with no app account shows the patient.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone.",
+        "One row per payment line (a split desk payment has one line per method)."
+      ]
+    },
+    {
+      "code": "revenue",
+      "title": "Revenue Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "revenue_status",
+          "label": "Revenue status",
+          "kind": "choice",
+          "params": ["revenue_status"],
+          "choices": ["earned", "pending", "refunded"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "appointment_date",
+          "label": "Appointment Date",
+          "kind": "date"
+        },
+        {
+          "key": "amount_paise",
+          "label": "Amount",
+          "kind": "paise"
+        },
+        {
+          "key": "revenue_status",
+          "label": "Revenue Status",
+          "kind": "str"
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Revenue Status (client to confirm): earned = paid and the appointment is completed; pending = paid and not completed / cancelled / no-show; refunded = the booking's payment was refunded.",
+        "Amount = the booking total paid by the patient.",
+        "Date range = appointment date.",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm."
+      ]
+    },
+    {
+      "code": "refund",
+      "title": "Refund Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "refund_status",
+          "label": "Refund status",
+          "kind": "choice",
+          "params": ["refund_status"],
+          "choices": ["requested", "processing", "processed", "failed"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "cancellation_date",
+          "label": "Cancellation Date",
+          "kind": "date"
+        },
+        {
+          "key": "appointment_date",
+          "label": "Appointment Date",
+          "kind": "date"
+        },
+        {
+          "key": "refund_amount_paise",
+          "label": "Refund Amount",
+          "kind": "paise"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "reason",
+          "label": "Reason",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range = the date the refund was requested.",
+        "Refunds are full, one per payment line (Q94, O-09).",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "settlement",
+      "title": "Settlement Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "settlement_status",
+          "label": "Settlement status",
+          "kind": "choice",
+          "params": ["settlement_status"],
+          "choices": ["open", "closed", "paid", "on_hold"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "settlement_period",
+          "label": "Settlement Period",
+          "kind": "str"
+        },
+        {
+          "key": "bookings",
+          "label": "Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "gross_revenue_paise",
+          "label": "Gross Revenue",
+          "kind": "paise"
+        },
+        {
+          "key": "commission_paise",
+          "label": "Commission",
+          "kind": "paise"
+        },
+        {
+          "key": "net_payable_paise",
+          "label": "Net Payable",
+          "kind": "paise"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "settlement_date",
+          "label": "Settlement Date",
+          "kind": "date"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range selects settlement periods overlapping it.",
+        "Commission includes the GST on commission (the period's one commission column).",
+        "Settlement Date = the date the payout was released (empty until released)."
+      ]
+    },
+    {
+      "code": "commission",
+      "title": "Commission Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "total_bookings",
+          "label": "Total Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "total_revenue_paise",
+          "label": "Total Revenue",
+          "kind": "paise"
+        },
+        {
+          "key": "commission_pct",
+          "label": "Commission %",
+          "kind": "percent"
+        },
+        {
+          "key": "commission_amount_paise",
+          "label": "Commission Amount",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Commission is a percentage (basis points) only; there is no flat commission amount in the schema. Amounts are the ledger's commission entries at the rate effective on the entry date (hospital commission history), for online (platform-collected) bookings; desk bookings carry no commission.",
+        "Total Bookings / Total Revenue = online bookings and patient payments in the ledger in the range.",
+        "Commission % = the rate in effect; when it changed inside the range, the base-weighted average rate (client to confirm).",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "commission_history",
+      "title": "Commission History Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "date",
+          "label": "Date",
+          "kind": "date"
+        },
+        {
+          "key": "commission_pct",
+          "label": "Commission %",
+          "kind": "percent"
+        },
+        {
+          "key": "revenue_paise",
+          "label": "Revenue",
+          "kind": "paise"
+        },
+        {
+          "key": "commission_amount_paise",
+          "label": "Commission Amount",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "One row per commission rate change; Date = the date the rate took effect. Revenue (patient payments) and Commission Amount are the ledger totals while that rate was in effect, clipped to the date range.",
+        "Commission is a percentage (basis points) only; there is no flat commission amount in the schema. Amounts are the ledger's commission entries at the rate effective on the entry date (hospital commission history), for online (platform-collected) bookings; desk bookings carry no commission."
+      ]
+    },
+    {
+      "code": "hospital_performance",
+      "title": "Hospital Performance Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "total_bookings",
+          "label": "Total Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "completed",
+          "label": "Completed",
+          "kind": "int"
+        },
+        {
+          "key": "cancelled",
+          "label": "Cancelled",
+          "kind": "int"
+        },
+        {
+          "key": "revenue_paise",
+          "label": "Revenue",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range = appointment date.",
+        "Platform revenue = what the patient paid for the booking (booking total), for bookings whose payment is held (paid; refunded bookings excluded, a refund still in progress counts until processed).",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+        "Grouped rows list only entities with at least one booking in the filtered range."
+      ]
+    },
+    {
+      "code": "doctor_performance",
+      "title": "Doctor Performance Report",
+      "filters": [
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "uuid",
+          "params": ["doctor_id"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "str"
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "bookings",
+          "label": "Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "completed",
+          "label": "Completed",
+          "kind": "int"
+        },
+        {
+          "key": "revenue_paise",
+          "label": "Revenue",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range = appointment date.",
+        "Platform revenue = what the patient paid for the booking (booking total), for bookings whose payment is held (paid; refunded bookings excluded, a refund still in progress counts until processed).",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+        "Grouped rows list only entities with at least one booking in the filtered range."
+      ]
+    },
+    {
+      "code": "department",
+      "title": "Department Report",
+      "filters": [
+        {
+          "key": "department",
+          "label": "Department",
+          "kind": "uuid",
+          "params": ["department_id"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "department",
+          "label": "Department",
+          "kind": "str"
+        },
+        {
+          "key": "bookings",
+          "label": "Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "revenue_paise",
+          "label": "Revenue",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Departments are grouped by name across hospitals (the sheet has no Hospital column); use the Hospital filter for one hospital.",
+        "Date range = appointment date.",
+        "Platform revenue = what the patient paid for the booking (booking total), for bookings whose payment is held (paid; refunded bookings excluded, a refund still in progress counts until processed).",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+        "Grouped rows list only entities with at least one booking in the filtered range."
+      ]
+    },
+    {
+      "code": "cancellation_no_show",
+      "title": "Cancellation / No-show Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "choice",
+          "params": ["status"],
+          "choices": ["cancelled", "no_show"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "patient",
+          "label": "Patient",
+          "kind": "str"
+        },
+        {
+          "key": "doctor",
+          "label": "Doctor",
+          "kind": "str"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "reason",
+          "label": "Reason",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range = appointment date.",
+        "Reason = the cancellation reason, or the status reason for a no-show.",
+        "Patient = the hospital patient's name with a masked phone number.",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm."
+      ]
+    },
+    {
+      "code": "user_activity",
+      "title": "User Activity Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "user",
+          "label": "User",
+          "kind": "uuid",
+          "params": ["user_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "user",
+          "label": "User",
+          "kind": "str"
+        },
+        {
+          "key": "total_bookings",
+          "label": "Total Bookings",
+          "kind": "int"
+        },
+        {
+          "key": "last_active",
+          "label": "Last Active",
+          "kind": "datetime"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Users = patient accounts; Total Bookings = bookings made by the account in the range (booking date).",
+        "Last Active = the account's last login. With a date range, only accounts with a booking or a login in the range are listed.",
+        "User = name with a masked phone number.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "user_spend",
+      "title": "User Spend Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "user",
+          "label": "User",
+          "kind": "uuid",
+          "params": ["user_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "user",
+          "label": "User",
+          "kind": "str"
+        },
+        {
+          "key": "total_spend_paise",
+          "label": "Total Spend",
+          "kind": "paise"
+        },
+        {
+          "key": "bookings",
+          "label": "Bookings",
+          "kind": "int"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Total Spend = the booking totals of the account's paid bookings (refunded bookings excluded); date range = booking date. Walk-in patients without an app account are not users.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "plan_usage",
+      "title": "Plan Usage Report",
+      "filters": [
+        {
+          "key": "plan",
+          "label": "Plan",
+          "kind": "uuid",
+          "params": ["plan_id"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "plan",
+          "label": "Plan",
+          "kind": "str"
+        },
+        {
+          "key": "booking_limit",
+          "label": "Booking Limit",
+          "kind": "int"
+        },
+        {
+          "key": "usage",
+          "label": "Usage",
+          "kind": "int"
+        },
+        {
+          "key": "overage",
+          "label": "Overage",
+          "kind": "int"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Booking Limit and Overage are always empty: plans limit users, doctors and storage, not bookings (v2 Q101-102); there is no booking limit in the schema.",
+        "Usage = bookings created at the hospital in its current subscription period."
+      ]
+    },
+    {
+      "code": "billing_invoice",
+      "title": "Billing / Invoice Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "choice",
+          "params": ["status"],
+          "choices": ["draft", "issued", "paid", "overdue", "void", "uncollectible"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "invoice_id",
+          "label": "Invoice ID",
+          "kind": "str"
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "amount_paise",
+          "label": "Amount",
+          "kind": "paise"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        },
+        {
+          "key": "due_date",
+          "label": "Due Date",
+          "kind": "date"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Subscription invoices; date range = issue date; Amount = invoice total including GST.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "payment_status",
+      "title": "Payment Status Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "choice",
+          "params": ["status"],
+          "choices": ["captured", "failed", "refunded"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "payment_id",
+          "label": "Payment ID",
+          "kind": "str"
+        },
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "amount_paise",
+          "label": "Amount",
+          "kind": "paise"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Payment ID = the gateway payment id for online payments; for desk payments (no gateway id) the receipt number of the payment's order.",
+        "Date range = payment date (capture time, or creation time for an uncaptured line).",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "revenue_breakdown",
+      "title": "Revenue Breakdown Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "fee_paise",
+          "label": "Fee",
+          "kind": "paise"
+        },
+        {
+          "key": "tax_paise",
+          "label": "Tax",
+          "kind": "paise"
+        },
+        {
+          "key": "commission_paise",
+          "label": "Commission",
+          "kind": "paise"
+        },
+        {
+          "key": "net_paise",
+          "label": "Net",
+          "kind": "paise"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Paid bookings; date range = appointment date. Fee = booking total − tax (consultation + service − discount + convenience fee); Tax = the booking's tax; Commission = ledger commission (none for desk bookings); Net = hospital share (consultation + service − discount) − commission. Definitions for the client to confirm.",
+        "Commission is a percentage (basis points) only; there is no flat commission amount in the schema. Amounts are the ledger's commission entries at the rate effective on the entry date (hospital commission history), for online (platform-collected) bookings; desk bookings carry no commission."
+      ]
+    },
+    {
+      "code": "settlement_summary",
+      "title": "Settlement Summary Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "uuid",
+          "params": ["hospital_id"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        },
+        {
+          "key": "total_settled_paise",
+          "label": "Total Settled",
+          "kind": "paise"
+        },
+        {
+          "key": "pending_paise",
+          "label": "Pending",
+          "kind": "paise"
+        },
+        {
+          "key": "last_settlement_date",
+          "label": "Last Settlement Date",
+          "kind": "date"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Over settlement periods overlapping the range: Total Settled = net payable of paid periods; Pending = net payable of periods not yet paid (open, closed, on hold); Last Settlement Date = latest released payout."
+      ]
+    },
+    {
+      "code": "booking_source",
+      "title": "Booking Source Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "source",
+          "label": "Source",
+          "kind": "choice",
+          "params": ["source"],
+          "choices": ["online", "walk_in"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "booking_id",
+          "label": "Booking ID",
+          "kind": "str"
+        },
+        {
+          "key": "source",
+          "label": "Source (App/Walk-in)",
+          "kind": "str"
+        },
+        {
+          "key": "hospital",
+          "label": "Hospital",
+          "kind": "str"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date range = booking date. Source filter values: online (App), walk_in (Walk-in).",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+        "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone."
+      ]
+    },
+    {
+      "code": "time_based_revenue",
+      "title": "Time-based Revenue Report",
+      "filters": [
+        {
+          "key": "date_range",
+          "label": "Date range",
+          "kind": "date_range",
+          "params": ["date_from", "date_to"]
+        },
+        {
+          "key": "time_interval",
+          "label": "Time interval",
+          "kind": "choice",
+          "params": ["time_interval"],
+          "choices": ["day", "week", "month"]
+        }
+      ],
+      "columns": [
+        {
+          "key": "date",
+          "label": "Date",
+          "kind": "date"
+        },
+        {
+          "key": "revenue_paise",
+          "label": "Revenue",
+          "kind": "paise"
+        },
+        {
+          "key": "bookings",
+          "label": "Bookings",
+          "kind": "int"
+        }
+      ],
+      "formats": ["csv", "xlsx", "pdf"],
+      "notes": [
+        "Date = the start of the day / week (Monday) / month of the appointment date; default interval = day. With both range ends given, empty periods are shown as zero.",
+        "Platform revenue = what the patient paid for the booking (booking total), for bookings whose payment is held (paid; refunded bookings excluded, a refund still in progress counts until processed).",
+        "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm."
+      ]
+    }
+  ],
+  "total": 20
+}

@@ -1,6 +1,7 @@
 import { cn } from '@/shared/lib/cn';
 import { fmtDate, money, moneyShort } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
+import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
 import { Icon } from '@/shared/ui/Icon';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
@@ -73,21 +74,24 @@ export function PayoutRunCard({
           </div>
         </div>
         <div className="flex-1"></div>
-        {run === null && runnable.length > 0 && (
-          <Button size="sm" icon="plus" onClick={onCreateRun}>
-            Create Payout Run ({runnable.length})
-          </Button>
-        )}
-        {run?.status === 'draft' && (
-          <Button size="sm" icon="check" busy={approving} onClick={() => onApprove(run.id)}>
-            Approve Run
-          </Button>
-        )}
-        {run && relRows.length > 0 && (
-          <Button size="sm" icon="landmark" onClick={() => onReleaseRun(group)}>
-            Release Run ({relRows.length} · {moneyShort(relTotal)})
-          </Button>
-        )}
+        {/* SEC-05: creating, approving and releasing runs need settlements.edit. */}
+        <CanOps perm="settlements.edit">
+          {run === null && runnable.length > 0 && (
+            <Button size="sm" icon="plus" onClick={onCreateRun}>
+              Create Payout Run ({runnable.length})
+            </Button>
+          )}
+          {run?.status === 'draft' && (
+            <Button size="sm" icon="check" busy={approving} onClick={() => onApprove(run.id)}>
+              Approve Run
+            </Button>
+          )}
+          {run && relRows.length > 0 && (
+            <Button size="sm" icon="landmark" onClick={() => onReleaseRun(group)}>
+              Release Run ({relRows.length} · {moneyShort(relTotal)})
+            </Button>
+          )}
+        </CanOps>
       </div>
       <TableShell
         columns={['Statement', 'Gross', 'Commission', 'Net Payable', 'Status', 'Action']}

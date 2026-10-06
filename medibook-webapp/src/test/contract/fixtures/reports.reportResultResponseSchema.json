@@ -1,0 +1,102 @@
+{
+  "code": "appointment",
+  "title": "Appointment Report",
+  "filters_applied": {},
+  "kpis": [
+    {
+      "key": "appointments",
+      "label": "Appointments",
+      "kind": "int",
+      "value": 173
+    },
+    {
+      "key": "completed",
+      "label": "Completed",
+      "kind": "int",
+      "value": 120
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "kind": "int",
+      "value": 20
+    }
+  ],
+  "columns": [
+    {
+      "key": "patient",
+      "label": "Patient",
+      "kind": "str"
+    },
+    {
+      "key": "doctor",
+      "label": "Doctor",
+      "kind": "str"
+    },
+    {
+      "key": "department",
+      "label": "Department",
+      "kind": "str"
+    },
+    {
+      "key": "appointment_date",
+      "label": "Appointment Date",
+      "kind": "date"
+    },
+    {
+      "key": "status",
+      "label": "Status",
+      "kind": "str"
+    }
+  ],
+  "rows": [
+    {
+      "patient": "Imran Sheikh (LKSM000016)",
+      "doctor": "Dr. Suresh Pillai",
+      "department": "General Medicine",
+      "appointment_date": "2026-10-10",
+      "status": "scheduled"
+    },
+    {
+      "patient": "Jacob Mathew (LKSM000007)",
+      "doctor": "Dr. Harish Menon",
+      "department": "Cardiology",
+      "appointment_date": "2026-10-07",
+      "status": "scheduled"
+    },
+    {
+      "patient": "Priya Nair (LKSM000006)",
+      "doctor": "Dr. Thomas Chacko",
+      "department": "Orthopaedics",
+      "appointment_date": "2026-10-07",
+      "status": "scheduled"
+    },
+    {
+      "patient": "Testbaby (LKSM000043)",
+      "doctor": "Dr. Suresh Pillai",
+      "department": "General Medicine",
+      "appointment_date": "2026-10-06",
+      "status": "scheduled"
+    },
+    {
+      "patient": "Jacob Mathew (LKSM000007)",
+      "doctor": "Dr. Harish Menon",
+      "department": "Cardiology",
+      "appointment_date": "2026-10-02",
+      "status": "scheduled"
+    }
+  ],
+  "page": {
+    "page": 1,
+    "page_size": 5,
+    "total": 173,
+    "has_next": true
+  },
+  "meta": {
+    "notes": [
+      "Date = appointment date, as a range date_from / date_to (a single day is from = to).",
+      "Patient = the patient's name with the hospital's MRN.",
+      "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm."
+    ]
+  }
+}

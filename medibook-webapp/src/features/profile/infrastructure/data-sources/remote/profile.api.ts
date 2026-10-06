@@ -36,7 +36,7 @@ export async function getSessions(surface: AuthSurface): Promise<ActiveSessionRe
 }
 
 export async function deleteSession(surface: AuthSurface, sessionId: string): Promise<void> {
-  await apiFor(surface).delete(`/auth/sessions/${sessionId}`);
+  await apiFor(surface).delete(`/auth/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 export async function postLogoutAll(surface: AuthSurface): Promise<void> {

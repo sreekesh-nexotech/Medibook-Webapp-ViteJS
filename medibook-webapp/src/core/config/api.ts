@@ -28,6 +28,9 @@ export const REQUEST_ID_HEADER = 'X-Request-Id';
 /** Path (relative to a surface) that rotates a refresh token into a new pair (D-12). */
 export const TOKEN_REFRESH_PATH = '/auth/token/refresh';
 
+/** Path (relative to a surface) that revokes the calling session. */
+export const LOGOUT_PATH = '/auth/logout';
+
 /* ---------------------------------------------------------------- query cache */
 
 /** Default freshness of server data before a background refetch. */

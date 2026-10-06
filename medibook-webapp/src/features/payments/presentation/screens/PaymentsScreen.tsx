@@ -563,8 +563,9 @@ export function PaymentsScreen() {
                     {/* HA-09: refund is reachable for prepaid online lines too. A
                         visit line has no refund endpoint (refunds are per
                         appointment), so it offers none. */}
+                    {/* SEC-13: the refund endpoint requires payments.del. */}
                     {line.status === 'captured' && line.appointmentId && (
-                      <Can perm={['Payments.del', 'Appointments.del']}>
+                      <Can perm="Payments.del">
                         <Button
                           size="sm"
                           variant="ghost"

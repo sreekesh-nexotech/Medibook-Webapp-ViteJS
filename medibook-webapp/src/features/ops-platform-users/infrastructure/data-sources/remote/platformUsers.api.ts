@@ -38,6 +38,9 @@ export async function postPlatformUserAction(
   action: PlatformUserAction,
   body: UserBlockRequest,
 ): Promise<PlatformUserSummaryResponse> {
-  const response = await platformApi.post(`/users/${encodeURIComponent(id)}/${action}`, body);
+  const response = await platformApi.post(
+    `/users/${encodeURIComponent(id)}/${encodeURIComponent(action)}`,
+    body,
+  );
   return platformUserSummaryResponseSchema.parse(response.data);
 }

@@ -23,6 +23,7 @@ import {
 import { useNow } from '@/shared/hooks/useNow';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -84,13 +85,15 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   const block = useBlockPlatformUserMutation();
   const unblock = useUnblockPlatformUserMutation();
   const unlock = useUnlockPlatformUserMutation();
+  // SEC-05: blocking, unblocking and unlocking a patient need platform_users.edit.
+  const mayEdit = useOpsPermission().can('platform_users.edit');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [reason, setReason] = useState('');
 
   const name = userName(u);
   const pill = ACCOUNT_STATUS_PILLS[u.status];
   const blocked = u.status === 'blocked';
-  const canModerate = u.status !== 'deleted';
+  const canModerate = mayEdit && u.status !== 'deleted';
   const locked = isLockedAt(u.lockedUntil, now);
   const family = u.persons.filter((p) => !p.isSelf);
   const busy = block.isPending || unblock.isPending;
@@ -161,7 +164,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
             <span className="text-caption text-text-muted">{contact || NO_VALUE}</span>
           </div>
           <div className="flex-1"></div>
-          {locked && (
+          {locked && mayEdit && (
             <Button
               variant="secondary"
               icon="key-round"

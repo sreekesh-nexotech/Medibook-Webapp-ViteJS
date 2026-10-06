@@ -36,7 +36,7 @@ export async function getSlotGrid(params: SlotGridParams) {
 /** Idempotency-Key is mandatory here (a confirmed block refunds). */
 export async function postSlotBlock(slotId: string, key: string) {
   const response = await hospitalApi.post(
-    `${SLOTS_PATH}/${slotId}/block`,
+    `${SLOTS_PATH}/${encodeURIComponent(slotId)}/block`,
     { reason: null },
     { headers: idempotencyKey(key) },
   );
@@ -44,7 +44,7 @@ export async function postSlotBlock(slotId: string, key: string) {
 }
 
 export async function postSlotOpen(slotId: string) {
-  const response = await hospitalApi.post(`${SLOTS_PATH}/${slotId}/open`);
+  const response = await hospitalApi.post(`${SLOTS_PATH}/${encodeURIComponent(slotId)}/open`);
   return slotResponseSchema.parse(response.data);
 }
 

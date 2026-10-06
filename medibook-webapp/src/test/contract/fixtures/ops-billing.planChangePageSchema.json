@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "id": "01a0ee2f-aff1-7883-94fe-f79615bdc219",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "from_plan_id": "01a0ee28-7f86-7b52-8ee1-14bf237feca5",
+      "to_plan_id": "01a0ee28-7f7e-7ee1-9dda-da4f5b84abbd",
+      "to_billing_period": "yearly",
+      "requested_by_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
+      "requested_at": "2026-09-29T17:21:37.777105Z",
+      "note": "Switch to yearly billing for the discount",
+      "status": "requested",
+      "reviewed_by_id": null,
+      "reviewed_at": null,
+      "effective_at": null,
+      "review_note": null,
+      "created_at": "2026-09-29T17:21:37.777649Z"
+    },
+    {
+      "id": "01a0ee2f-af83-7b11-95da-994e6270ba4f",
+      "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+      "from_plan_id": "01a0ee28-7f7e-7ee1-9dda-da4f5b84abbd",
+      "to_plan_id": "01a0ee28-7f7e-7ee1-9dda-da4f5b84abbd",
+      "to_billing_period": "yearly",
+      "requested_by_id": "01a0ee28-8edd-7671-9c98-0ec68610cb82",
+      "requested_at": "2026-09-29T17:21:37.667207Z",
+      "note": "Switch to yearly billing for the discount",
+      "status": "applied",
+      "reviewed_by_id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+      "reviewed_at": "2026-09-29T17:21:37.749052Z",
+      "effective_at": "2026-09-29",
+      "review_note": null,
+      "created_at": "2026-09-29T17:21:37.667811Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

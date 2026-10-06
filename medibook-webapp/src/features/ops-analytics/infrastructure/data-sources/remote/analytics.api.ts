@@ -20,7 +20,9 @@ import {
 
 /** `GET /platform/analytics/<tab>?period=` — platform-wide (no `hospital_id`). */
 async function getTab(tab: string, period: AnalyticsPeriodCode): Promise<unknown> {
-  const response = await platformApi.get(`/analytics/${tab}`, { params: { period } });
+  const response = await platformApi.get(`/analytics/${encodeURIComponent(tab)}`, {
+    params: { period },
+  });
   return response.data;
 }
 

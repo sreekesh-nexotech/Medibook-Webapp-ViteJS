@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-82a1-7b63-a8cc-dd3edf79e9ce",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "hospital_name": "Nilgiri Family Clinic",
+      "plan_id": "01a0ee28-7f75-7753-b4b9-0fbc57defab1",
+      "plan_code": "starter",
+      "plan_name": "Starter",
+      "billing_period": "monthly",
+      "status": "read_only",
+      "read_only": true,
+      "started_at": "2026-08-04T05:00:00.146652Z",
+      "trial_ends_at": "2026-08-17T18:30:00Z",
+      "current_period_start": "2026-09-17T18:30:00Z",
+      "current_period_end": "2026-10-17T18:30:00Z",
+      "next_invoice_at": "2026-10-17T18:30:00Z",
+      "cancel_at_period_end": false,
+      "cancelled_at": null,
+      "gateway": "manual",
+      "grace_days_override": null,
+      "created_at": "2026-08-04T05:00:00.146869Z",
+      "updated_at": "2026-09-29T17:21:21.174998Z",
+      "version": 6
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

@@ -1,0 +1,40 @@
+{
+  "period": "30d",
+  "date_from": "2026-09-06",
+  "date_to": "2026-10-05",
+  "hospital_id": null,
+  "results": [
+    {
+      "provider": "email",
+      "errors": 32,
+      "messages": 361
+    },
+    {
+      "provider": "push",
+      "errors": 30,
+      "messages": 5200
+    },
+    {
+      "provider": "razorpay",
+      "errors": 38,
+      "requests": 780
+    },
+    {
+      "provider": "sms",
+      "cost_paise": 71375,
+      "errors": 33,
+      "messages": 3457
+    },
+    {
+      "provider": "storage",
+      "errors": 44,
+      "requests": 576
+    },
+    {
+      "provider": "whatsapp",
+      "cost_paise": 112740,
+      "errors": 28,
+      "messages": 2230
+    }
+  ]
+}

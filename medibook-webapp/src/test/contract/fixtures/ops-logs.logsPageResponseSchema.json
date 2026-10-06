@@ -1,0 +1,118 @@
+{
+  "results": [
+    {
+      "id": "01a11031-8314-7822-8a4e-0c2805800f96",
+      "occurred_at": "2026-10-06T07:50:42.707946Z",
+      "request_id": "b90047531e5bb196e93b3441b36c2000",
+      "principal": "anonymous",
+      "actor_user_id": null,
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/platform/auth/login",
+      "action": "http.post",
+      "resource_type": "PlatformLoginView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/platform/auth/login",
+        "surface": "public"
+      }
+    },
+    {
+      "id": "01a11031-7eee-7682-bb1a-df5701a1af6b",
+      "occurred_at": "2026-10-06T07:50:41.646894Z",
+      "request_id": "6ca2613435ab4d5dc1d87fd5947a0de9",
+      "principal": "anonymous",
+      "actor_user_id": null,
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/auth/login",
+      "action": "http.post",
+      "resource_type": "HospitalLoginView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/hospital/auth/login",
+        "surface": "public"
+      }
+    },
+    {
+      "id": "01a11030-0ad0-7af0-a37c-02eab745d4ee",
+      "occurred_at": "2026-10-06T07:49:06.384081Z",
+      "request_id": "bb0a1f4980797ec011ef4ecb30445c85",
+      "principal": "anonymous",
+      "actor_user_id": null,
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/patient/auth/token/refresh",
+      "action": "http.post",
+      "resource_type": "TokenRefreshView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/patient/auth/token/refresh",
+        "surface": "public"
+      }
+    },
+    {
+      "id": "01a1102f-8493-7ee2-b6c9-a182f2422244",
+      "occurred_at": "2026-10-06T07:48:32.013081Z",
+      "request_id": "8e3334b2e529127590c823f2d857dd7f",
+      "principal": "anonymous",
+      "actor_user_id": null,
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/platform/auth/login",
+      "action": "http.post",
+      "resource_type": "PlatformLoginView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/platform/auth/login",
+        "surface": "public"
+      }
+    },
+    {
+      "id": "01a1102f-80fb-7cd2-a561-0925f91701c8",
+      "occurred_at": "2026-10-06T07:48:31.098976Z",
+      "request_id": "6bc0d367aa325eabddf9f394467fcf84",
+      "principal": "anonymous",
+      "actor_user_id": null,
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "POST",
+      "path": "/api/v1/hospital/auth/login",
+      "action": "http.post",
+      "resource_type": "HospitalLoginView",
+      "resource_id": null,
+      "before": null,
+      "after": null,
+      "diff": null,
+      "status_code": 200,
+      "meta": {
+        "route": "api/v1/hospital/auth/login",
+        "surface": "public"
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1290,
+  "has_next": true
+}

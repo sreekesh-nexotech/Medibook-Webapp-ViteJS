@@ -1,0 +1,838 @@
+{
+  "results": [
+    {
+      "doctor": {
+        "id": "01a0ee28-8526-7eb1-bb66-0f67c9c21951",
+        "name": "Dr. Suresh Pillai",
+        "department_id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+        "slot_length_min": 15
+      },
+      "date": "2026-10-06",
+      "sessions": [
+        {
+          "id": "01a0ee29-1e0b-77b0-920c-a7fb4ca26a7b",
+          "session_code": "morning",
+          "label": "Morning OPD",
+          "status": "scheduled",
+          "starts_at": "2026-10-06T03:30:00+00:00",
+          "ends_at": "2026-10-06T06:30:00+00:00",
+          "slots": [
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c6c426f668b2",
+              "starts_at": "2026-10-06T03:30:00+00:00",
+              "ends_at": "2026-10-06T03:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c6d2cd09a91c",
+              "starts_at": "2026-10-06T03:45:00+00:00",
+              "ends_at": "2026-10-06T04:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c6eefd0255ad",
+              "starts_at": "2026-10-06T04:00:00+00:00",
+              "ends_at": "2026-10-06T04:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c6fddbdd2260",
+              "starts_at": "2026-10-06T04:15:00+00:00",
+              "ends_at": "2026-10-06T04:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c7089dfd15fe",
+              "starts_at": "2026-10-06T04:30:00+00:00",
+              "ends_at": "2026-10-06T04:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c7175af9835f",
+              "starts_at": "2026-10-06T04:45:00+00:00",
+              "ends_at": "2026-10-06T05:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c72bbe76fbe0",
+              "starts_at": "2026-10-06T05:00:00+00:00",
+              "ends_at": "2026-10-06T05:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c73f295e86a5",
+              "starts_at": "2026-10-06T05:15:00+00:00",
+              "ends_at": "2026-10-06T05:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e13-7e52-a2f7-c7469dbd68a4",
+              "starts_at": "2026-10-06T05:30:00+00:00",
+              "ends_at": "2026-10-06T05:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e14-76f1-8f42-8bb93d55f498",
+              "starts_at": "2026-10-06T05:45:00+00:00",
+              "ends_at": "2026-10-06T06:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e14-76f1-8f42-8bcb07992df3",
+              "starts_at": "2026-10-06T06:00:00+00:00",
+              "ends_at": "2026-10-06T06:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1e14-76f1-8f42-8bda086ba70c",
+              "starts_at": "2026-10-06T06:15:00+00:00",
+              "ends_at": "2026-10-06T06:30:00+00:00",
+              "status": "booked",
+              "state": "booked",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": {
+                "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+                "booking_ref": "LKSB-2610-00211",
+                "token_label": "W001",
+                "status": "scheduled"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "doctor": {
+        "id": "01a0ee28-85e5-7da3-9304-2a385af65a5a",
+        "name": "Dr. Meera Varghese",
+        "department_id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+        "slot_length_min": 10
+      },
+      "date": "2026-10-06",
+      "sessions": [
+        {
+          "id": "01a0ee29-1814-78a0-a175-e985ca3acd82",
+          "session_code": "morning",
+          "label": "Morning OPD",
+          "status": "scheduled",
+          "starts_at": "2026-10-06T03:30:00+00:00",
+          "ends_at": "2026-10-06T06:30:00+00:00",
+          "slots": [
+            {
+              "id": "01a0ee29-1816-7ca2-8484-e2a87a8b1827",
+              "starts_at": "2026-10-06T03:30:00+00:00",
+              "ends_at": "2026-10-06T03:40:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f2f28365e3d0",
+              "starts_at": "2026-10-06T03:40:00+00:00",
+              "ends_at": "2026-10-06T03:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3011ae124d0",
+              "starts_at": "2026-10-06T03:50:00+00:00",
+              "ends_at": "2026-10-06T04:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f315e3f830d7",
+              "starts_at": "2026-10-06T04:00:00+00:00",
+              "ends_at": "2026-10-06T04:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f32ae8ca9446",
+              "starts_at": "2026-10-06T04:10:00+00:00",
+              "ends_at": "2026-10-06T04:20:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f338f28af8f4",
+              "starts_at": "2026-10-06T04:20:00+00:00",
+              "ends_at": "2026-10-06T04:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f34b781a33ce",
+              "starts_at": "2026-10-06T04:30:00+00:00",
+              "ends_at": "2026-10-06T04:40:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f35d195f9edc",
+              "starts_at": "2026-10-06T04:40:00+00:00",
+              "ends_at": "2026-10-06T04:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f362c89f0b54",
+              "starts_at": "2026-10-06T04:50:00+00:00",
+              "ends_at": "2026-10-06T05:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f37d628077f0",
+              "starts_at": "2026-10-06T05:00:00+00:00",
+              "ends_at": "2026-10-06T05:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f38773a3bbf4",
+              "starts_at": "2026-10-06T05:10:00+00:00",
+              "ends_at": "2026-10-06T05:20:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f39ecf586725",
+              "starts_at": "2026-10-06T05:20:00+00:00",
+              "ends_at": "2026-10-06T05:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3a9db73b67f",
+              "starts_at": "2026-10-06T05:30:00+00:00",
+              "ends_at": "2026-10-06T05:40:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3b2d2b6dbb5",
+              "starts_at": "2026-10-06T05:40:00+00:00",
+              "ends_at": "2026-10-06T05:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3c524da20a3",
+              "starts_at": "2026-10-06T05:50:00+00:00",
+              "ends_at": "2026-10-06T06:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3d414d3ca29",
+              "starts_at": "2026-10-06T06:00:00+00:00",
+              "ends_at": "2026-10-06T06:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3eb6279ee9f",
+              "starts_at": "2026-10-06T06:10:00+00:00",
+              "ends_at": "2026-10-06T06:20:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1817-7002-b7dc-f3fabd287c81",
+              "starts_at": "2026-10-06T06:20:00+00:00",
+              "ends_at": "2026-10-06T06:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "doctor": {
+        "id": "01a0ee28-8648-7251-b8f0-4b2b222f6f9c",
+        "name": "Dr. Rekha Nambiar",
+        "department_id": "01a0ee28-8494-7340-8907-128e1b77946b",
+        "slot_length_min": 15
+      },
+      "date": "2026-10-06",
+      "sessions": [
+        {
+          "id": "01a0ee29-1a67-7400-8c8e-293b7c7c9db8",
+          "session_code": "morning",
+          "label": "Morning OPD",
+          "status": "scheduled",
+          "starts_at": "2026-10-06T03:30:00+00:00",
+          "ends_at": "2026-10-06T06:30:00+00:00",
+          "slots": [
+            {
+              "id": "01a0ee29-1a69-70c2-821c-62ce44e13d1d",
+              "starts_at": "2026-10-06T03:30:00+00:00",
+              "ends_at": "2026-10-06T03:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b0bf9531d3f",
+              "starts_at": "2026-10-06T03:45:00+00:00",
+              "ends_at": "2026-10-06T04:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b1e99e93fc9",
+              "starts_at": "2026-10-06T04:00:00+00:00",
+              "ends_at": "2026-10-06T04:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b27f7f5c41e",
+              "starts_at": "2026-10-06T04:15:00+00:00",
+              "ends_at": "2026-10-06T04:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b395d547271",
+              "starts_at": "2026-10-06T04:30:00+00:00",
+              "ends_at": "2026-10-06T04:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b4f7e5e1c7f",
+              "starts_at": "2026-10-06T04:45:00+00:00",
+              "ends_at": "2026-10-06T05:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b5ece35aa9a",
+              "starts_at": "2026-10-06T05:00:00+00:00",
+              "ends_at": "2026-10-06T05:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b625af7eebe",
+              "starts_at": "2026-10-06T05:15:00+00:00",
+              "ends_at": "2026-10-06T05:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b734aa3142b",
+              "starts_at": "2026-10-06T05:30:00+00:00",
+              "ends_at": "2026-10-06T05:45:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b8a5cc44d35",
+              "starts_at": "2026-10-06T05:45:00+00:00",
+              "ends_at": "2026-10-06T06:00:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9b93668fe1f9",
+              "starts_at": "2026-10-06T06:00:00+00:00",
+              "ends_at": "2026-10-06T06:15:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1a6a-7781-87d3-9bad0c34428f",
+              "starts_at": "2026-10-06T06:15:00+00:00",
+              "ends_at": "2026-10-06T06:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "doctor": {
+        "id": "01a0ee28-86bf-7ce0-91fb-9c66da9bd3bd",
+        "name": "Dr. Thomas Chacko",
+        "department_id": "01a0ee28-84a0-79b1-b7a0-43b4162d0d9c",
+        "slot_length_min": 20
+      },
+      "date": "2026-10-06",
+      "sessions": [
+        {
+          "id": "01a0ee29-216c-7122-879e-b46ecb0afb08",
+          "session_code": "morning",
+          "label": "Morning OPD",
+          "status": "scheduled",
+          "starts_at": "2026-10-06T03:30:00+00:00",
+          "ends_at": "2026-10-06T06:30:00+00:00",
+          "slots": [
+            {
+              "id": "01a0ee29-216f-7582-8335-3ad4b0b31112",
+              "starts_at": "2026-10-06T03:30:00+00:00",
+              "ends_at": "2026-10-06T03:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-216f-7582-8335-3ae144e8735d",
+              "starts_at": "2026-10-06T03:50:00+00:00",
+              "ends_at": "2026-10-06T04:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-216f-7582-8335-3af6466a6edc",
+              "starts_at": "2026-10-06T04:10:00+00:00",
+              "ends_at": "2026-10-06T04:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-75b37430bf85",
+              "starts_at": "2026-10-06T04:30:00+00:00",
+              "ends_at": "2026-10-06T04:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-75c64fbd54f7",
+              "starts_at": "2026-10-06T04:50:00+00:00",
+              "ends_at": "2026-10-06T05:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-75d3c18dd4d3",
+              "starts_at": "2026-10-06T05:10:00+00:00",
+              "ends_at": "2026-10-06T05:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-75e6c8233afe",
+              "starts_at": "2026-10-06T05:30:00+00:00",
+              "ends_at": "2026-10-06T05:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-75fc81c79f6f",
+              "starts_at": "2026-10-06T05:50:00+00:00",
+              "ends_at": "2026-10-06T06:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-2170-7de1-baf8-760764b757f6",
+              "starts_at": "2026-10-06T06:10:00+00:00",
+              "ends_at": "2026-10-06T06:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "doctor": {
+        "id": "01a0ee28-8720-70f1-8043-0215ef7f18cb",
+        "name": "Dr. Harish Menon",
+        "department_id": "01a0ee28-84a8-76f2-82a6-97612c344980",
+        "slot_length_min": 20
+      },
+      "date": "2026-10-06",
+      "sessions": [
+        {
+          "id": "01a0ee29-1564-7d42-b4e6-ac5044f8b440",
+          "session_code": "morning",
+          "label": "Morning OPD",
+          "status": "scheduled",
+          "starts_at": "2026-10-06T03:30:00+00:00",
+          "ends_at": "2026-10-06T06:30:00+00:00",
+          "slots": [
+            {
+              "id": "01a0ee29-1566-7c12-8b26-289e0fcba489",
+              "starts_at": "2026-10-06T03:30:00+00:00",
+              "ends_at": "2026-10-06T03:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28a4094ba8cf",
+              "starts_at": "2026-10-06T03:50:00+00:00",
+              "ends_at": "2026-10-06T04:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28b2c8a3c290",
+              "starts_at": "2026-10-06T04:10:00+00:00",
+              "ends_at": "2026-10-06T04:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28c6f6f821af",
+              "starts_at": "2026-10-06T04:30:00+00:00",
+              "ends_at": "2026-10-06T04:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28d99f5a4b5d",
+              "starts_at": "2026-10-06T04:50:00+00:00",
+              "ends_at": "2026-10-06T05:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28e3e49c8aa8",
+              "starts_at": "2026-10-06T05:10:00+00:00",
+              "ends_at": "2026-10-06T05:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-28fcd4f1b315",
+              "starts_at": "2026-10-06T05:30:00+00:00",
+              "ends_at": "2026-10-06T05:50:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-290aade2e679",
+              "starts_at": "2026-10-06T05:50:00+00:00",
+              "ends_at": "2026-10-06T06:10:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            },
+            {
+              "id": "01a0ee29-1566-7c12-8b26-291a27655b45",
+              "starts_at": "2026-10-06T06:10:00+00:00",
+              "ends_at": "2026-10-06T06:30:00+00:00",
+              "status": "open",
+              "state": "past",
+              "capacity": 1,
+              "source": "generated",
+              "block_reason": null,
+              "hold_expires_at": null,
+              "booking": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 5,
+  "has_next": false
+}

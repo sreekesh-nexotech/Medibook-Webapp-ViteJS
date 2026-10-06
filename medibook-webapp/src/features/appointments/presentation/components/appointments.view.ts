@@ -1,3 +1,4 @@
+import type { PermissionKey } from '@/shared/hooks/usePermission';
 import type { IconName } from '@/shared/ui/icon-registry';
 
 import type {
@@ -161,6 +162,18 @@ export interface PrimaryAction {
   readonly icon: IconName;
   readonly variant: 'primary' | 'secondary';
 }
+
+/**
+ * The permission each row action needs — the same one the backend enforces
+ * and the details drawer checks for that action (SEC-13).
+ */
+export const PRIMARY_ACTION_PERMISSION: Readonly<Record<PrimaryKey, PermissionKey>> = {
+  approve: 'Appointments.edit',
+  pay: 'Payments.add',
+  checkin: 'Appointments.edit',
+  queue: 'Token Management.view',
+  receipt: 'Payments.view',
+};
 
 /** The one next step for an appointment, in the order the desk works. */
 export function primaryAction(a: DeskAppointment): PrimaryAction | null {

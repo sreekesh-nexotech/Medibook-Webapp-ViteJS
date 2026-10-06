@@ -1,0 +1,113 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-7bb6-76e1-a340-010a6fde7f56",
+      "user": {
+        "id": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+        "first_name": "Kavya",
+        "last_name": "Iyer",
+        "email": "kavya.iyer@medibook.example.com",
+        "last_login_at": "2026-10-06T07:50:42.576294Z"
+      },
+      "role": {
+        "id": "01a0ee19-def7-7663-bdf7-8ed7f868c67c",
+        "code": "owner",
+        "name": "Owner"
+      },
+      "status": "active",
+      "joined_at": "2026-07-30T04:00:00.911052Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "created_at": "2026-07-30T04:00:00.911935Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-7bd5-74b1-b5b0-d75dc4d2819d",
+      "user": {
+        "id": "01a0ee28-7bcf-7121-90f3-7769fa0cd7b7",
+        "first_name": "Rohan",
+        "last_name": "Mehta",
+        "email": "rohan.mehta@medibook.example.com",
+        "last_login_at": "2026-09-24T16:30:03.448840Z"
+      },
+      "role": {
+        "id": "01a0ee19-e18e-78c2-bcdd-6f26d6eba94c",
+        "code": "ops_manager",
+        "name": "Operations Manager"
+      },
+      "status": "active",
+      "joined_at": "2026-07-30T04:00:01.045320Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "created_at": "2026-07-30T04:00:00.942937Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-7cd2-7122-b79e-4e7179378886",
+      "user": {
+        "id": "01a0ee28-7ccf-77d3-a4da-5c7db8f4d275",
+        "first_name": "Farah",
+        "last_name": "Khan",
+        "email": "farah.khan@medibook.example.com",
+        "last_login_at": null
+      },
+      "role": {
+        "id": "01a0ee19-e4ac-7d22-a91b-6546a6787fe7",
+        "code": "finance",
+        "name": "Finance"
+      },
+      "status": "active",
+      "joined_at": "2026-07-30T04:00:01.224971Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "created_at": "2026-07-30T04:00:01.196186Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-7ddc-7f42-9b03-c073d081697a",
+      "user": {
+        "id": "01a0ee28-7dd9-7d40-b6d3-30bfe78588ee",
+        "first_name": "Deepak",
+        "last_name": "Nair",
+        "email": "deepak.nair@medibook.example.com",
+        "last_login_at": "2026-09-24T16:30:03.635748Z"
+      },
+      "role": {
+        "id": "01a0ee19-e504-70c2-9ec3-6eea5e438e99",
+        "code": "support",
+        "name": "Support"
+      },
+      "status": "active",
+      "joined_at": "2026-07-30T04:00:01.532984Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "created_at": "2026-07-30T04:00:01.461997Z",
+      "version": 1
+    },
+    {
+      "id": "01a0ee28-7e88-70f2-8575-f300d21b50d6",
+      "user": {
+        "id": "01a0ee28-7e84-7500-84cf-9f439509ea74",
+        "first_name": "Lakshmi",
+        "last_name": "Venkat",
+        "email": "lakshmi.venkat@medibook.example.com",
+        "last_login_at": null
+      },
+      "role": {
+        "id": "01a0ee19-e56f-77f3-82fc-5c8d34bf6ca5",
+        "code": "compliance",
+        "name": "Compliance"
+      },
+      "status": "active",
+      "joined_at": "2026-07-30T04:00:01.658450Z",
+      "deactivated_at": null,
+      "locked_until": null,
+      "created_at": "2026-07-30T04:00:01.634041Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 6,
+  "has_next": true
+}

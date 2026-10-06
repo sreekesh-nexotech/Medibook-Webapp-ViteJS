@@ -1,0 +1,19 @@
+{
+  "min_versions": {
+    "android": "1.0.0",
+    "ios": "1.0.0"
+  },
+  "feature_flags_public": {
+    "patient_app.insurance": true,
+    "patient_app.reviews": true
+  },
+  "otp_length": 4,
+  "support_contacts": {
+    "phone_e164": "+910000000000"
+  },
+  "legal_versions": {
+    "terms": 1,
+    "privacy": 1,
+    "guidelines": 1
+  }
+}

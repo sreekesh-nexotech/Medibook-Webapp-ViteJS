@@ -1,0 +1,69 @@
+{
+  "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+  "slug": "lakeshore-multispeciality-kochi",
+  "name": "Lakeshore Multispeciality Hospital",
+  "legal_name": "Lakeshore Healthcare Pvt Ltd",
+  "gstin": "00AAAAA0000A0A0",
+  "registration_no": "KL/EKM/2011/0457",
+  "email": "contact@lakeshore.medibook.example.com",
+  "phone_e164": "+910000000000",
+  "website": "https://files.example.test/",
+  "address_line1": "NH 66 Bypass, Maradu",
+  "address_line2": "Near Vyttila Hub",
+  "address_line3": null,
+  "city": "Kochi",
+  "state": "Kerala",
+  "pincode": "682040",
+  "location_id": "01a0ee28-7fd8-77f3-a934-b72a538b509f",
+  "lat": 9.9312,
+  "lng": 76.2673,
+  "timezone": "Asia/Kolkata",
+  "status": "active",
+  "app_visibility": "visible",
+  "online_booking_enabled": true,
+  "commission_bp": 450,
+  "convenience_fee_kind": "flat",
+  "convenience_fee_value": 2000,
+  "rating_avg": 3.9,
+  "rating_count": 21,
+  "go_live_at": "2026-08-09T09:30:00.238580Z",
+  "created_at": "2026-08-04T04:30:00.013117Z",
+  "updated_at": "2026-09-30T18:30:00.429040Z",
+  "version": 5,
+  "subscription": {
+    "id": "01a0ee28-8144-7650-8b73-866f4422ba0d",
+    "plan_id": "01a0ee28-7f86-7b52-8ee1-14bf237feca5",
+    "plan_code": "enterprise",
+    "status": "past_due",
+    "billing_period": "monthly",
+    "trial_ends_at": "2026-08-17T18:30:00Z",
+    "current_period_end": "2026-10-17T18:30:00Z"
+  },
+  "usage": {
+    "users": {
+      "current": 6,
+      "limit": null,
+      "hard": false,
+      "pct_bp": null
+    },
+    "doctors": {
+      "current": 5,
+      "limit": null,
+      "hard": false,
+      "pct_bp": null
+    },
+    "storage": {
+      "current": 1960809,
+      "limit": 107374182400,
+      "hard": false,
+      "pct_bp": 0
+    }
+  },
+  "onboarding": {
+    "id": "01a0ee28-8127-7102-9b69-de126a0b9556",
+    "stage": "live"
+  },
+  "staff_count": 5,
+  "active_suspensions": [],
+  "go_live_blockers": []
+}

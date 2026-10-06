@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
@@ -54,7 +55,9 @@ interface HospitalCommercialTermsCardProps {
  */
 export function HospitalCommercialTermsCard({ h }: HospitalCommercialTermsCardProps) {
   const [modal, setModal] = useState<'commission' | 'fee' | null>(null);
-  const locked = h.status === 'closed';
+  // A closed hospital, or a role without hospitals.edit (SEC-05), cannot change these.
+  const canEdit = useOpsPermission().can('hospitals.edit');
+  const locked = h.status === 'closed' || !canEdit;
 
   return (
     <Card>

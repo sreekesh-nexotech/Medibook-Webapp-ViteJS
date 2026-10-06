@@ -17,7 +17,7 @@ import {
  * fetched in full for the date.
  */
 
-const sessionPageSchema = paginatedSchema(sessionSnapshotSchema);
+export const sessionPageSchema = paginatedSchema(sessionSnapshotSchema);
 
 export async function getSessions(date: string): Promise<SessionSnapshotResponse[]> {
   const rows: SessionSnapshotResponse[] = [];
@@ -35,7 +35,10 @@ export async function postSessionCommand(
   sessionId: string,
   command: SessionCommand,
 ): Promise<SessionSnapshotResponse> {
-  const response = await hospitalApi.post(`/sessions/${sessionId}/${command}`, {});
+  const response = await hospitalApi.post(
+    `/sessions/${encodeURIComponent(sessionId)}/${encodeURIComponent(command)}`,
+    {},
+  );
   return sessionSnapshotSchema.parse(response.data);
 }
 
@@ -44,13 +47,18 @@ export async function postTokenCommand(
   command: TokenCommand,
   tokenNo: number,
 ): Promise<SessionSnapshotResponse> {
-  const response = await hospitalApi.post(`/sessions/${sessionId}/${command}`, {
-    token_no: tokenNo,
-  });
+  const response = await hospitalApi.post(
+    `/sessions/${encodeURIComponent(sessionId)}/${encodeURIComponent(command)}`,
+    {
+      token_no: tokenNo,
+    },
+  );
   return sessionSnapshotSchema.parse(response.data);
 }
 
 export async function postSkip(sessionId: string, tokenNo: number) {
-  const response = await hospitalApi.post(`/sessions/${sessionId}/skip`, { token_no: tokenNo });
+  const response = await hospitalApi.post(`/sessions/${encodeURIComponent(sessionId)}/skip`, {
+    token_no: tokenNo,
+  });
   return skipResponseSchema.parse(response.data);
 }

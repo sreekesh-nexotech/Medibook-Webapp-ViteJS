@@ -1,0 +1,44 @@
+{
+  "period": "30d",
+  "date_from": "2026-09-06",
+  "date_to": "2026-10-05",
+  "hospital_id": null,
+  "total": 354,
+  "results": [
+    {
+      "department_code": "general_medicine",
+      "bookings": 148,
+      "share_bp": 4180
+    },
+    {
+      "department_code": "paediatrics",
+      "bookings": 53,
+      "share_bp": 1497
+    },
+    {
+      "department_code": "gynaecology",
+      "bookings": 49,
+      "share_bp": 1384
+    },
+    {
+      "department_code": "cardiology",
+      "bookings": 38,
+      "share_bp": 1073
+    },
+    {
+      "department_code": "ent",
+      "bookings": 26,
+      "share_bp": 734
+    },
+    {
+      "department_code": "orthopaedics",
+      "bookings": 21,
+      "share_bp": 593
+    },
+    {
+      "department_code": "dermatology",
+      "bookings": 19,
+      "share_bp": 536
+    }
+  ]
+}

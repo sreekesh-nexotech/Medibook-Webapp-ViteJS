@@ -60,7 +60,7 @@ export function getPayoutRuns(): Promise<PayoutRunResponse[]> {
 }
 
 export async function getPayoutRun(runId: string): Promise<PayoutRunDetailResponse> {
-  const response = await platformApi.get(`/settlements/payout-runs/${runId}`);
+  const response = await platformApi.get(`/settlements/payout-runs/${encodeURIComponent(runId)}`);
   return payoutRunDetailResponseSchema.parse(response.data);
 }
 
@@ -75,7 +75,9 @@ export async function postPayoutRun(
 }
 
 export async function postPayoutRunApprove(runId: string): Promise<PayoutRunDetailResponse> {
-  const response = await platformApi.post(`/settlements/payout-runs/${runId}/approve`);
+  const response = await platformApi.post(
+    `/settlements/payout-runs/${encodeURIComponent(runId)}/approve`,
+  );
   return payoutRunDetailResponseSchema.parse(response.data);
 }
 
@@ -84,9 +86,13 @@ export async function postPayoutRunRelease(
   body: PayoutRunReleaseRequest,
   replayKey: string,
 ): Promise<PayoutRunDetailResponse> {
-  const response = await platformApi.post(`/settlements/payout-runs/${runId}/release`, body, {
-    headers: idempotencyKey(replayKey),
-  });
+  const response = await platformApi.post(
+    `/settlements/payout-runs/${encodeURIComponent(runId)}/release`,
+    body,
+    {
+      headers: idempotencyKey(replayKey),
+    },
+  );
   return payoutRunDetailResponseSchema.parse(response.data);
 }
 
@@ -95,8 +101,12 @@ export async function postPayoutRelease(
   body: PayoutReleaseRequest,
   replayKey: string,
 ): Promise<PayoutResponse> {
-  const response = await platformApi.post(`/settlements/payouts/${payoutId}/release`, body, {
-    headers: idempotencyKey(replayKey),
-  });
+  const response = await platformApi.post(
+    `/settlements/payouts/${encodeURIComponent(payoutId)}/release`,
+    body,
+    {
+      headers: idempotencyKey(replayKey),
+    },
+  );
   return payoutResponseSchema.parse(response.data);
 }

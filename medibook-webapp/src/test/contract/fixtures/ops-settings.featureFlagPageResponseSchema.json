@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "key": "hospital.display_screens",
+      "enabled": true,
+      "description": "Token display screens",
+      "is_public": false,
+      "updated_by": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "updated_at": "2026-07-31T04:00:00.287421Z"
+    },
+    {
+      "key": "patient_app.insurance",
+      "enabled": true,
+      "description": "Insurance policies in the patient app",
+      "is_public": true,
+      "updated_by": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "updated_at": "2026-07-31T04:00:00.283733Z"
+    },
+    {
+      "key": "patient_app.reviews",
+      "enabled": true,
+      "description": "Doctor reviews",
+      "is_public": true,
+      "updated_by": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "updated_at": "2026-07-31T04:00:00.285944Z"
+    },
+    {
+      "key": "platform.payout_automation",
+      "enabled": false,
+      "description": "Automated payout release",
+      "is_public": false,
+      "updated_by": "01a0ee28-7b44-7ba1-9646-d4b34dac002b",
+      "updated_at": "2026-07-31T04:00:00.288764Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 4,
+  "has_next": false
+}

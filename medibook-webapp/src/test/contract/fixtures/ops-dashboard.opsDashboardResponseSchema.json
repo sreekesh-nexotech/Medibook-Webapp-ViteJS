@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-10-06T07:51:49.259054Z",
+  "kpis": {
+    "hospitals_by_status": {
+      "draft": 0,
+      "onboarding": 1,
+      "active": 3,
+      "suspended": 0,
+      "closed": 0
+    },
+    "subscriptions_by_status": {
+      "trialing": 0,
+      "active": 1,
+      "past_due": 2,
+      "grace": 0,
+      "read_only": 1,
+      "cancelled": 0
+    },
+    "mrr_paise": 4966283,
+    "invoices_unpaid_count": 4,
+    "invoices_outstanding_paise": 12451597,
+    "appointments_last_30_days": 350
+  },
+  "alerts": [
+    {
+      "code": "hospitals_in_grace",
+      "count": 2,
+      "hospitals": [
+        {
+          "id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+          "name": "Sahyadri City Hospital"
+        },
+        {
+          "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+          "name": "Lakeshore Multispeciality Hospital"
+        }
+      ]
+    },
+    {
+      "code": "hospitals_read_only",
+      "count": 1,
+      "hospitals": [
+        {
+          "id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+          "name": "Nilgiri Family Clinic"
+        }
+      ]
+    },
+    {
+      "code": "unreconciled_cash_sessions",
+      "count": 3,
+      "hospitals": [
+        {
+          "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+          "sessions": 1
+        },
+        {
+          "id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+          "sessions": 1
+        },
+        {
+          "id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+          "sessions": 1
+        }
+      ]
+    },
+    {
+      "code": "pending_onboarding",
+      "count": 1,
+      "older_than_7_days": 1
+    }
+  ],
+  "recent_onboardings": [
+    {
+      "case_id": "01a0ee28-8342-7f80-82ac-59f01bbebff6",
+      "stage": "documents_pending",
+      "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+      "hospital_name": "Deccan Heart Institute",
+      "created_at": "2026-08-04T05:15:00.119217Z"
+    },
+    {
+      "case_id": "01a0ee28-828b-7393-a8af-9bbdeaa0cebf",
+      "stage": "live",
+      "hospital_id": "01a0ee28-821d-7db0-9de1-27e9172e3015",
+      "hospital_name": "Nilgiri Family Clinic",
+      "created_at": "2026-08-04T05:00:00.125086Z"
+    },
+    {
+      "case_id": "01a0ee28-81d5-7352-b39e-954677c1963f",
+      "stage": "live",
+      "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+      "hospital_name": "Sahyadri City Hospital",
+      "created_at": "2026-08-04T04:45:00.113717Z"
+    },
+    {
+      "case_id": "01a0ee28-8127-7102-9b69-de126a0b9556",
+      "stage": "live",
+      "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+      "hospital_name": "Lakeshore Multispeciality Hospital",
+      "created_at": "2026-08-04T04:30:00.128670Z"
+    }
+  ]
+}

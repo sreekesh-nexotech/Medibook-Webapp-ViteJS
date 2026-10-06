@@ -22,9 +22,21 @@ const envSchema = z.object({
     .trim()
     .default('')
     .transform((v) => v.replace(/\/+$/, '')),
+  VITE_STORAGE_ORIGIN: z
+    .string()
+    .trim()
+    .default('')
+    .transform((v) => v.replace(/\/+$/, '')),
 });
 
-const env = envSchema.parse(import.meta.env);
+// Name each key: Vite inlines exactly the `import.meta.env.X` expressions it
+// sees, so parsing the whole object would ship every VITE_ value — the dev
+// proxy target included — in the bundle (SEC-08).
+const env = envSchema.parse({
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  VITE_WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL,
+  VITE_STORAGE_ORIGIN: import.meta.env.VITE_STORAGE_ORIGIN,
+});
 
 /** Origin of the REST API; `''` means "same origin as the page" (dev proxy). */
 export const API_BASE_URL = env.VITE_API_BASE_URL;
@@ -34,3 +46,9 @@ export const API_BASE_URL = env.VITE_API_BASE_URL;
  * page's own origin" (dev proxy).
  */
 export const WS_BASE_URL = env.VITE_WS_BASE_URL;
+
+/**
+ * Origin of the file store that signed links point at (`https://…`); `''`
+ * when not configured (development), which accepts any https link.
+ */
+export const STORAGE_ORIGIN = env.VITE_STORAGE_ORIGIN;

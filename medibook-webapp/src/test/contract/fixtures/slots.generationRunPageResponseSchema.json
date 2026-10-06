@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "id": "01a10d8b-91f7-7bd3-9582-558ed50d0003",
+      "doctor_id": null,
+      "trigger": "nightly",
+      "horizon_from": "2026-10-06",
+      "horizon_to": "2026-11-05",
+      "started_at": "2026-10-05T19:30:13.111308Z",
+      "finished_at": "2026-10-05T19:30:18.988403Z",
+      "created_count": 65,
+      "updated_count": 0,
+      "closed_count": 0,
+      "preserved_count": 0,
+      "error": null
+    },
+    {
+      "id": "01a10865-3a6c-7091-8ddb-77930c0edbc0",
+      "doctor_id": null,
+      "trigger": "nightly",
+      "horizon_from": "2026-10-05",
+      "horizon_to": "2026-11-04",
+      "started_at": "2026-10-04T19:30:14.252538Z",
+      "finished_at": "2026-10-04T19:30:20.365579Z",
+      "created_count": 90,
+      "updated_count": 0,
+      "closed_count": 0,
+      "preserved_count": 0,
+      "error": null
+    },
+    {
+      "id": "01a1033e-c884-7de3-8c82-cf0f134c4b9a",
+      "doctor_id": null,
+      "trigger": "nightly",
+      "horizon_from": "2026-10-04",
+      "horizon_to": "2026-11-03",
+      "started_at": "2026-10-03T19:30:08.644651Z",
+      "finished_at": "2026-10-03T19:30:12.400444Z",
+      "created_count": 65,
+      "updated_count": 0,
+      "closed_count": 0,
+      "preserved_count": 0,
+      "error": null
+    },
+    {
+      "id": "01a0fe18-69c8-7402-870b-3a749aef3787",
+      "doctor_id": null,
+      "trigger": "nightly",
+      "horizon_from": "2026-10-03",
+      "horizon_to": "2026-11-02",
+      "started_at": "2026-10-02T19:30:07.943996Z",
+      "finished_at": "2026-10-02T19:30:11.365020Z",
+      "created_count": 90,
+      "updated_count": 0,
+      "closed_count": 0,
+      "preserved_count": 0,
+      "error": null
+    },
+    {
+      "id": "01a0f8f2-15b8-7e73-ba74-ba456537eb62",
+      "doctor_id": null,
+      "trigger": "nightly",
+      "horizon_from": "2026-10-02",
+      "horizon_to": "2026-11-01",
+      "started_at": "2026-10-01T19:30:09.976386Z",
+      "finished_at": "2026-10-01T19:30:15.552228Z",
+      "created_count": 0,
+      "updated_count": 0,
+      "closed_count": 0,
+      "preserved_count": 0,
+      "error": null
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 50,
+  "has_next": true
+}

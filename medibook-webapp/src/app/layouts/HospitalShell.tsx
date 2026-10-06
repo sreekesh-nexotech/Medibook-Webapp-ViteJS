@@ -1,7 +1,9 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
+import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
+import { useIdleTimeout } from '@/shared/hooks/useIdleTimeout';
 import { usePermission } from '@/shared/hooks/usePermission';
 
 import {
@@ -15,6 +17,7 @@ import {
 import type { HospitalSession } from '@/features/auth/domain/entities/auth.types';
 
 import { ErrorBoundary } from './ErrorBoundary';
+import { IdleWarningModal } from './IdleWarningModal';
 import {
   documentTitleFor,
   moduleForView,
@@ -48,6 +51,9 @@ interface HospitalShellProps {
 
 /** Hospital app frame: sidebar + topbar + per-view error boundary (design `AppShell`). */
 export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
+  // SEC-01: background polls keep the server session alive, so the tab signs
+  // itself out after the idle limit with no keyboard, mouse or touch input.
+  const idle = useIdleTimeout({ minutes: DEFAULT_IDLE_MINUTES, onTimeout: onLogout });
   const location = useLocation();
   const navigate = useNavigate();
   const { canViewModule } = usePermission();
@@ -126,8 +132,8 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary
             key={view}
-            fallback={(_err, reset) => (
-              <ScreenError onRetry={reset} onHome={() => handleNavigate('dashboard')} />
+            fallback={(err, reset) => (
+              <ScreenError error={err} onRetry={reset} onHome={() => handleNavigate('dashboard')} />
             )}
           >
             <Suspense fallback={<ScreenLoading />}>
@@ -143,6 +149,13 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
       >
         {sidebar('full')}
       </SidebarDrawer>
+      <IdleWarningModal
+        open={idle.warning}
+        secondsLeft={idle.secondsLeft}
+        minutes={DEFAULT_IDLE_MINUTES}
+        onStay={idle.stayActive}
+        onSignOut={onLogout}
+      />
     </div>
   );
 }

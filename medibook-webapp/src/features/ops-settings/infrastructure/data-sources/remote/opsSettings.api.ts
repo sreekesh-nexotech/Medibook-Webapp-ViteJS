@@ -70,12 +70,12 @@ export async function patchTaxRate(
   body: TaxRateRequest,
   version: number,
 ): Promise<TaxRateResponse> {
-  const response = await platformApi.patch(`/tax-rates/${id}`, body, {
+  const response = await platformApi.patch(`/tax-rates/${encodeURIComponent(id)}`, body, {
     headers: ifMatch(version),
   });
   return taxRateResponseSchema.parse(response.data);
 }
 
 export async function deleteTaxRate(id: string, version: number): Promise<void> {
-  await platformApi.delete(`/tax-rates/${id}`, { headers: ifMatch(version) });
+  await platformApi.delete(`/tax-rates/${encodeURIComponent(id)}`, { headers: ifMatch(version) });
 }

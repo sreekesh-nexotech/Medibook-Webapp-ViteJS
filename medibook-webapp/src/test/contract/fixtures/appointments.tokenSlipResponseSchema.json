@@ -1,0 +1,17 @@
+{
+  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "token_label": "W001",
+  "token_no": 1,
+  "token_source": "offline",
+  "booking_ref": "LKSB-2608-00002",
+  "mrn": "LKSM000002",
+  "patient_name": "Ramesh Babu",
+  "doctor_name": "Dr. Harish Menon",
+  "doctor_room": "OPD-05",
+  "department_name": "Cardiology",
+  "session_label": "Morning OPD",
+  "scheduled_date": "2026-08-25",
+  "scheduled_start_at": "2026-08-25T03:30:00+00:00",
+  "status": "no_show",
+  "payment_status": "paid"
+}

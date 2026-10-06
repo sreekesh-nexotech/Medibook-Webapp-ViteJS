@@ -14,6 +14,11 @@ interface ModalProps {
   footer?: ReactNode;
   /** Accessible name when the modal has no visible `title`. */
   ariaLabel?: string;
+  /**
+   * `false` for a question that must be answered with one of the footer
+   * buttons: no close button, and Escape and the scrim do nothing. Default `true`.
+   */
+  dismissible?: boolean;
 }
 
 /**
@@ -35,12 +40,13 @@ export function Modal({
   width = 560,
   footer,
   ariaLabel,
+  dismissible = true,
 }: ModalProps) {
-  const { panelRef, titleId } = useDialog({ open, onClose });
+  const { panelRef, titleId } = useDialog({ open, onClose, closeOnEscape: dismissible });
   if (!open) return null;
   return (
     <div
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
       className="animate-fade-in bg-text-strong/45 fixed inset-0 z-50 flex items-center justify-center p-6"
     >
       <div
@@ -56,14 +62,16 @@ export function Modal({
       >
         <div className="border-border-soft flex items-center justify-between border-b px-6 py-5">
           <SectionTitle id={titleId}>{title}</SectionTitle>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="text-text-muted flex cursor-pointer"
-          >
-            <Icon name="x" size={22} />
-          </button>
+          {dismissible && (
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+              className="text-text-muted flex cursor-pointer"
+            >
+              <Icon name="x" size={22} />
+            </button>
+          )}
         </div>
         <div className="p-6">{children}</div>
         {footer && <div className="flex justify-end gap-3 px-6 pb-6">{footer}</div>}

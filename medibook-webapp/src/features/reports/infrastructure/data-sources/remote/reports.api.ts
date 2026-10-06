@@ -82,10 +82,13 @@ async function withJsonErrorBody(error: unknown): Promise<unknown> {
  */
 export async function getReportExport(request: ReportExportRequest): Promise<ReportExportResponse> {
   const response = await hospitalApi
-    .get<Blob>(`/reports/${encodeURIComponent(request.code)}/export.${request.format}`, {
-      params: { ...filterParams(request.params), ...sortParam(request.sort) },
-      responseType: 'blob',
-    })
+    .get<Blob>(
+      `/reports/${encodeURIComponent(request.code)}/export.${encodeURIComponent(request.format)}`,
+      {
+        params: { ...filterParams(request.params), ...sortParam(request.sort) },
+        responseType: 'blob',
+      },
+    )
     .catch(async (error: unknown) => {
       throw await withJsonErrorBody(error);
     });

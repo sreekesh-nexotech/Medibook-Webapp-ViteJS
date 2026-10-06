@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
 
-import { AUTH_LOGIN_PATH, hospitalDashboardPath, opsPath } from '@/app/router/paths';
+import { AUTH_LOGIN_PATH, hospitalDashboardPath, OPS_BASE_PATH } from '@/app/router/paths';
 import { SessionLoading } from '@/app/router/SessionLoading';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
@@ -36,6 +36,6 @@ export function RootRedirect() {
       return <Navigate to={hospitalDashboardPath(FALLBACK_HOSPITAL_ROLE)} replace />;
     }
   }
-  if (hasStoredSession('platform')) return <Navigate to={opsPath('dashboard')} replace />;
+  if (hasStoredSession('platform')) return <Navigate to={OPS_BASE_PATH} replace />;
   return <Navigate to={AUTH_LOGIN_PATH} replace />;
 }

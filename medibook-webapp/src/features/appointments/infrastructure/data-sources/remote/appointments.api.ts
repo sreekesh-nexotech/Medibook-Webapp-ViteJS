@@ -26,8 +26,8 @@ import {
  * the backend declares idempotent carries a fresh `Idempotency-Key`.
  */
 
-const appointmentPageSchema = paginatedSchema(appointmentResponseSchema);
-const eventPageSchema = paginatedSchema(appointmentEventSchema);
+export const appointmentPageSchema = paginatedSchema(appointmentResponseSchema);
+export const eventPageSchema = paginatedSchema(appointmentEventSchema);
 
 async function fetchAllPages<T>(
   fetchPage: (page: number) => Promise<{ results: T[]; has_next: boolean }>,
@@ -40,7 +40,7 @@ async function fetchAllPages<T>(
   }
 }
 
-const base = (id: string) => `/appointments/${id}`;
+const base = (id: string) => `/appointments/${encodeURIComponent(id)}`;
 
 export function getAppointments(range: AppointmentRange) {
   return fetchAllPages(async (page) => {
@@ -110,7 +110,7 @@ export async function patchRemark(id: string, remark: string, version: number) {
 
 /** A bodiless action that answers the updated appointment. */
 async function act(id: string, action: 'approve' | 'check-in' | 'no-show', idempotent: boolean) {
-  const response = await hospitalApi.post(`${base(id)}/${action}`, undefined, {
+  const response = await hospitalApi.post(`${base(id)}/${encodeURIComponent(action)}`, undefined, {
     headers: idempotent ? idempotencyKey() : undefined,
   });
   return appointmentResponseSchema.parse(response.data);
@@ -122,7 +122,7 @@ export const postNoShow = (id: string) => act(id, 'no-show', false);
 
 async function withReason(id: string, action: 'cancel' | 'reject', reason: string) {
   const response = await hospitalApi.post(
-    `${base(id)}/${action}`,
+    `${base(id)}/${encodeURIComponent(action)}`,
     { reason },
     { headers: idempotencyKey() },
   );

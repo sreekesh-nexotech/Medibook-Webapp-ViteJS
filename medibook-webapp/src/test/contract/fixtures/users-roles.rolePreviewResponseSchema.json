@@ -1,0 +1,43 @@
+{
+  "role": {
+    "code": "receptionist",
+    "name": "Receptionist"
+  },
+  "modules": [
+    {
+      "module": "appointments",
+      "label": "Appointments",
+      "actions": ["add", "edit", "view"]
+    },
+    {
+      "module": "cash_desk",
+      "label": "Cash Desk",
+      "actions": ["add", "edit", "view"]
+    },
+    {
+      "module": "dashboard",
+      "label": "Dashboard",
+      "actions": ["view"]
+    },
+    {
+      "module": "patients",
+      "label": "Patients",
+      "actions": ["add", "edit", "view"]
+    },
+    {
+      "module": "payments",
+      "label": "Payments",
+      "actions": ["add", "view"]
+    },
+    {
+      "module": "reports",
+      "label": "Reports",
+      "actions": ["view"]
+    },
+    {
+      "module": "token_management",
+      "label": "Token Management",
+      "actions": ["edit", "view"]
+    }
+  ]
+}

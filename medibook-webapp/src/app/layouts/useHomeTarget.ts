@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { hospitalDashboardPath, OPS_BASE_PATH, opsPath, ROOT_PATH } from '@/app/router/paths';
+import { hospitalDashboardPath, OPS_BASE_PATH, ROOT_PATH } from '@/app/router/paths';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import {
@@ -31,8 +31,9 @@ export function useHomeTarget(): HomeTarget {
   let path = ROOT_PATH;
   let label = 'Back to sign in';
   if (toOps) {
-    path = opsPath('dashboard');
-    label = 'Back to Operations Dashboard';
+    // The console root sends each platform role to its own first screen (SEC-05).
+    path = OPS_BASE_PATH;
+    label = 'Back to Operations Console';
   } else if (hospital) {
     path = hospitalDashboardPath(hospitalUrlRole(hospital.role.code));
     label = 'Back to Dashboard';

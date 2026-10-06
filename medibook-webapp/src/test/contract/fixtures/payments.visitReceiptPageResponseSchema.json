@@ -1,0 +1,76 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-e8d9-7aa0-86ce-0edfb7c2b13f",
+      "receipt_no": "LKSR/26-27/00002",
+      "fy_code": "FY2026-27",
+      "appointment_id": "01a0ee28-e882-7011-bb5f-c269c60e2a02",
+      "visit_id": null,
+      "order_id": "01a0ee28-e8ab-7e70-b384-e00ea91982f7",
+      "issued_at": "2026-08-25T03:05:00.177386Z",
+      "issued_by_name": "Shalini Thomas",
+      "counter_code": "C2",
+      "subtotal_paise": 90000,
+      "tax_paise": 0,
+      "total_paise": 90000,
+      "lines": [
+        {
+          "qty": 1,
+          "line": "consultation",
+          "supplier": "hospital",
+          "tax_code": "EXEMPT",
+          "tax_paise": 0,
+          "unit_paise": 90000,
+          "booking_ref": "LKSB-2608-00002",
+          "description": "Consultation",
+          "tax_rate_bp": 0,
+          "amount_paise": 90000,
+          "tax_inclusive": false,
+          "appointment_id": "01a0ee28-e882-7011-bb5f-c269c60e2a02"
+        }
+      ],
+      "payment_lines": [
+        {
+          "method": "upi",
+          "reference": "UPI01A0EE28E8",
+          "amount_paise": 45000
+        },
+        {
+          "method": "cash",
+          "reference": null,
+          "amount_paise": 45000
+        }
+      ],
+      "hospital_snapshot": {
+        "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
+        "city": "Kochi",
+        "name": "Lakeshore Multispeciality Hospital",
+        "gstin": "00AAAAA0000A0A0",
+        "state": "Kerala",
+        "pincode": "682040",
+        "legal_name": "Lakeshore Healthcare Pvt Ltd",
+        "phone_e164": "+910000000000",
+        "logo_file_id": null,
+        "address_line1": "NH 66 Bypass, Maradu",
+        "address_line2": "Near Vyttila Hub",
+        "address_line3": null,
+        "stamp_file_id": null
+      },
+      "platform_snapshot": {
+        "city": "Kochi",
+        "gstin": "00AAAAA0000A0A0",
+        "state": "Kerala",
+        "pincode": "682042",
+        "legal_name": "Medibook Health Technologies Pvt Ltd",
+        "address_line1": "4th Floor, Infopark Phase 2",
+        "address_line2": null,
+        "address_line3": null
+      },
+      "has_pdf": true
+    }
+  ],
+  "page": 1,
+  "page_size": 25,
+  "total": 1,
+  "has_next": false
+}

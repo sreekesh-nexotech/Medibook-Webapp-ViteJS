@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
@@ -104,6 +105,10 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
   const suspend = useSuspendHospitalMutation();
   const reinstate = useReinstateHospitalMutation();
   const pdf = useInvoicePdfMutation();
+  // SEC-05: invoice actions need billing.edit; suspension needs hospitals.edit.
+  const ops = useOpsPermission();
+  const canBill = ops.can('billing.edit');
+  const canSuspend = ops.can('hospitals.edit');
 
   const subscription = subscriptionQuery.data ?? null;
   const planName = subscription?.planName ?? null;
@@ -221,7 +226,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
             message: unpaid
               ? 'Queue one to chase the hospital for payment.'
               : 'The invoice was settled without needing a reminder.',
-            ...(unpaid
+            ...(unpaid && canBill
               ? { actionLabel: 'Queue reminder', onAction: () => setModal('reminder') }
               : {}),
           }
@@ -244,7 +249,9 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
             message: unpaid
               ? 'Nothing has been paid against this invoice. Record money received outside the gateway with Mark as Paid.'
               : 'This invoice was settled without a payment record.',
-            ...(unpaid ? { actionLabel: 'Mark as paid', onAction: () => setModal('paid') } : {}),
+            ...(unpaid && canBill
+              ? { actionLabel: 'Mark as paid', onAction: () => setModal('paid') }
+              : {}),
           }
         : undefined;
 
@@ -277,12 +284,12 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
             <Button variant="secondary" icon="download" onClick={exportCsv}>
               Export CSV
             </Button>
-            {canVoid(inv) && (
+            {canBill && canVoid(inv) && (
               <Button variant="ghost" icon="ban" onClick={() => setModal('void')}>
                 Void
               </Button>
             )}
-            {unpaid && (
+            {unpaid && canBill && (
               <>
                 <Button variant="secondary" icon="bell-ring" onClick={() => setModal('reminder')}>
                   Send Reminder
@@ -325,10 +332,12 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
                 )
               </div>
             </div>
-            <Button size="sm" variant="secondary" icon="clock" onClick={() => setModal('grace')}>
-              Grace Window
-            </Button>
-            {suspended ? (
+            {canBill && (
+              <Button size="sm" variant="secondary" icon="clock" onClick={() => setModal('grace')}>
+                Grace Window
+              </Button>
+            )}
+            {!canSuspend ? null : suspended ? (
               <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
                 Lift Suspension
               </Button>
@@ -372,9 +381,11 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
                 Since {fmtDateTime(suspension.suspendedAt)}
               </div>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
-              Lift Suspension
-            </Button>
+            {canSuspend && (
+              <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
+                Lift Suspension
+              </Button>
+            )}
           </div>
         </Card>
       )}

@@ -5,6 +5,7 @@ import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Icon } from '@/shared/ui/Icon';
 
+import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { isFailure } from '@/core/error/failure';
 import type { Failure } from '@/core/error/failure';
 
@@ -15,7 +16,7 @@ import {
   AUTH_SURFACE_PARAM,
   hospitalDashboardPath,
   isOpsReturnPath,
-  opsPath,
+  OPS_BASE_PATH,
   returnPathAfterLogin,
 } from '@/app/router/paths';
 
@@ -68,7 +69,8 @@ export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [show, setShow] = useState(false);
-  const [remember, setRemember] = useState(true);
+  // Off by default: front-desk terminals are shared (SEC-02).
+  const [remember, setRemember] = useState(false);
   const [err, setErr] = useState('');
   const isOps = mode === 'ops';
 
@@ -81,7 +83,8 @@ export function LoginScreen() {
   const land = (session: StaffSession) => {
     const back = returnPathAfterLogin(next, session.surface);
     if (session.surface === 'platform') {
-      navigate(back ?? opsPath('dashboard'), { replace: true });
+      // `/ops` sends each platform role to the first screen it can open.
+      navigate(back ?? OPS_BASE_PATH, { replace: true });
       return;
     }
     if (session.hospital.status === 'suspended') {
@@ -188,14 +191,20 @@ export function LoginScreen() {
                   <Icon name="lock" size={14} /> Sessions aren't remembered — sign in each time.
                 </span>
               ) : (
-                <label className="text-body text-text-body flex cursor-pointer items-center gap-2">
+                <label className="text-body text-text-body flex cursor-pointer items-start gap-2">
                   <input
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    className="accent-blue size-4"
-                  />{' '}
-                  Remember me
+                    className="accent-blue mt-0.5 size-4 flex-none"
+                  />
+                  <span>
+                    Keep me signed in on this computer
+                    <span className="text-caption text-text-muted block">
+                      Only on your own computer. You are still signed out after{' '}
+                      {DEFAULT_IDLE_MINUTES} minutes without use.
+                    </span>
+                  </span>
                 </label>
               )}
               <button

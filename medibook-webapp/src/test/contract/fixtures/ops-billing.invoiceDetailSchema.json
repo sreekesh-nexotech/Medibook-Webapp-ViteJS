@@ -1,0 +1,57 @@
+{
+  "id": "01a0fdfc-dfc0-7c33-a9f9-2cca1d86e72f",
+  "invoice_no": "INV-2026-0010",
+  "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
+  "hospital_name": "Deccan Heart Institute",
+  "subscription_id": "01a0ee28-835b-74b1-b749-2d63c4886a2d",
+  "period_start": "2026-10-03",
+  "period_end": "2026-11-02",
+  "issued_at": "2026-10-02T19:00:01.208951Z",
+  "due_at": "2026-10-10",
+  "subtotal_paise": 1999900,
+  "gst_paise": 360000,
+  "total_paise": 2359900,
+  "amount_paid_paise": 0,
+  "status": "issued",
+  "paid_at": null,
+  "grace_ends_at": null,
+  "reminders_sent": 0,
+  "last_reminder_at": null,
+  "version": 1,
+  "lines": [
+    {
+      "id": "01a0fdfc-e112-7780-9caf-f087f7efd6b2",
+      "line_type": "plan",
+      "description": "Enterprise (monthly) 2026-10-03 – 2026-11-02",
+      "quantity": 1,
+      "unit_paise": 1999900,
+      "amount_paise": 1999900,
+      "tax_rate_bp": 1800,
+      "tax_paise": 360000
+    }
+  ],
+  "hospital_snapshot": {
+    "city": "Hyderabad",
+    "name": "Deccan Heart Institute",
+    "email": "info@deccanheart.medibook.example.com",
+    "gstin": null,
+    "state": "Telangana",
+    "pincode": "500033",
+    "legal_name": null,
+    "phone_e164": "+910000000000",
+    "address_line1": "Road No. 10",
+    "address_line2": "Jubilee Hills",
+    "address_line3": null
+  },
+  "platform_snapshot": {
+    "city": "Kochi",
+    "gstin": "00AAAAA0000A0A0",
+    "state": "Kerala",
+    "pincode": "682042",
+    "legal_name": "Medibook Health Technologies Pvt Ltd",
+    "phone_e164": "+910000000000",
+    "address_line1": "4th Floor, Infopark Phase 2",
+    "address_line2": null,
+    "address_line3": null
+  }
+}

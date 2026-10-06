@@ -2,9 +2,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
+import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { useIdleTimeout } from '@/shared/hooks/useIdleTimeout';
-import { Button } from '@/shared/ui/Button';
-import { Modal } from '@/shared/ui/Modal';
 import { OpsSkeleton } from '@/shared/ui/OpsSkeleton';
 
 import {
@@ -19,6 +18,7 @@ import type { PlatformSession } from '@/features/auth/domain/entities/auth.types
 import { useOpsSettingsQuery } from '@/features/ops-settings/application/queries/useOpsSettingsQuery';
 
 import { ErrorBoundary } from './ErrorBoundary';
+import { IdleWarningModal } from './IdleWarningModal';
 import { OPS_DETAIL_PARENT, opsDocumentTitleFor } from './ops-nav';
 import { OpsSidebar } from './OpsSidebar';
 import { OpsTopbar } from './OpsTopbar';
@@ -103,10 +103,10 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
   const handleLogout = onLogout;
 
   // Audit 3.7.5 — the platform's Session Timeout setting has a timer behind
-  // it, with a warning at T-60s. Until the setting has loaded (or if this
-  // staff member cannot read it) the client timer is off; the server's own
-  // token expiry still applies.
-  const idleMinutes = settings.data?.sessionTimeoutMin ?? 0;
+  // it, with a warning at T-60s. A role that cannot read the setting, or a
+  // console still loading it, uses the backend's default, so every platform
+  // role signs out when idle (SEC-12).
+  const idleMinutes = settings.data?.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES;
   const { warning, secondsLeft, stayActive } = useIdleTimeout({
     minutes: idleMinutes,
     onTimeout: handleLogout,
@@ -137,8 +137,8 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary
             key={view}
-            fallback={(_err, reset) => (
-              <ScreenError onRetry={reset} onHome={() => handleNavigate('dashboard')} />
+            fallback={(err, reset) => (
+              <ScreenError error={err} onRetry={reset} onHome={() => handleNavigate('dashboard')} />
             )}
           >
             {loading ? (
@@ -158,28 +158,13 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
       >
         {sidebar('full')}
       </SidebarDrawer>
-      <Modal
+      <IdleWarningModal
         open={warning}
-        onClose={stayActive}
-        title="Still there?"
-        width={440}
-        footer={
-          <>
-            <Button variant="secondary" icon="log-out" onClick={handleLogout}>
-              Sign out now
-            </Button>
-            <Button icon="shield-check" onClick={stayActive}>
-              Stay signed in
-            </Button>
-          </>
-        }
-      >
-        <p className="text-body-lg text-text-body m-0 leading-[1.6]">
-          You have been idle for a while. For security, this session signs out in{' '}
-          <span className="text-text-strong font-semibold tabular-nums">{secondsLeft}s</span>. The
-          session timeout is {idleMinutes} min, set under Platform Settings.
-        </p>
-      </Modal>
+        secondsLeft={secondsLeft}
+        minutes={idleMinutes}
+        onStay={stayActive}
+        onSignOut={handleLogout}
+      />
     </div>
   );
 }

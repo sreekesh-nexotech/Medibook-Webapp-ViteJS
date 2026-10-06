@@ -1,3 +1,4 @@
+import { revokeSession, takeSession } from '@/core/api/http';
 import { clearTokens, setTokens } from '@/core/api/tokens';
 import { toTokenGrant } from '@/core/api/tokens.response';
 import { attempt } from '@/core/error/attempt';
@@ -12,7 +13,6 @@ import {
   getPlatformMe,
   postInvitationAccept,
   postLogin,
-  postLogout,
   postPasswordForgot,
   postPasswordReset,
 } from '@/features/auth/infrastructure/data-sources/remote/auth.api';
@@ -41,10 +41,10 @@ export const authRepository: AuthRepository = {
   getSession: (surface) => attempt(() => fetchSession(surface)),
 
   logout: async (surface): Promise<Result<null>> => {
-    // Revoking server-side is best effort: the tokens are forgotten locally
-    // whatever the server says, so "Log out" always logs out.
-    await attempt(() => postLogout(surface));
-    clearTokens(surface);
+    // Every tab is signed out before any request (SEC-10, SEC-14); revoking
+    // on the server is best effort, so "Log out" logs out whatever it says.
+    const session = takeSession(surface);
+    await attempt(() => revokeSession(surface, session));
     return ok(null);
   },
 

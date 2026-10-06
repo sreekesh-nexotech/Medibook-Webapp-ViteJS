@@ -2,15 +2,24 @@ import axios, { isAxiosError } from 'axios';
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { z } from 'zod';
 
+import { announceRotation, announceSessionEnd } from '@/core/api/sessionSync';
 import { activeSurface } from '@/core/api/surface';
 import type { ApiSurface } from '@/core/api/surface';
-import { expireSession, getAccessToken, getRefreshToken, setTokens } from '@/core/api/tokens';
+import type { TokenGrant } from '@/core/api/tokens';
+import {
+  clearTokens,
+  expireSession,
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+} from '@/core/api/tokens';
 import { toTokenGrant, tokensResponseSchema } from '@/core/api/tokens.response';
 import {
   API_PREFIX,
   API_TIMEOUT_MS,
   AUTH_HEADER,
   AUTH_SCHEME,
+  LOGOUT_PATH,
   TOKEN_REFRESH_PATH,
 } from '@/core/config/api';
 import { API_BASE_URL } from '@/core/config/env';
@@ -26,6 +35,9 @@ import { API_BASE_URL } from '@/core/config/env';
  *   interceptors). Concurrent 401s share one refresh call. When the server refuses the refresh the session is
  *   expired (`onSessionExpired` listeners fire) and the 401 propagates.
  *
+ * Refreshes are serialised across this browser's tabs, and every rotation
+ * and sign-out is shared with the other tabs (`sessionSync.ts`).
+ *
  * Clients resolve to raw Axios responses; `*.api.ts` files validate bodies
  * with Zod and repositories wrap calls in `attempt()` to get a `Result`.
  */
@@ -33,7 +45,20 @@ import { API_BASE_URL } from '@/core/config/env';
 const API_ROOT = `${API_BASE_URL}${API_PREFIX}`;
 
 const HTTP_UNAUTHORIZED = 401;
+const HTTP_TOO_MANY_REQUESTS = 429;
 const HTTP_SERVER_ERROR_MIN = 500;
+
+const MS_PER_SECOND = 1000;
+
+/** A rate-limited refresh is retried once after `Retry-After`, waiting no longer than this. */
+const MAX_RETRY_AFTER_MS = 10_000;
+const DEFAULT_RETRY_AFTER_MS = 2_000;
+
+/**
+ * After announcing a rotation, keep the cross-tab lock this long, so the other
+ * tabs take the new pair before any of them can start a refresh of its own.
+ */
+const ROTATION_SETTLE_MS = 200;
 
 /** 401 codes a token refresh can fix (backend `core/errors.py`). */
 const REFRESHABLE_CODES: ReadonlySet<string> = new Set([
@@ -53,41 +78,138 @@ const refreshClient = axios.create({ baseURL: API_ROOT, timeout: API_TIMEOUT_MS 
 
 const refreshInFlight = new Map<ApiSurface, Promise<string | null>>();
 
-async function runRefresh(surface: ApiSurface): Promise<string | null> {
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function statusOf(error: unknown): number | undefined {
+  return isAxiosError(error) ? error.response?.status : undefined;
+}
+
+function retryAfterMs(error: unknown): number {
+  const header: unknown = isAxiosError(error) ? error.response?.headers['retry-after'] : undefined;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds >= 0
+    ? Math.min(seconds * MS_PER_SECOND, MAX_RETRY_AFTER_MS)
+    : DEFAULT_RETRY_AFTER_MS;
+}
+
+/** End `surface`'s session in this tab and every other one. */
+function endSession(surface: ApiSurface): void {
+  expireSession(surface);
+  announceSessionEnd(surface);
+}
+
+/**
+ * Run `task` holding `surface`'s refresh lock across this browser's tabs
+ * (Web Locks), so two tabs never send the same refresh token. Without the
+ * API the in-tab sharing below still applies.
+ */
+function withRefreshLock<T>(surface: ApiSurface, task: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  return locks ? locks.request(`medibook.refresh.${surface}`, task) : task();
+}
+
+async function postRefresh(surface: ApiSurface, refresh: string): Promise<TokenGrant> {
+  const response = await refreshClient.post(`/${surface}${TOKEN_REFRESH_PATH}`, { refresh });
+  return toTokenGrant(tokensResponseSchema.parse(response.data));
+}
+
+/**
+ * A refresh that did not go through. The server refusing the refresh token
+ * (expired, revoked, rotated out) ends the session everywhere. A network,
+ * rate-limit or server failure keeps the tokens, so the next request can try
+ * again, and surfaces as that failure.
+ */
+function refreshFailed(surface: ApiSurface, error: unknown): null {
+  const status = statusOf(error);
+  if (status !== undefined && status < HTTP_SERVER_ERROR_MIN && status !== HTTP_TOO_MANY_REQUESTS) {
+    endSession(surface);
+    return null;
+  }
+  throw error;
+}
+
+async function runRefresh(surface: ApiSurface, startedWith: string | null): Promise<string | null> {
   const refresh = getRefreshToken(surface);
   if (!refresh) return null;
-  try {
-    const response = await refreshClient.post(`/${surface}${TOKEN_REFRESH_PATH}`, { refresh });
-    const grant = toTokenGrant(tokensResponseSchema.parse(response.data));
-    setTokens(surface, grant);
-    return grant.access;
-  } catch (error) {
-    // The server refused the refresh token (expired, revoked, rotated out):
-    // the session is over. A network or 5xx failure keeps the tokens so the
-    // next request can try again, and surfaces as that failure instead.
-    const status = isAxiosError(error) ? error.response?.status : undefined;
-    if (status !== undefined && status < HTTP_SERVER_ERROR_MIN) {
-      expireSession(surface);
-      return null;
-    }
-    throw error;
+  // Another tab refreshed while this one waited for the lock and handed this
+  // tab the new pair: use it rather than refresh again.
+  if (refresh !== startedWith) {
+    const access = getAccessToken(surface);
+    if (access) return access;
   }
+
+  let grant: TokenGrant;
+  try {
+    grant = await postRefresh(surface, refresh);
+  } catch (error) {
+    if (statusOf(error) !== HTTP_TOO_MANY_REQUESTS) return refreshFailed(surface, error);
+    // A whole hospital can share one address, and sign-in and refresh share a
+    // per-address limit (SEC-07): wait as the server asks, then try once more.
+    await wait(retryAfterMs(error));
+    try {
+      grant = await postRefresh(surface, refresh);
+    } catch (retryError) {
+      return refreshFailed(surface, retryError);
+    }
+  }
+  setTokens(surface, grant);
+  announceRotation(surface, refresh, grant);
+  await wait(ROTATION_SETTLE_MS);
+  return grant.access;
 }
 
 /**
  * Rotate `surface`'s refresh token into a new pair and return the new access
  * token, or `null` when the tab has no session or the server refused it.
- * Concurrent callers share one in-flight call — a rotated-out refresh token
- * sent twice would revoke the whole session family (D-12).
+ * Concurrent callers share one in-flight call, and tabs take turns — a
+ * rotated-out refresh token sent twice would revoke the whole session family
+ * (D-12).
  */
 export function refreshAccessToken(surface: ApiSurface): Promise<string | null> {
   const existing = refreshInFlight.get(surface);
   if (existing) return existing;
-  const pending = runRefresh(surface).finally(() => {
+  const startedWith = getRefreshToken(surface);
+  const pending = withRefreshLock(surface, () => runRefresh(surface, startedWith)).finally(() => {
     refreshInFlight.delete(surface);
   });
   refreshInFlight.set(surface, pending);
   return pending;
+}
+
+/** The credentials a tab held when it signed out. */
+export interface SignedOutSession {
+  readonly access: string | null;
+  readonly refresh: string | null;
+}
+
+/**
+ * Sign this tab and every other one out of `surface` at once (SEC-10,
+ * SEC-14): the tokens are gone before any request is made, so "Log out"
+ * works with the network down. Returns what the tab held, for
+ * `revokeSession`.
+ */
+export function takeSession(surface: ApiSurface): SignedOutSession {
+  const session = { access: getAccessToken(surface), refresh: getRefreshToken(surface) };
+  clearTokens(surface);
+  announceSessionEnd(surface);
+  return session;
+}
+
+/**
+ * Revoke a signed-out session on the server, using the credentials taken
+ * before it was cleared. The backend revokes the session that makes the call,
+ * so an expired access token is first exchanged for a fresh one.
+ */
+export async function revokeSession(surface: ApiSurface, session: SignedOutSession): Promise<void> {
+  const access =
+    session.access ??
+    (session.refresh ? (await postRefresh(surface, session.refresh)).access : null);
+  if (!access) return;
+  await refreshClient.post(`/${surface}${LOGOUT_PATH}`, null, {
+    headers: { [AUTH_HEADER]: bearer(access) },
+  });
 }
 
 /* ------------------------------------------------------------------ clients */
@@ -121,14 +243,14 @@ function createClient(basePath: string, resolveSurface: () => ApiSurface): Axios
     const parsed = errorCodeSchema.safeParse(error.response.data);
     const code = parsed.success ? parsed.data.code : null;
     if (code === SESSION_REVOKED_CODE) {
-      expireSession(surface);
+      endSession(surface);
       throw error;
     }
     if (code !== null && !REFRESHABLE_CODES.has(code)) throw error;
 
     const token = await refreshAccessToken(surface);
     if (!token) {
-      expireSession(surface);
+      endSession(surface);
       throw error;
     }
     // Retry once through the bare Axios instance: it runs none of these

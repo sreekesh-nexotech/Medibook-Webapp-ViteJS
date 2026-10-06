@@ -1,3 +1,4 @@
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -22,6 +23,8 @@ const LOADING_ROWS = 3;
 export function OpsSettingsFlagsCard() {
   const flags = useOpsFeatureFlagsQuery();
   const setFlag = useSetOpsFeatureFlagMutation();
+  // SEC-05: switching a flag needs settings.edit.
+  const canEdit = useOpsPermission().can('settings.edit');
 
   const handleToggle = (key: string, enabled: boolean) => {
     setFlag.mutate(
@@ -72,7 +75,7 @@ export function OpsSettingsFlagsCard() {
               value={flag.enabled}
               onChange={(v) => handleToggle(flag.key, v)}
               label={flag.key}
-              disabled={setFlag.isPending && setFlag.variables.key === flag.key}
+              disabled={!canEdit || (setFlag.isPending && setFlag.variables.key === flag.key)}
             />
             <div className="flex flex-col gap-0.5">
               <span className="text-body text-text-strong flex items-center gap-2 font-medium">

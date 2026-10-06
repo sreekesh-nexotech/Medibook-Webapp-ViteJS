@@ -5,7 +5,7 @@ import type { ApiSurface } from '@/core/api/surface';
 import { isFailure } from '@/core/error/failure';
 
 import { ReportDownloadScreen } from '@/app/router/lazyScreens';
-import { hospitalDashboardPath, loginReturningTo, opsPath } from '@/app/router/paths';
+import { hospitalDashboardPath, loginReturningTo, OPS_BASE_PATH } from '@/app/router/paths';
 import { SessionError } from '@/app/router/SessionError';
 import { SessionLoading } from '@/app/router/SessionLoading';
 import { useSessionExit } from '@/app/router/useSessionExit';
@@ -68,7 +68,7 @@ export function ReportDownloadGuard({ surface }: ReportDownloadGuardProps) {
 
   const homePath = hospital
     ? hospitalDashboardPath(hospitalUrlRole(hospital.role.code))
-    : opsPath('dashboard');
+    : OPS_BASE_PATH;
 
   return (
     <Suspense fallback={<SessionLoading />}>

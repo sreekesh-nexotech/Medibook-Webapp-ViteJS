@@ -38,10 +38,6 @@ export async function getPlatformMe(): Promise<PlatformMeResponse> {
   return platformMeResponseSchema.parse(response.data);
 }
 
-export async function postLogout(surface: AuthSurface): Promise<void> {
-  await apiFor(surface).post('/auth/logout');
-}
-
 export async function postPasswordForgot(surface: AuthSurface, email: string): Promise<void> {
   await publicApiFor(surface).post('/auth/password/forgot', { email });
 }

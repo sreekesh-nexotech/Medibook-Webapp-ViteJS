@@ -26,9 +26,9 @@ import {
  * page is fetched. Codes the backend requires are derived from the name.
  */
 
-const servicePageSchema = paginatedSchema(serviceResponseSchema);
-const taxRatePageSchema = paginatedSchema(taxRateResponseSchema);
-const couponPageSchema = paginatedSchema(couponResponseSchema);
+export const servicePageSchema = paginatedSchema(serviceResponseSchema);
+export const taxRatePageSchema = paginatedSchema(taxRateResponseSchema);
+export const couponPageSchema = paginatedSchema(couponResponseSchema);
 
 const CODE_SEPARATOR_PATTERN = /[^a-z0-9]+/g;
 const CODE_TRIM_PATTERN = /^-+|-+$/g;
@@ -88,14 +88,18 @@ export async function patchService(
   input: ServiceInput,
   version: number,
 ): Promise<ServiceResponse> {
-  const response = await hospitalApi.patch(`/services/${id}`, serviceBody(input), {
-    headers: ifMatch(version),
-  });
+  const response = await hospitalApi.patch(
+    `/services/${encodeURIComponent(id)}`,
+    serviceBody(input),
+    {
+      headers: ifMatch(version),
+    },
+  );
   return serviceResponseSchema.parse(response.data);
 }
 
 export async function deleteService(id: string): Promise<void> {
-  await hospitalApi.delete(`/services/${id}`);
+  await hospitalApi.delete(`/services/${encodeURIComponent(id)}`);
 }
 
 /* ----------------------------------------------------------------- tax rates */
@@ -132,14 +136,18 @@ export async function patchTaxRate(
   input: TaxRateInput,
   version: number,
 ): Promise<TaxRateResponse> {
-  const response = await hospitalApi.patch(`/tax-rates/${id}`, taxRateBody(input), {
-    headers: ifMatch(version),
-  });
+  const response = await hospitalApi.patch(
+    `/tax-rates/${encodeURIComponent(id)}`,
+    taxRateBody(input),
+    {
+      headers: ifMatch(version),
+    },
+  );
   return taxRateResponseSchema.parse(response.data);
 }
 
 export async function deleteTaxRate(id: string): Promise<void> {
-  await hospitalApi.delete(`/tax-rates/${id}`);
+  await hospitalApi.delete(`/tax-rates/${encodeURIComponent(id)}`);
 }
 
 /* ------------------------------------------------------------------- coupons */
@@ -185,12 +193,16 @@ export async function patchCoupon(
   input: CouponInput,
   version: number,
 ): Promise<CouponResponse> {
-  const response = await hospitalApi.patch(`/coupons/${id}`, couponBody(input), {
-    headers: ifMatch(version),
-  });
+  const response = await hospitalApi.patch(
+    `/coupons/${encodeURIComponent(id)}`,
+    couponBody(input),
+    {
+      headers: ifMatch(version),
+    },
+  );
   return couponResponseSchema.parse(response.data);
 }
 
 export async function deleteCoupon(id: string): Promise<void> {
-  await hospitalApi.delete(`/coupons/${id}`);
+  await hospitalApi.delete(`/coupons/${encodeURIComponent(id)}`);
 }

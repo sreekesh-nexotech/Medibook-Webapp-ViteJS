@@ -1,0 +1,364 @@
+{
+  "permissions": [
+    {
+      "code": "analytics.add",
+      "module": "analytics",
+      "action": "add",
+      "label": "Analytics.add"
+    },
+    {
+      "code": "analytics.del",
+      "module": "analytics",
+      "action": "del",
+      "label": "Analytics.del"
+    },
+    {
+      "code": "analytics.edit",
+      "module": "analytics",
+      "action": "edit",
+      "label": "Analytics.edit"
+    },
+    {
+      "code": "analytics.view",
+      "module": "analytics",
+      "action": "view",
+      "label": "Analytics.view"
+    },
+    {
+      "code": "billing.add",
+      "module": "billing",
+      "action": "add",
+      "label": "Billing.add"
+    },
+    {
+      "code": "billing.del",
+      "module": "billing",
+      "action": "del",
+      "label": "Billing.del"
+    },
+    {
+      "code": "billing.edit",
+      "module": "billing",
+      "action": "edit",
+      "label": "Billing.edit"
+    },
+    {
+      "code": "billing.view",
+      "module": "billing",
+      "action": "view",
+      "label": "Billing.view"
+    },
+    {
+      "code": "compliance.add",
+      "module": "compliance",
+      "action": "add",
+      "label": "Compliance.add"
+    },
+    {
+      "code": "compliance.del",
+      "module": "compliance",
+      "action": "del",
+      "label": "Compliance.del"
+    },
+    {
+      "code": "compliance.edit",
+      "module": "compliance",
+      "action": "edit",
+      "label": "Compliance.edit"
+    },
+    {
+      "code": "compliance.view",
+      "module": "compliance",
+      "action": "view",
+      "label": "Compliance.view"
+    },
+    {
+      "code": "dashboard.add",
+      "module": "dashboard",
+      "action": "add",
+      "label": "Dashboard.add"
+    },
+    {
+      "code": "dashboard.del",
+      "module": "dashboard",
+      "action": "del",
+      "label": "Dashboard.del"
+    },
+    {
+      "code": "dashboard.edit",
+      "module": "dashboard",
+      "action": "edit",
+      "label": "Dashboard.edit"
+    },
+    {
+      "code": "dashboard.view",
+      "module": "dashboard",
+      "action": "view",
+      "label": "Dashboard.view"
+    },
+    {
+      "code": "hospitals.add",
+      "module": "hospitals",
+      "action": "add",
+      "label": "Hospitals.add"
+    },
+    {
+      "code": "hospitals.del",
+      "module": "hospitals",
+      "action": "del",
+      "label": "Hospitals.del"
+    },
+    {
+      "code": "hospitals.edit",
+      "module": "hospitals",
+      "action": "edit",
+      "label": "Hospitals.edit"
+    },
+    {
+      "code": "hospitals.view",
+      "module": "hospitals",
+      "action": "view",
+      "label": "Hospitals.view"
+    },
+    {
+      "code": "logs.add",
+      "module": "logs",
+      "action": "add",
+      "label": "Logs.add"
+    },
+    {
+      "code": "logs.del",
+      "module": "logs",
+      "action": "del",
+      "label": "Logs.del"
+    },
+    {
+      "code": "logs.edit",
+      "module": "logs",
+      "action": "edit",
+      "label": "Logs.edit"
+    },
+    {
+      "code": "logs.view",
+      "module": "logs",
+      "action": "view",
+      "label": "Logs.view"
+    },
+    {
+      "code": "notifications.add",
+      "module": "notifications",
+      "action": "add",
+      "label": "Notifications.add"
+    },
+    {
+      "code": "notifications.del",
+      "module": "notifications",
+      "action": "del",
+      "label": "Notifications.del"
+    },
+    {
+      "code": "notifications.edit",
+      "module": "notifications",
+      "action": "edit",
+      "label": "Notifications.edit"
+    },
+    {
+      "code": "notifications.view",
+      "module": "notifications",
+      "action": "view",
+      "label": "Notifications.view"
+    },
+    {
+      "code": "onboarding.add",
+      "module": "onboarding",
+      "action": "add",
+      "label": "Onboarding.add"
+    },
+    {
+      "code": "onboarding.del",
+      "module": "onboarding",
+      "action": "del",
+      "label": "Onboarding.del"
+    },
+    {
+      "code": "onboarding.edit",
+      "module": "onboarding",
+      "action": "edit",
+      "label": "Onboarding.edit"
+    },
+    {
+      "code": "onboarding.view",
+      "module": "onboarding",
+      "action": "view",
+      "label": "Onboarding.view"
+    },
+    {
+      "code": "plans.add",
+      "module": "plans",
+      "action": "add",
+      "label": "Plans.add"
+    },
+    {
+      "code": "plans.del",
+      "module": "plans",
+      "action": "del",
+      "label": "Plans.del"
+    },
+    {
+      "code": "plans.edit",
+      "module": "plans",
+      "action": "edit",
+      "label": "Plans.edit"
+    },
+    {
+      "code": "plans.view",
+      "module": "plans",
+      "action": "view",
+      "label": "Plans.view"
+    },
+    {
+      "code": "platform_users.add",
+      "module": "platform_users",
+      "action": "add",
+      "label": "Platform Users.add"
+    },
+    {
+      "code": "platform_users.del",
+      "module": "platform_users",
+      "action": "del",
+      "label": "Platform Users.del"
+    },
+    {
+      "code": "platform_users.edit",
+      "module": "platform_users",
+      "action": "edit",
+      "label": "Platform Users.edit"
+    },
+    {
+      "code": "platform_users.view",
+      "module": "platform_users",
+      "action": "view",
+      "label": "Platform Users.view"
+    },
+    {
+      "code": "reports.add",
+      "module": "reports",
+      "action": "add",
+      "label": "Reports.add"
+    },
+    {
+      "code": "reports.del",
+      "module": "reports",
+      "action": "del",
+      "label": "Reports.del"
+    },
+    {
+      "code": "reports.edit",
+      "module": "reports",
+      "action": "edit",
+      "label": "Reports.edit"
+    },
+    {
+      "code": "reports.view",
+      "module": "reports",
+      "action": "view",
+      "label": "Reports.view"
+    },
+    {
+      "code": "settings.add",
+      "module": "settings",
+      "action": "add",
+      "label": "Settings.add"
+    },
+    {
+      "code": "settings.del",
+      "module": "settings",
+      "action": "del",
+      "label": "Settings.del"
+    },
+    {
+      "code": "settings.edit",
+      "module": "settings",
+      "action": "edit",
+      "label": "Settings.edit"
+    },
+    {
+      "code": "settings.view",
+      "module": "settings",
+      "action": "view",
+      "label": "Settings.view"
+    },
+    {
+      "code": "settlements.add",
+      "module": "settlements",
+      "action": "add",
+      "label": "Settlements.add"
+    },
+    {
+      "code": "settlements.del",
+      "module": "settlements",
+      "action": "del",
+      "label": "Settlements.del"
+    },
+    {
+      "code": "settlements.edit",
+      "module": "settlements",
+      "action": "edit",
+      "label": "Settlements.edit"
+    },
+    {
+      "code": "settlements.view",
+      "module": "settlements",
+      "action": "view",
+      "label": "Settlements.view"
+    },
+    {
+      "code": "staff.add",
+      "module": "staff",
+      "action": "add",
+      "label": "Staff.add"
+    },
+    {
+      "code": "staff.del",
+      "module": "staff",
+      "action": "del",
+      "label": "Staff.del"
+    },
+    {
+      "code": "staff.edit",
+      "module": "staff",
+      "action": "edit",
+      "label": "Staff.edit"
+    },
+    {
+      "code": "staff.view",
+      "module": "staff",
+      "action": "view",
+      "label": "Staff.view"
+    },
+    {
+      "code": "support.add",
+      "module": "support",
+      "action": "add",
+      "label": "Support.add"
+    },
+    {
+      "code": "support.del",
+      "module": "support",
+      "action": "del",
+      "label": "Support.del"
+    },
+    {
+      "code": "support.edit",
+      "module": "support",
+      "action": "edit",
+      "label": "Support.edit"
+    },
+    {
+      "code": "support.view",
+      "module": "support",
+      "action": "view",
+      "label": "Support.view"
+    }
+  ]
+}

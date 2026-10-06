@@ -1,0 +1,48 @@
+{
+  "period": "today",
+  "date_from": "2026-10-06",
+  "date_to": "2026-10-06",
+  "appointments": {
+    "total": 13,
+    "by_status": {
+      "cancelled": 12,
+      "scheduled": 1
+    },
+    "by_source": {
+      "online": 12,
+      "walk_in": 1
+    }
+  },
+  "revenue": {
+    "collected_paise": 50000,
+    "refunded_paise": 50000,
+    "net_paise": 0,
+    "by_channel": {
+      "desk": 50000
+    },
+    "by_method": {
+      "cash": 50000
+    }
+  },
+  "departments": [
+    {
+      "department_id": "01a0ee28-848a-7f52-89d9-c840d366ade4",
+      "name": "General Medicine",
+      "appointments": 1
+    }
+  ],
+  "top_doctors": [
+    {
+      "doctor_id": "01a0ee28-8526-7eb1-bb66-0f67c9c21951",
+      "name": "Dr. Suresh Pillai",
+      "appointments": 1,
+      "completed": 0
+    }
+  ],
+  "alerts": {
+    "pending_approvals": 0,
+    "pending_patient_changes": 0,
+    "unpaid_walk_ins_today": 0,
+    "cash_sessions_to_reconcile": 3
+  }
+}

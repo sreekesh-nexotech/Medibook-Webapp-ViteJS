@@ -1,0 +1,26 @@
+{
+  "period": "12m",
+  "date_from": "2025-10-06",
+  "date_to": "2026-10-05",
+  "hospital_id": null,
+  "results": [
+    {
+      "month": "2026-08",
+      "online": 63,
+      "walk_in": 27,
+      "total": 90
+    },
+    {
+      "month": "2026-09",
+      "online": 279,
+      "walk_in": 121,
+      "total": 400
+    },
+    {
+      "month": "2026-10",
+      "online": 25,
+      "walk_in": 0,
+      "total": 25
+    }
+  ]
+}

@@ -47,7 +47,7 @@ export async function searchPatientsByMrn(mrn: string) {
 }
 
 export async function getPatient(id: string) {
-  const response = await hospitalApi.get(`${PATIENTS_PATH}/${id}`);
+  const response = await hospitalApi.get(`${PATIENTS_PATH}/${encodeURIComponent(id)}`);
   return hospitalPatientResponseSchema.parse(response.data);
 }
 
@@ -62,7 +62,7 @@ export async function postPatient(body: PatientRequestBody) {
 
 /** `200` = applied (the record); `202` = sent to an admin for approval. */
 export async function patchPatient(id: string, body: PatientRequestBody, version: number) {
-  const response = await hospitalApi.patch(`${PATIENTS_PATH}/${id}`, body, {
+  const response = await hospitalApi.patch(`${PATIENTS_PATH}/${encodeURIComponent(id)}`, body, {
     headers: ifMatch(version),
   });
   if (response.status === HTTP_ACCEPTED) {
@@ -75,9 +75,12 @@ export async function patchPatient(id: string, body: PatientRequestBody, version
 }
 
 export async function getPatientAppointments(id: string, pageSize: number) {
-  const response = await hospitalApi.get(`${PATIENTS_PATH}/${id}/appointments`, {
-    params: { page_size: pageSize },
-  });
+  const response = await hospitalApi.get(
+    `${PATIENTS_PATH}/${encodeURIComponent(id)}/appointments`,
+    {
+      params: { page_size: pageSize },
+    },
+  );
   return patientAppointmentPageResponseSchema.parse(response.data);
 }
 
@@ -86,6 +89,9 @@ export async function postApprovalDecision(
   decision: 'approve' | 'reject',
   note: string | null,
 ) {
-  const response = await hospitalApi.post(`${APPROVALS_PATH}/${requestId}/${decision}`, { note });
+  const response = await hospitalApi.post(
+    `${APPROVALS_PATH}/${encodeURIComponent(requestId)}/${encodeURIComponent(decision)}`,
+    { note },
+  );
   return approvalRequestResponseSchema.parse(response.data);
 }

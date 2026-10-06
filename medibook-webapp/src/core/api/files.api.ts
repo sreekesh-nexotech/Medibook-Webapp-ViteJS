@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+import { isFileStoreUrl } from '@/core/api/fileUrls';
 import { ifMatch } from '@/core/api/headers';
 import { sharedApi } from '@/core/api/http';
 import { activeSurface } from '@/core/api/surface';
@@ -87,13 +88,19 @@ export async function uploadFile(input: FileUploadInput): Promise<Result<StoredF
       ...(input.hospitalId ? { hospital_id: input.hospitalId } : {}),
     });
     const ticket = uploadTicketResponseSchema.parse(created.data);
+    if (!isFileStoreUrl(ticket.upload_url)) {
+      throw clientFailure(
+        'forbidden',
+        'The upload link does not point to the file store, so the file was not sent.',
+      );
+    }
 
     await axios.put(ticket.upload_url, input.file, {
       headers: ticket.headers,
       timeout: STORAGE_PUT_TIMEOUT_MS,
     });
 
-    const completed = await sharedApi.post(`/files/${ticket.file_id}/complete`);
+    const completed = await sharedApi.post(`/files/${encodeURIComponent(ticket.file_id)}/complete`);
     return toStoredFile(storedFileResponseSchema.parse(completed.data));
   });
 }
@@ -101,7 +108,7 @@ export async function uploadFile(input: FileUploadInput): Promise<Result<StoredF
 /** `GET /files/{id}` — metadata (e.g. to watch the scan status). */
 export function getFile(fileId: string): Promise<Result<StoredFile>> {
   return attempt(async () => {
-    const response = await sharedApi.get(`/files/${fileId}`);
+    const response = await sharedApi.get(`/files/${encodeURIComponent(fileId)}`);
     return toStoredFile(storedFileResponseSchema.parse(response.data));
   });
 }
@@ -109,8 +116,15 @@ export function getFile(fileId: string): Promise<Result<StoredFile>> {
 /** `GET /files/{id}/url` — a 10-minute signed download link. */
 export function getFileUrl(fileId: string): Promise<Result<SignedFileUrl>> {
   return attempt(async () => {
-    const response = await sharedApi.get(`/files/${fileId}/url`);
-    return toSignedFileUrl(signedUrlResponseSchema.parse(response.data));
+    const response = await sharedApi.get(`/files/${encodeURIComponent(fileId)}/url`);
+    const signed = toSignedFileUrl(signedUrlResponseSchema.parse(response.data));
+    if (!isFileStoreUrl(signed.url)) {
+      throw clientFailure(
+        'forbidden',
+        'This file link does not point to the file store, so it was not opened.',
+      );
+    }
+    return signed;
   });
 }
 
@@ -121,7 +135,7 @@ export function getFileUrl(fileId: string): Promise<Result<SignedFileUrl>> {
  */
 export function deleteFile(fileId: string, version?: number): Promise<Result<null>> {
   return attempt(async () => {
-    await sharedApi.delete(`/files/${fileId}`, {
+    await sharedApi.delete(`/files/${encodeURIComponent(fileId)}`, {
       headers: version === undefined ? undefined : ifMatch(version),
     });
     return null;

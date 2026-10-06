@@ -50,7 +50,9 @@ export async function patchStaffRole(
 }
 
 export async function postStaffAction(id: string, action: StaffAction): Promise<StaffResponse> {
-  const response = await platformApi.post(`/staff/${encodeURIComponent(id)}/${action}`);
+  const response = await platformApi.post(
+    `/staff/${encodeURIComponent(id)}/${encodeURIComponent(action)}`,
+  );
   return staffResponseSchema.parse(response.data);
 }
 
