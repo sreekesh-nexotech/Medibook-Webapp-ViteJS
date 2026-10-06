@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
@@ -10,10 +10,13 @@ import type { Failure } from '@/core/error/failure';
 
 import {
   AUTH_FORGOT_PATH,
+  AUTH_NEXT_PARAM,
   AUTH_SURFACE_OPS,
   AUTH_SURFACE_PARAM,
   hospitalDashboardPath,
+  isOpsReturnPath,
   opsPath,
+  returnPathAfterLogin,
 } from '@/app/router/paths';
 
 import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
@@ -51,14 +54,17 @@ function loginErrorMessage(failure: Failure, isOps: boolean): string {
  * toggle, "Welcome Back" heading, email + password fields, the remember-me /
  * ops lock note, forgot-password link and email validation — now signing in
  * against `/<surface>/auth/login`, validating the session with `/me`, refusing
- * a suspended hospital, and landing on the session role's dashboard.
+ * a suspended hospital, and landing on the session role's dashboard — or back
+ * on the emailed report link that sent the user here (`?next=`).
  */
 export function LoginScreen() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get(AUTH_NEXT_PARAM);
   const loginMutation = useLoginMutation();
   const { mutate: logout } = useLogoutMutation();
 
-  const [mode, setMode] = useState<LoginMode>('hospital');
+  const [mode, setMode] = useState<LoginMode>(isOpsReturnPath(next) ? 'ops' : 'hospital');
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   const [show, setShow] = useState(false);
@@ -73,8 +79,9 @@ export function LoginScreen() {
   };
 
   const land = (session: StaffSession) => {
+    const back = returnPathAfterLogin(next, session.surface);
     if (session.surface === 'platform') {
-      navigate(opsPath('dashboard'), { replace: true });
+      navigate(back ?? opsPath('dashboard'), { replace: true });
       return;
     }
     if (session.hospital.status === 'suspended') {
@@ -83,7 +90,9 @@ export function LoginScreen() {
       setErr(SUSPENDED_MESSAGE);
       return;
     }
-    navigate(hospitalDashboardPath(hospitalUrlRole(session.role.code)), { replace: true });
+    navigate(back ?? hospitalDashboardPath(hospitalUrlRole(session.role.code)), {
+      replace: true,
+    });
   };
 
   const go = () => {
@@ -139,6 +148,11 @@ export function LoginScreen() {
               ? 'Sign in to the Medibook operations console.'
               : "Sign in to your hospital's mbAdmin panel."}
           </p>
+          {returnPathAfterLogin(next, isOps ? 'platform' : 'hospital') && (
+            <div className="text-caption text-text-navy bg-blue-soft-bg mb-5 flex items-center gap-2 rounded-sm px-3 py-2.5">
+              <Icon name="file-down" size={15} /> Sign in to download the report from your email.
+            </div>
+          )}
           <div className="flex flex-col gap-5">
             <AuthField
               label="Email Address"

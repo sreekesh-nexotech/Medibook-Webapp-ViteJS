@@ -109,3 +109,17 @@ export interface ReportExportRequest {
 export type ReportExport =
   | { readonly kind: 'file'; readonly file: Blob; readonly filename: string }
   | { readonly kind: 'queued'; readonly exportId: string; readonly rows: number };
+
+/**
+ * A finished export an emailed link points at (`/shared/files/{id}`). The
+ * backend stores it as an `export` file and emails `…/reports/downloads/{id}`.
+ */
+export interface ReportExportFile {
+  readonly id: string;
+  /** The file name the server gave it, e.g. `appointments.csv`. */
+  readonly name: string;
+  readonly sizeBytes: number;
+  readonly createdAt: string;
+  /** When the file stops being available; `null` when it does not expire. */
+  readonly expiresAt: string | null;
+}

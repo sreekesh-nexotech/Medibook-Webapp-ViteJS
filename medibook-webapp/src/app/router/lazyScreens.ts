@@ -155,6 +155,11 @@ export const ReportsScreen = lazy(() =>
     default: m.ReportsScreen,
   })),
 );
+export const ReportDownloadScreen = lazy(() =>
+  import('@/features/reports/presentation/screens/ReportDownloadScreen').then((m) => ({
+    default: m.ReportDownloadScreen,
+  })),
+);
 export const HospitalProfileScreen = lazy(() =>
   import('@/features/settings/presentation/screens/HospitalProfileScreen').then((m) => ({
     default: m.HospitalProfileScreen,

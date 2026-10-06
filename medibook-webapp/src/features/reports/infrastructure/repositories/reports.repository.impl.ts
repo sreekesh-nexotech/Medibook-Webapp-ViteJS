@@ -1,4 +1,6 @@
+import { getFile } from '@/core/api/files.api';
 import { attempt } from '@/core/error/attempt';
+import { ok } from '@/core/error/failure';
 
 import type { ReportsRepository } from '@/features/reports/domain/repositories/reports.repository';
 import {
@@ -26,4 +28,17 @@ export const reportsRepository: ReportsRepository = {
       // because a blob download cannot read `Content-Disposition` cross-origin.
       return { kind: 'file', file: response.file, filename: `${request.code}.${request.format}` };
     }),
+
+  getExportFile: async (fileId) => {
+    const result = await getFile(fileId);
+    if (!result.ok) return result;
+    const f = result.data;
+    return ok({
+      id: f.id,
+      name: f.originalName,
+      sizeBytes: f.sizeBytes,
+      createdAt: f.createdAt,
+      expiresAt: f.expiresAt,
+    });
+  },
 };

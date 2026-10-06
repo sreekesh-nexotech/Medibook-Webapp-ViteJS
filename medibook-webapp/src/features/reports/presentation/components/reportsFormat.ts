@@ -120,3 +120,12 @@ export function kpiTile(kpi: ReportKpiValue, item: ReportCatalogItem): StatCardD
     subClass: 'text-text-muted',
   };
 }
+
+const BYTES_PER_KB = 1024;
+
+/** 2_400_000 → "2.3 MB"; 900 → "900 B". */
+export function fileSizeCopy(bytes: number): string {
+  if (bytes < BYTES_PER_KB) return `${bytes} B`;
+  const kb = bytes / BYTES_PER_KB;
+  return kb < BYTES_PER_KB ? `${kb.toFixed(1)} KB` : `${(kb / BYTES_PER_KB).toFixed(1)} MB`;
+}

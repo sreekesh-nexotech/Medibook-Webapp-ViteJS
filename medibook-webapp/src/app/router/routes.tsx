@@ -4,6 +4,7 @@ import { NotFoundScreen } from '@/app/layouts/NotFoundScreen';
 import { DashboardSwitch } from '@/app/router/DashboardSwitch';
 import { HospitalGuard } from '@/app/router/HospitalGuard';
 import { OpsGuard } from '@/app/router/OpsGuard';
+import { ReportDownloadGuard } from '@/app/router/ReportDownloadGuard';
 import {
   AUTH_FORGOT_PATH,
   AUTH_INVITE_PATH,
@@ -11,8 +12,10 @@ import {
   AUTH_RESET_PATH,
   HOSPITAL_VIEW_SEGMENT,
   OPS_BASE_PATH,
+  OPS_REPORT_DOWNLOAD_PATH,
   OPS_RESET_PATH,
   OPS_VIEW_SEGMENT,
+  REPORT_DOWNLOAD_PATH,
   ROOT_PATH,
 } from '@/app/router/paths';
 import { RequireAdmin } from '@/app/router/RequireAdmin';
@@ -86,6 +89,9 @@ export const router = createBrowserRouter([
   { path: AUTH_RESET_PATH, element: <ResetPasswordScreen surface="hospital" /> },
   { path: OPS_RESET_PATH, element: <ResetPasswordScreen surface="platform" /> },
   { path: AUTH_INVITE_PATH, element: <AcceptInvitationScreen /> },
+  // Emailed report links — matched ahead of `/:role` and `/ops/*` (static segments rank first).
+  { path: REPORT_DOWNLOAD_PATH, element: <ReportDownloadGuard surface="hospital" /> },
+  { path: OPS_REPORT_DOWNLOAD_PATH, element: <ReportDownloadGuard surface="platform" /> },
   {
     path: '/:role',
     element: <HospitalGuard />,

@@ -8,6 +8,8 @@
  * mapped to real URLs. No magic path strings anywhere else.
  */
 
+import type { ApiSurface } from '@/core/api/surface';
+
 /* ---------------------------------------------------------------- roles */
 
 /** The two hospital roles the URL's `:role` segment may carry (design `ROLES`). */
@@ -46,6 +48,43 @@ export const AUTH_SURFACE_PARAM = 'surface';
 
 /** `AUTH_SURFACE_PARAM` value for the operations console. */
 export const AUTH_SURFACE_OPS = 'ops';
+
+/*
+ * Emailed report links. A large export or a scheduled report is emailed as
+ * `{FRONTEND_HOSPITAL_URL}/reports/downloads/{file_id}` or
+ * `{FRONTEND_PLATFORM_URL}/reports/downloads/{file_id}`
+ * (`messaging/services/context.py`). Signed file links live 10 minutes, so the
+ * page mints one after sign-in instead of the email carrying it.
+ */
+export const REPORT_DOWNLOAD_PATH = '/reports/downloads/:fileId';
+export const OPS_REPORT_DOWNLOAD_PATH = `${OPS_BASE_PATH}${REPORT_DOWNLOAD_PATH}`;
+
+/** Query param carrying the emailed link to reopen after sign-in. */
+export const AUTH_NEXT_PARAM = 'next';
+
+/** An emailed report link on either surface: `[/ops]/reports/downloads/<uuid>`. */
+const REPORT_DOWNLOAD_PATTERN =
+  /^(\/ops)?\/reports\/downloads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Sign-in that returns to `path` (an emailed report link) afterwards. */
+export function loginReturningTo(path: string): string {
+  return `${AUTH_LOGIN_PATH}?${new URLSearchParams({ [AUTH_NEXT_PARAM]: path }).toString()}`;
+}
+
+/** Whether `next` is an emailed link into the operations console. */
+export function isOpsReturnPath(next: string | null): boolean {
+  return next !== null && REPORT_DOWNLOAD_PATTERN.test(next) && next.startsWith(OPS_BASE_PATH);
+}
+
+/**
+ * Where sign-in returns to, or `null` for the dashboard. Only an emailed
+ * report link on the surface just signed in to is accepted, so the param can
+ * never send anyone off-site or into the other console.
+ */
+export function returnPathAfterLogin(next: string | null, surface: ApiSurface): string | null {
+  if (next === null || !REPORT_DOWNLOAD_PATTERN.test(next)) return null;
+  return isOpsReturnPath(next) === (surface === 'platform') ? next : null;
+}
 
 /* ------------------------------------------------------- hospital views */
 

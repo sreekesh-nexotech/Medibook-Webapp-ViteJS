@@ -6,4 +6,5 @@ export const reportsKeys = {
   catalog: () => [...reportsKeys.all, 'catalog'] as const,
   results: () => [...reportsKeys.all, 'result'] as const,
   result: (query: ReportQuery) => [...reportsKeys.results(), query] as const,
+  exportFile: (fileId: string) => [...reportsKeys.all, 'export-file', fileId] as const,
 };
