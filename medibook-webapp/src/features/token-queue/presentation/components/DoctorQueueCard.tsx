@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useCan } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -11,20 +12,28 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
-import type { QueueSession } from '@/features/token-queue/domain/entities/tokenQueue.entities';
+import type {
+  QueueSession,
+  TokenCommand,
+} from '@/features/token-queue/domain/entities/tokenQueue.entities';
 import {
   useSessionCommandMutation,
   useSkipTokenMutation,
   useTokenCommandMutation,
 } from '@/features/token-queue/application/queries/tokenQueue.mutations';
 
-import { isServing, minutesSince, pillFor, upNextFor, type QueuePill } from './tokenQueue.view';
+import { TokenChip } from './TokenChip';
+import {
+  isServing,
+  minutesSince,
+  pillFor,
+  skippedFor,
+  upNextFor,
+  type QueuePill,
+} from './tokenQueue.view';
 
 /** Up-next chips shown before collapsing into "+N". */
 const UP_NEXT_CHIPS = 3;
-
-/** Minutes after which an open call is flagged (design threshold). */
-const LONG_WAIT_MINUTES = 20;
 
 /** Per-status dot fill (design `DOC_STATUS_META[...].fg`). */
 const STATUS_DOT: Readonly<Record<QueuePill, string>> = {
@@ -59,6 +68,8 @@ interface DoctorQueueCardProps {
   appointments: readonly DeskAppointment[];
   /** Clock for the elapsed timers (re-renders every 30 s). */
   now: number;
+  /** Expected consultation length; a call open longer than this is flagged. */
+  expectedMinutes: number;
 }
 
 /**
@@ -76,7 +87,9 @@ export function DoctorQueueCard({
   room,
   appointments,
   now,
+  expectedMinutes,
 }: DoctorQueueCardProps) {
+  const canRunQueue = useCan('Token Management.edit');
   const sessionCommand = useSessionCommandMutation();
   const tokenCommand = useTokenCommandMutation();
   const skip = useSkipTokenMutation();
@@ -90,11 +103,15 @@ export function DoctorQueueCard({
   const elapsed = serving ? minutesSince(session.lastCalledAt, now) : null;
   const queue = upNextFor(session, appointments);
   const upNext = queue.slice(0, UP_NEXT_CHIPS);
+  const skipped = skippedFor(session, appointments);
   const isOpen = session.status === 'open';
   const isPaused = session.status === 'paused';
   const isLive = isOpen || isPaused;
   const busy = sessionCommand.isPending || tokenCommand.isPending || skip.isPending;
   const canCall = isOpen && session.waitingCount > 0 && session.queueState !== 'consulting';
+  // A specific token can be called (Q24) when the desk is free: open, nobody
+  // with the doctor and nobody already called.
+  const canCallToken = canRunQueue && isOpen && !serving && !busy;
 
   const onError = (fallback: string) => (error: unknown) =>
     toast(failureText(error, fallback), 'error');
@@ -105,7 +122,7 @@ export function DoctorQueueCard({
       { onError: onError('The queue did not accept that.') },
     );
 
-  const runToken = (command: 'serve' | 'complete' | 'no-show', tokenNo: number) =>
+  const runToken = (command: TokenCommand, tokenNo: number) =>
     tokenCommand.mutate(
       { sessionId: session.id, command, tokenNo },
       { onError: onError('The queue did not accept that.') },
@@ -170,7 +187,7 @@ export function DoctorQueueCard({
             <span
               className={cn(
                 'text-caption flex-none font-semibold',
-                elapsed != null && elapsed > LONG_WAIT_MINUTES ? 'text-d-500' : 'text-text-muted',
+                elapsed != null && elapsed > expectedMinutes ? 'text-d-500' : 'text-text-muted',
               )}
             >
               {elapsed == null ? '' : elapsed === 0 ? 'just now' : `${elapsed} min`}
@@ -200,13 +217,16 @@ export function DoctorQueueCard({
             <span className="text-caption text-text-muted">nobody yet</span>
           ) : (
             upNext.map((a) => (
-              <span
+              <TokenChip
                 key={a.id}
-                title={a.patient?.fullName ?? undefined}
-                className="text-caption text-blue bg-blue-soft-bg rounded-full px-2.25 py-0.5 font-semibold"
-              >
-                {a.tokenLabel ?? '—'}
-              </span>
+                label={a.tokenLabel ?? '—'}
+                patientName={a.patient?.fullName ?? null}
+                onCall={
+                  canCallToken && a.tokenNo !== null
+                    ? () => runToken('call', a.tokenNo ?? 0)
+                    : undefined
+                }
+              />
             ))
           )}
           {queue.length > UP_NEXT_CHIPS && (
@@ -222,6 +242,32 @@ export function DoctorQueueCard({
           {session.waitingCount} waiting
         </span>
       </div>
+
+      {skipped.length > 0 && (
+        <div className="flex min-h-6 items-center gap-2">
+          <span
+            className="text-caption text-text-muted flex-none"
+            title="Called earlier and skipped — Call Next passes them by"
+          >
+            Skipped
+          </span>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {skipped.map((a) => (
+              <TokenChip
+                key={a.id}
+                label={a.tokenLabel ?? '—'}
+                patientName={a.patient?.fullName ?? null}
+                muted
+                onCall={
+                  canCallToken && a.tokenNo !== null
+                    ? () => runToken('call', a.tokenNo ?? 0)
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <Can
         perm="Token Management.edit"
@@ -260,6 +306,15 @@ export function DoctorQueueCard({
               >
                 Done
               </Button>
+              {session.queueState === 'waiting' && (
+                <IconBtn
+                  name="megaphone"
+                  label="Recall — call this token again"
+                  box={34}
+                  size={15}
+                  onClick={() => runToken('recall', session.currentTokenNo ?? 0)}
+                />
+              )}
               {session.queueState === 'waiting' && (
                 <IconBtn
                   name="skip-forward"

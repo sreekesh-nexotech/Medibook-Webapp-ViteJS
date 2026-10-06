@@ -32,6 +32,8 @@ export interface DoctorProfile {
   readonly feeRupees: number;
   /** Fee for a follow-up within the hospital's follow-up window, or `null` if none is set. */
   readonly followUpFeeRupees: number | null;
+  /** How long a consultation is expected to take; `null` = the hospital default. */
+  readonly expectedConsultMinutes: number | null;
   /** Length of one bookable slot, in minutes (per doctor). */
   readonly slotLengthMin: number;
   readonly room: string;

@@ -85,6 +85,7 @@ export const hospitalSettingsResponseSchema = z.object({
   hold_timeout_seconds: z.number().int(),
   cancellation_cutoff_hours: z.number().int(),
   follow_up_window_days: z.number().int(),
+  expected_consult_minutes: z.number().int().nullable().optional(),
   version: z.number().int(),
   derived: derivedSchema,
 });
@@ -98,6 +99,7 @@ export function toHospitalRuleSettings(dto: HospitalSettingsResponse): HospitalR
     holdTimeoutSeconds: dto.hold_timeout_seconds,
     cancellationCutoffHours: dto.cancellation_cutoff_hours,
     followUpWindowDays: dto.follow_up_window_days,
+    expectedConsultMinutes: dto.expected_consult_minutes ?? null,
     version: dto.version,
     derived: {
       bookingWindowEndDate: dto.derived.booking_window_end_date ?? null,

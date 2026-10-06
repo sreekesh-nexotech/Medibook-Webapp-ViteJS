@@ -37,6 +37,8 @@ Paths under `backend:` are in the Django repository.
 | APPT-06   | Desk staff cannot read services, so no service can be booked  | Medium   | Bookings use the doctor's fee only          |
 | APPT-07   | A cancelled appointment keeps the token it gave up            | Medium   | Patients history hides it on cancelled rows |
 | PAT-01    | The patient list carries no visit count                       | Low      | One extra request per row                   |
+| TOK-01    | Desk roles cannot read the expected consultation time         | Low      | Falls back to 20 minutes for them           |
+| TOK-02    | A session snapshot does not list its queue                    | Medium   | Queue rebuilt from the appointment list     |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -463,3 +465,35 @@ serializer).
 **What the web app does meanwhile.** One cached count request per row, counting completed
 consultations only. Before this fix the column counted every booking, cancelled ones
 included (Ishaan Varma showed 1 visit for a cancelled booking).
+
+## TOK-01 — Desk roles cannot read the expected consultation time
+
+**New finding (live check of Token Management, 6 Oct 2026).**
+
+**What fails.** The queue's own notion of a long consultation is the doctor's
+`expected_consult_minutes`, falling back to the hospital's (backend:
+`tokens/services/queue.py:343-344`, Q29). On Lakeshore no doctor sets one, so the hospital
+default (10 minutes) applies, but it lives on `GET /hospital/settings`, which needs
+`hospital_settings.view` — receptionists, who run the queue, cannot read it.
+
+**What the backend needs.** The effective expected minutes on the session snapshot (e.g.
+`expected_minutes`), or the hospital default on `/hospital/me`.
+
+**What the web app does meanwhile.** A call open longer than the doctor's expected time —
+else the hospital default for roles that can read settings, else 20 minutes — is flagged.
+
+## TOK-02 — A session snapshot does not list its queue
+
+**What fails.** `GET /hospital/sessions` and the `session.updated` push carry counts and the
+current token only (backend: `tokens/services/queue.py:122-149`), not which tokens are
+waiting or skipped. The desk's "Up next" and "Skipped" lists have to be rebuilt from
+`GET /hospital/appointments` for the day, so they depend on that list being fresh and on
+the role being able to read appointments, and they can lag a socket push.
+
+**What the backend needs.** The waiting tokens in call order (token number, label,
+patient name, called/skipped flag) on the session snapshot or a
+`GET /hospital/sessions/{id}/queue`.
+
+**What the web app does meanwhile.** "Up next" lists the session's un-called waiting
+tokens by token number — the same rule `call_next` uses — and "Skipped" lists the ones
+already called; both refresh with the appointment list.

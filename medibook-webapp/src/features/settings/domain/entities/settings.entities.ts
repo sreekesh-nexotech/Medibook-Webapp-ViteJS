@@ -68,6 +68,8 @@ export interface HospitalRuleSettings {
   readonly holdTimeoutSeconds: number;
   readonly cancellationCutoffHours: number;
   readonly followUpWindowDays: number;
+  /** Default consultation length, used for doctors without their own. */
+  readonly expectedConsultMinutes: number | null;
   readonly version: number;
   readonly derived: HospitalRulesDerived;
 }
