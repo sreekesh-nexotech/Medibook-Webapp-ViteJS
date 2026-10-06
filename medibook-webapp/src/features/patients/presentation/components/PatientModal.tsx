@@ -15,7 +15,7 @@ import type {
   PatientRecord,
 } from '@/features/patients/domain/entities/patients.entities';
 import {
-  GENDER_LABELS,
+  GENDER_NOT_SPECIFIED,
   GENDER_OPTIONS,
   diffDemographics,
   displayPhone,
@@ -48,7 +48,7 @@ const BLANK: PatientForm = {
   name: '',
   phone: '',
   dob: '',
-  gender: GENDER_LABELS.male,
+  gender: GENDER_NOT_SPECIFIED,
   email: '',
   address: '',
 };
@@ -71,7 +71,9 @@ function toForm(p: PatientRecord): PatientForm {
     name: p.fullName,
     phone: displayPhone(p.phone),
     dob: p.dateOfBirth ?? '',
-    gender: genderLabel(p.gender) || GENDER_LABELS.male,
+    // A record with no gender must stay that way: defaulting the field would
+    // turn an untouched edit into "gender changed to Male".
+    gender: genderLabel(p.gender) || GENDER_NOT_SPECIFIED,
     email: p.email ?? '',
     // The single field edits the first address line; city, state and
     // pincode are kept as they are.

@@ -11,30 +11,32 @@ Paths under `backend:` are in the Django repository.
 
 ## Summary
 
-| ID        | Problem                                                       | Severity | Web app status                          |
-| --------- | ------------------------------------------------------------- | -------- | --------------------------------------- |
-| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available  |
-| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only              |
-| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision    |
-| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`    |
-| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself          |
-| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs     |
-| CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                           |
-| ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates      |
-| CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)       |
-| ENV-01    | Email links are relative when the frontend URLs are unset     | High     | Deployment setting                      |
-| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                 |
-| ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing      |
-| API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible        |
-| DASH-01   | Admin dashboard counts cancelled bookings as appointments     | Medium   | Web app subtracts them; walk-ins can't  |
-| DASH-02   | Refunds are not split by channel or payment method            | Medium   | Front desk shows refunds separately     |
-| DASH-03   | No server-side read state for hospital notifications          | Low      | Bell remembers "read" per browser tab   |
-| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid    | High     | Desk must collect again before check-in |
-| APPT-02   | Cancelled unpaid bookings keep payment status "pending"       | Low      | Shown as "Not paid"                     |
-| APPT-03   | No per-hospital list of accepted desk payment methods         | Low      | Fixed list: cash, UPI, card, POS, other |
-| APPT-04   | Appointment history names no actor                            | Low      | Shows patient / staff / system only     |
-| APPT-05   | The desk cannot preview a walk-in's real fee before booking   | Medium   | Shows standard and follow-up fee        |
-| APPT-06   | Desk staff cannot read services, so no service can be booked  | Medium   | Bookings use the doctor's fee only      |
+| ID        | Problem                                                       | Severity | Web app status                              |
+| --------- | ------------------------------------------------------------- | -------- | ------------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots) | Blocker  | Needs backend; admin stopgap available      |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT    | High     | Read-only smoke tests only                  |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)            | High     | Needs backend and a product decision        |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit            | High     | App retries once after `Retry-After`        |
+| SEC-01-B  | Background polls keep a server session from going idle        | Medium   | App signs idle tabs out itself              |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session      | Medium   | App coordinates refresh across tabs         |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation    | High     | Needs backend                               |
+| ROLE-01   | Only admins can refund cash at the desk                       | Medium   | Product decision on role templates          |
+| CORE-03-B | Go-live does not open the hospital to patients atomically     | Medium   | Web app works around it (2 calls)           |
+| ENV-01    | Email links are relative when the frontend URLs are unset     | High     | Deployment setting                          |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                     |
+| ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing          |
+| API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible            |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments     | Medium   | Web app subtracts them; walk-ins can't      |
+| DASH-02   | Refunds are not split by channel or payment method            | Medium   | Front desk shows refunds separately         |
+| DASH-03   | No server-side read state for hospital notifications          | Low      | Bell remembers "read" per browser tab       |
+| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid    | High     | Desk must collect again before check-in     |
+| APPT-02   | Cancelled unpaid bookings keep payment status "pending"       | Low      | Shown as "Not paid"                         |
+| APPT-03   | No per-hospital list of accepted desk payment methods         | Low      | Fixed list: cash, UPI, card, POS, other     |
+| APPT-04   | Appointment history names no actor                            | Low      | Shows patient / staff / system only         |
+| APPT-05   | The desk cannot preview a walk-in's real fee before booking   | Medium   | Shows standard and follow-up fee            |
+| APPT-06   | Desk staff cannot read services, so no service can be booked  | Medium   | Bookings use the doctor's fee only          |
+| APPT-07   | A cancelled appointment keeps the token it gave up            | Medium   | Patients history hides it on cancelled rows |
+| PAT-01    | The patient list carries no visit count                       | Low      | One extra request per row                   |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -431,3 +433,33 @@ receptionists), alongside CORE-07's doctors and departments.
 
 **What the web app does meanwhile.** New Appointment books consultations without a
 service; a service picker can follow once desk roles can read the list.
+
+## APPT-07 — A cancelled appointment keeps the token it gave up
+
+**New finding (live check of Appointments and Patients, 6 Oct 2026).**
+
+**What fails.** Cancelling a booking releases its token for the next booking (the history
+shows `token_reassigned`, and a new booking records `token_reused`), but the cancelled
+appointment keeps its `token_label` and `token_no`. On Lakeshore today, 12 cancelled
+appointments all read `A001` — the token now held by someone else — and patients' booking
+histories show the same stale tokens.
+
+**What the backend needs.** Clear (or flag as released) `token_label` / `token_no` on an
+appointment when its token is released, so no screen can show a token that belongs to
+another patient.
+
+**What the web app does meanwhile.** The patient booking history hides the token on
+cancelled rows. (The Appointments list still shows it pending a decision.)
+
+## PAT-01 — The patient list carries no visit count
+
+**What fails.** `GET /hospital/patients` returns no count of the patient's visits, so the
+list's Visits column makes one `GET /patients/{id}/appointments?status=completed&page_size=1`
+per row (8 per page). It worked on the test backend but scales with the page size.
+
+**What the backend needs.** A `completed_visits` count on each list row (or on the patient
+serializer).
+
+**What the web app does meanwhile.** One cached count request per row, counting completed
+consultations only. Before this fix the column counted every booking, cancelled ones
+included (Ishaan Varma showed 1 visit for a cancelled booking).

@@ -21,6 +21,12 @@ import {
 
 const PATIENT_NOT_FOUND = 'No patient with this MR number exists at this hospital.';
 
+/** `AppointmentStatus` of a consultation that took place. */
+const COMPLETED_STATUS = 'completed';
+
+/** A count needs only the `total`, so the page holds one row. */
+const COUNT_PAGE_SIZE = 1;
+
 export const patientsRepository: PatientsRepository = {
   listPatients: (params) => attempt(async () => toPage(await getPatients(params), toPatientRecord)),
 
@@ -49,6 +55,12 @@ export const patientsRepository: PatientsRepository = {
         ? { status: 'pendingApproval' as const, requestId: outcome.request.request_id }
         : { status: 'applied' as const, patient: toPatientRecord(outcome.patient) };
     }),
+
+  // Cancelled, no-show and upcoming bookings are not visits.
+  countCompletedVisits: (id) =>
+    attempt(
+      async () => (await getPatientAppointments(id, COUNT_PAGE_SIZE, [COMPLETED_STATUS])).total,
+    ),
 
   listPatientAppointments: (id, limit) =>
     attempt(async () => {

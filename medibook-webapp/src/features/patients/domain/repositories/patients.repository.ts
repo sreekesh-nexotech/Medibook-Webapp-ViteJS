@@ -26,6 +26,8 @@ export interface PatientsRepository {
   ): Promise<Result<PatientEditOutcome>>;
   /** The latest `limit` appointments, plus the total on record. */
   listPatientAppointments(id: string, limit: number): Promise<Result<PatientAppointmentHistory>>;
+  /** Consultations the patient actually attended here (completed appointments). */
+  countCompletedVisits(id: string): Promise<Result<number>>;
   approvePatientChange(requestId: string): Promise<Result<PatientChangeDecision>>;
   rejectPatientChange(requestId: string, note: string): Promise<Result<PatientChangeDecision>>;
 }

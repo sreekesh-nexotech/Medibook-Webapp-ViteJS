@@ -74,11 +74,19 @@ export async function patchPatient(id: string, body: PatientRequestBody, version
   return { kind: 'applied' as const, patient: hospitalPatientResponseSchema.parse(response.data) };
 }
 
-export async function getPatientAppointments(id: string, pageSize: number) {
+/** `status` narrows to those appointment statuses (comma-separated, `core/filters.py`). */
+export async function getPatientAppointments(
+  id: string,
+  pageSize: number,
+  statuses: readonly string[] = [],
+) {
   const response = await hospitalApi.get(
     `${PATIENTS_PATH}/${encodeURIComponent(id)}/appointments`,
     {
-      params: { page_size: pageSize },
+      params: {
+        page_size: pageSize,
+        status: statuses.length > 0 ? statuses.join(',') : undefined,
+      },
     },
   );
   return patientAppointmentPageResponseSchema.parse(response.data);

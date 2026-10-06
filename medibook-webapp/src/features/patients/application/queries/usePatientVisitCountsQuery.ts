@@ -2,24 +2,21 @@ import { useQueries } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
 
-import {
-  PATIENT_VISIT_COUNT_LIMIT,
-  PATIENTS_STALE_TIME_MS,
-} from '@/features/patients/application/queries/patients.config';
+import { PATIENTS_STALE_TIME_MS } from '@/features/patients/application/queries/patients.config';
 import { patientsKeys } from '@/features/patients/application/queries/patients.keys';
-import { fetchPatientAppointments } from '@/features/patients/application/usecases/fetchPatientAppointments';
+import { fetchCompletedVisitCount } from '@/features/patients/application/usecases/fetchCompletedVisitCount';
 
 /**
- * Visit counts for the rows on screen. The list endpoint carries no count, so
- * each row reads its appointments' `total` from a one-row page. Returns
+ * Visit counts for the rows on screen: completed consultations only. The
+ * list endpoint carries no count (BACKEND_BLOCKERS PAT-01), so each row reads
+ * it separately. Returns
  * id → count; ids still loading (or failed) are absent.
  */
 export function usePatientVisitCountsQuery(ids: readonly string[]): ReadonlyMap<string, number> {
   return useQueries({
     queries: ids.map((id) => ({
-      queryKey: patientsKeys.appointments(id, PATIENT_VISIT_COUNT_LIMIT),
-      queryFn: async () =>
-        unwrap(await fetchPatientAppointments(id, PATIENT_VISIT_COUNT_LIMIT)).total,
+      queryKey: patientsKeys.visitCount(id),
+      queryFn: async () => unwrap(await fetchCompletedVisitCount(id)),
       staleTime: PATIENTS_STALE_TIME_MS,
     })),
     combine: (results) => {

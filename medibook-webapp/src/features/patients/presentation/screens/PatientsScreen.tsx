@@ -77,8 +77,6 @@ export function PatientsScreen() {
   const { role } = useParams();
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
 
-  // Booking still runs on the appointments store until H7 lands.
-
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState(ALL_SOURCES);
   const [sortF, setSortF] = useState(SORT_RECENT);
