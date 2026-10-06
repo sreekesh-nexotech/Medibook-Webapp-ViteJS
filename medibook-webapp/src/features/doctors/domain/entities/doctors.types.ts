@@ -22,6 +22,8 @@ export interface DoctorProfile {
   readonly departmentId: string;
   readonly slug: string;
   readonly name: string;
+  /** Designation shown under the name, e.g. "Consultant"; empty when not set. */
+  readonly title: string;
   readonly qualification: string;
   readonly specialisation: string;
   readonly registrationNo: string;
@@ -42,6 +44,8 @@ export interface DoctorProfile {
   /** `null` until the first rating. */
   readonly ratingAvg: number | null;
   readonly ratingCount: number;
+  /** Starting rating the patient app shows until there are approved reviews (Q76). */
+  readonly ratingBase: number | null;
   readonly version: number;
 }
 
@@ -95,6 +99,20 @@ export interface DoctorScheduleData {
   readonly weeklySessions: readonly WeeklySession[];
   readonly leaves: readonly DoctorLeaveEntry[];
   readonly dateExceptions: readonly DoctorDateException[];
+  /** The next 14 days as the backend resolves them (holidays, leave, exceptions, weekly). */
+  readonly upcoming: readonly ResolvedDay[];
+}
+
+/** Why a date has the sessions it has, as the backend resolved it. */
+export type ResolvedSource =
+  'weekly' | 'holiday' | 'leave' | 'exception_closed' | 'exception_custom_sessions' | 'inactive';
+
+/** One date of the backend's resolved schedule. */
+export interface ResolvedDay {
+  /** ISO `yyyy-mm-dd`. */
+  readonly date: string;
+  readonly source: ResolvedSource | string;
+  readonly sessions: readonly ExceptionSession[];
 }
 
 /** A booking a schedule change would cancel (with a full refund) once confirmed. */
@@ -125,6 +143,7 @@ export interface DepartmentInput {
 
 export interface DoctorInput {
   readonly name: string;
+  readonly title: string;
   readonly departmentId: string;
   readonly specialisation: string;
   readonly qualification: string;
@@ -133,6 +152,12 @@ export interface DoctorInput {
   readonly bio: string;
   readonly room: string;
   readonly feeRupees: number;
+  /** `null` = a follow-up costs the consultation fee. */
+  readonly followUpFeeRupees: number | null;
+  /** `null` = the hospital's default consultation time. */
+  readonly expectedConsultMinutes: number | null;
+  readonly slotLengthMin: number;
+  readonly isBookableOnline: boolean;
   readonly status: DoctorStatus;
   readonly photoFileId: string | null;
 }

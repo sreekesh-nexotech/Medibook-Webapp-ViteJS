@@ -43,6 +43,7 @@ Paths under `backend:` are in the Django repository.
 | PAY-01    | Payments cannot be filtered by source (desk / online)         | Low      | Source filters the visible page only        |
 | SET-01    | A paid period's net payable differs from its own ledger       | High     | Drawer flags the gap                        |
 | SET-02    | Statement PDFs are served by a redirect to file storage       | Low      | Stored copy used; storage needs CORS        |
+| DOC-01    | Hospitals can't read their doctors' patient reviews           | Low      | Average and count only                      |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -565,3 +566,20 @@ browser; and configure CORS on the storage bucket for the app's origin.
 
 **What the web app does meanwhile.** Statements that have a stored PDF (both on
 Lakeshore) download through the shared files API; the on-demand render is the fallback.
+
+## DOC-01 — Hospitals can't read their doctors' patient reviews
+
+**New finding (live check of Doctors & Departments, 6 Oct 2026).**
+
+**What fails.** Patients submit a review per appointment
+(`/patient/appointments/{id}/review`) and Medibook moderates them (`/platform/reviews`),
+but no endpoint lists them to the hospital. The hospital API exposes only a doctor's
+`rating_avg` and `rating_count` (approved reviews), so the doctor's Reviews tab can show
+the average but not what patients wrote.
+
+**What the backend needs.** `GET /hospital/doctors/{id}/reviews` (paginated): approved
+reviews only — rating, text, date and the patient's initials — read-only, under `doctors_departments.view`.
+
+**What the web app does meanwhile.** The Reviews tab shows the average and the number
+of approved reviews (or the starting rating the app falls back to) and says the
+written reviews are moderated by Medibook.

@@ -74,7 +74,7 @@
       "status": "active",
       "is_bookable_online": true,
       "rating_base": null,
-      "rating_avg": 3,
+      "rating_avg": 3.0,
       "rating_count": 1,
       "sort_order": 2,
       "version": 2,
@@ -101,7 +101,7 @@
       "status": "active",
       "is_bookable_online": true,
       "rating_base": null,
-      "rating_avg": 4,
+      "rating_avg": 4.0,
       "rating_count": 3,
       "sort_order": 3,
       "version": 2,
@@ -137,7 +137,7 @@
     }
   ],
   "page": 1,
-  "page_size": 5,
+  "page_size": 100,
   "total": 5,
   "has_next": false
 }

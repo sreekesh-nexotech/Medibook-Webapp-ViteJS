@@ -109,7 +109,8 @@ export function getDoctors(filters: DoctorFilters): Promise<DoctorResponse[]> {
       params: {
         page,
         page_size: MAX_PAGE_SIZE,
-        search: filters.search || undefined,
+        // The backend's free-text parameter is `q` (`search` is rejected).
+        q: filters.search || undefined,
         department_id: filters.departmentId,
         status: filters.status,
       },
@@ -126,6 +127,7 @@ export async function getDoctor(id: string): Promise<DoctorResponse> {
 function doctorBody(input: DoctorInput) {
   return {
     name: input.name,
+    title: input.title || null,
     department_id: input.departmentId,
     specialisation: input.specialisation,
     qualification: input.qualification || null,
@@ -134,6 +136,13 @@ function doctorBody(input: DoctorInput) {
     bio: input.bio || null,
     room: input.room || null,
     consultation_fee_paise: Math.round(input.feeRupees * PAISE_PER_RUPEE),
+    follow_up_fee_paise:
+      input.followUpFeeRupees === null
+        ? null
+        : Math.round(input.followUpFeeRupees * PAISE_PER_RUPEE),
+    expected_consult_minutes: input.expectedConsultMinutes,
+    slot_length_min: input.slotLengthMin,
+    is_bookable_online: input.isBookableOnline,
     status: input.status,
     photo_file_id: input.photoFileId,
   };

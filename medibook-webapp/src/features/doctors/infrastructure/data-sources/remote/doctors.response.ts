@@ -36,6 +36,7 @@ export const doctorResponseSchema = z.object({
   department_id: z.string(),
   slug: z.string(),
   name: z.string(),
+  title: z.string().nullable().optional(),
   qualification: z.string().nullable(),
   specialisation: z.string(),
   registration_no: z.string().nullable(),
@@ -52,6 +53,8 @@ export const doctorResponseSchema = z.object({
   is_bookable_online: z.boolean(),
   rating_avg: z.number().nullable(),
   rating_count: z.number().int(),
+  // DRF decimal → string ("4.20"); optional so an older backend still parses.
+  rating_base: z.union([z.string(), z.number()]).nullable().optional(),
   version: z.number().int(),
 });
 
@@ -96,6 +99,15 @@ export const scheduleResponseSchema = z.object({
   weekly_sessions: z.array(weeklySessionSchema),
   leaves: z.array(leaveSchema),
   date_exceptions: z.array(dateExceptionSchema),
+  resolved: z
+    .array(
+      z.object({
+        date: z.string(),
+        source: z.string(),
+        sessions: z.array(exceptionSessionSchema),
+      }),
+    )
+    .optional(),
 });
 
 const affectedBookingSchema = z.object({
@@ -136,6 +148,7 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     departmentId: dto.department_id,
     slug: dto.slug,
     name: dto.name,
+    title: dto.title ?? '',
     qualification: dto.qualification ?? '',
     specialisation: dto.specialisation,
     registrationNo: dto.registration_no ?? '',
@@ -152,6 +165,7 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     isBookableOnline: dto.is_bookable_online,
     ratingAvg: dto.rating_avg,
     ratingCount: dto.rating_count,
+    ratingBase: dto.rating_base == null ? null : Number(dto.rating_base),
     version: dto.version,
   };
 }
@@ -206,6 +220,11 @@ export function toSchedule(dto: ScheduleResponse): DoctorScheduleData {
     weeklySessions: dto.weekly_sessions.filter((s) => s.is_active !== false).map(toWeeklySession),
     leaves: dto.leaves.map(toLeave),
     dateExceptions: dto.date_exceptions.map(toDateException),
+    upcoming: (dto.resolved ?? []).map((day) => ({
+      date: day.date,
+      source: day.source,
+      sessions: day.sessions.map(toExceptionSession),
+    })),
   };
 }
 

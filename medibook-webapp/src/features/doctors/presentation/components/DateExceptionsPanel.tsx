@@ -109,12 +109,15 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
               sessions: closed
                 ? []
                 : [
+                    // The form edits the first window; it keeps its code and
+                    // label, and any further windows are kept as they are.
                     {
-                      sessionCode: EXCEPTION_SESSION_CODE,
-                      label: EXCEPTION_SESSION_LABEL,
+                      sessionCode: firstWindow?.sessionCode ?? EXCEPTION_SESSION_CODE,
+                      label: firstWindow?.label ?? EXCEPTION_SESSION_LABEL,
                       startsAt,
                       endsAt,
                     },
+                    ...(exception?.sessions.slice(1) ?? []),
                   ],
             },
           }),
@@ -164,6 +167,15 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
               aria-labelledby="exception-closed-label"
             />
           </div>
+          {!isClosed && exception && exception.sessions.length > 1 && (
+            <span className="text-caption text-text-muted">
+              Editing the first window ({firstWindow?.label}). Also kept unchanged:{' '}
+              {exception.sessions
+                .slice(1)
+                .map((w) => `${w.label} ${hhmmToLabel(w.startsAt)} – ${hhmmToLabel(w.endsAt)}`)
+                .join(', ')}
+            </span>
+          )}
           {!isClosed && (
             <div className="grid grid-cols-2 gap-4.5">
               <Field label="Opens" required>
