@@ -51,6 +51,8 @@ export interface HospitalSession {
     readonly status: HospitalStatus;
     /** Subscription lapsed: reads work, writes are refused (D-30). */
     readonly readOnly: boolean;
+    /** The hospital's uploaded logo (a stored file id), or `null`. */
+    readonly logoFileId: string | null;
   };
 }
 

@@ -26,6 +26,9 @@ Paths under `backend:` are in the Django repository.
 | SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays         | Medium   | Web app fixed (CORE-01)                |
 | ENV-02    | Test backend signs file links for an unreachable host         | Medium   | Blocks end-to-end download testing     |
 | API-01    | No way to read a hospital's commission history                | Low      | Future-dated rates are invisible       |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments     | Medium   | Web app subtracts them; walk-ins can't |
+| DASH-02   | Refunds are not split by channel or payment method            | Medium   | Front desk shows refunds separately    |
+| DASH-03   | No server-side read state for hospital notifications          | Low      | Bell remembers "read" per browser tab  |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -273,3 +276,61 @@ scheduled change is invisible until it applies.
 
 **What the backend needs.** `GET /platform/hospitals/{id}/commission-history`, newest
 first. The Commercial Terms card will list upcoming and past rates.
+
+## DASH-01 — The admin dashboard counts cancelled bookings
+
+**New finding (live check of the hospital dashboard, 6 Oct 2026).**
+
+**What fails.** For the same day the two dashboards disagree. On Lakeshore,
+`GET /hospital/dashboard/admin?period=today` returned `appointments.total = 13` with
+`by_status = {cancelled: 12, scheduled: 1}`, while `GET /hospital/dashboard/reception`
+returned `queue_summary.total = 1`. The admin total leaves out only pending-payment
+bookings (backend: `analytics/services/dashboard.py:118`); the reception total also
+leaves out cancelled ones (backend: `analytics/services/dashboard.py:168`). The admin
+department chart and top doctors count live bookings only, so the admin screen
+contradicted itself (13 appointments, 1 in the chart).
+
+`appointments.by_source` has the same gap: it counts cancelled bookings (backend:
+`analytics/services/dashboard.py:67-69`), so the front desk's "Walk-ins Today" includes
+walk-ins that were cancelled, and there is no per-source cancelled count to subtract.
+
+**What the backend needs.** One definition of "appointments" across both dashboards —
+excluding cancelled (and pending-payment) bookings — for `appointments.total` and
+`appointments.by_source`.
+
+**What the web app does meanwhile.** The admin tile subtracts `by_status.cancelled` from
+the total and says how many cancelled bookings it left out. The Walk-ins Today tile cannot
+be corrected, so its caption says cancellations are included.
+
+## DASH-02 — Refunds are not split by channel or payment method
+
+**What fails.** `revenue.by_channel` and `revenue.by_method` are gross collections
+(captured payments), and `revenue.refunded_paise` is one hospital-wide total (backend:
+`analytics/services/dashboard.py:79-90`). The front desk's Today's Collection therefore
+cannot show what the desk actually kept. On the test backend it showed ₹500 collected at
+the desk for a payment that was refunded in full the same day (net ₹0). Desk payments are
+also not split by method within the desk channel, so "UPI / card" at the desk can only be
+estimated as desk total minus cash.
+
+**What the backend needs.** Refunds grouped by channel and by method (or net figures per
+channel and method), and a per-channel method breakdown, e.g.
+`revenue.by_channel_method: {desk: {cash, upi, card, …}, online: {…}}`.
+
+**What the web app does meanwhile.** The desk tiles are labelled as before refunds, the
+non-cash tile reads "Desk UPI / Card / Other", and a separate Refunded Today tile shows
+the hospital-wide refund total.
+
+## DASH-03 — Hospital notifications have no read state
+
+**What fails.** The topbar bell is built from live counts (dashboard alerts and
+settlement periods). The hospital API has no notifications or read-receipt endpoint, so
+"Mark all read" cannot be stored: it does not survive a reload and does not carry over to
+other devices or tabs.
+
+**What the backend needs.** Either a hospital notifications feed with read state
+(`GET /hospital/notifications`, `POST …/read`), or a per-staff "last seen" timestamp for
+the alert counts.
+
+**What the web app does meanwhile.** Every bell item counts towards the badge. "Mark all
+read" clears the badge for that tab until a count changes (a new booking or drawer makes
+the item unread again).

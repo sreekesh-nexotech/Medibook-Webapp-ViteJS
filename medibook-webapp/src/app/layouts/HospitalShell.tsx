@@ -15,6 +15,7 @@ import {
 } from '@/app/router/paths';
 
 import type { HospitalSession } from '@/features/auth/domain/entities/auth.types';
+import { useHospitalImageUrlQuery } from '@/features/settings/application/queries/useHospitalImageUrlQuery';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { IdleWarningModal } from './IdleWarningModal';
@@ -60,6 +61,10 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
   const hospitalName = session.hospital.name;
   const { user } = session;
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+
+  // The hospital's own logo, from the session (`/hospital/me`), so every
+  // role sees it; the sidebar shows the Medibook mark when there is none.
+  const logoUrl = useHospitalImageUrlQuery(session.hospital.logoFileId);
 
   useEffect(() => () => history.clear(), []);
 
@@ -109,6 +114,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
       onNavigate={handleNavigate}
       role={role}
       hospitalName={hospitalName}
+      logoSrc={logoUrl.data ?? null}
       mode={mode}
     />
   );

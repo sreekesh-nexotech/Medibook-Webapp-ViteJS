@@ -27,7 +27,6 @@ interface HospitalNotif {
   readonly t: string;
   readonly s: string;
   readonly go: HospitalNavView;
-  readonly unread?: boolean;
 }
 
 /** The latest settlement periods, unfiltered by date. */
@@ -46,7 +45,7 @@ function netRupees(periods: readonly SettlementPeriod[]): number {
 /**
  * The bell's items, all from live data: desk work for every role, plus
  * patient changes, cash drawers and settlements for admins. Anything that
- * needs action is unread; an empty list shows the bell's empty state.
+ * needs action starts unread; an empty list shows the bell's empty state.
  */
 function buildNotifs(
   isAdmin: boolean,
@@ -61,7 +60,6 @@ function buildNotifs(
       t: `${plural(alerts.unpaidWalkInsToday, 'walk-in payment')} pending`,
       s: 'Collect at the desk to issue tokens',
       go: 'appointments',
-      unread: true,
     });
   }
   if (alerts && alerts.pendingApprovals > 0) {
@@ -71,7 +69,6 @@ function buildNotifs(
       t: `${plural(alerts.pendingApprovals, 'booking')} awaiting approval`,
       s: 'Online requests the hospital has to confirm',
       go: 'appointments',
-      unread: true,
     });
   }
   if (!isAdmin) return out;
@@ -82,7 +79,6 @@ function buildNotifs(
       t: `${plural(alerts.pendingPatientChanges, 'patient change')} to review`,
       s: 'Profile edits patients asked for',
       go: 'patients',
-      unread: true,
     });
   }
   if (alerts && alerts.cashSessionsToReconcile > 0) {
@@ -102,7 +98,6 @@ function buildNotifs(
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
       go: 'settlements',
-      unread: true,
     });
   }
   const awaiting = periods.filter((p) => p.status === 'closed');
@@ -163,7 +158,12 @@ export function HospitalTopbar({
   const alerts = useAdminDashboardQuery('today').data?.alerts;
   const periods = useSettlementPeriodsQuery(LATEST_PERIODS, isAdmin).data?.items ?? [];
   const notifs = buildNotifs(isAdmin, alerts, periods);
-  const unread = notifs.filter((n) => n.unread).length;
+  // There is no server-side read state (BACKEND_BLOCKERS DASH-03), so "Mark
+  // all read" remembers what this tab has seen. An item's text carries its
+  // count, so a new booking or drawer makes it unread again.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const isUnread = (n: HospitalNotif): boolean => !seen.has(n.t);
+  const unread = notifs.filter(isUnread).length;
   return (
     <header className="min-h-topbar border-border relative z-20 flex flex-none flex-wrap items-center justify-between gap-y-2 border-b bg-white px-4 py-2 lg:px-7 lg:py-0">
       <div className="flex min-w-0 items-center gap-3.5">
@@ -219,6 +219,7 @@ export function HospitalTopbar({
                   <span
                     className="text-caption text-blue cursor-pointer"
                     onClick={() => {
+                      setSeen(new Set(notifs.map((n) => n.t)));
                       toast('All caught up', 'success');
                       setNotif(false);
                     }}
@@ -243,7 +244,7 @@ export function HospitalTopbar({
                       className={cn(
                         'hover:bg-grey-200 flex cursor-pointer items-start gap-3 px-4 py-3.25 transition-colors duration-150',
                         i < notifs.length - 1 && 'border-border-soft border-b',
-                        n.unread ? 'bg-bg-app' : 'bg-white',
+                        isUnread(n) ? 'bg-bg-app' : 'bg-white',
                       )}
                     >
                       <div
@@ -258,7 +259,7 @@ export function HospitalTopbar({
                         <div className="text-body text-text-strong font-medium">{n.t}</div>
                         <div className="text-caption text-text-muted">{n.s}</div>
                       </div>
-                      {n.unread && (
+                      {isUnread(n) && (
                         <span className="bg-blue mt-1.5 size-1.75 flex-none rounded-full" />
                       )}
                     </div>

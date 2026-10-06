@@ -154,17 +154,23 @@ export function ReceptionistDashboardScreen() {
       icon: 'footprints',
       label: 'Walk-ins Today',
       value: today.isError ? '—' : (todayFigures?.appointmentsBySource.walk_in ?? 0),
-      sub: 'Booked at the desk',
+      // `appointments.by_source` has no cancelled split (BACKEND_BLOCKERS DASH-01).
+      sub: 'Booked at the desk, cancellations included',
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
       go: 'appointments',
     },
   ];
 
+  // Collections are gross: the backend reports refunds as one hospital-wide
+  // total, not per channel or method (BACKEND_BLOCKERS DASH-02), so refunds
+  // get their own tile instead of being netted out of desk figures.
+  const refundedToday = todayFigures?.refundedRupees ?? 0;
   const collections: readonly { label: string; value: number; cls: string }[] = [
     { label: 'Desk Cash', value: deskCash, cls: 'text-blue' },
-    { label: 'Desk UPI / Card', value: deskOther, cls: 'text-y-600' },
+    { label: 'Desk UPI / Card / Other', value: deskOther, cls: 'text-y-600' },
     { label: 'Collected at Desk', value: deskTotal, cls: 'text-g-600' },
+    { label: 'Refunded Today', value: refundedToday, cls: 'text-d-500' },
   ];
 
   return (
@@ -344,6 +350,10 @@ export function ReceptionistDashboardScreen() {
           (collected by Medibook):{' '}
           <b className="text-text-strong tabular-nums">{money(onlinePrepaid)}</b> — settled to the
           hospital later, not handled at the desk.
+        </div>
+        <div className="text-caption text-text-muted mt-2">
+          Desk figures are before refunds. Refunded Today covers every refund processed today, at
+          the desk and online.
         </div>
       </Card>
     </div>

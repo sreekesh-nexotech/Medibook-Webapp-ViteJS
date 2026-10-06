@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { usePermission } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 
@@ -7,11 +9,16 @@ import { NAV_MODEL, NAV_PERMISSION_MODULE, type HospitalNavView } from './hospit
 import { HospitalNavItem } from './HospitalNavItem';
 import type { SidebarMode } from './useSidebarMode';
 
+/** Shown when the hospital has no logo, or its link fails to load. */
+const FALLBACK_LOGO_SRC = '/assets/medibook-mark.svg';
+
 interface HospitalSidebarProps {
   active: HospitalView;
   onNavigate: (view: HospitalNavView) => void;
   role: HospitalRole;
   hospitalName: string;
+  /** Signed URL of the hospital's uploaded logo; `null` shows the Medibook mark. */
+  logoSrc?: string | null;
   /** Legacy icon-rail switch, kept for compatibility. Prefer `mode`. */
   collapsed?: boolean;
   /**
@@ -28,10 +35,14 @@ export function HospitalSidebar({
   onNavigate,
   role,
   hospitalName,
+  logoSrc = null,
   collapsed = false,
   mode,
 }: HospitalSidebarProps) {
   const { canViewModule } = usePermission();
+  // A logo link that fails to load (expired, or unreachable storage) falls
+  // back to the mark instead of a broken image.
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const isRail = mode ? mode === 'rail' : collapsed;
 
   // Permission gate — audit 2.4/X-01: a module the signed-in user's real
@@ -53,7 +64,12 @@ export function HospitalSidebar({
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <img src="/assets/apollo-logo.png" alt="logo" className="size-8.5 flex-none" />
+        <img
+          src={logoSrc && failedLogo !== logoSrc ? logoSrc : FALLBACK_LOGO_SRC}
+          alt={`${hospitalName} logo`}
+          onError={() => setFailedLogo(logoSrc)}
+          className="size-8.5 flex-none object-contain"
+        />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg truncate font-bold text-black">{hospitalName}</div>

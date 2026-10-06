@@ -136,7 +136,7 @@ const NOT_AVAILABLE_PLACEHOLDER = 'Not available';
 const PLATFORM_MANAGED_HINT = 'Managed by Medibook — contact support to change it.';
 
 /** Fallback artwork while the hospital has no logo of its own. */
-const DEFAULT_LOGO_SRC = '/assets/apollo-logo.png';
+const DEFAULT_LOGO_SRC = '/assets/medibook-mark.svg';
 
 /** Landline or mobile: 10 or 11 digits once separators are stripped. */
 const MIN_PHONE_DIGITS = 10;

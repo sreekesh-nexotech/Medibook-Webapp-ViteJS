@@ -37,6 +37,8 @@ export const hospitalMeResponseSchema = z.object({
     name: z.string(),
     status: z.enum(['draft', 'onboarding', 'active', 'suspended', 'closed']),
     read_only: z.boolean(),
+    // Optional so an older backend without it still signs in.
+    logo_file_id: z.string().nullable().optional(),
   }),
   default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
 });
@@ -87,6 +89,7 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
       name: dto.hospital.name,
       status: dto.hospital.status,
       readOnly: dto.hospital.read_only,
+      logoFileId: dto.hospital.logo_file_id ?? null,
     },
   };
 }

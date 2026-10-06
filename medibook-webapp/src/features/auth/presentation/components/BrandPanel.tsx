@@ -20,7 +20,7 @@ export function BrandPanel() {
       </div>
       <div className="relative flex items-center gap-3">
         <div className="flex size-11.5 items-center justify-center rounded-lg bg-white">
-          <img src="/assets/apollo-logo.png" alt="logo" className="size-8.5" />
+          <img src="/assets/medibook-mark.svg" alt="Medibook" className="size-8.5" />
         </div>
         <span className="text-h2 font-bold">Medibook</span>
       </div>
