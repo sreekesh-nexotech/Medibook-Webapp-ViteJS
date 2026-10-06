@@ -149,16 +149,6 @@ export async function postPayment(id: string, lines: readonly PaymentLineInput[]
   return paymentResponseSchema.parse(response.data).receipt;
 }
 
-/** One payment (and one receipt) for every unpaid consultation of a visit. */
-export async function postVisitPayment(visitId: string, lines: readonly PaymentLineInput[]) {
-  const response = await hospitalApi.post(
-    `/visits/${encodeURIComponent(visitId)}/payments`,
-    paymentLinesBody(lines),
-    { headers: idempotencyKey() },
-  );
-  return paymentResponseSchema.parse(response.data).receipt;
-}
-
 export async function postRefund(id: string, reason: string): Promise<void> {
   await hospitalApi.post(`${base(id)}/refunds`, { reason }, { headers: idempotencyKey() });
 }

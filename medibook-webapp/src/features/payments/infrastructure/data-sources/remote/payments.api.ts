@@ -1,14 +1,15 @@
-import { z } from 'zod';
-
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE, fetchAllPages } from '@/core/api/pagination';
 
 import type {
+  PaymentExportFormat,
   PaymentFilters,
   PaymentPageQuery,
 } from '@/features/payments/domain/entities/payments.entities';
 import type {
   CashSessionResponse,
+  CashSummaryResponse,
+  RefundPageResponse,
   PaymentDetailResponse,
   PaymentLineResponse,
   VisitReceiptPageResponse,
@@ -16,6 +17,8 @@ import type {
 import {
   cashSessionPageResponseSchema,
   cashSessionResponseSchema,
+  cashSummaryResponseSchema,
+  refundPageResponseSchema,
   paymentDetailResponseSchema,
   paymentPageResponseSchema,
   visitReceiptPageResponseSchema,
@@ -24,7 +27,12 @@ import {
 /** Payments endpoints (`/api/v1/hospital/…`). Every body is Zod-validated. */
 
 const PAYMENTS_PATH = '/payments';
-const EXPORT_CSV_PATH = '/payments/export.csv';
+/** The server builds each export; the list's filters apply to all three. */
+const EXPORT_PATHS = {
+  csv: '/payments/export.csv',
+  xlsx: '/payments/export.xlsx',
+  pdf: '/payments/export.pdf',
+} as const;
 
 /** Day totals read every page; past this the figures would be partial, so stop. */
 const MAX_TOTAL_PAGES = 20;
@@ -75,12 +83,38 @@ export async function listVisitReceipts(visitId: string): Promise<VisitReceiptPa
   return visitReceiptPageResponseSchema.parse(response.data);
 }
 
-export async function exportPaymentsCsv(filters: PaymentFilters): Promise<string> {
-  const response = await hospitalApi.get(EXPORT_CSV_PATH, {
+export async function exportPayments(
+  filters: PaymentFilters,
+  format: PaymentExportFormat,
+): Promise<Blob> {
+  const response = await hospitalApi.get<Blob>(EXPORT_PATHS[format], {
     params: filterParams(filters),
-    responseType: 'text',
+    responseType: 'blob',
   });
-  return z.string().parse(response.data);
+  return response.data;
+}
+
+/** Every refund in a hospital-local date window (all pages, capped like the totals). */
+export async function listRefunds(
+  dateFrom: string,
+  dateTo: string,
+): Promise<RefundPageResponse['results']> {
+  const out: RefundPageResponse['results'] = [];
+  for (let page = 1; page <= MAX_TOTAL_PAGES; page += 1) {
+    const response = await hospitalApi.get('/refunds', {
+      params: { date_from: dateFrom, date_to: dateTo, page, page_size: MAX_PAGE_SIZE },
+    });
+    const parsed = refundPageResponseSchema.parse(response.data);
+    out.push(...parsed.results);
+    if (!parsed.has_next) break;
+  }
+  return out;
+}
+
+/** The day's cash per staff member (`cash_desk.view`). */
+export async function getCashSummary(date: string): Promise<CashSummaryResponse> {
+  const response = await hospitalApi.get(`${CASH_SESSIONS_PATH}/summary`, { params: { date } });
+  return cashSummaryResponseSchema.parse(response.data);
 }
 
 /* ------------------------------------------------------------ cash sessions */

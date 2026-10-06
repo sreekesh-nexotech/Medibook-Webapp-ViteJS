@@ -39,6 +39,8 @@ Paths under `backend:` are in the Django repository.
 | PAT-01    | The patient list carries no visit count                       | Low      | One extra request per row                   |
 | TOK-01    | Desk roles cannot read the expected consultation time         | Low      | Falls back to 20 minutes for them           |
 | TOK-02    | A session snapshot does not list its queue                    | Medium   | Queue rebuilt from the appointment list     |
+| PAY-02    | Refunding one consultation of a visit refunds the whole visit | High     | Desk collects per consultation              |
+| PAY-01    | Payments cannot be filtered by source (desk / online)         | Low      | Source filters the visible page only        |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -497,3 +499,34 @@ patient name, called/skipped flag) on the session snapshot or a
 **What the web app does meanwhile.** "Up next" lists the session's un-called waiting
 tokens by token number — the same rule `call_next` uses — and "Skipped" lists the ones
 already called; both refresh with the appointment list.
+
+## PAY-02 — Refunding one consultation of a visit refunds the whole visit
+
+**New finding (live check of Billing → Payments, 6 Oct 2026).**
+
+**What fails.** A refund — a desk refund or a hospital cancellation — looks for the
+appointment's own paid order and, when there is none, the paid order of its **visit**
+(backend: `payments/services/refunds.py:27-43`). It then refunds every captured line of that
+order. When a visit's consultations are paid together (`POST /visits/{id}/payments`, one
+order), cancelling or refunding one consultation hands back the money for all of them,
+while the other consultations stay booked and unpaid on paper.
+
+**What the backend needs.** Refunds of one appointment limited to that appointment's
+share of a visit order (per-appointment allocation on the order), or refuse a
+single-appointment refund on a visit order and offer a visit-level refund instead.
+
+**What the web app does meanwhile.** The desk collects each consultation separately (one
+order per appointment), so every refund stays within its own consultation. Visit-level
+collection (one payment and one receipt for the visit) can return once this is fixed.
+
+## PAY-01 — Payments cannot be filtered by source
+
+**What fails.** `GET /hospital/payments` filters by date, method, status, doctor,
+department and search only (backend: `payments/views/hospital_payment_list.py:14`), not by
+channel (desk / online). The Payments screen's Source filter can only narrow the page it
+already loaded, so page counts and totals ignore it.
+
+**What the backend needs.** A `channel` filter (`desk` / `online`) on the payment list and
+its exports.
+
+**What the web app does meanwhile.** Source filters the visible page and says so.

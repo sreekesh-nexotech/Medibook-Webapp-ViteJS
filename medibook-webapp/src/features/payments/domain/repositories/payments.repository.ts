@@ -3,6 +3,9 @@ import type { Result } from '@/core/error/failure';
 
 import type {
   CashSession,
+  CashSummaryRow,
+  PaymentExportFile,
+  PaymentExportFormat,
   PaymentFilters,
   PaymentLine,
   PaymentPageQuery,
@@ -18,8 +21,15 @@ export interface PaymentsRepository {
   /** The refunds issued against one payment line. */
   listPaymentRefunds(paymentId: string): Promise<Result<readonly PaymentRefund[]>>;
   listVisitReceipts(visitId: string): Promise<Result<readonly VisitReceipt[]>>;
-  /** The server-built CSV of every line matching `filters`. */
-  exportCsv(filters: PaymentFilters): Promise<Result<string>>;
+  /** The server-built CSV, Excel or PDF of every line matching `filters`. */
+  exportPayments(
+    filters: PaymentFilters,
+    format: PaymentExportFormat,
+  ): Promise<Result<PaymentExportFile>>;
+  /** Every refund in a date window (desk and online). */
+  listRefunds(dateFrom: string, dateTo: string): Promise<Result<readonly PaymentRefund[]>>;
+  /** The day's cash per staff member: float, cash in, refunds, expected, counted. */
+  getCashSummary(date: string): Promise<Result<readonly CashSummaryRow[]>>;
 
   /** `staffId`'s open cash drawer, or `null` when it is closed. */
   getOpenCashSession(staffId: string): Promise<Result<CashSession | null>>;

@@ -97,8 +97,10 @@ import {
 } from '@/features/patients/infrastructure/data-sources/remote/patients.response';
 import {
   cashSessionPageResponseSchema,
+  cashSummaryResponseSchema,
   paymentDetailResponseSchema,
   paymentPageResponseSchema,
+  refundPageResponseSchema,
   visitReceiptPageResponseSchema,
 } from '@/features/payments/infrastructure/data-sources/remote/payments.response';
 import { activeSessionsPageResponseSchema } from '@/features/profile/infrastructure/data-sources/remote/profile.response';
@@ -215,8 +217,10 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'patients.hospitalPatientResponseSchema': hospitalPatientResponseSchema,
   'patients.patientAppointmentPageResponseSchema': patientAppointmentPageResponseSchema,
   'payments.cashSessionPageResponseSchema': cashSessionPageResponseSchema,
+  'payments.cashSummaryResponseSchema': cashSummaryResponseSchema,
   'payments.paymentDetailResponseSchema': paymentDetailResponseSchema,
   'payments.paymentPageResponseSchema': paymentPageResponseSchema,
+  'payments.refundPageResponseSchema': refundPageResponseSchema,
   'payments.visitReceiptPageResponseSchema': visitReceiptPageResponseSchema,
   'profile.activeSessionsPageResponseSchema': activeSessionsPageResponseSchema,
   'reports.reportCatalogResponseSchema': reportCatalogResponseSchema,

@@ -624,7 +624,6 @@ export function CreateAppointmentScreen() {
       </div>
       <AppointmentBookedModal
         appointments={booked?.appointments ?? null}
-        visitId={booked?.visitId ?? null}
         patientName={patientName}
         onDone={onDone}
       />

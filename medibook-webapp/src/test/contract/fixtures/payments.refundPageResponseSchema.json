@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "id": "01a11010-8937-7240-9f9a-340493692d18",
+      "payment_id": "01a10fd4-6c1a-7b80-9e9f-01bfc09b3444",
+      "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
+      "booking_ref": "LKSB-2610-00211",
+      "method": "cash",
+      "amount_paise": 50000,
+      "reason": "QA: cash refund verification",
+      "status": "processed",
+      "initiated_by_kind": "staff",
+      "requested_at": "2026-10-06T07:14:41.588505Z",
+      "processed_at": "2026-10-06T07:14:41.588505Z",
+      "failure_reason": null,
+      "cash_session_id": "01a11010-79da-7741-95be-9597fb474fc1",
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": true
+      },
+      "created_at": "2026-10-06T07:14:41.591234Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total": 1,
+  "has_next": false
+}

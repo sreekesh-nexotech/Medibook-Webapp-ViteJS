@@ -33,11 +33,21 @@ export function rangeForWindow(window: PaymentWindow): DateRange {
   return { dateFrom: today, dateTo: today };
 }
 
-/** The mode filter's options and the method each one asks the server for. */
+/**
+ * The mode filter's options and the method each one asks the server for:
+ * every method the backend records, so POS and Other desk payments (and the
+ * gateway's net banking / wallet / EMI) can be found too.
+ */
 export const MODE_FILTER: Readonly<Record<string, PaymentMethod>> = {
   Cash: 'cash',
   UPI: 'upi',
   Card: 'card',
+  POS: 'pos',
+  Other: 'other',
+  'Net banking': 'netbanking',
+  Wallet: 'wallet',
+  EMI: 'emi',
+  'Pay later': 'paylater',
 };
 
 export const METHOD_LABEL: Readonly<Record<PaymentMethod, string>> = {

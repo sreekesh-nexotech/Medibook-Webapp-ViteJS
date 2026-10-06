@@ -28,11 +28,6 @@ export interface AppointmentsRepository {
   cancel(id: string, reason: string): Promise<Result<DeskAppointment>>;
   /** Collect a walk-in's fee (split lines); returns the issued receipt. */
   collectPayment(id: string, lines: readonly PaymentLineInput[]): Promise<Result<DeskReceipt>>;
-  /** Collect every unpaid consultation of a visit together; returns the one receipt. */
-  collectVisitPayment(
-    visitId: string,
-    lines: readonly PaymentLineInput[],
-  ): Promise<Result<DeskReceipt>>;
   /** Full refund, one per payment line to its original method. */
   refund(id: string, reason: string): Promise<Result<null>>;
   receipt(id: string): Promise<Result<DeskReceipt>>;
