@@ -132,7 +132,7 @@ export interface NewWalkInPatient {
   readonly lastName: string;
   /** E.164. */
   readonly phone: string;
-  readonly gender: 'female' | 'male' | 'other' | null;
+  readonly gender: 'female' | 'male' | 'other' | 'undisclosed' | null;
   /** ISO `yyyy-mm-dd`, optional. */
   readonly dateOfBirth: string | null;
 }

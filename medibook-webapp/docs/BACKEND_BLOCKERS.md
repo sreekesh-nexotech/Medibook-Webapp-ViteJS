@@ -33,6 +33,8 @@ Paths under `backend:` are in the Django repository.
 | APPT-02   | Cancelled unpaid bookings keep payment status "pending"       | Low      | Shown as "Not paid"                     |
 | APPT-03   | No per-hospital list of accepted desk payment methods         | Low      | Fixed list: cash, UPI, card, POS, other |
 | APPT-04   | Appointment history names no actor                            | Low      | Shows patient / staff / system only     |
+| APPT-05   | The desk cannot preview a walk-in's real fee before booking   | Medium   | Shows standard and follow-up fee        |
+| APPT-06   | Desk staff cannot read services, so no service can be booked  | Medium   | Bookings use the doctor's fee only      |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -392,3 +394,40 @@ as patient approvals already do (`requested_by_name`).
 
 **What the web app does meanwhile.** History lists each step with Patient, Hospital
 staff or System, and the status change it made.
+
+## APPT-05 — The desk cannot preview a walk-in's real fee
+
+**New finding (live check of New Appointment, 6 Oct 2026).**
+
+**What fails.** A walk-in is priced at booking time by `fees.quote` (backend:
+`appointments/services/booking.py:248-255`, `catalog/services/fees.py:179`): follow-up
+pricing within `follow_up_window_days`, an optional service, and tax. No hospital
+endpoint returns that quote before booking. On Lakeshore, 2 of the 12 most recent
+walk-ins were follow-ups charged half the doctor's fee (₹450 instead of ₹900), so a
+preview built from the doctor's standard fee overstates them by 50%.
+
+**What the backend needs.** A read-only quote for desk bookings, e.g.
+`POST /hospital/appointments/quote {patient, consultations[]}` returning per-consultation
+fee, follow-up flag, tax and total, using the same `fees.quote`.
+
+**What the web app does meanwhile.** The preview shows the standard fee and, when lower,
+the follow-up fee the same doctors would charge; the booked modal then shows the real
+totals from the booking.
+
+## APPT-06 — Desk staff cannot read services, so no service can be booked
+
+**What fails.** A walk-in consultation may name a `service_id` (backend:
+`appointments/serializers/hospital_walk_in_consultation_serializer.py:9`), and Lakeshore has
+services linked to doctors (ECG, X-Ray (Knee)). But `GET /hospital/services` and
+`GET /hospital/doctor-services` need `hospital_settings.view` (backend:
+`catalog/views/hospital_service_list.py:16`,
+`catalog/views/hospital_doctor_service_list.py:16`), which receptionists — the people who
+book walk-ins — do not have. The desk cannot offer a service, so every walk-in is booked as
+a plain consultation.
+
+**What the backend needs.** Read access to active services and doctor–service links for
+desk roles (a `services` read under `appointments.add`, or `hospital_settings.view` for
+receptionists), alongside CORE-07's doctors and departments.
+
+**What the web app does meanwhile.** New Appointment books consultations without a
+service; a service picker can follow once desk roles can read the list.

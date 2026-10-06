@@ -43,6 +43,8 @@ export const doctorResponseSchema = z.object({
   bio: z.string().nullable(),
   photo_file_id: z.string().nullable(),
   consultation_fee_paise: z.number().int(),
+  // Optional so an older backend without it still parses.
+  follow_up_fee_paise: z.number().int().nullable().optional(),
   slot_length_min: z.number().int(),
   room: z.string().nullable(),
   status: z.enum(['active', 'on_leave', 'inactive']),
@@ -140,6 +142,8 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     bio: dto.bio ?? '',
     photoFileId: dto.photo_file_id,
     feeRupees: dto.consultation_fee_paise / PAISE_PER_RUPEE,
+    followUpFeeRupees:
+      dto.follow_up_fee_paise == null ? null : dto.follow_up_fee_paise / PAISE_PER_RUPEE,
     slotLengthMin: dto.slot_length_min,
     room: dto.room ?? '',
     status: dto.status,

@@ -16,7 +16,7 @@ import type {
   DeskAppointment,
   PaymentMethod,
 } from '@/features/appointments/domain/entities/appointments.entities';
-import { useCollectPaymentMutation } from '@/features/appointments/application/queries/appointments.mutations';
+import { useCollectVisitPaymentMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import { AppointmentReceiptModal } from '@/features/appointments/presentation/components/AppointmentReceiptModal';
 import { AppointmentTokenModal } from '@/features/appointments/presentation/components/AppointmentTokenModal';
 import {
@@ -33,35 +33,47 @@ const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
 interface AppointmentBookedModalProps {
   /** The visit just booked; `null` = closed. */
   appointments: readonly DeskAppointment[] | null;
+  /** The visit they belong to — collected together in one payment. */
+  visitId: string | null;
   patientName: string;
   onDone: () => void;
 }
 
 /**
  * After a walk-in booking: every consultation booked with its token and fee,
- * one "Collect" for all of them (one payment per appointment, same method),
- * then each one's receipt and token slip. Leaving without collecting is
+ * one "Collect" for all of them — a single visit payment and one receipt
+ * (`POST /visits/{id}/payments`) — then the receipt and each token slip. Leaving without collecting is
  * allowed — the bookings stay "Pending payment" in the list.
  */
 export function AppointmentBookedModal({
   appointments,
+  visitId,
   patientName,
   onDone,
 }: AppointmentBookedModalProps) {
-  if (!appointments) return null;
-  return <BookedVisit appointments={appointments} patientName={patientName} onDone={onDone} />;
+  if (!appointments || !visitId) return null;
+  return (
+    <BookedVisit
+      appointments={appointments}
+      visitId={visitId}
+      patientName={patientName}
+      onDone={onDone}
+    />
+  );
 }
 
 function BookedVisit({
   appointments,
+  visitId,
   patientName,
   onDone,
 }: {
   appointments: readonly DeskAppointment[];
+  visitId: string;
   patientName: string;
   onDone: () => void;
 }) {
-  const collect = useCollectPaymentMutation();
+  const collect = useCollectVisitPaymentMutation();
   const [paidIds, setPaidIds] = useState<readonly string[]>([]);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reference, setReference] = useState('');
@@ -73,20 +85,20 @@ function BookedVisit({
   const unpaid = appointments.filter((a) => needsPayment(a) && !paidIds.includes(a.id));
   const dueTotal = unpaid.reduce((sum, a) => sum + a.totalRupees, 0);
 
-  /** One payment per appointment, in order; stops at the first refusal. */
+  /** One visit payment for every unpaid consultation: one order, one receipt. */
   const collectAll = async (): Promise<void> => {
     setIsCollecting(true);
     setError(null);
     try {
-      for (const a of unpaid) {
-        if (a.totalRupees > 0) {
-          await collect.mutateAsync({
-            id: a.id,
-            lines: [{ method, amountRupees: a.totalRupees, reference: reference.trim() }],
-          });
-        }
-        setPaidIds((ids) => [...ids, a.id]);
+      const ids = unpaid.map((a) => a.id);
+      if (dueTotal > 0) {
+        await collect.mutateAsync({
+          visitId,
+          appointmentIds: ids,
+          lines: [{ method, amountRupees: dueTotal, reference: reference.trim() }],
+        });
       }
+      setPaidIds((paid) => [...paid, ...ids]);
       toast(`Payment of ${money(dueTotal)} recorded`, 'success');
     } catch (failure) {
       setError(

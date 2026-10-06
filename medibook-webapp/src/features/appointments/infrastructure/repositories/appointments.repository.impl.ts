@@ -26,6 +26,8 @@ export const appointmentsRepository: AppointmentsRepository = {
   noShow: (id) => attempt(async () => toAppointment(await api.postNoShow(id))),
   cancel: (id, reason) => attempt(async () => toAppointment(await api.postCancel(id, reason))),
   collectPayment: (id, lines) => attempt(async () => toReceipt(await api.postPayment(id, lines))),
+  collectVisitPayment: (visitId, lines) =>
+    attempt(async () => toReceipt(await api.postVisitPayment(visitId, lines))),
   refund: (id, reason) =>
     attempt(async () => {
       await api.postRefund(id, reason);

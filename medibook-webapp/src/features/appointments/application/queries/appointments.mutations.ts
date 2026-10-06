@@ -13,6 +13,7 @@ import { bookWalkIn } from '@/features/appointments/application/usecases/appoint
 import { cancelAppointment } from '@/features/appointments/application/usecases/appointments.cancelAppointment';
 import { checkInAppointment } from '@/features/appointments/application/usecases/appointments.checkInAppointment';
 import { collectPayment } from '@/features/appointments/application/usecases/appointments.collectPayment';
+import { collectVisitPayment } from '@/features/appointments/application/usecases/appointments.collectVisitPayment';
 import { fetchReceiptPdfUrl } from '@/features/appointments/application/usecases/appointments.fetchReceiptPdfUrl';
 import { fetchTokenSlipPdf } from '@/features/appointments/application/usecases/appointments.fetchTokenSlipPdf';
 import { markNoShow } from '@/features/appointments/application/usecases/appointments.markNoShow';
@@ -122,6 +123,28 @@ export function useCollectPaymentMutation() {
     onSuccess: (receipt, { id }) => {
       queryClient.setQueryData(appointmentsKeys.receipt(id), receipt);
       invalidateAppointment(queryClient, id);
+    },
+  });
+}
+
+interface VisitPaymentInput {
+  readonly visitId: string;
+  /** The visit's appointments, so each one's receipt and row refresh. */
+  readonly appointmentIds: readonly string[];
+  readonly lines: readonly PaymentLineInput[];
+}
+
+/** Collect a whole visit at once: one order, one receipt (D-27). */
+export function useCollectVisitPaymentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ visitId, lines }: VisitPaymentInput) =>
+      unwrap(await collectVisitPayment(visitId, lines)),
+    onSuccess: (receipt, { appointmentIds }) => {
+      for (const id of appointmentIds) {
+        queryClient.setQueryData(appointmentsKeys.receipt(id), receipt);
+        invalidateAppointment(queryClient, id);
+      }
     },
   });
 }

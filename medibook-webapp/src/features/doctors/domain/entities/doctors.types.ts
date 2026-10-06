@@ -30,6 +30,8 @@ export interface DoctorProfile {
   readonly photoFileId: string | null;
   /** Consultation fee in whole rupees. */
   readonly feeRupees: number;
+  /** Fee for a follow-up within the hospital's follow-up window, or `null` if none is set. */
+  readonly followUpFeeRupees: number | null;
   /** Length of one bookable slot, in minutes (per doctor). */
   readonly slotLengthMin: number;
   readonly room: string;
