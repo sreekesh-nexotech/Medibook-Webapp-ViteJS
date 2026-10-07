@@ -64,6 +64,29 @@ describe('toFailure', () => {
     });
   });
 
+  it('flattens nested and per-item field errors into dotted paths (UAT-48)', () => {
+    const failure = toFailure(
+      httpError(
+        400,
+        envelope('VALIDATION_ERROR', 'Some fields are invalid.', {
+          errors: {
+            booking: { prefix: ['Another hospital already uses this prefix.'] },
+            lines: [{}, { amount_paise: ['Must be positive.'] }],
+            scopes: ['Pick at least one.', { service_id: 'Unknown service.' }],
+            'If-Match': ['This header is required (the record version).'],
+          },
+        }),
+      ),
+    );
+    expect(failure.fieldErrors).toEqual({
+      'booking.prefix': ['Another hospital already uses this prefix.'],
+      'lines.1.amount_paise': ['Must be positive.'],
+      scopes: ['Pick at least one.'],
+      'scopes.1.service_id': ['Unknown service.'],
+      'If-Match': ['This header is required (the record version).'],
+    });
+  });
+
   it('never shows a server error’s own message to the user', () => {
     const failure = toFailure(httpError(500, envelope('INTERNAL', 'Traceback: db password…')));
     expect(failure.kind).toBe('server');
