@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
 
+import { applySavedRole } from '@/features/users-roles/application/queries/usersRoles.cache';
 import { usersRolesKeys } from '@/features/users-roles/application/queries/usersRoles.keys';
 import { updateRoleDescription } from '@/features/users-roles/application/usecases/updateRoleDescription';
 import type { StaffRoleCode } from '@/features/users-roles/domain/entities/usersRoles.types';
@@ -19,6 +20,7 @@ export function useUpdateRoleDescriptionMutation() {
   return useMutation({
     mutationFn: async ({ roleCode, description, version }: UpdateRoleDescriptionInput) =>
       unwrap(await updateRoleDescription(roleCode, description, version)),
+    onSuccess: (saved) => applySavedRole(queryClient, saved),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: usersRolesKeys.roles() });
     },

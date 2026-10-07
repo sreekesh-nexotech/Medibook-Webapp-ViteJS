@@ -29,3 +29,4 @@ e2e/.auth
 *.njsproj
 *.sln
 *.sw?
+e2e/uat/results.json

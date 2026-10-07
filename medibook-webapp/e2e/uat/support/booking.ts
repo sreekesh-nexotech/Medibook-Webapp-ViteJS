@@ -196,11 +196,16 @@ export interface CleanSessionOptions {
   readonly leadMinutes?: number;
   /** Only doctors patients can book online. */
   readonly bookableOnline?: boolean;
+  /**
+   * `false` for background bookings a step does not watch on the queue: any
+   * session with enough free slots will do (it need not be untouched).
+   */
+  readonly clean?: boolean;
 }
 
 const DEFAULT_LEAD_MINUTES = 5;
 const UAT_SESSION_LABEL = 'UAT clinic';
-const UAT_SESSION_MINUTES = 180;
+/** An added session is short (the day has room for many runs): an hour, or the slots a step needs. */
 const UAT_SESSION_MIN_MINUTES = 60;
 const UAT_SESSION_START_DELAY_MINUTES = 10;
 const MINUTE_STEP = 5;
@@ -251,6 +256,7 @@ interface ScheduleChange {
 async function addUatSessionToday(
   admin: ApiClient,
   doctor: HospitalDoctor,
+  minOpenSlots: number,
 ): Promise<{ readonly id: string; readonly label: string } | null> {
   const today = todayIso();
   const rows = await admin.get<HoursRow[]>('/hours');
@@ -267,14 +273,22 @@ async function addUatSessionToday(
     starts_at: clockIn(new Date(s.starts_at)),
     ends_at: clockIn(new Date(s.ends_at)),
   }));
+  const minutes = Math.max(
+    UAT_SESSION_MIN_MINUTES,
+    Math.ceil(((minOpenSlots + 1) * doctor.slot_length_min) / MINUTE_STEP) * MINUTE_STEP,
+  );
+  // The first gap of that length from now on, between the day's sessions.
   const nowMinutes = minutesOf(clockIn(new Date())) + UAT_SESSION_START_DELAY_MINUTES;
   let start = Math.max(opens, Math.ceil(nowMinutes / MINUTE_STEP) * MINUTE_STEP);
-  for (const s of existing) {
-    const [from, to] = [minutesOf(s.starts_at), minutesOf(s.ends_at)];
-    if (start < to && start + UAT_SESSION_MIN_MINUTES > from) start = to;
+  const busy = existing
+    .map((s) => [minutesOf(s.starts_at), minutesOf(s.ends_at)] as const)
+    .sort((a, b) => a[0] - b[0]);
+  for (const [from, to] of busy) {
+    if (start + minutes <= from) break;
+    if (to > start) start = to;
   }
-  const end = Math.min(start + UAT_SESSION_MINUTES, closes);
-  if (end - start < UAT_SESSION_MIN_MINUTES) return null;
+  const end = start + minutes;
+  if (end > closes) return null;
   // A label of its own: earlier runs' UAT sessions stay on the day.
   const label = `${UAT_SESSION_LABEL} ${hhmm(start)}`;
   const sessions = [
@@ -346,13 +360,14 @@ export async function cleanSessionToday(
     const mine = sessions.filter((s) => s.doctor_id === doctor.id);
     // The desk tells sessions apart by "doctor · label", so the label must be unique that day.
     const unique = (label: string) => mine.filter((s) => s.label === label).length === 1;
+    const untouched = (s: SessionSnapshot) =>
+      s.status === 'scheduled' &&
+      s.waiting_count === 0 &&
+      (s.in_consultation_count ?? 0) === 0 &&
+      s.current_appointment_id === null;
+    const usable = (s: SessionSnapshot) => s.status === 'scheduled' || s.status === 'open';
     const clean = mine.filter(
-      (s) =>
-        unique(s.label) &&
-        s.status === 'scheduled' &&
-        s.waiting_count === 0 &&
-        (s.in_consultation_count ?? 0) === 0 &&
-        s.current_appointment_id === null,
+      (s) => unique(s.label) && (options.clean === false ? usable(s) : untouched(s)),
     );
     if (clean.length === 0) continue;
     const day = await slotDay(admin, doctor.id, today);
@@ -372,7 +387,7 @@ export async function cleanSessionToday(
   }
 
   for (const doctor of candidates) {
-    const added = await addUatSessionToday(admin, doctor);
+    const added = await addUatSessionToday(admin, doctor, options.minOpenSlots);
     if (!added) continue;
     const day = await slotDay(admin, doctor.id, today);
     const grid = day?.sessions.find((g) => g.id === added.id);

@@ -17,6 +17,7 @@ import {
   primaryAction,
   rangeFor,
   reasonCopy,
+  windowForTab,
 } from '@/features/appointments/presentation/components/appointments.view';
 
 const TODAY = '2026-10-07';
@@ -230,5 +231,17 @@ describe('date windows use the hospital day (UAT-47)', () => {
       dateFrom: '2026-12-01',
       dateTo: '2026-12-01',
     });
+  });
+});
+
+describe('windowForTab', () => {
+  it('opens Needs Approval on every upcoming day (UAT A-13, BE-26)', () => {
+    expect(windowForTab('Needs Approval', 'Today')).toBe('Upcoming');
+    expect(windowForTab('Needs Approval', 'Yesterday')).toBe('Upcoming');
+  });
+
+  it('keeps the chosen window on the other tabs', () => {
+    expect(windowForTab('Online', 'Tomorrow')).toBe('Tomorrow');
+    expect(windowForTab('All', 'Today')).toBe('Today');
   });
 });

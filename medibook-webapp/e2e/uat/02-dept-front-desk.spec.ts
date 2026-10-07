@@ -63,10 +63,16 @@ async function expectCalled(card: Locator, label: string): Promise<void> {
 
 /** Skip the token at the desk; returns true when the no-show offer opened. */
 async function skipCurrent(page: Page, card: Locator): Promise<boolean> {
-  await card.getByRole('button', { name: 'Skip — call again later' }).click();
   const offer = dialog(page, 'Mark as no-show?');
   const skipped = toast(page, /^Skipped /);
-  await expect(offer.or(skipped)).toBeVisible();
+  const before = await skipped.count();
+  await card.getByRole('button', { name: 'Skip — call again later' }).click();
+  // This skip's own answer: the no-show offer, or one more "Skipped …" toast.
+  await expect
+    .poll(async () => (await offer.isVisible()) || (await skipped.count()) > before, {
+      message: 'the skip is answered',
+    })
+    .toBe(true);
   return offer.isVisible();
 }
 
@@ -83,7 +89,8 @@ test('4.2 Department front desk — Lakeshore', async ({ browser }) => {
   let online: OnlineBooking | null = null;
   const contexts: BrowserContext[] = [];
 
-  const pages = () => (desk ? [desk.page] : []);
+  // Evidence on failure: the main desk and every other browser a step opened.
+  const pages = () => [...(desk ? [desk.page] : []), ...contexts.flatMap((c) => c.pages())];
   const watch = () => (desk ? [desk.watch] : []);
 
   /* Q-1 ------------------------------------------------------------------ */
@@ -302,7 +309,8 @@ test('4.2 Department front desk — Lakeshore', async ({ browser }) => {
     );
     const booked = dialog(page, `Booked for ${patientName}`);
     await expect(booked.getByText(/Send the patient to reception to pay/)).toBeVisible();
-    await expect(booked.getByRole('button', { name: /^Collect/ })).toHaveCount(0);
+    // Only "Collect later" — no button that takes the money.
+    await expect(booked.getByRole('button', { name: /^Collect(?! later$)/ })).toHaveCount(0);
     await booked.getByRole('button', { name: 'Collect later' }).click();
 
     // Reception collects the fee.

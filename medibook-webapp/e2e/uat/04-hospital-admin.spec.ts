@@ -85,7 +85,7 @@ interface PaymentLineDto {
 }
 
 interface ReportDto {
-  readonly total: number;
+  readonly page: { readonly total: number };
   readonly kpis: readonly { readonly label: string }[];
   readonly columns: readonly { readonly label: string }[];
 }
@@ -110,7 +110,8 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
   const adminApi = await ApiClient.staff('hospital', admin.email);
   let desk: StaffSession | null = null;
   const contexts: BrowserContext[] = [];
-  const pages = () => (desk ? [desk.page] : []);
+  // Evidence on failure: the main desk and every other browser a step opened.
+  const pages = () => [...(desk ? [desk.page] : []), ...contexts.flatMap((c) => c.pages())];
   const watch = () => (desk ? [desk.watch] : []);
 
   let doctor: { readonly id: string; readonly name: string } | null = null;
@@ -132,7 +133,6 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       ['Last 7 days', '7d'],
       ['Last 30 days', '30d'],
       ['This month', 'mtd'],
-      ['Today', 'today'],
     ] as const) {
       const [answer] = await Promise.all([
         s.page.waitForResponse(
@@ -146,6 +146,9 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       await expect(s.page.getByText(`Appointments by Department — ${label}`)).toBeVisible();
       await expect(s.page.getByText(`Appointments by Status — ${label}`)).toBeVisible();
     }
+    // Back to Today (read when the dashboard opened, so it may come from the cache).
+    await period.selectOption('Today');
+    await expect(s.page.getByText('Appointments by Department — Today')).toBeVisible();
     await expect(s.page.getByText('Appointments Today', { exact: true })).toBeVisible();
     expect(s.watch.problems(), 'every period loads without errors').toEqual([]);
   });
@@ -274,7 +277,8 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     await expect(page.getByText('Leave / Unavailability')).toBeVisible();
 
     // Leave: the affected booking is listed before anything is applied.
-    await page.getByRole('button', { name: 'Add Leave' }).click();
+    // The section header's button (the empty state offers the same action).
+    await page.getByRole('button', { name: 'Add Leave' }).first().click();
     const leave = dialog(page, 'Add Leave');
     await leave.getByLabel(/^From/).fill(day.leave);
     await leave.getByLabel(/^To/).fill(day.leave);
@@ -298,7 +302,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
 
     // A date exception: closed all day.
     await goTo(page, `${ADMIN}/doctors/${doc.id}?tab=availability`);
-    await page.getByRole('button', { name: 'Add Date Exception' }).click();
+    await page.getByRole('button', { name: 'Add Date Exception' }).first().click();
     const exception = dialog(page, 'Add Date Exception');
     await exception.getByLabel(/^Date/).fill(day.exception);
     await exception.getByRole('switch', { name: 'Closed all day' }).click();
@@ -351,7 +355,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     await expect(toast(page, `${doc.name} · ${label} opened`)).toBeVisible();
 
     // Bulk-block the afternoon: the booking in it is listed before confirming.
-    await page.getByRole('button', { name: 'Bulk Update' }).click();
+    await page.getByRole('button', { name: 'Bulk Update', exact: true }).click();
     const bulk = dialog(page, 'Bulk Update Slots');
     await bulk.getByRole('combobox', { name: /Apply to/ }).selectOption('This date — one doctor');
     await bulk.getByRole('combobox', { name: /^Doctor/ }).selectOption(doc.name);
@@ -425,7 +429,16 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     const edit = dialog(page, 'Edit Closure');
     await edit.getByLabel(/^Note/).fill('Emergency care only.');
     await edit.getByRole('button', { name: 'Save Closure' }).click();
-    await expect(toast(page, /^Holiday saved/)).toBeVisible();
+    // The dry run may list bookings it keeps (already being seen elsewhere on
+    // the horizon); a note edit must cancel none.
+    const keepList = dialog(page, 'Apply this change?');
+    const saved2 = toast(page, /^Holiday saved/);
+    await expect(keepList.or(saved2).first()).toBeVisible();
+    if (await keepList.isVisible()) {
+      await expect(keepList.getByText('Applying the change cancels no bookings.')).toBeVisible();
+      await keepList.getByRole('button', { name: 'Apply', exact: true }).click();
+    }
+    await expect(saved2).toBeVisible();
     await expect(row(page, name).getByText('Emergency care only.')).toBeVisible();
   });
 
@@ -449,7 +462,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     await expect(toast(page, 'Settings saved')).toBeVisible();
 
     // The next receipt carries the new address.
-    const session = await cleanSessionToday(adminApi, { minOpenSlots: 1 });
+    const session = await cleanSessionToday(adminApi, { minOpenSlots: 1, clean: false });
     const walkIn = await bookWalkIn(
       adminApi,
       session.doctor,
@@ -525,7 +538,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       await expect(page.getByRole('combobox', { name: 'Saturday closing time' })).toHaveValue(
         '7:30 pm',
       );
-      const session = await cleanSessionToday(adminApi, { minOpenSlots: 1 });
+      const session = await cleanSessionToday(adminApi, { minOpenSlots: 1, clean: false });
       const walkIn = await bookWalkIn(
         adminApi,
         session.doctor,
@@ -617,6 +630,10 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       await service.getByRole('combobox', { name: /^Tax/ }).selectOption(`${taxName} 12%`);
       await service.getByRole('button', { name: 'Add Service' }).click();
       await expect(toast(page, 'Service added')).toBeVisible();
+      // Earlier runs' services page the list: find this one by name.
+      const findService = () =>
+        page.getByRole('textbox', { name: 'Search services' }).fill(serviceName);
+      await findService();
       const serviceRow = row(page, serviceName);
       await expect(serviceRow.getByText(rupees(1120))).toBeVisible();
       await expect(serviceRow.getByText(`+ ${rupees(120)} tax`)).toBeVisible();
@@ -632,17 +649,24 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       await coupon.getByRole('combobox', { name: /Departments/ }).selectOption(department.name);
       await coupon.getByRole('button', { name: 'Create Coupon' }).click();
       await expect(toast(page, 'Coupon created')).toBeVisible();
+      // Earlier runs' coupons page the list: find this one by its code.
+      await page.getByRole('textbox', { name: 'Search coupon codes' }).fill(couponCode);
       await expect(row(page, couponCode)).toBeVisible();
 
       // Delete the rate: refused while the service bills with it …
       await page.getByRole('tab', { name: 'Taxes' }).click();
       await page.getByTitle(`Delete ${taxName}`, { exact: true }).click();
-      await dialog(page, 'Delete this tax rate?').getByRole('button', { name: 'Delete' }).click();
-      const inUse = dialog(page, `${taxName} is still in use`);
+      // The rate in use is refused up front (B4, TAX_RATE_IN_USE), naming the service.
+      const inUse = dialog(page, new RegExp(`^${escapeRegExp(taxName)}( \\d+%)? is still in use$`));
+      const askFirst = dialog(page, 'Delete this tax rate?');
+      await expect(inUse.or(askFirst).first()).toBeVisible();
+      if (await askFirst.isVisible())
+        await askFirst.getByRole('button', { name: 'Delete' }).click();
       await expect(inUse.getByText(serviceName)).toBeVisible();
       await inUse.getByRole('button', { name: 'OK' }).click();
       // … so the service goes to "No tax" first, then the rate is deleted.
       await page.getByRole('tab', { name: 'Services' }).click();
+      await findService();
       await page.getByTitle(`Edit ${serviceName}`, { exact: true }).click();
       const edit = dialog(page, 'Edit Service');
       await edit.getByRole('combobox', { name: /^Tax/ }).selectOption('No tax (exempt)');
@@ -654,6 +678,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       await expect(toast(page, `“${taxName}” deleted`)).toBeVisible();
       // The deleted rate no longer applies.
       await page.getByRole('tab', { name: 'Services' }).click();
+      await findService();
       await expect(row(page, serviceName).getByText('tax exempt')).toBeVisible();
       await expect(row(page, serviceName).getByText(rupees(1000)).first()).toBeVisible();
     },
@@ -725,7 +750,8 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     // Put the grid back.
     await page.getByRole('dialog').getByRole('checkbox', { name: 'View on Reports' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Save Role' }).click();
-    await expect(toast(page, /updated$/)).toBeVisible();
+    // The first save's toast may still be up: this is the second one.
+    await expect(toast(page, /updated$/)).toHaveCount(2);
   });
 
   /* A-11 ----------------------------------------------------------------- */
@@ -887,6 +913,8 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     await page.getByRole('tab', { name: /^Needs Approval/ }).click();
     await appointmentSearch(page).fill(toApprove.appointment.booking_ref);
     const first = row(page, toApprove.personName);
+    // The search narrows the upcoming requests to this booking.
+    await expect(first).toHaveCount(1);
     await first.getByRole('button', { name: 'Approve' }).click();
     await expect(toast(page, 'Booking approved')).toBeVisible();
 
@@ -999,7 +1027,9 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
 
     await search.fill(closure.id);
     await search.press('Enter');
-    const holidayRows = trail.getByRole('row').filter({ hasText: admin.name });
+    // The actor column names the person; your own entries read "You".
+    const actor = new RegExp(`\\b(You|${escapeRegExp(admin.name)})\\b`);
+    const holidayRows = trail.getByRole('row').filter({ hasText: actor });
     await expect(holidayRows.first()).toBeVisible();
     await expect(holidayRows.first().getByText(fmtDate(today).slice(0, 6))).toBeVisible();
 
@@ -1014,7 +1044,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     const refundRow = trail
       .getByRole('row')
       .filter({ hasText: /\/refunds/ })
-      .filter({ hasText: admin.name });
+      .filter({ hasText: actor });
     await expect(refundRow.first()).toBeVisible();
   });
 

@@ -79,6 +79,7 @@ import {
   statusBadge,
   timeOf,
   type DateWindow,
+  windowForTab,
 } from '@/features/appointments/presentation/components/appointments.view';
 import { uniqueLabels } from '@/features/appointments/presentation/components/createAppointment.view';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
@@ -118,7 +119,7 @@ const COLUMNS = [
 
 /** "Needs Approval" links from the dashboards cover every upcoming day (BE-26). */
 function initialWindow(tab: AppointmentTab): DateWindow {
-  return tab === 'Needs Approval' ? 'Upcoming' : 'Today';
+  return windowForTab(tab, 'Today');
 }
 
 /** What the update caption says: live over the queue socket, or polling. */
@@ -250,6 +251,11 @@ export function AppointmentsScreen() {
     };
   const setTab = (next: AppointmentTab) => {
     setParam(APPOINTMENTS_TAB_PARAM, next === 'All' ? null : TAB_SLUGS[next]);
+    const nextWindow = windowForTab(next, dateF);
+    if (nextWindow !== dateF) {
+      setDateF(nextWindow);
+      setExact('');
+    }
     setPage(0);
   };
   const tabLabel = (t: AppointmentTab) => {

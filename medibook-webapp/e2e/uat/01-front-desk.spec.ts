@@ -82,7 +82,8 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
   let online: OnlineBooking | null = null;
   const extraContexts: BrowserContext[] = [];
 
-  const pages = () => (desk ? [desk.page] : []);
+  // Evidence on failure: the main desk and every other browser a step opened.
+  const pages = () => [...(desk ? [desk.page] : []), ...extraContexts.flatMap((c) => c.pages())];
   const watch = () => (desk ? [desk.watch] : []);
 
   /* R-1 ------------------------------------------------------------------ */

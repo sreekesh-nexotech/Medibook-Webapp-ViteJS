@@ -18,6 +18,7 @@ import type {
   DeskAppointment,
   PaymentMethod,
 } from '@/features/appointments/domain/entities/appointments.entities';
+import type { AppointmentTab } from '@/features/appointments/domain/appointments.listFilters';
 
 /**
  * View-model helpers for the desk appointment screens: badge labels,
@@ -367,6 +368,16 @@ export const DATE_WINDOWS: readonly DateWindow[] = [
   'Yesterday',
   'Last 7 Days',
 ];
+
+/**
+ * The date window a tab opens on. Approval requests are for coming days, so
+ * "Needs Approval" shows every upcoming one — from the tab as from the
+ * dashboard link (BE-26); a request booked for tomorrow was invisible under
+ * "Today" (UAT A-13). Other tabs keep the window the desk chose.
+ */
+export function windowForTab(tab: AppointmentTab, current: DateWindow): DateWindow {
+  return tab === 'Needs Approval' ? 'Upcoming' : current;
+}
 
 export function isDateWindow(value: string): value is DateWindow {
   return (DATE_WINDOWS as readonly string[]).includes(value);

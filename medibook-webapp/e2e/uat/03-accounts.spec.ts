@@ -69,7 +69,7 @@ interface PeriodDetailDto extends PeriodDto {
 }
 
 interface ReportDto {
-  readonly total: number;
+  readonly page: { readonly total: number };
   readonly kpis: readonly { readonly key: string; readonly label: string }[];
   readonly columns: readonly { readonly key: string; readonly label: string }[];
 }
@@ -99,7 +99,8 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
   const adminApi = await ApiClient.staff('hospital', admin.email);
   let desk: StaffSession | null = null;
   const contexts: BrowserContext[] = [];
-  const pages = () => (desk ? [desk.page] : []);
+  // Evidence on failure: the main desk and every other browser a step opened.
+  const pages = () => [...(desk ? [desk.page] : []), ...contexts.flatMap((c) => c.pages())];
   const watch = () => (desk ? [desk.watch] : []);
 
   /* C-1 ------------------------------------------------------------------ */
@@ -120,7 +121,7 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
   await uatStep('C-2', { watch: watch(), pages }, async () => {
     const { page } = needs(desk, 'C-1');
     // Background data: one desk UPI payment taken and refunded today.
-    const session = await cleanSessionToday(adminApi, { minOpenSlots: 2 });
+    const session = await cleanSessionToday(adminApi, { minOpenSlots: 2, clean: false });
     const walkIn = await bookWalkIn(
       adminApi,
       session.doctor,
@@ -156,10 +157,19 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
       await expect(tab(page, name)).toHaveAttribute('aria-selected', 'true');
       const body = lines.filter({ has: page.getByRole('cell') });
       await expect(body.first()).toBeVisible();
-      for (const line of await body.all()) {
-        await expect(line.getByRole('cell').first()).toContainText(todayCell);
-        await expect(line.getByText(badge, { exact: true }).first()).toBeVisible();
-      }
+      // Every row of the tab (once its list has replaced the previous tab's):
+      // today's date in the first column, the tab's status in "Status".
+      await expect
+        .poll(async () => {
+          const dates = await body.locator('td:nth-child(1)').allInnerTexts();
+          const statuses = await body.locator('td:nth-child(7)').allInnerTexts();
+          return {
+            notToday: dates.filter((d) => !d.includes(todayCell)).length,
+            otherStatus: statuses.filter((t) => t.trim() !== badge).length,
+            rows: dates.length,
+          };
+        })
+        .toMatchObject({ notToday: 0, otherStatus: 0 });
     }
     await tab(page, 'Refunded').click();
     await expect(row(page, `Refund Uat${tag}`)).toBeVisible();
@@ -182,12 +192,20 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
     const rows = csvRows(csv.text());
     expect(rows[0], 'human column headers').toContain('Booking refs');
     expect(rows.length - 1, 'the CSV has every line on screen').toBe(total);
-    // Every patient on the first page is in the file.
-    const firstPage = page.getByRole('region', { name: 'Payments' }).getByRole('row');
-    for (const line of (await firstPage.filter({ has: page.getByRole('cell') }).all()).slice(
-      0,
-      3,
-    )) {
+    // Every patient on the first page is in the file. Unpaid walk-ins are
+    // listed first as "Due" rows; they are not payment lines (the screen says
+    // so) and are not exported.
+    const firstPage = page
+      .getByRole('region', { name: 'Payments' })
+      .getByRole('row')
+      .filter({
+        has: page
+          .getByRole('cell')
+          .first()
+          .filter({ hasText: fmtDate(today) }),
+      });
+    await expect(firstPage.first()).toBeVisible();
+    for (const line of (await firstPage.all()).slice(0, 3)) {
       const name = (await line.getByRole('cell').nth(1).innerText()).split('\n')[0]?.trim() ?? '';
       if (name && name !== 'Patient unavailable') expect(csv.text()).toContain(name);
     }
@@ -344,7 +362,7 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
     ]);
     expect(answer.status()).toBe(200);
     const report = (await answer.json()) as ReportDto;
-    expect(report.total, 'rows for last month').toBeGreaterThan(0);
+    expect(report.page.total, 'rows for last month').toBeGreaterThan(0);
     for (const kpi of report.kpis)
       await expect(page.getByText(kpi.label, { exact: true }).first()).toBeVisible();
     const table = page.getByRole('region', { name: 'Revenue Report rows' });
@@ -374,7 +392,9 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
       const data = await adminApi
         .get<ReportDto>(`/reports/${r.code}`, { date_from: from, date_to: today, page_size: 1 })
         .catch(() => null);
-      if (data && (!biggest || data.total > biggest.total)) biggest = { ...r, total: data.total };
+      if (data && (!biggest || data.page.total > biggest.total)) {
+        biggest = { ...r, total: data.page.total };
+      }
     }
     const target = needs(biggest, 'a report');
     const syncMax = pdfSyncMaxRows();
