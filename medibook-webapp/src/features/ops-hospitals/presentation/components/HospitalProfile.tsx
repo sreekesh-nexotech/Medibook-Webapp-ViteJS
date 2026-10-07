@@ -1,58 +1,77 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { opsOnboardingPath, opsPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
-import { money } from '@/shared/lib/format';
+
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
-import { toast } from '@/shared/ui/toast/toast.store';
+import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoGrid, type InfoGridItem } from '@/shared/ui/InfoGrid';
 import { OpsConfirm } from '@/shared/ui/OpsConfirm';
+import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { Select } from '@/shared/ui/Select';
 import { StatCard, type StatCardData } from '@/shared/ui/StatCard';
 import { Tabs } from '@/shared/ui/Tabs';
+import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
+
+import {
+  opsBillingForHospitalPath,
+  opsOnboardingCasePath,
+  opsOnboardingPath,
+  opsPath,
+} from '@/app/router/paths';
 
 import { BillingHospitalCard } from '@/features/ops-billing/presentation/components/BillingHospitalCard';
+import { ChangeSubscriptionModal } from '@/features/ops-billing/presentation/components/ChangeSubscriptionModal';
 import { LogsHospitalActivityCard } from '@/features/ops-logs/presentation/components/LogsHospitalActivityCard';
 import { OpsSettlementsHospitalCard } from '@/features/ops-settlements/presentation/components/OpsSettlementsHospitalCard';
 import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
-import { useReinstateHospitalMutation } from '@/features/ops-hospitals/application/queries/useReinstateHospitalMutation';
-import { useSuspendHospitalMutation } from '@/features/ops-hospitals/application/queries/useSuspendHospitalMutation';
-import { HospitalCommercialTermsCard } from '@/features/ops-hospitals/presentation/components/HospitalCommercialTermsCard';
-import { HospitalEditProfileModal } from '@/features/ops-hospitals/presentation/components/HospitalEditProfileModal';
-import { HospitalPatientAccessCard } from '@/features/ops-hospitals/presentation/components/HospitalPatientAccessCard';
-import { longDateFromTimestamp } from '@/features/ops-hospitals/presentation/components/hospitals.dates';
 import type {
+  HospitalSuspendReason,
   HospitalUsageMeter,
   PlatformHospitalDetail,
 } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
-
+import { useReinstateHospitalMutation } from '@/features/ops-hospitals/application/queries/useReinstateHospitalMutation';
+import { useSuspendHospitalMutation } from '@/features/ops-hospitals/application/queries/useSuspendHospitalMutation';
+import { FirstAdminInvitationCard } from '@/features/ops-hospitals/presentation/components/FirstAdminInvitationCard';
+import { HospitalBankAccountsCard } from '@/features/ops-hospitals/presentation/components/HospitalBankAccountsCard';
+import { HospitalCommercialTermsCard } from '@/features/ops-hospitals/presentation/components/HospitalCommercialTermsCard';
+import { HospitalEditProfileModal } from '@/features/ops-hospitals/presentation/components/HospitalEditProfileModal';
+import { HospitalNumberingCard } from '@/features/ops-hospitals/presentation/components/HospitalNumberingCard';
+import { HospitalPatientAccessCard } from '@/features/ops-hospitals/presentation/components/HospitalPatientAccessCard';
+import { HospitalTokenPolicyCard } from '@/features/ops-hospitals/presentation/components/HospitalTokenPolicyCard';
+import { longDateFromTimestamp } from '@/features/ops-hospitals/presentation/components/hospitals.dates';
 import {
   GO_LIVE_BLOCKER_FALLBACK,
   GO_LIVE_BLOCKER_LABEL,
-  HOSPITAL_STATUS_VIEW,
   ONBOARDING_STAGE_VIEW,
+  SUSPEND_REASON_OPTIONS,
   SUSPENSION_REASON_LABEL,
+  hospitalStatusView,
   isHospitalPending,
+  isRejectedApplication,
+  reactivateCopy,
+  suspendCopy,
 } from '@/features/ops-hospitals/presentation/components/hospitals.view';
 
 /** Which dialog is open. */
-type DetailModal = 'suspend' | 'unsuspend' | 'edit' | null;
+type DetailModal = 'suspend' | 'unsuspend' | 'edit' | 'plan' | null;
 
-const TABS = ['Overview', 'Billing & Settlements', 'Activity'] as const;
+const TAB_OVERVIEW = 'Overview';
+const TAB_BILLING = 'Billing & Settlements';
+const TAB_SETUP = 'Numbering & Tokens';
+const TAB_ACTIVITY = 'Activity';
 
 /** Storage usage arrives in bytes; plan limits are whole GB (backend `limits.GB`). */
 const BYTES_PER_GB = 1024 ** 3;
 
-/** A suspension applied from this page is recorded as a manual review. */
-const MANUAL_SUSPENSION_NOTE = 'Suspended from the hospital profile by operations.';
-
-/** Shown where the platform API has no value for a field. */
-const NOT_AVAILABLE = 'Not available on the platform yet';
+/** The suspension note the backend accepts (`PlatformHospitalSuspendSerializer`). */
+const SUSPEND_NOTE_MAX = 2000;
 
 const ACTION_FAILED_MESSAGE = 'That did not go through. Please try again.';
 
@@ -75,18 +94,26 @@ function usageSub(meter: HospitalUsageMeter | undefined, noun: string): string {
 
 const gb = (bytes: number): string => `${(bytes / BYTES_PER_GB).toFixed(1)} GB`;
 
+/** The masked primary payout account, as one line for the profile grid. */
+function payoutAccountCopy(h: PlatformHospitalDetail): string {
+  if (h.bankAccounts === null) return 'See Billing & Settlements';
+  const primary = h.bankAccounts.find((a) => a.isPrimary);
+  if (!primary) return 'No payout account yet';
+  return `${primary.bankName} ${primary.accountNumberMasked}${primary.verifiedAt ? ' · verified' : ' · not verified'}`;
+}
+
 /**
  * One hospital's platform profile (design `OpsHospitalDetail`): header and
- * lifecycle actions, suspension notice, profile, onboarding progress and plan
- * usage. Suspend / reactivate call their own action endpoints. Edit Profile
- * (`PATCH /platform/hospitals/{id}`), the patient-app switches
- * (`set-visibility`, `online_booking_enabled`) and the commercial terms
- * (`set-commission`, `set-convenience-fee`) keep a live hospital correct.
+ * lifecycle actions, suspension notice, profile, onboarding progress, the
+ * first administrator and plan usage. Suspend (with a reason, UAT-58) and
+ * reactivate call their own action endpoints. Edit Profile, the patient-app
+ * switches and the commercial terms keep a live hospital correct; "Manage
+ * Plan" changes this hospital's subscription with proration (10·R9).
  *
- * Approve, reject and the KYC review belong to the onboarding pipeline (P3);
- * a pending hospital is sent there. Departments, doctors and bookings have no
- * platform endpoint. Invoices, payments, settlements and activity are this
- * hospital's latest rows from the billing, settlements and logs modules.
+ * Every tab, card and button is shown only to roles whose permission its
+ * endpoint enforces (UAT-59, SEC-05): billing tables need `billing.view`,
+ * settlements `settlements.view`, activity `logs.view`, numbering and token
+ * policy `hospitals.edit`, the onboarding link `onboarding.view`.
  */
 interface HospitalProfileProps {
   h: PlatformHospitalDetail;
@@ -94,34 +121,64 @@ interface HospitalProfileProps {
 
 export function HospitalProfile({ h }: HospitalProfileProps) {
   const navigate = useNavigate();
+  const { can } = useOpsPermission();
   const plansQuery = usePlansQuery();
   const suspendMutation = useSuspendHospitalMutation();
   const reinstateMutation = useReinstateHospitalMutation();
   // SEC-05: suspending, reactivating and editing a hospital need hospitals.edit.
-  const canEditHospital = useOpsPermission().can('hospitals.edit');
+  const canEditHospital = can('hospitals.edit');
+  const canBillingView = can('billing.view');
+  const canSettlementsView = can('settlements.view');
+  const canOnboarding = can('onboarding.view');
 
   const [modal, setModal] = useState<DetailModal>(null);
-  const [tab, setTab] = useState<string>('Overview');
+  const [tab, setTab] = useState<string>(TAB_OVERVIEW);
+  const [suspendReason, setSuspendReason] = useState<HospitalSuspendReason>('manual');
+  const [suspendNote, setSuspendNote] = useState('');
 
   const plan = h.subscription
     ? (plansQuery.data?.find((p) => p.id === h.subscription?.planId) ?? null)
     : null;
   const planLabel = h.subscription
-    ? (plan?.name ?? h.subscription.planCode)
+    ? (h.subscription.planName ?? plan?.name ?? h.subscription.planCode ?? 'Current plan')
     : 'No active subscription';
-  const [statusBadge, statusLabel] = HOSPITAL_STATUS_VIEW[h.status];
+  const isYearly = h.subscription?.billingPeriod === 'yearly';
+  const planPrice = plan ? (isYearly ? plan.priceYearly : plan.priceMonthly) : null;
+  const [statusBadge, statusLabel] = hospitalStatusView({
+    status: h.status,
+    suspensionReason: h.activeSuspensions[0]?.reason ?? null,
+    onboardingStage: h.onboarding?.stage ?? null,
+  });
   const isPending = isHospitalPending(h.status);
   const isSuspended = h.status === 'suspended';
+  const isRejected = isRejectedApplication(h);
   const suspension = h.activeSuspensions[0] ?? null;
   const location = `${h.city}${h.state ? `, ${h.state}` : ''}`;
   const stage = h.onboarding ? ONBOARDING_STAGE_VIEW[h.onboarding.stage] : null;
+  const caseId = h.onboarding?.id ?? null;
+  const onboardingHref = caseId ? opsOnboardingCasePath(caseId) : opsOnboardingPath();
+  const adminAccepted = !h.goLiveBlockers.some((b) => b.code === 'no_admin_accepted');
+
+  const tabs = [
+    TAB_OVERVIEW,
+    TAB_BILLING,
+    ...(canEditHospital ? [TAB_SETUP] : []),
+    ...(can('logs.view') ? [TAB_ACTIVITY] : []),
+  ];
+  const activeTab = tabs.includes(tab) ? tab : TAB_OVERVIEW;
 
   const failToast = (error: unknown) =>
     toast(isFailure(error) ? error.message : ACTION_FAILED_MESSAGE, 'error');
 
+  const openSuspend = () => {
+    setSuspendReason('manual');
+    setSuspendNote('');
+    setModal('suspend');
+  };
+
   const handleSuspend = () =>
     suspendMutation.mutate(
-      { id: h.id, reason: 'manual', note: MANUAL_SUSPENSION_NOTE },
+      { id: h.id, reason: suspendReason, note: suspendNote.trim() || null },
       {
         onSuccess: () => {
           toast(`${h.name} suspended.`, 'success');
@@ -145,7 +202,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
       icon: 'users',
       label: 'Active Staff',
       value: h.staffCount.toLocaleString('en-IN'),
-      sub: 'Doctors, staff and admins',
+      sub: 'Staff and admin sign-ins (doctors do not sign in)',
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
     },
@@ -179,15 +236,16 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
     { k: 'Email', v: h.email },
     { k: 'Phone', v: h.phone, num: true },
     { k: 'Location', v: location },
+    { k: 'Time zone', v: h.timezone ?? '—' },
     { k: 'Plan', v: planLabel },
+    { k: 'Subscription', v: h.subscription ? h.subscription.status.replace('_', ' ') : '—' },
     { k: 'Onboarded', v: longDateFromTimestamp(h.createdAt) },
     { k: 'Live Since', v: h.goLiveAt ? longDateFromTimestamp(h.goLiveAt) : 'Not live yet' },
     { k: 'Instance ID', v: h.slug, num: true },
     { k: 'Legal Name', v: h.legalName || '—' },
     { k: 'GSTIN', v: h.gstin || 'Not on file', num: Boolean(h.gstin) },
     { k: 'Registration No.', v: h.registrationNo || 'Not on file' },
-    { k: 'Payout Account', v: NOT_AVAILABLE },
-    { k: 'Payment Grace', v: NOT_AVAILABLE },
+    { k: 'Payout Account', v: payoutAccountCopy(h) },
     ...(suspension
       ? [
           { k: 'Suspended Since', v: longDateFromTimestamp(suspension.suspendedAt) },
@@ -219,22 +277,21 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
                 Edit Profile
               </Button>
             )}
-            {isPending ? (
-              <Button icon="rocket" onClick={() => navigate(opsOnboardingPath())}>
-                Review in Onboarding
+            {(isPending || isRejected) && canOnboarding && (
+              <Button icon="rocket" onClick={() => navigate(onboardingHref)}>
+                {isRejected ? 'Re-open in Onboarding' : 'Review in Onboarding'}
               </Button>
-            ) : h.status === 'closed' ? null : (
-              <>
-                {canEditHospital && (
-                  <Button
-                    variant={isSuspended ? 'secondary' : 'danger'}
-                    onClick={() => setModal(isSuspended ? 'unsuspend' : 'suspend')}
-                  >
-                    {isSuspended ? 'Reactivate Instance' : 'Suspend Instance'}
-                  </Button>
-                )}
-                <Button onClick={() => navigate(opsPath('plans'))}>Manage Plan</Button>
-              </>
+            )}
+            {!isPending && !isRejected && h.status !== 'closed' && canEditHospital && (
+              <Button
+                variant={isSuspended ? 'secondary' : 'danger'}
+                onClick={() => (isSuspended ? setModal('unsuspend') : openSuspend())}
+              >
+                {isSuspended ? 'Reactivate Instance' : 'Suspend Instance'}
+              </Button>
+            )}
+            {h.subscription && h.status !== 'closed' && can('billing.edit') && (
+              <Button onClick={() => setModal('plan')}>Manage Plan</Button>
             )}
           </div>
         </div>
@@ -248,19 +305,27 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
             </div>
             <div className="min-w-50 flex-1">
               <div className="text-body text-text-strong font-medium">
-                Suspended
-                {suspension ? ` — ${SUSPENSION_REASON_LABEL[suspension.reason].toLowerCase()}` : ''}
+                {isRejected ? 'Application rejected' : 'Suspended'}
+                {suspension && !isRejected
+                  ? ` — ${SUSPENSION_REASON_LABEL[suspension.reason].toLowerCase()}`
+                  : ''}
               </div>
               {suspension && (
                 <div className="text-caption text-text-muted">
                   Since {longDateFromTimestamp(suspension.suspendedAt)}
+                  {suspension.note ? ` · ${suspension.note}` : ''}
                 </div>
               )}
+              {isRejected && h.onboarding?.rejectionReason && (
+                <div className="text-caption text-text-muted">{h.onboarding.rejectionReason}</div>
+              )}
               <div className="text-caption text-text-muted mt-1">
-                Staff cannot sign in and patients cannot book while this is in force.
+                {isRejected
+                  ? 'The hospital stays suspended until its onboarding case is re-opened. Its staff can sign in and read, but every change is refused.'
+                  : 'Staff can still sign in and view their records, but every change is refused and patients cannot book while this is in force.'}
               </div>
             </div>
-            {canEditHospital && (
+            {!isRejected && canEditHospital && (
               <Button size="sm" variant="secondary" onClick={() => setModal('unsuspend')}>
                 Lift Suspension
               </Button>
@@ -270,38 +335,50 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
       )}
 
       <Card pad={14}>
-        <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
+        <Tabs tabs={tabs} value={activeTab} onChange={setTab} ariaLabel="Hospital profile" />
       </Card>
 
-      {tab === 'Overview' && (
+      {activeTab === TAB_OVERVIEW && (
         <>
           <InfoGrid items={infoItems} />
           <HospitalPatientAccessCard h={h} />
+          {(isPending || h.firstAdminInvitation !== null) && (
+            <FirstAdminInvitationCard
+              hospitalId={h.id}
+              hospitalName={h.name}
+              invitation={h.firstAdminInvitation}
+              adminAccepted={adminAccepted}
+            />
+          )}
           <Card>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5">
                 <SectionTitle>Verification &amp; KYC</SectionTitle>
                 {stage && <Badge status={stage[0]}>{stage[1]}</Badge>}
               </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="rocket"
-                onClick={() => navigate(opsOnboardingPath())}
-              >
-                Review in Onboarding
-              </Button>
+              {canOnboarding && h.onboarding && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="rocket"
+                  onClick={() => navigate(onboardingHref)}
+                >
+                  Review in Onboarding
+                </Button>
+              )}
             </div>
             <div className="text-caption text-text-muted mb-3.5">
               {!h.onboarding
                 ? 'This hospital has no onboarding case.'
-                : h.goLiveBlockers.length > 0
-                  ? 'Documents are reviewed one by one on the onboarding pipeline. These items still block go-live:'
-                  : isPending
-                    ? 'Nothing is blocking go-live. Approve the instance on the onboarding pipeline.'
-                    : 'Onboarding is complete.'}
+                : isRejected
+                  ? 'The application was rejected. Re-open the case on the onboarding pipeline to continue.'
+                  : h.goLiveBlockers.length > 0
+                    ? 'Documents are reviewed one by one on the onboarding pipeline. These items still block go-live:'
+                    : isPending
+                      ? 'Nothing is blocking go-live. Approve the instance on the onboarding pipeline.'
+                      : 'Onboarding is complete.'}
             </div>
-            {h.goLiveBlockers.length > 0 && (
+            {h.goLiveBlockers.length > 0 && !isRejected && (
               <ul className="flex list-none flex-col gap-1.5 p-0">
                 {h.goLiveBlockers.map((b) => (
                   <li key={b.code} className="text-body text-text-body flex items-start gap-2">
@@ -311,7 +388,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
                       {b.details.length > 0 && (
                         <span className="text-caption text-text-muted">
                           {' '}
-                          ({b.details.join(', ')})
+                          ({b.details.map((d) => d.replace(/_/g, ' ')).join(', ')})
                         </span>
                       )}
                     </span>
@@ -328,7 +405,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
         </>
       )}
 
-      {tab === 'Billing & Settlements' && (
+      {activeTab === TAB_BILLING && (
         <>
           <Card pad={16} className="flex flex-wrap items-center gap-3.5">
             <div className="bg-blue-soft-bg text-text-navy flex size-10 flex-none items-center justify-center rounded-md">
@@ -337,16 +414,17 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
             <div className="min-w-50 flex-1">
               <div className="text-body text-text-strong font-medium">
                 {planLabel}
-                {plan && (
+                {planPrice !== null && (
                   <>
                     {' '}
-                    · <span className="tabular-nums">{money(plan.priceMonthly)}</span>/mo
+                    · <span className="tabular-nums">{money(planPrice)}</span>
+                    {isYearly ? '/yr' : '/mo'}
                   </>
                 )}
               </div>
               <div className="text-caption text-text-muted">
                 {h.subscription
-                  ? `${h.subscription.status} · billed ${h.subscription.billingPeriod}${
+                  ? `${h.subscription.status.replace('_', ' ')} · billed ${h.subscription.billingPeriod}${
                       h.subscription.currentPeriodEnd
                         ? ` · period ends ${longDateFromTimestamp(h.subscription.currentPeriodEnd)}`
                         : ''
@@ -354,48 +432,94 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
                   : 'This hospital has no current subscription.'}
               </div>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => navigate(opsPath('plans'))}>
-              Plan Catalog
-            </Button>
+            {canBillingView && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => navigate(opsBillingForHospitalPath(h.id))}
+              >
+                Open billing
+              </Button>
+            )}
+            {can('plans.view') && (
+              <Button size="sm" variant="secondary" onClick={() => navigate(opsPath('plans'))}>
+                Plan Catalog
+              </Button>
+            )}
           </Card>
           <HospitalCommercialTermsCard h={h} />
-          <BillingHospitalCard hospitalId={h.id} />
-          <OpsSettlementsHospitalCard hospitalId={h.id} />
+          {canBillingView && <HospitalBankAccountsCard hospitalId={h.id} />}
+          {canBillingView && <BillingHospitalCard hospitalId={h.id} />}
+          {canSettlementsView && <OpsSettlementsHospitalCard hospitalId={h.id} />}
         </>
       )}
 
-      {tab === 'Activity' && <LogsHospitalActivityCard hospitalId={h.id} />}
+      {activeTab === TAB_SETUP && canEditHospital && (
+        <>
+          <HospitalNumberingCard hospitalId={h.id} />
+          <HospitalTokenPolicyCard hospitalId={h.id} />
+        </>
+      )}
+
+      {activeTab === TAB_ACTIVITY && <LogsHospitalActivityCard hospitalId={h.id} />}
 
       {modal === 'edit' && <HospitalEditProfileModal h={h} onClose={() => setModal(null)} />}
+      {modal === 'plan' && h.subscription && (
+        <ChangeSubscriptionModal
+          subscriptionId={h.subscription.id}
+          hospitalName={h.name}
+          onClose={() => setModal(null)}
+        />
+      )}
       <OpsConfirm
         open={modal === 'suspend'}
         onClose={() => setModal(null)}
         icon="ban"
         tone="danger"
         title="Suspend this hospital?"
-        body={`${h.name}'s staff lose access to Medibook immediately and patients can no longer book appointments there. Existing bookings are kept. Reactivation is a separate action.`}
+        body={suspendCopy(h.name)}
         summary={[
           { k: 'Hospital', v: h.name },
           { k: 'Plan', v: planLabel },
           { k: 'Active staff', v: h.staffCount.toLocaleString('en-IN'), num: true },
-          { k: 'Reason recorded', v: SUSPENSION_REASON_LABEL.manual },
         ]}
         confirmLabel={suspendMutation.isPending ? 'Suspending…' : 'Suspend Instance'}
         confirmVariant="danger"
         busy={suspendMutation.isPending}
         onConfirm={handleSuspend}
-      />
+      >
+        <div className="flex w-full flex-col gap-3 text-left">
+          <OpsField label="Reason">
+            <Select
+              value={SUSPENSION_REASON_LABEL[suspendReason]}
+              options={SUSPEND_REASON_OPTIONS.map((r) => SUSPENSION_REASON_LABEL[r])}
+              onChange={(label) =>
+                setSuspendReason(
+                  SUSPEND_REASON_OPTIONS.find((r) => SUSPENSION_REASON_LABEL[r] === label) ??
+                    suspendReason,
+                )
+              }
+              height={44}
+            />
+          </OpsField>
+          <OpsField label="Note (kept on the record)">
+            <TextInput
+              value={suspendNote}
+              onChange={setSuspendNote}
+              maxLength={SUSPEND_NOTE_MAX}
+              placeholder="e.g. Licence lapsed — awaiting renewal certificate"
+              height={44}
+            />
+          </OpsField>
+        </div>
+      </OpsConfirm>
       <OpsConfirm
         open={modal === 'unsuspend'}
         onClose={() => setModal(null)}
         icon="circle-check"
         tone="success"
         title="Reactivate this hospital?"
-        body={`${h.name} regains access immediately and can take new bookings right away.${
-          suspension?.reason === 'non_payment' || suspension?.reason === 'non_payment_read_only'
-            ? ' Its unpaid invoice stays unpaid — record the payment on the invoice as well.'
-            : ''
-        }`}
+        body={reactivateCopy(h)}
         confirmLabel={reinstateMutation.isPending ? 'Reactivating…' : 'Reactivate'}
         busy={reinstateMutation.isPending}
         onConfirm={handleReinstate}

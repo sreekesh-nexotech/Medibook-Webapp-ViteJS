@@ -24,7 +24,10 @@ import { clientFailure } from '@/core/error/toFailure';
  * token is the active surface's (see `sharedApi`).
  */
 
-/** The presigned PUT is valid for 5 minutes; give a slow upload all of it. */
+/**
+ * The presigned PUT must *start* within 2 minutes (B6, M-38); the transfer
+ * itself may take longer on a slow line, so allow it 5.
+ */
 const STORAGE_PUT_TIMEOUT_MS = 5 * 60_000;
 
 const BYTES_PER_MB = 1024 * 1024;
@@ -82,13 +85,22 @@ export async function uploadFile(input: FileUploadInput): Promise<Result<StoredF
   if (refused) return err(refused);
 
   return attempt(async () => {
+    // The server requires the checksum and storage verifies the bytes
+    // against it (B6, M-38); WebCrypto exists only on secure origins.
     const sha256 = await sha256Hex(input.file);
+    if (sha256 === null) {
+      throw clientFailure(
+        'validation',
+        'Files can only be uploaded over a secure (https) connection.',
+        'INSECURE_ORIGIN',
+      );
+    }
     const created = await sharedApi.post('/files/uploads', {
       purpose: input.purpose,
       mime,
       size_bytes: input.file.size,
       original_name: input.file.name,
-      ...(sha256 ? { sha256 } : {}),
+      sha256,
       ...(input.hospitalId ? { hospital_id: input.hospitalId } : {}),
     });
     const ticket = uploadTicketResponseSchema.parse(created.data);

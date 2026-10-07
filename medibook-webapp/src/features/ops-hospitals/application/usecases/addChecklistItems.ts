@@ -13,9 +13,13 @@ export async function addChecklistItems(
   codes: readonly string[],
 ): Promise<Result<null>> {
   for (const code of codes) {
-    const result = await onboardingRepository.updateChecklistItem(caseId, code, {
-      status: 'pending',
-    });
+    // A code not on the checklist yet has no row, so no version to send.
+    const result = await onboardingRepository.updateChecklistItem(
+      caseId,
+      code,
+      { status: 'pending' },
+      null,
+    );
     if (!result.ok) return result;
   }
   return ok(null);

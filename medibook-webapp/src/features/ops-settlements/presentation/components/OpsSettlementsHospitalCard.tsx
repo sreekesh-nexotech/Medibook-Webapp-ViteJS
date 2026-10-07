@@ -7,12 +7,13 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import { opsPath } from '@/app/router/paths';
+import { opsSettlementsForHospitalPath } from '@/app/router/paths';
 
 import { useSettlementPeriodsQuery } from '@/features/ops-settlements/application/queries/useSettlementPeriodsQuery';
-import type {
-  PeriodFilter,
-  SettlementPeriodStatus,
+import {
+  STATEMENT_PERIOD_STATUSES,
+  type PeriodFilter,
+  type SettlementPeriodStatus,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 
 /** Periods shown, newest first; Hospital Settlements has the full queue. */
@@ -22,7 +23,7 @@ const COLUMNS = ['Period', 'Gross', 'Commission', 'Net Payable', 'Status'] as co
 
 /** [badge status, label] per period status. */
 const PERIOD_STATUS_VIEW: Readonly<Record<SettlementPeriodStatus, readonly [string, string]>> = {
-  open: ['Pending', 'Accruing'],
+  open: ['Pending', 'Open'],
   closed: ['Pending', 'Payable'],
   paid: ['Paid', 'Paid out'],
   on_hold: ['Overdue', 'On hold'],
@@ -36,7 +37,8 @@ interface OpsSettlementsHospitalCardProps {
 export function OpsSettlementsHospitalCard({ hospitalId }: OpsSettlementsHospitalCardProps) {
   const navigate = useNavigate();
   const filter: PeriodFilter = {
-    statuses: ['open', 'closed', 'paid', 'on_hold'],
+    // Closed periods only: nothing accrues (decision 11).
+    statuses: STATEMENT_PERIOD_STATUSES,
     dateFrom: null,
     dateTo: null,
     hospitalId,
@@ -58,7 +60,7 @@ export function OpsSettlementsHospitalCard({ hospitalId }: OpsSettlementsHospita
         <SectionTitle>Settlements</SectionTitle>
         <button
           type="button"
-          onClick={() => navigate(opsPath('settlements'))}
+          onClick={() => navigate(opsSettlementsForHospitalPath(hospitalId))}
           className="text-body text-blue cursor-pointer border-none bg-transparent p-0"
         >
           Open hospital settlements

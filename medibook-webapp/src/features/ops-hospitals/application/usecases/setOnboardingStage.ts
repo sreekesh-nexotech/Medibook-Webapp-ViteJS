@@ -9,6 +9,7 @@ import { onboardingRepository } from '@/features/ops-hospitals/infrastructure/re
 export function setOnboardingStage(
   caseId: string,
   stage: ManualOnboardingStage,
+  version: number | null,
 ): Promise<Result<OnboardingCaseDetail>> {
-  return onboardingRepository.setStage(caseId, stage);
+  return onboardingRepository.setStage(caseId, stage, version);
 }

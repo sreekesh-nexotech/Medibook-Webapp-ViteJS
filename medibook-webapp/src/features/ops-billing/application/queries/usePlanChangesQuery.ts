@@ -7,9 +7,10 @@ import { BILLING_STALE_TIME_MS } from '@/features/ops-billing/application/querie
 import { billingKeys } from '@/features/ops-billing/application/queries/billing.keys';
 import { fetchPlanChanges } from '@/features/ops-billing/application/usecases/fetchPlanChanges';
 
-/** Hospitals' plan-change requests, newest first. */
-export function usePlanChangesQuery(params: PlanChangeListParams) {
+/** Hospitals' plan-change requests, newest first. Readable with `billing.view` (decision 13). */
+export function usePlanChangesQuery(params: PlanChangeListParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: billingKeys.planChanges(params),
     queryFn: async () => unwrap(await fetchPlanChanges(params)),
     placeholderData: keepPreviousData,

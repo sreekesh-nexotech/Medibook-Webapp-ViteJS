@@ -35,3 +35,22 @@ export function deviceLabel(userAgent: string | null): string {
   if (browser && system) return `${browser} on ${system}`;
   return browser ?? system ?? 'Unknown device';
 }
+
+const MS_PER_MINUTE = 60_000;
+
+/**
+ * Whether a device's session has already ended from inactivity: the server
+ * refuses a session once `last_seen_at + idle limit` has passed
+ * (`accounts/authentication.py`), so listing it would offer to sign out a
+ * ghost (UAT-69). The backend drops these itself once BE-21 lands; this keeps
+ * the list honest meanwhile. This browser's own session is never hidden.
+ */
+export function isIdleExpired(
+  session: { readonly lastSeenAt: string; readonly current: boolean },
+  idleMinutes: number,
+  now: number = Date.now(),
+): boolean {
+  if (session.current) return false;
+  const lastSeen = new Date(session.lastSeenAt).getTime();
+  return Number.isFinite(lastSeen) && lastSeen + idleMinutes * MS_PER_MINUTE <= now;
+}

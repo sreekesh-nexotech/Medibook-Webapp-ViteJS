@@ -10,6 +10,7 @@ export function updateChecklistItem(
   caseId: string,
   code: string,
   update: ChecklistUpdate,
+  version: number | null,
 ): Promise<Result<ChecklistItem>> {
-  return onboardingRepository.updateChecklistItem(caseId, code, update);
+  return onboardingRepository.updateChecklistItem(caseId, code, update, version);
 }

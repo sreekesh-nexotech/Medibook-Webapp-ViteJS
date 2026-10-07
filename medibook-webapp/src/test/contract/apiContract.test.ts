@@ -301,6 +301,29 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
   payoutPageResponseSchema: 'New in wave 1 — record against the merged backend.',
   creditNotePageResponseSchema: 'New in wave 1 — record against the merged backend.',
+  statementPdfLinkSchema: 'Reading it renders and stores the statement PDF (SET-02).',
+  // New to the web app in fe/f4 (shells, ops hospitals, billing, plans, settlements). The
+  // recorder's SPEC lists each one; record against the merged backend at integration (several
+  // come from the B4 / B9 contracts and are not served by the recorded backend yet).
+  hospitalAlertFeedResponseSchema:
+    'Not yet recorded: GET /hospital/notifications (B9 DASH-03; the bell falls back without it).',
+  paymentSchema: 'Not yet recorded: GET /platform/billing/payments/{id} (B4 BE-28).',
+  billingSummarySchema: 'Not yet recorded: GET /platform/billing/summary (B4 BE-28).',
+  subscriptionPageSchema:
+    'Not yet recorded: GET /platform/billing/subscriptions (SubscriptionSerializer).',
+  prorationPreviewSchema:
+    'Not yet recorded: GET /platform/billing/subscriptions/{id}/proration-preview (B4).',
+  numberingSeriesResponseSchema:
+    'Not yet recorded: GET /platform/hospitals/{id}/numbering/{kind} (NumberingSeriesSerializer).',
+  commissionHistoryResponseSchema:
+    'Not yet recorded: GET /platform/hospitals/{id}/commission-history (B4 API-01).',
+  payoutBankAccountPageResponseSchema:
+    'Not yet recorded: GET /platform/hospitals/{id}/bank-accounts (B4 M-45).',
+  subscriberRowsPageSchema:
+    'Not yet recorded: GET /platform/plans/{id}/subscribers rows (SubscriptionSerializer).',
+  periodDetailResponseSchema:
+    'Not yet recorded: GET /platform/settlements/periods/{id} (B4 BE-27 breakdown).',
+  payoutPageResponseSchema: 'Not yet recorded: GET /platform/settlements/payouts (B4 BE-27).',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

@@ -20,10 +20,13 @@ import { useRevokeSessionMutation } from '@/features/profile/application/queries
 import {
   deviceLabel,
   formatDateTime,
+  isIdleExpired,
 } from '@/features/profile/presentation/components/profileFormat';
 
 interface ProfileSessionsCardProps {
   surface: AuthSurface;
+  /** The idle limit; sessions idle longer than this are already over. */
+  idleMinutes: number;
   /** After "sign out everywhere" — this browser is signed out too. */
   onSignedOut: () => void;
 }
@@ -32,8 +35,13 @@ interface ProfileSessionsCardProps {
  * Where the user is signed in on this surface, with per-device sign-out and
  * "sign out everywhere". Loading, error (retry), empty and list states.
  */
-export function ProfileSessionsCard({ surface, onSignedOut }: ProfileSessionsCardProps) {
+export function ProfileSessionsCard({
+  surface,
+  idleMinutes,
+  onSignedOut,
+}: ProfileSessionsCardProps) {
   const sessions = useActiveSessionsQuery(surface);
+  const live = sessions.data?.filter((s) => !isIdleExpired(s, idleMinutes)) ?? [];
   const revoke = useRevokeSessionMutation();
   const everywhere = useLogoutEverywhereMutation();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -74,7 +82,7 @@ export function ProfileSessionsCard({ surface, onSignedOut }: ProfileSessionsCar
         onRetry={() => void sessions.refetch()}
       />
     );
-  } else if (sessions.data.length === 0) {
+  } else if (live.length === 0) {
     body = (
       <EmptyState
         compact
@@ -86,7 +94,7 @@ export function ProfileSessionsCard({ surface, onSignedOut }: ProfileSessionsCar
   } else {
     body = (
       <ul className="divide-border-soft divide-y">
-        {sessions.data.map((s) => (
+        {live.map((s) => (
           <li key={s.id} className="flex flex-wrap items-center gap-3 py-3">
             <div className="bg-bg-subtle text-text-muted flex size-9 items-center justify-center rounded-md">
               <Icon name="smartphone" size={18} />

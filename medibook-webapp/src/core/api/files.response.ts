@@ -30,7 +30,11 @@ export const storedFileResponseSchema = z.object({
   version: z.number().int(),
 });
 
-/** `POST /shared/files/uploads` → 201: the pending row plus a presigned PUT (5 min). */
+/**
+ * `POST /shared/files/uploads` → 201: the pending row plus a presigned PUT
+ * (start it within 2 minutes) and the headers — including
+ * `x-amz-checksum-sha256` — the PUT must send verbatim (B6).
+ */
 export const uploadTicketResponseSchema = z.object({
   file_id: z.string(),
   upload_url: z.string().min(1),

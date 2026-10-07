@@ -25,8 +25,9 @@ interface RejectDocumentModalProps {
 /**
  * Collect the reason for a negative onboarding decision — sending one
  * checklist document back, or rejecting the whole application (audit SA-01
- * asks for a reason on every rejection). The reason is required because the
- * hospital is told it: a "no" with no explanation is not actionable.
+ * asks for a reason on every rejection). The reason is required and recorded
+ * on the case: a "no" with no explanation is not actionable. Medibook does not
+ * message the hospital about it (10·F18) — ops passes it on.
  */
 export function RejectDocumentModal({
   open,

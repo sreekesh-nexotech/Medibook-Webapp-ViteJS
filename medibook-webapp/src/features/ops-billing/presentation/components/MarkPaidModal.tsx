@@ -13,12 +13,11 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useMarkInvoicePaidMutation } from '@/features/ops-billing/application/queries/useMarkInvoicePaidMutation';
 import type {
   BillingInvoice,
-  PaymentMethod,
+  ManualPaymentMethod,
 } from '@/features/ops-billing/domain/entities/billing.entities';
 import {
   METHOD_LABELS,
   failureText,
-  fromLabel,
   outstandingPaise,
   rupees,
 } from '@/features/ops-billing/presentation/components/billingView';
@@ -28,14 +27,19 @@ const REFERENCE_MAX_LENGTH = 200;
 const MARK_PAID_FAILED = 'The payment could not be recorded. Please try again.';
 
 /** Order the modes the way ops collects off-gateway money most often. */
-const METHOD_ORDER: readonly PaymentMethod[] = ['bank_transfer', 'manual', 'razorpay'];
+const METHOD_ORDER: readonly ManualPaymentMethod[] = ['bank_transfer', 'manual', 'razorpay'];
 
 /** Placeholder per mode, so ops knows which reference to paste. */
-const REFERENCE_PLACEHOLDER: Readonly<Record<PaymentMethod, string>> = {
+const REFERENCE_PLACEHOLDER: Readonly<Record<ManualPaymentMethod, string>> = {
   bank_transfer: 'UTR, e.g. HDFCN52026061300123',
   manual: 'Cheque no., receipt no. or UPI reference',
   razorpay: 'Razorpay payment id, e.g. pay_29QQoUBi66xm2f',
 };
+
+/** The manual method a picked label names (a credit note is never recorded by hand). */
+function manualMethodOf(label: string): ManualPaymentMethod {
+  return METHOD_ORDER.find((m) => METHOD_LABELS[m] === label) ?? 'bank_transfer';
+}
 
 interface MarkPaidForm {
   method: string;
@@ -83,7 +87,7 @@ export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
     },
     validate: validators,
     onSubmit: async (values) => {
-      const method = fromLabel(METHOD_LABELS, values.method) ?? 'bank_transfer';
+      const method = manualMethodOf(values.method);
       const amountPaise = Math.round(Number(values.amount) * PAISE_PER_RUPEE);
       try {
         const updated = await markPaid.mutateAsync({
@@ -111,7 +115,7 @@ export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
   });
 
   const { values } = form;
-  const method = fromLabel(METHOD_LABELS, values.method) ?? 'bank_transfer';
+  const method = manualMethodOf(values.method);
 
   return (
     <FormModal

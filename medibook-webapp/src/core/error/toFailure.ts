@@ -19,6 +19,34 @@ const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
 };
 
 /**
+ * Codes whose server sentence is replaced with one that says what still
+ * works. The tenant gate refuses every hospital write with these before RBAC
+ * runs (D-30, `subscriptions/services/gate.py`), so the user must not read
+ * them as a permission problem (UAT-38).
+ */
+export const HOSPITAL_WRITE_BLOCK_CODES = ['HOSPITAL_READ_ONLY', 'HOSPITAL_SUSPENDED'] as const;
+
+export type HospitalWriteBlockCode = (typeof HOSPITAL_WRITE_BLOCK_CODES)[number];
+
+const CODE_MESSAGES: Readonly<Record<HospitalWriteBlockCode, string>> = {
+  HOSPITAL_READ_ONLY:
+    "This hospital is read-only until its Medibook subscription is paid. You can still view everything; changes can't be saved.",
+  HOSPITAL_SUSPENDED:
+    "This hospital is suspended by Medibook operations. You can still view everything; changes can't be saved. Contact support@medibook.in.",
+};
+
+/** Whether `failure` is the tenant gate refusing a write (read-only or suspended hospital). */
+export function isHospitalWriteBlock(failure: Failure): boolean {
+  return (HOSPITAL_WRITE_BLOCK_CODES as readonly (string | null)[]).includes(failure.code);
+}
+
+function codeMessage(code: string | undefined): string | undefined {
+  return code !== undefined && code in CODE_MESSAGES
+    ? CODE_MESSAGES[code as HospitalWriteBlockCode]
+    : undefined;
+}
+
+/**
  * The backend's single error envelope `{code, message, errors, request_id,
  * meta}` (backend `core/exceptions.py`). Lenient: every field is optional so a
  * proxy's HTML error page still maps to a status-based failure.
@@ -129,7 +157,9 @@ export function toFailure(error: unknown): Failure {
     return failure(kind, {
       status: response.status,
       code: body.code ?? null,
-      message: !isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind],
+      message:
+        codeMessage(body.code) ??
+        (!isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind]),
       fieldErrors: toFieldErrors(body.errors),
       requestId: body.request_id ?? null,
       meta: body.meta ?? {},

@@ -1,6 +1,6 @@
 import { isFailure } from '@/core/error/failure';
 import { downloadFromUrl } from '@/shared/lib/download';
-import { addDaysISO, daysFromTodayISO, money } from '@/shared/lib/format';
+import { addDaysISO, daysFromTodayISO, money, toLocalISO } from '@/shared/lib/format';
 
 import {
   UNPAID_INVOICE_STATUSES,
@@ -13,6 +13,8 @@ import {
   type PaymentMethod,
   type PaymentStatus,
   type PlanChangeStatus,
+  type ReminderStatus,
+  type SubscriptionStatus,
 } from '@/features/ops-billing/domain/entities/billing.entities';
 
 /**
@@ -23,7 +25,11 @@ import {
 const PAISE_PER_RUPEE = 100;
 const BASIS_POINTS_PER_PERCENT = 100;
 
-/** The backend's grace window when neither the invoice nor the hospital sets one. */
+/**
+ * The seeded `platform_settings.default_grace_days`. Used only to project a
+ * window when the setting cannot be read (no `settings.view`); the projection
+ * is then labelled an estimate (11·F13).
+ */
 export const PLATFORM_GRACE_DAYS = 7;
 
 /** A failed `GET …/{id}.pdf` with this status means the server cannot render PDFs. */
@@ -60,9 +66,17 @@ export function fmtDateTime(iso: string | null): string {
   });
 }
 
-/** The local calendar date of an ISO date-time, for date-only columns. */
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The browser's calendar date of an ISO date-time, for date-only columns. The
+ * UTC prefix would put anything issued 00:00–05:30 IST on the day before
+ * (11·F6). A bare date passes through unchanged.
+ */
 export function dateOf(iso: string): string {
-  return iso.slice(0, 10);
+  if (ISO_DATE_ONLY.test(iso)) return iso;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : toLocalISO(d);
 }
 
 export const INVOICE_STATUS_BADGES: Readonly<Record<InvoiceStatus, BadgeSpec>> = {
@@ -93,6 +107,7 @@ export const METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {
   bank_transfer: 'Bank transfer',
   manual: 'Manual (cash / cheque / UPI)',
   razorpay: 'Razorpay',
+  credit_note: 'Credit note',
 };
 
 export const DUNNING_LABELS: Readonly<Record<DunningKind, string>> = {
@@ -108,6 +123,79 @@ export const DUNNING_LABELS: Readonly<Record<DunningKind, string>> = {
   retry_attempted: 'Retry attempted',
   voided: 'Voided',
 };
+
+/** Subscription status → pill (D-30 states included). */
+export const SUBSCRIPTION_STATUS_BADGES: Readonly<Record<SubscriptionStatus, BadgeSpec>> = {
+  trialing: { status: 'Info', label: 'Trial' },
+  active: { status: 'Active', label: 'Active' },
+  past_due: { status: 'Overdue', label: 'Past due' },
+  grace: { status: 'Warning', label: 'In grace' },
+  read_only: { status: 'Blocked', label: 'Read-only' },
+  cancelled: { status: 'Inactive', label: 'Cancelled' },
+};
+
+/** A status this build knows, else its raw value on a neutral pill. */
+export function subscriptionBadge(status: string): BadgeSpec {
+  return (
+    (SUBSCRIPTION_STATUS_BADGES as Readonly<Record<string, BadgeSpec | undefined>>)[status] ?? {
+      status: 'Inactive',
+      label: status,
+    }
+  );
+}
+
+/** Dunning event → what happened, for the timeline (the reminder labels are shorter). */
+export const DUNNING_TIMELINE_LABELS: Readonly<Record<DunningKind, string>> = {
+  reminder_queued: 'Reminder queued',
+  reminder_sent: 'Reminder sent',
+  grace_started: 'Grace period started',
+  grace_extended: 'Grace period changed',
+  suspended: 'Hospital suspended',
+  read_only: 'Hospital made read-only',
+  reinstated: 'Hospital reinstated',
+  marked_paid: 'Invoice marked paid',
+  retry_scheduled: 'Payment retry scheduled',
+  retry_attempted: 'Payment retried',
+  voided: 'Invoice voided',
+};
+
+/** Reminder delivery → pill (UAT-56). */
+export const REMINDER_STATUS_BADGES: Readonly<Record<ReminderStatus, BadgeSpec>> = {
+  none: { status: 'Inactive', label: 'None' },
+  queued: { status: 'Queued', label: 'Queued' },
+  sent: { status: 'Sent', label: 'Sent' },
+};
+
+/**
+ * Where an invoice's reminders stand. `reminder_status` (BE-28) says whether
+ * the last queued one reached the email provider; an older backend reports
+ * only the queued count, so nothing can be called Sent there.
+ */
+export function reminderSummary(
+  inv: Pick<
+    BillingInvoice,
+    'reminderStatus' | 'remindersSent' | 'lastReminderAt' | 'lastReminderSentAt'
+  >,
+): { readonly badge: BadgeSpec; readonly detail: string } {
+  const status: ReminderStatus = inv.reminderStatus ?? (inv.remindersSent > 0 ? 'queued' : 'none');
+  const queued = plural(inv.remindersSent, 'reminder');
+  if (status === 'sent') {
+    return {
+      badge: REMINDER_STATUS_BADGES.sent,
+      detail: `${queued} queued · last delivered ${fmtDateTime(inv.lastReminderSentAt)}`,
+    };
+  }
+  if (status === 'queued') {
+    return {
+      badge: REMINDER_STATUS_BADGES.queued,
+      detail:
+        inv.reminderStatus === null
+          ? `${queued} queued · last ${fmtDateTime(inv.lastReminderAt)}`
+          : `${queued} queued · last one ${fmtDateTime(inv.lastReminderAt)}, not delivered yet`,
+    };
+  }
+  return { badge: REMINDER_STATUS_BADGES.none, detail: 'No reminder queued' };
+}
 
 /** Pick the enum value whose label matches, or `null` for "All". */
 export function fromLabel<K extends string>(
@@ -136,12 +224,17 @@ export function canVoid(inv: Pick<BillingInvoice, 'status' | 'amountPaidPaise'>)
   return (inv.status === 'draft' || isUnpaid(inv)) && inv.amountPaidPaise === 0;
 }
 
+/** `1800` → "18%". */
+export function ratePercent(bp: number): string {
+  return `${bp / BASIS_POINTS_PER_PERCENT}%`;
+}
+
 /** "GST (18%)" from the lines' rates; "GST" when the lines disagree or carry none. */
 export function gstLabel(lines: readonly InvoiceLine[]): string {
   const rates = new Set(lines.filter((l) => l.taxRateBp > 0).map((l) => l.taxRateBp));
   if (rates.size !== 1) return 'GST';
   const [bp] = [...rates];
-  return `GST (${(bp ?? 0) / BASIS_POINTS_PER_PERCENT}%)`;
+  return `GST (${ratePercent(bp ?? 0)})`;
 }
 
 export interface GraceView {
@@ -149,6 +242,8 @@ export interface GraceView {
   readonly endsIso: string;
   /** Who decided the length: a date set on the invoice, the hospital override, or the default. */
   readonly source: 'invoice' | 'hospital' | 'platform';
+  /** The platform default was not readable, so the end date is a projection from the seed. */
+  readonly estimated: boolean;
   /** Whole days from today to the end — negative once it has closed. */
   readonly daysLeft: number;
   /** Past the due date, still inside the window. */
@@ -160,20 +255,24 @@ export interface GraceView {
 /**
  * When an unpaid invoice's grace window closes. Once the backend has set
  * `grace_ends_at` that date stands; before then it is the due date plus the
- * hospital's override, or the platform default.
+ * hospital's override, or the platform's `default_grace_days` (`null` when the
+ * caller cannot read settings — the seeded 7 days is then an estimate).
  */
 export function graceFor(
   inv: BillingInvoice,
   subscription: BillingSubscription | null | undefined,
+  platformGraceDays: number | null,
 ): GraceView | null {
   if (!isUnpaid(inv)) return null;
   const override = subscription?.graceDaysOverride ?? null;
-  const endsIso = inv.graceEndsAt ?? addDaysISO(inv.dueAt, override ?? PLATFORM_GRACE_DAYS);
+  const fallbackDays = platformGraceDays ?? PLATFORM_GRACE_DAYS;
+  const endsIso = inv.graceEndsAt ?? addDaysISO(inv.dueAt, override ?? fallbackDays);
   const source = inv.graceEndsAt ? 'invoice' : override !== null ? 'hospital' : 'platform';
   const daysLeft = daysFromTodayISO(endsIso);
   return {
     endsIso,
     source,
+    estimated: source === 'platform' && platformGraceDays === null,
     daysLeft,
     inGrace: daysFromTodayISO(inv.dueAt) < 0 && daysLeft >= 0,
     expired: daysLeft < 0,

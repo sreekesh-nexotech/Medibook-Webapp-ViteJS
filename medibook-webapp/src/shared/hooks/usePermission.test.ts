@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { permissionChecks, type PermissionKey } from '@/shared/hooks/usePermission';
+import {
+  hospitalWriteBlock,
+  permissionChecks,
+  type PermissionKey,
+} from '@/shared/hooks/usePermission';
 
 /** The seeded receptionist role's codes (backend `core/seeds/v1.py`). */
 const RECEPTIONIST = [
@@ -59,5 +63,27 @@ describe('permissionChecks without a hospital session', () => {
     const checks = permissionChecks(null);
     expect(checks.can('Users & Roles.del')).toBe(true);
     expect(checks.perms).toBeNull();
+  });
+});
+
+describe('write blocks (UAT-38)', () => {
+  it('turns every add/edit/del off for a read-only or suspended hospital, keeping views', () => {
+    const checks = permissionChecks(RECEPTIONIST, 'read_only');
+    expect(checks.writeBlock).toBe('read_only');
+    expect(checks.can('Appointments.view')).toBe(true);
+    expect(checks.can('Appointments.add')).toBe(false);
+    expect(checks.can('Payments.add')).toBe(false);
+    expect(checks.canViewModule('Appointments')).toBe(true);
+  });
+
+  it('derives the block from the hospital state', () => {
+    expect(hospitalWriteBlock({ status: 'active', readOnly: false })).toBeNull();
+    expect(hospitalWriteBlock({ status: 'active', readOnly: true })).toBe('read_only');
+    expect(hospitalWriteBlock({ status: 'suspended', readOnly: false })).toBe('suspended');
+    expect(hospitalWriteBlock({ status: 'closed', readOnly: true })).toBe('suspended');
+  });
+
+  it('never blocks the ops console (no hospital session)', () => {
+    expect(permissionChecks(null, 'read_only').writeBlock).toBeNull();
   });
 });

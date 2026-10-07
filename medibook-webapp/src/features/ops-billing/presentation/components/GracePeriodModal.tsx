@@ -31,7 +31,7 @@ interface GracePeriodModalProps {
 /**
  * Set when an unpaid invoice's grace window closes (audit SA-03: "no grace
  * period"). The backend stores the end date on the invoice; it may not fall
- * before the due date. Moving it past today lifts a non-payment hold the
+ * before the due date. Moving it past today lifts the D-30 read-only state the
  * dunning job placed, if no other invoice is past its own window.
  */
 export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalProps) {
@@ -86,7 +86,9 @@ export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalPr
               ? 'Currently set on this invoice.'
               : grace.source === 'hospital'
                 ? "Currently from the hospital's own grace setting."
-                : 'Currently the platform default.'
+                : grace.estimated
+                  ? 'Currently the platform default (estimated here).'
+                  : 'Currently the platform default.'
           }`}
         >
           <TextInput
@@ -106,7 +108,8 @@ export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalPr
               : left >= 0
                 ? `The hospital has ${plural(left, 'day')} left to pay.`
                 : `That date is ${plural(-left, 'day')} ago, so the window stays closed.`}{' '}
-            Suspension for non-payment is only offered after the window closes.
+            If the invoice is still unpaid when the window closes, the hospital becomes read-only
+            (staff keep signing in) until it is paid; a date in the future lifts that again.
           </span>
         </div>
       </div>

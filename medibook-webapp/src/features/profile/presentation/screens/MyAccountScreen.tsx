@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Spinner } from '@/shared/ui/Spinner';
 
+import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { isFailure } from '@/core/error/failure';
 
-import { AUTH_LOGIN_PATH } from '@/app/router/paths';
+import { loginPathFor } from '@/app/router/paths';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
@@ -50,7 +51,8 @@ export function MyAccountScreen({ surface }: MyAccountScreenProps) {
       <ProfilePasswordCard surface={surface} />
       <ProfileSessionsCard
         surface={surface}
-        onSignedOut={() => navigate(AUTH_LOGIN_PATH, { replace: true })}
+        idleMinutes={session.data.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES}
+        onSignedOut={() => navigate(loginPathFor(surface), { replace: true })}
       />
       <ProfileBuildInfo />
     </div>

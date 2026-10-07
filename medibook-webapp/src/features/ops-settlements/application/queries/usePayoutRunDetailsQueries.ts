@@ -15,8 +15,9 @@ export interface PayoutRunDetailsResult {
 }
 
 /**
- * The payouts of each run in `runIds` — the backend has no flat payout list,
- * so a period's payout (status, UTR, bank) is read through its run.
+ * The payouts of each run in `runIds` — only for a backend without the flat
+ * payout list (BE-27), where a period's payout (status, UTR, bank) is read
+ * through its run. Pass no ids otherwise.
  */
 export function usePayoutRunDetailsQueries(runIds: readonly string[]): PayoutRunDetailsResult {
   return useQueries({

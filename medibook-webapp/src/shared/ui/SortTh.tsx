@@ -14,37 +14,50 @@ interface SortThProps {
   onSort?: (key: string) => void;
 }
 
-/** Shared clickable sort header cell — used by table shells. */
+/**
+ * Shared sort header cell — used by table shells. A sortable column is a real
+ * button inside the header (keyboard-operable) and the header reports its
+ * order through `aria-sort` (UAT-76, 01·F31).
+ */
 export function SortTh({ label, baseClassName, right, sortKeys, sort, onSort }: SortThProps) {
   const key = sortKeys?.[label];
-  const clickable = Boolean(key && onSort);
   const active = Boolean(sort && key && sort.key === key);
+  const ariaSort =
+    active && sort ? (sort.dir === 'asc' ? 'ascending' : 'descending') : key ? 'none' : undefined;
+  const content = (
+    <span className={cn('inline-flex items-center gap-1.25', right && 'flex-row-reverse')}>
+      {label}
+      {key && onSort && (
+        <Icon
+          name={
+            active && sort
+              ? sort.dir === 'asc'
+                ? 'chevron-up'
+                : 'chevron-down'
+              : 'chevrons-up-down'
+          }
+          size={14}
+          className={active ? 'text-text-navy' : 'text-text-faint'}
+        />
+      )}
+    </span>
+  );
   return (
     <th
-      onClick={key && onSort ? () => onSort(key) : undefined}
+      aria-sort={ariaSort}
       className={cn(
         baseClassName,
         right ? 'text-right' : 'text-left',
-        clickable ? 'cursor-pointer' : 'cursor-default',
-        'select-none',
+        'cursor-default select-none',
       )}
     >
-      <span className={cn('inline-flex items-center gap-1.25', right && 'flex-row-reverse')}>
-        {label}
-        {clickable && (
-          <Icon
-            name={
-              active && sort
-                ? sort.dir === 'asc'
-                  ? 'chevron-up'
-                  : 'chevron-down'
-                : 'chevrons-up-down'
-            }
-            size={14}
-            className={active ? 'text-text-navy' : 'text-text-faint'}
-          />
-        )}
-      </span>
+      {key && onSort ? (
+        <button type="button" onClick={() => onSort(key)} className="cursor-pointer">
+          {content}
+        </button>
+      ) : (
+        content
+      )}
     </th>
   );
 }

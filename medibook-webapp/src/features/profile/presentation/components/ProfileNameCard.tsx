@@ -12,6 +12,9 @@ import { isFailure } from '@/core/error/failure';
 import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
 import { useUpdateNameMutation } from '@/features/profile/application/queries/useUpdateNameMutation';
 
+/** `users.first_name` / `last_name` column length (backend `UserSerializer`). */
+const NAME_MAX_LENGTH = 100;
+
 interface ProfileNameCardProps {
   session: StaffSession;
 }
@@ -27,6 +30,7 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName ?? '');
   const [error, setError] = useState<string | null>(null);
+  const [lastNameError, setLastNameError] = useState<string | null>(null);
   const isDirty = firstName.trim() !== user.firstName || lastName.trim() !== (user.lastName ?? '');
 
   const save = () => {
@@ -35,6 +39,7 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
       return;
     }
     setError(null);
+    setLastNameError(null);
     update.mutate(
       {
         surface: session.surface,
@@ -44,9 +49,20 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
       {
         onSuccess: () => toast('Your name was updated'),
         onError: (failure) => {
-          const message = isFailure(failure) ? failure.message : 'Could not save your name.';
-          setError(message);
-          toast(message, 'error');
+          if (!isFailure(failure)) {
+            setError('Could not save your name.');
+            return;
+          }
+          // Per-field messages (e.g. too long) go under their field (01·F25).
+          const first = failure.fieldErrors.first_name?.join(' ');
+          const last = failure.fieldErrors.last_name?.join(' ');
+          if (first ?? last) {
+            setError(first ?? null);
+            setLastNameError(last ?? null);
+            return;
+          }
+          setError(failure.message);
+          toast(failure.message, 'error');
         },
       },
     );
@@ -57,10 +73,20 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
       <SectionTitle>Profile</SectionTitle>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="First Name" required error={error}>
-          <TextInput value={firstName} onChange={setFirstName} autoComplete="given-name" />
+          <TextInput
+            value={firstName}
+            onChange={setFirstName}
+            autoComplete="given-name"
+            maxLength={NAME_MAX_LENGTH}
+          />
         </Field>
-        <Field label="Last Name">
-          <TextInput value={lastName} onChange={setLastName} autoComplete="family-name" />
+        <Field label="Last Name" error={lastNameError}>
+          <TextInput
+            value={lastName}
+            onChange={setLastName}
+            autoComplete="family-name"
+            maxLength={NAME_MAX_LENGTH}
+          />
         </Field>
       </div>
       <dl className="mt-4 grid gap-4 sm:grid-cols-2">

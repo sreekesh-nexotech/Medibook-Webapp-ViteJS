@@ -49,6 +49,29 @@ export const AUTH_SURFACE_PARAM = 'surface';
 /** `AUTH_SURFACE_PARAM` value for the operations console. */
 export const AUTH_SURFACE_OPS = 'ops';
 
+/**
+ * The sign-in screen for `surface`. Operations exits (logout, idle sign-out,
+ * session expiry, a signed-out `/ops` visit) open the Operations tab, so the
+ * next sign-in goes to the right surface (UAT-44).
+ */
+export function loginPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_LOGIN_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_LOGIN_PATH;
+}
+
+/** The forgot-password screen for `surface` (emails come from that surface). */
+export function forgotPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_FORGOT_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_FORGOT_PATH;
+}
+
+/** The surface a `?surface=` value names (anything but `ops` is the hospital app). */
+export function surfaceFromParam(value: string | null): ApiSurface {
+  return value === AUTH_SURFACE_OPS ? 'platform' : 'hospital';
+}
+
 /*
  * Emailed report links. A large export or a scheduled report is emailed as
  * `{FRONTEND_HOSPITAL_URL}/reports/downloads/{file_id}` or
@@ -400,6 +423,30 @@ export function opsHospitalDetailPath(id: string): string {
 
 export function opsOnboardingPath(): string {
   return opsPath('onboarding');
+}
+
+/** Query param that opens one application on the onboarding pipeline (10·F13). */
+export const ONBOARDING_CASE_PARAM = 'case';
+
+/** The onboarding pipeline with `caseId` open. */
+export function opsOnboardingCasePath(caseId: string): string {
+  return `${opsPath('onboarding')}?${new URLSearchParams({ [ONBOARDING_CASE_PARAM]: caseId }).toString()}`;
+}
+
+/** Query param that filters the Billing screen to one hospital (11·R8). */
+export const BILLING_HOSPITAL_PARAM = 'hospital';
+
+/** The Billing screen filtered to one hospital. */
+export function opsBillingForHospitalPath(hospitalId: string): string {
+  return `${opsPath('billing')}?${new URLSearchParams({ [BILLING_HOSPITAL_PARAM]: hospitalId }).toString()}`;
+}
+
+/** `?hospital=<id>` on Settlements: the queue for one hospital. */
+export const SETTLEMENTS_HOSPITAL_PARAM = 'hospital';
+
+/** The Settlements screen filtered to one hospital. */
+export function opsSettlementsForHospitalPath(hospitalId: string): string {
+  return `${opsPath('settlements')}?${new URLSearchParams({ [SETTLEMENTS_HOSPITAL_PARAM]: hospitalId }).toString()}`;
 }
 
 export function opsCompliancePath(): string {

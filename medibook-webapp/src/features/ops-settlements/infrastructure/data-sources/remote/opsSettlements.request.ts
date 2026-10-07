@@ -1,7 +1,11 @@
 import type {
+  AdjustmentDraft,
   PayoutRelease,
   PayoutRunDraft,
+  PeriodCloseRequest,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
+
+const PAISE_PER_RUPEE = 100;
 
 /** `PayoutRunCreateRequest`. */
 export interface PayoutRunCreateRequest {
@@ -19,6 +23,48 @@ export interface PayoutRunReleaseRequest {
 /** `PayoutCommandRequest` for `/payouts/{id}/release`. */
 export interface PayoutReleaseRequest {
   readonly utr_ref: string;
+}
+
+/** `PayoutCommandRequest` for `/payouts/{id}/hold` and `/fail`. */
+export interface PayoutReasonRequest {
+  readonly reason: string;
+}
+
+/** `PeriodCloseSerializer`: no `hospital_id` closes every hospital with activity. */
+export interface PeriodCloseBody {
+  readonly hospital_id?: string;
+  readonly period_start: string;
+  readonly period_end: string;
+}
+
+/** `AdjustmentCreateSerializer`: signed paise. */
+export interface AdjustmentCreateRequest {
+  readonly hospital_id: string;
+  readonly settlement_period_id: string;
+  readonly amount_paise: number;
+  readonly reason: string;
+}
+
+/** `StatementIssueSerializer`. */
+export interface StatementIssueRequest {
+  readonly period: string;
+}
+
+export function toPeriodCloseBody(request: PeriodCloseRequest): PeriodCloseBody {
+  return {
+    ...(request.hospitalId ? { hospital_id: request.hospitalId } : {}),
+    period_start: request.periodStart,
+    period_end: request.periodEnd,
+  };
+}
+
+export function toAdjustmentCreateRequest(draft: AdjustmentDraft): AdjustmentCreateRequest {
+  return {
+    hospital_id: draft.hospitalId,
+    settlement_period_id: draft.settlementPeriodId,
+    amount_paise: Math.round(draft.amountRupees * PAISE_PER_RUPEE),
+    reason: draft.reason,
+  };
 }
 
 export function toPayoutRunCreateRequest(draft: PayoutRunDraft): PayoutRunCreateRequest {
