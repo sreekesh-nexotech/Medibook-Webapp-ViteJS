@@ -582,6 +582,12 @@ const SPEC = [
     path: '/platform/ambulance-providers',
     params: LIST,
   },
+  {
+    key: 'ops-reviews.reviewPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/reviews',
+    params: LIST,
+  },
   { key: 'ops-reports.reportListResponseSchema', surface: 'platform', path: '/platform/reports' },
   {
     key: 'ops-reports.reportResultResponseSchema',

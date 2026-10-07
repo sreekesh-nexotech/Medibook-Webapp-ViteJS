@@ -85,4 +85,9 @@ describe('ops access to the screens added for UAT report §8', () => {
     expect(canOpenOpsView('content', opsPermissionChecks(['settings.view']))).toBe(true);
     expect(canOpenOpsView('content', opsPermissionChecks(SUPPORT))).toBe(false);
   });
+
+  it('lets support moderate reviews (notifications.edit), not read-only roles', () => {
+    expect(canOpenOpsView('reviews', opsPermissionChecks(SUPPORT))).toBe(true);
+    expect(canOpenOpsView('reviews', opsPermissionChecks(['notifications.view']))).toBe(false);
+  });
 });

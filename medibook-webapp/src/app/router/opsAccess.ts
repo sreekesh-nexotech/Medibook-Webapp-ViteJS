@@ -28,6 +28,7 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   notifications: 'settings.view',
   settings: 'settings.view',
   content: 'settings.view',
+  reviews: 'notifications.edit',
   account: null,
 };
 
