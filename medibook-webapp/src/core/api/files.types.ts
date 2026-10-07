@@ -4,9 +4,12 @@
  * and `files.api.ts`).
  */
 
-/** Lifecycle (backend `documents.models.File.Status`); only `clean` files may be attached. */
+/**
+ * Lifecycle (backend `documents.models.File.Status`); only `clean` files may
+ * be attached. `failed` marks an async report export whose build failed (B7).
+ */
 export type FileStatus =
-  'pending' | 'uploaded' | 'scanning' | 'clean' | 'infected' | 'sealed' | 'scan_failed';
+  'pending' | 'uploaded' | 'scanning' | 'clean' | 'infected' | 'sealed' | 'scan_failed' | 'failed';
 
 /** What a file is for — decides who may upload it and which types are allowed. */
 export type FilePurpose =

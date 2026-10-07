@@ -12,7 +12,17 @@ export const storedFileResponseSchema = z.object({
   mime: z.string(),
   size_bytes: z.number().int(),
   sha256: z.string().nullable(),
-  status: z.enum(['pending', 'uploaded', 'scanning', 'clean', 'infected', 'sealed', 'scan_failed']),
+  // `failed`: an async report export whose build failed (backend B7, L-37).
+  status: z.enum([
+    'pending',
+    'uploaded',
+    'scanning',
+    'clean',
+    'infected',
+    'sealed',
+    'scan_failed',
+    'failed',
+  ]),
   uploaded_at: z.string().nullable(),
   scanned_at: z.string().nullable(),
   expires_at: z.string().nullable(),

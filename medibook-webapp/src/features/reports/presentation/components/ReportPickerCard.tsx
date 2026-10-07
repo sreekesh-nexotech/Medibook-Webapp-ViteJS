@@ -12,14 +12,18 @@ interface ReportPickerCardProps {
 
 /**
  * One report tile in the picker grid. Selected → blue ring + soft-blue fill
- * (design `on ? '1.5px solid var(--blue)' : '1px solid var(--border)'`).
+ * (design `on ? '1.5px solid var(--blue)' : '1px solid var(--border)'`). A
+ * real button, so it is reachable with Tab and opens with Enter or Space
+ * (08 F14), and it says which report is open.
  */
 export function ReportPickerCard({ report, selected, onSelect }: ReportPickerCardProps) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
-        'shadow-card flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors duration-150',
+        'shadow-card flex w-full cursor-pointer items-start gap-3 rounded-xl border p-4 text-left transition-colors duration-150',
         selected ? 'border-blue bg-blue-soft-bg' : 'border-border bg-white',
       )}
     >
@@ -36,6 +40,6 @@ export function ReportPickerCard({ report, selected, onSelect }: ReportPickerCar
         <div className="text-caption text-text-muted mt-0.5">{report.brief}</div>
       </div>
       {selected && <Icon name="check" size={16} className="text-blue flex-none" />}
-    </div>
+    </button>
   );
 }
