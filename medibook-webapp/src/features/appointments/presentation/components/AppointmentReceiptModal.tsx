@@ -1,3 +1,4 @@
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { cn } from '@/shared/lib/cn';
 import { downloadFromUrl } from '@/shared/lib/download';
@@ -40,6 +41,7 @@ interface AppointmentReceiptModalProps {
  */
 export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentReceiptModalProps) {
   const receipt = useReceiptQuery(appointmentId);
+  const timeZone = useHospitalTimeZone();
   const pdf = useReceiptPdfMutation();
   const { ref, print } = usePrintArea<HTMLDivElement>();
 
@@ -98,14 +100,14 @@ export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentR
         />
       ) : (
         <div ref={ref}>
-          <ReceiptBody receipt={receipt.data} />
+          <ReceiptBody receipt={receipt.data} timeZone={timeZone} />
         </div>
       )}
     </Modal>
   );
 }
 
-function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
+function ReceiptBody({ receipt, timeZone }: { receipt: DeskReceipt; timeZone: string }) {
   return (
     <div className="border-border overflow-hidden rounded-lg border">
       <div className="bg-bg-tint p-4.5">
@@ -123,7 +125,7 @@ function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
           </span>
           <span className="text-text-muted">Issued</span>
           <span className="text-text-strong text-right font-medium">
-            {dateTimeOf(receipt.issuedAt)}
+            {dateTimeOf(receipt.issuedAt, timeZone)}
           </span>
           {receipt.issuedByName && (
             <>

@@ -1,3 +1,4 @@
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { downloadFromUrl } from '@/shared/lib/download';
 import { Button } from '@/shared/ui/Button';
@@ -31,6 +32,7 @@ interface AppointmentTokenModalProps {
  */
 export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTokenModalProps) {
   const slip = useTokenSlipQuery(appointmentId);
+  const timeZone = useHospitalTimeZone();
   const { ref, print } = usePrintArea<HTMLDivElement>();
   const pdf = useTokenSlipPdfMutation();
 
@@ -116,7 +118,7 @@ export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTok
             {slip.data.doctorRoom ? row('Room', slip.data.doctorRoom) : null}
             {row(
               'Time',
-              `${dayOf(slip.data.scheduledStartAt)} · ${timeOf(slip.data.scheduledStartAt)}`,
+              `${dayOf(slip.data.scheduledStartAt, timeZone)} · ${timeOf(slip.data.scheduledStartAt, timeZone)}`,
             )}
             {row('Booking', slip.data.bookingRef)}
           </div>

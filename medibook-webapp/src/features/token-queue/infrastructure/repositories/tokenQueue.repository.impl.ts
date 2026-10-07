@@ -2,6 +2,7 @@ import { attempt } from '@/core/error/attempt';
 
 import type { TokenQueueRepository } from '@/features/token-queue/domain/repositories/tokenQueue.repository';
 import {
+  getSessionCalls,
   getSessions,
   postSessionCommand,
   postSkip,
@@ -11,6 +12,7 @@ import {
   sessionSnapshotSchema,
   toQueueSession,
   toSkipOutcome,
+  toTokenCall,
 } from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.response';
 
 export const tokenQueueRepository: TokenQueueRepository = {
@@ -21,6 +23,8 @@ export const tokenQueueRepository: TokenQueueRepository = {
     attempt(async () => toQueueSession(await postTokenCommand(sessionId, command, tokenNo))),
   skip: (sessionId, tokenNo) =>
     attempt(async () => toSkipOutcome(await postSkip(sessionId, tokenNo))),
+  listCalls: (sessionId) =>
+    attempt(async () => (await getSessionCalls(sessionId)).map(toTokenCall)),
   readPushedSession: (data) => {
     const parsed = sessionSnapshotSchema.safeParse(data);
     return parsed.success ? toQueueSession(parsed.data) : null;

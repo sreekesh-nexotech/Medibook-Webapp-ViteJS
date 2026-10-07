@@ -1,12 +1,20 @@
+import { useEffect } from 'react';
+
+import { useNow } from '@/shared/hooks/useNow';
 import { Select } from '@/shared/ui/Select';
 
-import { timeOf } from '@/features/appointments/presentation/components/appointments.view';
 import { useSlotGridQuery } from '@/features/slots/application/queries/useSlotGridQuery';
+
+import { bookableSlots, NO_SLOT_COPY } from './slotPicker.view';
+
+/** Slots end while the form is open; re-check every minute. */
+const CLOCK_TICK_MS = 60_000;
 
 interface AppointmentSlotSelectProps {
   /** Hospital-local `yyyy-mm-dd`. */
   date: string;
   doctorId: string;
+  timeZone: string;
   /** The chosen slot id, or `''`. */
   value: string;
   onChange: (slotId: string) => void;
@@ -16,46 +24,54 @@ interface AppointmentSlotSelectProps {
 }
 
 /**
- * The open slots of one doctor on one date (H5's slot grid) — a walk-in
- * consultation must name one (Q74). Loading, error and "no open slots" are
- * said in the select itself so the row keeps its layout.
+ * The bookable slots of one doctor on one date (H5's slot grid) — a walk-in
+ * consultation must name one (Q74). Slots of closed sessions and slots that
+ * have ended are never offered; while another date or doctor loads, nothing
+ * from the previous one is offered; a chosen slot that disappears (taken,
+ * blocked, session closed) is cleared (UAT-18). Loading, error and the reason
+ * a day has no slot are said in the select itself so the row keeps its layout.
  */
 export function AppointmentSlotSelect({
   date,
   doctorId,
+  timeZone,
   value,
   onChange,
   excluded,
   ariaLabel,
 }: AppointmentSlotSelectProps) {
   const grid = useSlotGridQuery({ date, departmentId: null, doctorId });
-  const open =
-    grid.data?.days
-      .filter((d) => d.doctorId === doctorId)
-      .flatMap((d) =>
-        d.sessions.flatMap((s) =>
-          s.slots
-            .filter((slot) => slot.state === 'open' && !excluded.includes(slot.id))
-            .map((slot) => ({ id: slot.id, label: `${timeOf(slot.startsAt)} · ${s.label}` })),
-        ),
-      ) ?? [];
+  const now = useNow(CLOCK_TICK_MS);
+  // Placeholder data is the previous date's or doctor's grid: never offer it.
+  const isLoading = grid.isPending || grid.isPlaceholderData;
+  const choice =
+    !isLoading && grid.data
+      ? bookableSlots(grid.data.days, doctorId, excluded, now, timeZone)
+      : { options: [], emptyReason: null };
+  const isGone = value !== '' && !isLoading && !choice.options.some((o) => o.id === value);
 
-  const placeholder = grid.isPending
+  // The picked slot left the list (taken, ended, blocked): drop it so the
+  // booking never sends a slot the screen no longer shows.
+  useEffect(() => {
+    if (isGone) onChange('');
+  }, [isGone, onChange]);
+
+  const placeholder = isLoading
     ? 'Loading slots…'
     : grid.isError
       ? 'Could not load slots — reselect the doctor to retry'
-      : open.length === 0
-        ? 'No open slots this day'
+      : choice.emptyReason
+        ? NO_SLOT_COPY[choice.emptyReason]
         : 'Select a time';
 
-  const current = open.find((o) => o.id === value)?.label ?? '';
+  const current = choice.options.find((o) => o.id === value)?.label ?? '';
 
   return (
     <Select
       value={current}
       placeholder={placeholder}
-      options={open.map((o) => o.label)}
-      onChange={(label) => onChange(open.find((o) => o.label === label)?.id ?? '')}
+      options={choice.options.map((o) => o.label)}
+      onChange={(label) => onChange(choice.options.find((o) => o.label === label)?.id ?? '')}
       aria-label={ariaLabel}
     />
   );

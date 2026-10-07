@@ -18,6 +18,8 @@
  *   FIXTURE_PASSWORD=… \
  *   node scripts/record-api-fixtures.mjs
  *
+ * Add `FIXTURE_ONLY=<key>,<key>` to rewrite only those fixtures.
+ *
  * Use a hospital admin (every hospital endpoint) and a platform owner.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -28,6 +30,16 @@ const LIST = { page_size: 5 };
 const WIDE_DATES = { date_from: '2026-01-01', date_to: '2026-12-31' };
 
 const base = required('FIXTURE_API_BASE').replace(/\/+$/, '');
+/**
+ * Optional comma list of fixture keys to (re)write; the others are still read
+ * (later entries need their ids) but their files are left untouched.
+ */
+const only = new Set(
+  (process.env.FIXTURE_ONLY ?? '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean),
+);
 const password = required('FIXTURE_PASSWORD');
 const accounts = {
   hospital: required('FIXTURE_HOSPITAL_EMAIL'),
@@ -140,6 +152,32 @@ const SPEC = [
     surface: 'hospital',
     path: '/hospital/sessions',
     params: { ...LIST, date: new Date().toISOString().slice(0, 10) },
+  },
+  {
+    key: 'token-queue.tokenCallPageSchema',
+    surface: 'hospital',
+    path: '/hospital/sessions/{id}/calls',
+    params: LIST,
+    needs: (fx) => ({
+      id: (
+        first(fx, 'token-queue.sessionPageSchema', (s) => s.last_called_token_no != null) ??
+        first(fx, 'token-queue.sessionPageSchema')
+      )?.id,
+    }),
+  },
+
+  // hospital: help & support
+  {
+    key: 'help.supportTicketPageSchema',
+    surface: 'hospital',
+    path: '/hospital/support/tickets',
+    params: LIST,
+  },
+  {
+    key: 'help.supportTicketDetailSchema',
+    surface: 'hospital',
+    path: '/hospital/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'help.supportTicketPageSchema')?.id }),
   },
 
   // hospital: payments and cash
@@ -690,6 +728,10 @@ for (const entry of SPEC) {
   }
   const body = await response.json();
   fixtures[entry.key] = body;
+  if (only.size > 0 && !only.has(entry.key)) {
+    report.push([entry.key, 'read, not written (FIXTURE_ONLY)']);
+    continue;
+  }
   writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(body), null, 2)}\n`);
   report.push([entry.key, 'recorded']);
 }

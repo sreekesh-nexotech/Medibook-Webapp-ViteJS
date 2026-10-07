@@ -14,7 +14,13 @@ export type ApptStatus =
   | 'cancelled'
   | 'no_show';
 
-export type ApptPaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed';
+/**
+ * `not_required` (BE-07, UAT-12): a ₹0 walk-in has nothing to collect — an
+ * older backend leaves it `unpaid`, so read `isNothingDue`. `cancelled`
+ * (APPT-02): cancelled or expired before any money was taken.
+ */
+export type ApptPaymentStatus =
+  'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed' | 'not_required' | 'cancelled';
 
 export type ApptSource = 'online' | 'walk_in';
 
@@ -40,6 +46,10 @@ export interface DeskAppointment {
   /** The doctor session (the queue) the booking sits in. */
   readonly sessionId: string;
   readonly sessionLabel: string;
+  /** The session's lifecycle (`scheduled`, `open`, `paused`, `closed`, `cancelled`), when sent. */
+  readonly sessionStatus: string | null;
+  /** The priced service, if the booking carries one. */
+  readonly serviceId: string | null;
   readonly visitId: string | null;
   /** ISO `yyyy-mm-dd` (hospital-local). */
   readonly scheduledDate: string;
@@ -50,6 +60,9 @@ export interface DeskAppointment {
   readonly tokenNo: number | null;
   /** Set once the token has been called (a skipped token keeps it). */
   readonly calledAt: string | null;
+  /** How many times the desk skipped this token (Q27). */
+  readonly noShowAttempts: number;
+  readonly consultationStartedAt: string | null;
   readonly isFollowUp: boolean;
   readonly patientNotes: string;
   readonly remark: string;
@@ -76,6 +89,8 @@ export interface AppointmentEvent {
   readonly id: string;
   readonly eventType: string;
   readonly actorKind: string;
+  /** Who did it by name, when the backend sends it (APPT-04). */
+  readonly actorName: string | null;
   readonly fromStatus: string | null;
   readonly toStatus: string | null;
   readonly occurredAt: string;
@@ -112,6 +127,27 @@ export interface DeskReceipt {
   readonly taxRupees: number;
   readonly totalRupees: number;
   readonly hasPdf: boolean;
+}
+
+/**
+ * Refund lifecycle (`Refund.Status`): a gateway refund is `requested` /
+ * `processing` until confirmed; `superseded` is a failed row replaced by a
+ * later refund of the same line.
+ */
+export type RefundStatus = 'requested' | 'processing' | 'processed' | 'failed' | 'superseded';
+
+/** One refund row — one per payment line, always in full (Q94, Q95). */
+export interface DeskRefund {
+  readonly id: string;
+  readonly amountRupees: number;
+  readonly status: RefundStatus;
+  readonly method: string | null;
+}
+
+/** A cancel or reject: the booking as it now stands and the refunds it started. */
+export interface RefundOutcome {
+  readonly appointment: DeskAppointment;
+  readonly refunds: readonly DeskRefund[];
 }
 
 export interface TokenSlipData {
@@ -152,6 +188,8 @@ export interface WalkInConsultation {
   readonly doctorId: string;
   /** An open slot of that doctor — every walk-in consultation needs one (Q74). */
   readonly slotId: string;
+  /** An optional priced service for this consultation (APPT-06). */
+  readonly serviceId: string | null;
 }
 
 export interface WalkInInput {
@@ -169,4 +207,69 @@ export interface WalkInResult {
 export interface AppointmentRange {
   readonly dateFrom: string;
   readonly dateTo: string;
+}
+
+/** Server sorts the desk list supports (`GET /hospital/appointments?sort=`). */
+export type AppointmentSortField = 'scheduled_start_at' | 'token_no' | 'created_at' | 'booking_ref';
+
+export interface AppointmentSort {
+  readonly field: AppointmentSortField;
+  readonly direction: 'asc' | 'desc';
+}
+
+/**
+ * One page of the desk list, filtered and sorted by the server — every
+ * filter is one the backend allowlists (`hospital_appointment_list.py`).
+ * Empty `statuses` = any status.
+ */
+export interface AppointmentListParams extends AppointmentRange {
+  readonly statuses: readonly ApptStatus[];
+  readonly source: ApptSource | null;
+  readonly paymentStatus: ApptPaymentStatus | null;
+  readonly departmentId: string | null;
+  readonly doctorId: string | null;
+  readonly q: string;
+  readonly sort: AppointmentSort;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/** A page of desk appointments. */
+export interface AppointmentPage {
+  readonly items: readonly DeskAppointment[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+}
+
+/** One consultation to price before booking (`POST /hospital/appointments/quote`, APPT-05). */
+export interface QuoteConsultationInput {
+  readonly doctorId: string;
+  /** The chosen slot (its date prices follow-ups), when picked. */
+  readonly slotId: string | null;
+  readonly serviceId: string | null;
+  /** Hospital-local day of the visit, used until a slot is picked. */
+  readonly date: string;
+}
+
+export interface QuoteInput {
+  /** An existing patient (follow-up pricing); a new patient is never a follow-up. */
+  readonly hospitalPatientId: string | null;
+  readonly consultations: readonly QuoteConsultationInput[];
+}
+
+/** What one consultation would cost, exactly as the booking would snapshot it. */
+export interface QuotedConsultation {
+  readonly index: number;
+  readonly isFollowUp: boolean;
+  readonly consultationRupees: number;
+  readonly serviceRupees: number;
+  readonly discountRupees: number;
+  readonly taxRupees: number;
+  readonly totalRupees: number;
+}
+
+export interface FeeQuote {
+  readonly consultations: readonly QuotedConsultation[];
+  readonly totalRupees: number;
 }

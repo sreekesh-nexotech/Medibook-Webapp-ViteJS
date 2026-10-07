@@ -1,5 +1,9 @@
 import { useState, type ReactNode } from 'react';
 
+import { useActionKeys } from '@/shared/hooks/useActionKeys';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { useNow } from '@/shared/hooks/useNow';
+import { useCan } from '@/shared/hooks/usePermission';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -16,6 +20,7 @@ import { isFailure } from '@/core/error/failure';
 import type {
   AppointmentEvent,
   DeskAppointment,
+  DeskRefund,
 } from '@/features/appointments/domain/entities/appointments.entities';
 import {
   useApproveMutation,
@@ -36,51 +41,49 @@ import { AppointmentRemarkModal } from '@/features/appointments/presentation/com
 import { AppointmentTokenModal } from '@/features/appointments/presentation/components/AppointmentTokenModal';
 import {
   actorLabel,
+  canCancel,
   canCheckIn,
+  canMarkNoShow,
   dateTimeOf,
   dayOf,
+  deskErrorText,
   eventLabel,
-  isInQueue,
-  localIso,
+  hasPaid,
+  hasTokenSlip,
+  isClosed,
+  isNothingDue,
+  moneyBackAction,
   needsApproval,
   needsPayment,
   paymentBadge,
-  SOURCE_LABEL,
-  STATUS_LABEL,
+  reasonCopy,
+  sourceBadge,
+  statusBadge,
   statusLabelOf,
   timeOf,
+  type ReasonKind,
 } from '@/features/appointments/presentation/components/appointments.view';
 
-type ReasonKind = 'cancel' | 'reject' | 'refund';
-
-const REASON_COPY: Readonly<
-  Record<ReasonKind, { readonly title: string; readonly body: string; readonly confirm: string }>
-> = {
-  cancel: {
-    title: 'Cancel Appointment',
-    body: 'The booking is cancelled and the patient is refunded in full — including any convenience fee — to the original payment method. This cannot be undone.',
-    confirm: 'Cancel & refund',
-  },
-  reject: {
-    title: 'Reject Booking',
-    body: 'The booking is rejected and the patient is refunded in full, including the convenience fee. This cannot be undone.',
-    confirm: 'Reject & refund',
-  },
-  refund: {
-    title: 'Refund Payment',
-    body: 'The full amount is refunded — one refund per payment line, to its original method. Cash is handed back from your open cash session.',
-    confirm: 'Refund in full',
-  },
-};
+/** The no-show rule depends on the slot's start; re-read the clock each minute. */
+const CLOCK_TICK_MS = 60_000;
 
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return isFailure(error) ? deskErrorText(error, fallback) : fallback;
+}
+
+/** What to say once refunds were started: gateway refunds finish later (03 F12). */
+function refundToast(refunds: readonly DeskRefund[], done: string): string {
+  const pending = refunds.some((r) => r.status === 'requested' || r.status === 'processing');
+  return pending
+    ? `${done} The online refund shows as refunded once the payment gateway confirms it.`
+    : done;
 }
 
 interface AppointmentDrawerProps {
   /** Appointment to show; `null` = closed. */
   id: string | null;
   onClose: () => void;
+  /** Open the patient's record; offered only to roles that may (03 F7). */
   onViewPatient?: (mrn: string) => void;
 }
 
@@ -88,13 +91,16 @@ interface AppointmentDrawerProps {
  * Appointment detail drawer + its desk actions (design `Flows.jsx`
  * `AppointmentDrawer`), on the hospital API. Every action is one the
  * backend supports: approve / reject a booking awaiting approval, collect a
- * walk-in's fee, check in, mark a no-show, edit the remark, cancel or refund
- * (both in full), the receipt and the token slip. There is no reschedule or
- * fee waiver (D-14) — cancel and book again instead.
+ * walk-in's fee, check in, mark a no-show, edit the remark, cancel (a live
+ * booking, refunding what was paid) or refund (a finished one), the receipt
+ * and the token slip. There is no reschedule or fee waiver (D-14) — cancel
+ * and book again instead. Dates and times are the hospital's (UAT-47).
  */
 export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDrawerProps) {
   const appt = useAppointmentQuery(id);
   const events = useAppointmentEventsQuery(id);
+  const { timeZone } = useHospitalToday();
+  const canViewPatients = useCan('Patients.view');
 
   return (
     <Drawer
@@ -119,13 +125,18 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
       ) : (
         <DrawerBody
           appt={appt.data}
+          timeZone={timeZone}
           history={events.data ?? []}
           isHistoryLoading={events.isPending}
-          onViewPatient={() => {
-            if (!appt.data.patient) return;
-            onClose();
-            onViewPatient?.(appt.data.patient.mrn);
-          }}
+          onViewPatient={
+            canViewPatients && onViewPatient
+              ? () => {
+                  if (!appt.data.patient) return;
+                  onClose();
+                  onViewPatient(appt.data.patient.mrn);
+                }
+              : undefined
+          }
         />
       )}
     </Drawer>
@@ -147,19 +158,23 @@ function Row({ k, v }: { k: ReactNode; v: ReactNode }) {
 
 interface DrawerBodyProps {
   appt: DeskAppointment;
+  timeZone: string;
   history: readonly AppointmentEvent[];
   isHistoryLoading: boolean;
-  onViewPatient: () => void;
+  /** Absent for roles that cannot open patient records. */
+  onViewPatient?: () => void;
 }
 
-function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBodyProps) {
+function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }: DrawerBodyProps) {
   const payBadge = paymentBadge(appt);
+  const status = statusBadge(appt.status);
+  const source = sourceBadge(appt.source);
   const refundedButLive = needsPayment(appt) && appt.paymentStatus === 'refunded';
   return (
     <>
       <div className="mb-4.5 flex flex-wrap gap-2">
-        <Badge status={SOURCE_LABEL[appt.source]} />
-        <Badge status={STATUS_LABEL[appt.status]} />
+        <Badge status={source.status}>{source.label}</Badge>
+        <Badge status={status.status}>{status.label}</Badge>
         <Badge status={payBadge.status}>{payBadge.label}</Badge>
         {needsApproval(appt) && <Badge status="Pending verification">Needs approval</Badge>}
       </div>
@@ -168,7 +183,16 @@ function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBo
           <div className="text-caption text-text-muted mb-1">Desk confirmation</div>
           <div className="text-body text-text-body">
             This booking needs the hospital's approval. Approve it to confirm the slot, or reject it
-            — the patient is refunded in full.
+            {hasPaid(appt) ? ' — the patient is refunded in full.' : '.'}
+          </div>
+        </Card>
+      )}
+      {isNothingDue(appt) && appt.source === 'walk_in' && !isClosed(appt) && (
+        <Card pad={16} className="mb-4">
+          <div className="text-caption text-text-muted mb-1">Nothing to collect</div>
+          <div className="text-body text-text-body">
+            This consultation is free (a follow-up or a doctor without a fee). No receipt is issued;
+            the patient can be checked in on the day.
           </div>
         </Card>
       )}
@@ -186,7 +210,7 @@ function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBo
         <Row k="Department" v={appt.department.name} />
         <Row
           k="Date & Time"
-          v={`${dayOf(appt.scheduledDate)}, ${timeOf(appt.scheduledStartAt)} · ${appt.sessionLabel}`}
+          v={`${dayOf(appt.scheduledDate, timeZone)}, ${timeOf(appt.scheduledStartAt, timeZone)} · ${appt.sessionLabel}`}
         />
         <Row
           k="Booking Source"
@@ -256,20 +280,25 @@ function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBo
               <li key={e.id} className="text-caption text-text-body flex justify-between gap-3">
                 <span>
                   {eventLabel(e.eventType)}
-                  <span className="text-text-muted"> · {actorLabel(e.actorKind)}</span>
+                  <span className="text-text-muted">
+                    {' '}
+                    · {e.actorName ?? actorLabel(e.actorKind)}
+                  </span>
                   {e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus && (
                     <span className="text-text-muted block">
                       {statusLabelOf(e.fromStatus)} → {statusLabelOf(e.toStatus)}
                     </span>
                   )}
                 </span>
-                <span className="text-text-muted tabular-nums">{dateTimeOf(e.occurredAt)}</span>
+                <span className="text-text-muted tabular-nums">
+                  {dateTimeOf(e.occurredAt, timeZone)}
+                </span>
               </li>
             ))}
           </ul>
         )}
       </Card>
-      {appt.patient && (
+      {appt.patient && onViewPatient && (
         <Button variant="secondary" icon="user" className="w-full" onClick={onViewPatient}>
           View Patient Profile
         </Button>
@@ -286,6 +315,10 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
   const noShow = useNoShowMutation();
   const cancel = useCancelMutation();
   const refund = useRefundMutation();
+  const actionKeys = useActionKeys();
+  const { today, timeZone } = useHospitalToday();
+  const now = useNow(CLOCK_TICK_MS);
+  const canCollect = useCan('Payments.add');
   const [pay, setPay] = useState(false);
   const [receipt, setReceipt] = useState(false);
   const [token, setToken] = useState(false);
@@ -297,30 +330,71 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
     toast(failureText(error, fallback), 'error');
 
   const awaiting = needsApproval(appt);
-  const closed =
-    appt.status === 'cancelled' || appt.status === 'completed' || appt.status === 'no_show';
-  const isPaid = appt.paymentStatus === 'paid';
+  const closed = isClosed(appt);
+  const owes = needsPayment(appt);
+  const moneyBack = moneyBackAction(appt);
   const reasonBusy = cancel.isPending || reject.isPending || refund.isPending;
+  const total = money(appt.totalRupees);
 
   const runReason = (kind: ReasonKind, text: string): void => {
-    const done = () => {
+    const scope = `${kind}:${appt.id}`;
+    const idempotencyKey = actionKeys.keyFor(scope);
+    const settle = () => {
+      actionKeys.settle(scope);
       setReason(null);
-      toast(
-        kind === 'refund'
-          ? 'Refund issued'
-          : kind === 'reject'
-            ? 'Booking rejected'
-            : 'Appointment cancelled',
-        'info',
-      );
     };
     const fail = onError('Could not complete that.');
-    if (kind === 'cancel')
-      cancel.mutate({ id: appt.id, reason: text }, { onSuccess: done, onError: fail });
-    else if (kind === 'reject')
-      reject.mutate({ id: appt.id, reason: text }, { onSuccess: done, onError: fail });
-    else refund.mutate({ id: appt.id, reason: text }, { onSuccess: done, onError: fail });
+    if (kind === 'cancel') {
+      cancel.mutate(
+        { id: appt.id, reason: text, idempotencyKey },
+        {
+          onSuccess: (outcome) => {
+            settle();
+            toast(refundToast(outcome.refunds, 'Appointment cancelled.'), 'info');
+          },
+          onError: fail,
+        },
+      );
+    } else if (kind === 'reject') {
+      reject.mutate(
+        { id: appt.id, reason: text, idempotencyKey },
+        {
+          onSuccess: (outcome) => {
+            settle();
+            toast(refundToast(outcome.refunds, 'Booking rejected.'), 'info');
+          },
+          onError: fail,
+        },
+      );
+    } else {
+      refund.mutate(
+        { id: appt.id, reason: text, idempotencyKey },
+        {
+          onSuccess: (refunds) => {
+            settle();
+            toast(refundToast(refunds, 'Refund issued.'), 'info');
+          },
+          onError: fail,
+        },
+      );
+    }
   };
+
+  const doCheckIn = (): void => {
+    const scope = `check-in:${appt.id}`;
+    checkIn.mutate(
+      { id: appt.id, idempotencyKey: actionKeys.keyFor(scope) },
+      {
+        onSuccess: () => {
+          actionKeys.settle(scope);
+          toast('Checked in', 'success');
+        },
+        onError: onError('Could not check in.'),
+      },
+    );
+  };
+
+  const copy = reason ? reasonCopy(reason, appt, total) : null;
 
   return (
     <>
@@ -351,38 +425,29 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
             </Can>
           </>
         )}
-        {!awaiting && needsPayment(appt) && (
-          <Can perm="Payments.add">
-            <Button icon="indian-rupee" onClick={() => setPay(true)}>
-              Collect {money(appt.totalRupees)}
-            </Button>
-          </Can>
+        {!awaiting && owes && canCollect && (
+          <Button icon="indian-rupee" onClick={() => setPay(true)}>
+            Collect {total}
+          </Button>
         )}
-        {canCheckIn(appt, localIso(new Date())) && !needsPayment(appt) && (
+        {!awaiting && owes && !canCollect && (
+          <span className="text-caption text-text-muted">
+            Unpaid — the patient pays {total} at reception before check-in.
+          </span>
+        )}
+        {canCheckIn(appt, today) && (
           <Can perm="Appointments.edit">
-            <Button
-              icon="log-in"
-              busy={checkIn.isPending}
-              onClick={() =>
-                checkIn.mutate(
-                  { id: appt.id },
-                  {
-                    onSuccess: () => toast('Checked in', 'success'),
-                    onError: onError('Could not check in.'),
-                  },
-                )
-              }
-            >
+            <Button icon="log-in" busy={checkIn.isPending} onClick={doCheckIn}>
               Check in
             </Button>
           </Can>
         )}
-        {appt.tokenLabel && appt.status !== 'cancelled' && (
+        {hasTokenSlip(appt) && (
           <Button variant="secondary" icon="ticket" onClick={() => setToken(true)}>
             Token
           </Button>
         )}
-        {(isPaid || appt.paymentStatus === 'refunded') && (
+        {(hasPaid(appt) || appt.paymentStatus === 'refunded') && (
           <Can perm="Payments.view">
             <Button variant="secondary" icon="receipt" onClick={() => setReceipt(true)}>
               Receipt
@@ -396,24 +461,24 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
             </Button>
           </Can>
         )}
-        {(appt.status === 'scheduled' || isInQueue(appt)) && (
+        {canMarkNoShow(appt, today, now) && (
           <Can perm="Token Management.edit">
             <Button variant="ghost" onClick={() => setConfirmNoShow(true)}>
               No-show
             </Button>
           </Can>
         )}
-        {isPaid && closed && (
+        {moneyBack === 'refund' && (
           <Can perm="Payments.del">
             <Button variant="ghost" icon="undo-2" onClick={() => setReason('refund')}>
               Refund
             </Button>
           </Can>
         )}
-        {!closed && !awaiting && (
+        {!awaiting && canCancel(appt) && (
           <Can perm="Appointments.del">
             <Button variant="ghost" className="text-d-500!" onClick={() => setReason('cancel')}>
-              Cancel
+              {moneyBack === 'cancel-refund' ? 'Cancel & refund' : 'Cancel'}
             </Button>
           </Can>
         )}
@@ -436,13 +501,14 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
         onClose={() => setToken(false)}
       />
       <AppointmentRemarkModal appt={remark ? appt : null} onClose={() => setRemark(false)} />
-      {reason && (
+      {reason && copy && (
         <AppointmentReasonModal
           key={reason}
           open
-          title={REASON_COPY[reason].title}
-          body={REASON_COPY[reason].body}
-          confirmLabel={REASON_COPY[reason].confirm}
+          title={copy.title}
+          body={copy.body}
+          confirmLabel={copy.confirm}
+          dismissLabel={reason === 'refund' ? 'Back' : 'Keep booking'}
           busy={reasonBusy}
           onClose={() => setReason(null)}
           onConfirm={(text) => runReason(reason, text)}
@@ -451,7 +517,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
       <ConfirmModal
         open={confirmNoShow}
         title="Mark as No-show"
-        body={`Mark ${appt.patient?.fullName ?? 'this patient'} as a no-show? This is recorded in the appointment's history.`}
+        body={`Mark ${appt.patient?.fullName ?? 'this patient'} as a no-show for ${dayOf(appt.scheduledDate, timeZone)}? This is recorded in the appointment's history.`}
         confirmLabel="Mark No-show"
         onClose={() => setConfirmNoShow(false)}
         onConfirm={() => {

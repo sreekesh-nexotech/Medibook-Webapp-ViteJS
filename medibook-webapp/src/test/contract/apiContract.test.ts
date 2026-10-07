@@ -18,6 +18,10 @@ import {
   platformMeResponseSchema,
 } from '@/features/auth/infrastructure/data-sources/remote/auth.response';
 import {
+  supportTicketDetailSchema,
+  supportTicketPageSchema,
+} from '@/features/help/infrastructure/data-sources/remote/help.response';
+import {
   adminDashboardResponseSchema,
   receptionDashboardResponseSchema,
 } from '@/features/dashboard/infrastructure/data-sources/remote/dashboard.response';
@@ -146,6 +150,7 @@ import {
   slotGridPageResponseSchema,
 } from '@/features/slots/infrastructure/data-sources/remote/slots.response';
 import { sessionPageSchema } from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.api';
+import { tokenCallPageSchema } from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.response';
 import {
   invitationPageResponseSchema,
   rolePreviewResponseSchema,
@@ -177,6 +182,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'dashboard.adminDashboardResponseSchema': adminDashboardResponseSchema,
   'dashboard.receptionDashboardResponseSchema': receptionDashboardResponseSchema,
   'doctors.dateExceptionPageSchema': dateExceptionPageSchema,
+  'help.supportTicketDetailSchema': supportTicketDetailSchema,
+  'help.supportTicketPageSchema': supportTicketPageSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,
@@ -257,6 +264,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'slots.generationRunPageResponseSchema': generationRunPageResponseSchema,
   'slots.slotGridPageResponseSchema': slotGridPageResponseSchema,
   'token-queue.sessionPageSchema': sessionPageSchema,
+  'token-queue.tokenCallPageSchema': tokenCallPageSchema,
   'users-roles.counterPageResponseSchema': usersRolesCounterPageResponseSchema,
   'users-roles.invitationPageResponseSchema': invitationPageResponseSchema,
   'users-roles.permissionCatalogueResponseSchema': permissionCatalogueResponseSchema,
@@ -272,6 +280,7 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
   reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
+  faqFeedSchema: 'New hospital FAQ feed (BE-34); record once the backend serves it.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

@@ -2,27 +2,99 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
 
-import type { AppointmentRange } from '@/features/appointments/domain/entities/appointments.entities';
+import type {
+  AppointmentListParams,
+  AppointmentRange,
+  QuoteInput,
+} from '@/features/appointments/domain/entities/appointments.entities';
 import { appointmentsKeys } from '@/features/appointments/application/queries/appointments.keys';
+import { countAppointments } from '@/features/appointments/application/usecases/appointments.countAppointments';
 import { fetchAppointment } from '@/features/appointments/application/usecases/appointments.fetchAppointment';
 import { fetchAppointmentEvents } from '@/features/appointments/application/usecases/appointments.fetchAppointmentEvents';
 import { fetchAppointments } from '@/features/appointments/application/usecases/appointments.fetchAppointments';
+import { fetchAppointmentsPage } from '@/features/appointments/application/usecases/appointments.fetchAppointmentsPage';
 import { fetchReceipt } from '@/features/appointments/application/usecases/appointments.fetchReceipt';
 import { fetchTokenSlip } from '@/features/appointments/application/usecases/appointments.fetchTokenSlip';
+import { quoteWalkIn } from '@/features/appointments/application/usecases/appointments.quoteWalkIn';
+import {
+  TAB_COUNT_FILTERS,
+  type CountedTab,
+} from '@/features/appointments/domain/appointments.listFilters';
 
 /** The desk list moves all day (check-ins, payments); keep it fresh. */
 const LIST_STALE_TIME_MS = 15_000;
 
+/** A quote depends on prices and follow-up history; a short freshness is plenty. */
+const QUOTE_STALE_TIME_MS = 30_000;
+
 /** A receipt never changes once issued. */
 const RECEIPT_STALE_TIME_MS = 10 * 60_000;
 
+interface DayListOptions {
+  /** Re-read on this interval as a safety net for missed live pushes. */
+  readonly refetchIntervalMs?: number;
+}
+
+interface PageListOptions extends DayListOptions {
+  /** `false` holds the request (a filter combination nothing can match). */
+  readonly enabled?: boolean;
+}
+
 /** Every appointment in a hospital-local date window (all pages). */
-export function useAppointmentsQuery(range: AppointmentRange) {
+export function useAppointmentsQuery(range: AppointmentRange, options: DayListOptions = {}) {
   return useQuery({
     queryKey: appointmentsKeys.list(range),
     queryFn: async () => unwrap(await fetchAppointments(range)),
     placeholderData: keepPreviousData,
     staleTime: LIST_STALE_TIME_MS,
+    refetchInterval: options.refetchIntervalMs,
+  });
+}
+
+/**
+ * One page of the desk list, filtered, sorted and paged by the server. The
+ * previous page stays on screen while the next loads (`isPlaceholderData`
+ * says so — the table dims instead of jumping).
+ */
+export function useAppointmentsPageQuery(
+  params: AppointmentListParams,
+  options: PageListOptions = {},
+) {
+  return useQuery({
+    queryKey: appointmentsKeys.page(params),
+    queryFn: async () => unwrap(await fetchAppointmentsPage(params)),
+    placeholderData: keepPreviousData,
+    staleTime: LIST_STALE_TIME_MS,
+    refetchInterval: options.refetchIntervalMs,
+    enabled: options.enabled ?? true,
+  });
+}
+
+/**
+ * The tab counts of the desk list for the current window and filters: one
+ * light `page_size=1` request per tab, reading each page's `total`.
+ */
+export function useAppointmentTabCountsQuery(
+  params: AppointmentListParams,
+  options: DayListOptions = {},
+) {
+  return useQuery({
+    queryKey: appointmentsKeys.counts(params),
+    queryFn: async () => {
+      const entries = await Promise.all(
+        (Object.keys(TAB_COUNT_FILTERS) as CountedTab[]).map(
+          async (tab) =>
+            [
+              tab,
+              unwrap(await countAppointments({ ...params, ...TAB_COUNT_FILTERS[tab] })),
+            ] as const,
+        ),
+      );
+      return Object.fromEntries(entries) as Readonly<Record<CountedTab, number>>;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: LIST_STALE_TIME_MS,
+    refetchInterval: options.refetchIntervalMs,
   });
 }
 
@@ -60,5 +132,21 @@ export function useTokenSlipQuery(id: string | null) {
     queryKey: appointmentsKeys.tokenSlip(id ?? ''),
     queryFn: async () => unwrap(await fetchTokenSlip(id ?? '')),
     enabled: id !== null,
+  });
+}
+
+/**
+ * The real fee of the walk-in being prepared (APPT-05), re-read when the
+ * patient, a doctor, a slot or a service changes. `data === null` means the
+ * backend cannot quote yet; `input === null` stays idle.
+ */
+export function useWalkInQuoteQuery(input: QuoteInput | null) {
+  return useQuery({
+    queryKey: appointmentsKeys.quote(input ?? { hospitalPatientId: null, consultations: [] }),
+    queryFn: async () =>
+      unwrap(await quoteWalkIn(input ?? { hospitalPatientId: null, consultations: [] })),
+    enabled: input !== null && input.consultations.length > 0,
+    staleTime: QUOTE_STALE_TIME_MS,
+    placeholderData: keepPreviousData,
   });
 }
