@@ -48,6 +48,9 @@ const BOOKINGS_SORT_KEY = 'bookings';
 /** Days counted as "this week" for the New This Week tile. */
 const NEW_WINDOW_DAYS = 7;
 
+/** Days counted for the Monthly Active tile (signed in within them). */
+const ACTIVE_WINDOW_DAYS = 30;
+
 const ALL_STATUSES_LABEL = 'Status: All';
 
 /** Filter labels → backend status, in menu order. */
@@ -107,6 +110,12 @@ export function OpsPlatformUsersScreen() {
     status: null,
     createdFrom: addDaysISO(todayISO(), -NEW_WINDOW_DAYS),
   });
+  // B2's `last_login_from` (BE-31): accounts that signed in within the window.
+  const monthlyActive = usePlatformUserCountQuery({
+    status: null,
+    createdFrom: null,
+    lastLoginFrom: addDaysISO(todayISO(), -ACTIVE_WINDOW_DAYS),
+  });
 
   const kpis: readonly StatCardData[] = [
     {
@@ -121,8 +130,10 @@ export function OpsPlatformUsersScreen() {
     {
       icon: 'trending-up',
       label: 'Monthly Active',
-      value: NO_VALUE,
-      sub: NOT_AVAILABLE_SUB,
+      value: countValue(monthlyActive.data),
+      sub: monthlyActive.isError
+        ? NOT_AVAILABLE_SUB
+        : `Signed in within the last ${ACTIVE_WINDOW_DAYS} days`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
       subClass: 'text-text-muted',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { toCountQuery } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.request';
 import {
   toPlatformUserDetail,
   toPlatformUserSummary,
@@ -61,5 +62,20 @@ describe('platform user display helpers', () => {
   it('describes a device and a verification', () => {
     expect(deviceLine('android', '2.3.1', null)).toBe('android · app 2.3.1');
     expect(verifiedLabel(null)).toBe('Not verified');
+  });
+});
+
+describe('KPI counts (B2 BE-31)', () => {
+  it('asks for one row with only the filters a tile sets', () => {
+    expect(toCountQuery({ status: 'blocked', createdFrom: null })).toEqual({
+      page: 1,
+      page_size: 1,
+      status: 'blocked',
+    });
+    expect(toCountQuery({ status: null, createdFrom: null, lastLoginFrom: '2026-09-07' })).toEqual({
+      page: 1,
+      page_size: 1,
+      last_login_from: '2026-09-07',
+    });
   });
 });

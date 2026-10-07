@@ -17,6 +17,8 @@ export interface PlatformUserCountFilter {
   readonly status: PlatformUserStatus | null;
   /** Inclusive `yyyy-mm-dd` (IST) — B2's `created_from` (BE-31). */
   readonly createdFrom: string | null;
+  /** Signed in on or after this inclusive `yyyy-mm-dd` (IST) — B2's `last_login_from` (BE-31). */
+  readonly lastLoginFrom?: string | null;
 }
 
 /** Filters, sort and page for `GET /platform/users`. */
