@@ -77,6 +77,9 @@ Paths under `backend:` are in the Django repository.
 | PRD-05-B  | Ops lists lack plan, bookings, city, activity and payout data              | Low      | Columns and tiles left out                    |
 | PRD-06-B  | Two receipt settings and the series separator are never used               | Low      | Left out; needs a decision                    |
 | PRD-07-B  | The desk cannot get a fee quote before booking                             | Low      | Screen says the booking prices it             |
+| REP-01    | User Activity's Last Active is sent and exported in UTC                    | Medium   | Screen shows the UTC time too                 |
+| REP-02    | Sorting a report high-to-low puts empty values first                       | Low      | Screen shows what the server returns          |
+| REP-03    | System reasons are exported as codes (`patient_cancellation`)              | Low      | Screen shows the codes too                    |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1070,3 +1073,54 @@ the booking, and shows the real bill before any payment is collected.
 
 **What the backend needs.** A hospital-side quote, e.g. `GET /hospital/fee-quotes`
 with `doctor_id` and `hospital_patient_id`, returning `is_follow_up` and the fee.
+
+## REP-01 — User Activity's Last Active is sent and exported in UTC
+
+**New finding (live check of Management → Reports, 7 Oct 2026).**
+
+**What fails.** Every other report shows dates on the hospital's own calendar
+(`reports/services/queries.py` `local_date` / `local_dt`, D-09), but the User Activity
+report returns `last_active` straight from `users.last_login_at`
+(backend: `reports/services/report_rows.py:851`), so the JSON carries a UTC instant
+(`2026-10-07T17:55:27Z`). The exports render it with `isoformat`
+(`engine.display_value`), so the CSV, Excel and PDF files show `17:55+00:00` for a
+sign-in at 23:25 in Kochi.
+
+**What the backend needs.** Convert the value with `local_dt(…, hospital timezone)`
+before it reaches the envelope, as the other datetime columns are.
+
+**What the web app does meanwhile.** Shows the value as sent (UTC). Reading it on the
+hospital's clock is a small web-app change once this is decided.
+
+## REP-02 — Sorting a report high-to-low puts empty values first
+
+**New finding (live check of Management → Reports, 7 Oct 2026).**
+
+**What fails.** `engine._sort` sorts on `(value is None, value)` and then reverses the
+whole key for a descending sort (backend: `reports/services/engine.py:192`). Empty
+values therefore go last on an ascending sort but **first** on a descending one. Sorting
+User Activity by Last Active, newest first, fills the first two pages with patients who
+never signed in (the first value is row 25 of 42), and Cancellation / No-show sorted by
+Reason, Z to A, starts with every no-show that has no reason.
+
+**What the backend needs.** Keep empty values last in both directions, e.g. sort the
+non-empty rows and append the empty ones.
+
+**What the web app does meanwhile.** Nothing it can do: rows are sorted and paged on the
+server, so the screen shows the server's order.
+
+## REP-03 — System reasons are exported as codes
+
+**New finding (live check of Management → Reports, 7 Oct 2026).**
+
+**What fails.** The Refund and Cancellation / No-show reports put the reason the
+backend recorded itself in the same column as the text people type. System reasons
+are codes — `patient_cancellation`, `hospital_cancellation`, `schedule_change`,
+`payment_after_deadline`, `amount_mismatch` (backend:
+`appointments/services/cancellation.py`, `payments/services/online.py`) — and the
+CSV, Excel and PDF exports print them as they are.
+
+**What the backend needs.** Word the system reasons in the report rows (or send a
+separate `reason_code`), so the exports read like the screen.
+
+**What the web app does meanwhile.** Shows the codes as sent, like the exports.
