@@ -93,6 +93,7 @@ export const METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {
   bank_transfer: 'Bank transfer',
   manual: 'Manual (cash / cheque / UPI)',
   razorpay: 'Razorpay',
+  credit_note: 'Credit note',
 };
 
 export const DUNNING_LABELS: Readonly<Record<DunningKind, string>> = {

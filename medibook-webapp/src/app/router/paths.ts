@@ -373,6 +373,22 @@ export function opsOnboardingPath(): string {
   return opsPath('onboarding');
 }
 
+/** Query param that opens one application on the onboarding pipeline (10·F13). */
+export const ONBOARDING_CASE_PARAM = 'case';
+
+/** The onboarding pipeline with `caseId` open. */
+export function opsOnboardingCasePath(caseId: string): string {
+  return `${opsPath('onboarding')}?${new URLSearchParams({ [ONBOARDING_CASE_PARAM]: caseId }).toString()}`;
+}
+
+/** Query param that filters the Billing screen to one hospital (11·R8). */
+export const BILLING_HOSPITAL_PARAM = 'hospital';
+
+/** The Billing screen filtered to one hospital. */
+export function opsBillingForHospitalPath(hospitalId: string): string {
+  return `${opsPath('billing')}?${new URLSearchParams({ [BILLING_HOSPITAL_PARAM]: hospitalId }).toString()}`;
+}
+
 export function opsCompliancePath(): string {
   return opsPath('compliance');
 }

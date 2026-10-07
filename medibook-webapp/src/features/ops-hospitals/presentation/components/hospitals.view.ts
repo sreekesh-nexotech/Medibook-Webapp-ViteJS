@@ -212,3 +212,19 @@ export function bookabilityGaps(
   if (!h.onlineBookingEnabled) gaps.push('Online booking is switched off.');
   return gaps;
 }
+
+/**
+ * Time zones offered for a hospital (D-09: hospital-local logic runs through
+ * `hospitals.timezone`). India-first; the field is fixed once live (L-20).
+ */
+export const HOSPITAL_TIMEZONES: readonly string[] = [
+  'Asia/Kolkata',
+  'Asia/Kathmandu',
+  'Asia/Dhaka',
+  'Asia/Colombo',
+  'Asia/Dubai',
+  'Asia/Singapore',
+];
+
+/** The default zone for a new hospital (the backend's own default). */
+export const DEFAULT_HOSPITAL_TIMEZONE = 'Asia/Kolkata';

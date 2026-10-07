@@ -6,6 +6,7 @@ import { email, pincode, required } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
 import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
@@ -14,6 +15,10 @@ import type {
   PlatformHospitalDetail,
 } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
 import { useUpdatePlatformHospitalMutation } from '@/features/ops-hospitals/application/queries/useUpdatePlatformHospitalMutation';
+import {
+  DEFAULT_HOSPITAL_TIMEZONE,
+  HOSPITAL_TIMEZONES,
+} from '@/features/ops-hospitals/presentation/components/hospitals.view';
 
 /** Backend patterns (`PatchedPlatformHospitalProfileRequest`). */
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z0-9]{13}$/;
@@ -36,6 +41,7 @@ interface ProfileForm {
   city: string;
   state: string;
   pincode: string;
+  timezone: string;
 }
 
 type FormKey = keyof ProfileForm;
@@ -84,6 +90,7 @@ const SERVER_FIELDS: Readonly<Record<string, FormKey>> = {
   city: 'city',
   state: 'state',
   pincode: 'pincode',
+  timezone: 'timezone',
 };
 
 function toForm(h: PlatformHospitalDetail): ProfileForm {
@@ -100,6 +107,7 @@ function toForm(h: PlatformHospitalDetail): ProfileForm {
     city: h.city,
     state: h.state,
     pincode: h.pincode,
+    timezone: h.timezone ?? DEFAULT_HOSPITAL_TIMEZONE,
   };
 }
 
@@ -129,6 +137,9 @@ function toChanges(v: ProfileForm, h: PlatformHospitalDetail): HospitalProfileCh
     ...(v.city.trim() !== h.city && { city: v.city.trim() }),
     ...(v.state.trim() !== h.state && { state: v.state.trim() }),
     ...(v.pincode.trim() !== h.pincode && { pincode: v.pincode.trim() }),
+    // Fixed once the hospital is live (L-20); only sent before go-live.
+    ...(h.goLiveAt === null &&
+      v.timezone !== (h.timezone ?? DEFAULT_HOSPITAL_TIMEZONE) && { timezone: v.timezone }),
   };
 }
 
@@ -276,6 +287,27 @@ export function HospitalEditProfileModal({ h, onClose }: HospitalEditProfileModa
             </OpsField>
             <OpsField label="PIN Code" required error={errorFor('pincode')}>
               {text('pincode', { inputMode: 'numeric' })}
+            </OpsField>
+            <OpsField
+              label="Time zone"
+              error={errorFor('timezone')}
+              hint={
+                h.goLiveAt === null
+                  ? 'Hospital-local dates (today, sessions, cut-offs) use this zone.'
+                  : 'Fixed once the hospital is live.'
+              }
+            >
+              <Select
+                value={values.timezone}
+                options={
+                  HOSPITAL_TIMEZONES.includes(values.timezone)
+                    ? HOSPITAL_TIMEZONES
+                    : [values.timezone, ...HOSPITAL_TIMEZONES]
+                }
+                onChange={(v) => form.setField('timezone', v)}
+                height={FIELD_HEIGHT}
+                disabled={h.goLiveAt !== null}
+              />
             </OpsField>
           </div>
         </section>
