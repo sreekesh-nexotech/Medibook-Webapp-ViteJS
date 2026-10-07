@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { maskedContactSchema, toContactLine } from '@/core/api/labels.response';
 import { paginatedSchema, toPage } from '@/core/api/pagination';
 import type { Page } from '@/core/api/pagination';
 
@@ -39,6 +40,7 @@ const auditLogResponseSchema = z.object({
   severity: z.string().nullable().optional(),
   actor_name: z.string().nullable().optional(),
   actor_email: z.string().nullable().optional(),
+  actor_contact: maskedContactSchema,
   hospital_name: z.string().nullable().optional(),
 });
 
@@ -91,7 +93,7 @@ export function toAuditLogEntry(dto: AuditLogResponse): AuditLogEntry {
     principal: dto.principal,
     actorUserId: dto.actor_user_id,
     actorName: dto.actor_name ?? null,
-    actorEmail: dto.actor_email ?? null,
+    actorEmail: dto.actor_email ?? toContactLine(dto.actor_contact),
     hospitalId: dto.hospital_id,
     hospitalName: dto.hospital_name ?? null,
     ip: dto.ip,

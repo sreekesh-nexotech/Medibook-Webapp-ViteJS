@@ -103,7 +103,7 @@ export function LogEntryDrawer({
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <Fact label="Who" value={actorLabel(entry)} />
           <Fact label="Account type" value={principalLabel(entry.principal)} />
-          <Fact label="Actor email" value={entry.actorEmail ?? NONE} />
+          <Fact label="Actor contact" value={entry.actorEmail ?? NONE} />
           <Fact
             label="Hospital"
             value={entry.hospitalName ?? (hospitalId ? hospitalId : 'Platform (no hospital)')}

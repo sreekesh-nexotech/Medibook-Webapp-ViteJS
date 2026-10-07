@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { maskedContactSchema, toContactLine } from '@/core/api/labels.response';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import {
@@ -58,7 +59,7 @@ export const dataRequestResponseSchema = z.object({
   retention_carve_out: z.unknown().optional(),
   // B6 (BE-30): names on compliance rows; absent on older backends.
   subject_name: z.string().nullable().optional(),
-  subject_contact: z.string().nullable().optional(),
+  subject_contact: maskedContactSchema,
   hospital_name: z.string().nullable().optional(),
   requested_by_name: z.string().nullable().optional(),
 });
@@ -131,7 +132,7 @@ export function toDataRequest(dto: DataRequestResponse): DataRequest {
     notes: dto.notes ?? null,
     retentionCarveOut: toCarveOut(dto.retention_carve_out),
     subjectName: dto.subject_name ?? null,
-    subjectContact: dto.subject_contact ?? null,
+    subjectContact: toContactLine(dto.subject_contact),
     hospitalName: dto.hospital_name ?? null,
     requestedByName: dto.requested_by_name ?? null,
   };

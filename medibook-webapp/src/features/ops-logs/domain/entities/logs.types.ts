@@ -28,7 +28,7 @@ export interface AuditLogEntry {
   readonly principal: string;
   /** Acting user, or `null` for system and anonymous actions. */
   readonly actorUserId: string | null;
-  /** Actor's display name and email, when the backend sends them (B6/B9). */
+  /** Actor's display name and (masked) contact, when the backend sends them (B6). */
   readonly actorName: string | null;
   readonly actorEmail: string | null;
   readonly hospitalId: string | null;
