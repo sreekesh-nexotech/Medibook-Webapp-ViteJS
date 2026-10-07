@@ -81,13 +81,20 @@ export function acceptsReplies(ticket: SupportTicket): boolean {
   return ticket.status !== 'closed';
 }
 
-/** "Anita Menon · Hospital staff · Lakeshore Hospital", with what the server sent. */
-export function requesterLine(ticket: SupportTicket): string {
-  const parts = [ticket.raisedByName ?? 'Name unavailable', RAISER_LABEL[ticket.raisedByKind]];
-  if (ticket.raisedByKind === 'hospital_staff') {
-    parts.push(ticket.hospitalName ?? 'Hospital name unavailable');
-  }
-  return parts.join(' · ');
+/**
+ * "Anita Menon · Hospital staff · Lakeshore Hospital", with what is known:
+ * names from the server (B9), else the hospital from `hospitalNameOf` (the
+ * console's hospital list), else just the requester kind.
+ */
+export function requesterLine(
+  ticket: SupportTicket,
+  hospitalNameOf: (hospitalId: string) => string | null = () => null,
+): string {
+  const hospital =
+    ticket.hospitalName ?? (ticket.hospitalId ? hospitalNameOf(ticket.hospitalId) : null);
+  return [ticket.raisedByName, RAISER_LABEL[ticket.raisedByKind], hospital]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
 }
 
 /** The assignee as the desk names them; `staffName` resolves an id when the server sends none. */

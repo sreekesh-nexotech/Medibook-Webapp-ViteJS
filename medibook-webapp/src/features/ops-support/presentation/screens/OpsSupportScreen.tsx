@@ -96,6 +96,8 @@ export function OpsSupportScreen() {
           .filter((s) => s.status === 'active')
           .map((s) => ({ id: s.id, name: s.name }))
       : null;
+  const hospitalName = (id: string): string | null =>
+    hospitals.options.find((h) => h.id === id)?.name ?? null;
   const staffName = (id: string): string | null =>
     staff.data?.items.find((s) => s.id === id)?.name ?? null;
 
@@ -197,7 +199,7 @@ export function OpsSupportScreen() {
           ))}
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <div className="w-64">
+          <div className="w-72">
             <SearchField
               value={ticketNo}
               onChange={reset(setTicketNo)}
@@ -304,7 +306,7 @@ export function OpsSupportScreen() {
                   />
                 </button>
               </td>
-              <td className={tdClass}>{requesterLine(t)}</td>
+              <td className={tdClass}>{requesterLine(t, hospitalName)}</td>
               <td className={tdClass}>{CATEGORY_LABEL[t.category]}</td>
               <td className={tdClass}>
                 <Badge status={PRIORITY_LOOK[t.priority].badge}>
@@ -321,7 +323,12 @@ export function OpsSupportScreen() {
         </TableShell>
         <Pager total={total} page={page} pageSize={PAGE_SIZE} onPage={setPage} noun="tickets" />
       </Card>
-      <TicketDrawer ticketId={openId} assignees={assignees} onClose={() => setOpenId(null)} />
+      <TicketDrawer
+        ticketId={openId}
+        assignees={assignees}
+        hospitalNameOf={hospitalName}
+        onClose={() => setOpenId(null)}
+      />
     </div>
   );
 }

@@ -58,6 +58,8 @@ interface TicketDrawerProps {
   ticketId: string | null;
   /** Active staff (`staff.view`); `null` when this role cannot list them. */
   assignees: readonly AssigneeOption[] | null;
+  /** Names a hospital the server did not name (the console's hospital list). */
+  hospitalNameOf: (hospitalId: string) => string | null;
   onClose: () => void;
 }
 
@@ -176,9 +178,11 @@ function TicketControls({
 function TicketBody({
   ticket,
   assignees,
+  hospitalNameOf,
 }: {
   ticket: SupportTicketDetail;
   assignees: readonly AssigneeOption[] | null;
+  hospitalNameOf: (hospitalId: string) => string | null;
 }) {
   const { can } = useOpsPermission();
   const entries = threadEntries(ticket);
@@ -195,7 +199,7 @@ function TicketBody({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Fact label="Raised by">{requesterLine(ticket)}</Fact>
+        <Fact label="Raised by">{requesterLine(ticket, hospitalNameOf)}</Fact>
         <Fact label="Raised">{when(ticket.createdAt)}</Fact>
         <Fact label="Last activity">{when(ticket.updatedAt)}</Fact>
         {!can('support.edit') && <Fact label="Assignee">{assigned}</Fact>}
@@ -261,7 +265,7 @@ function TicketBody({
  * assignee (`support.edit`, guarded by the ticket's version — B9 L-25), the
  * conversation with internal notes, and the reply box (`support.add`).
  */
-export function TicketDrawer({ ticketId, assignees, onClose }: TicketDrawerProps) {
+export function TicketDrawer({ ticketId, assignees, hospitalNameOf, onClose }: TicketDrawerProps) {
   const ticket = useTicketQuery(ticketId);
   if (ticketId === null) return null;
   const data = ticket.data;
@@ -284,7 +288,7 @@ export function TicketDrawer({ ticketId, assignees, onClose }: TicketDrawerProps
           onRetry={() => void ticket.refetch()}
         />
       ) : (
-        <TicketBody ticket={ticket.data} assignees={assignees} />
+        <TicketBody ticket={ticket.data} assignees={assignees} hospitalNameOf={hospitalNameOf} />
       )}
     </Drawer>
   );

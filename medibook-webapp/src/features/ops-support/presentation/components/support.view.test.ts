@@ -92,8 +92,20 @@ describe('names', () => {
   it('describes the requester with what the server sent', () => {
     expect(requesterLine(ticket())).toBe('Anita Menon · Hospital staff · Lakeshore Hospital');
     expect(
-      requesterLine(ticket({ raisedByKind: 'patient', raisedByName: null, hospitalId: null })),
-    ).toBe('Name unavailable · Patient');
+      requesterLine(
+        ticket({
+          raisedByKind: 'patient',
+          raisedByName: null,
+          hospitalId: null,
+          hospitalName: null,
+        }),
+      ),
+    ).toBe('Patient');
+    const older = ticket({ raisedByName: null, hospitalName: null });
+    expect(requesterLine(older)).toBe('Hospital staff');
+    expect(requesterLine(older, () => 'Lakeshore Hospital')).toBe(
+      'Hospital staff · Lakeshore Hospital',
+    );
   });
 
   it('names the assignee from the ticket, then the staff list', () => {

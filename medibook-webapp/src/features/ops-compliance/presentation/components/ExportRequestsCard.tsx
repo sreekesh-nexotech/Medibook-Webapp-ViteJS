@@ -233,7 +233,7 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
         />
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="w-64">
+        <div className="w-72">
           <SearchField
             value={requestNo}
             onChange={(v) => {
