@@ -165,6 +165,7 @@ Paths under `backend:` are in the Django repository.
 | MSG-03    | The test backend's gateways never confirm delivery                         | Low      | Test deliveries stay at Sent                        |
 | AUD-01    | Audit masking turns digit runs inside ids into `[phone]`                   | Medium   | Shows the values as stored                          |
 | AUD-02    | The audit CSV leaves out what changed, and stops at 10,000 rows            | Low      | The screen's detail view shows every change         |
+| HELP-01   | Hospitals have no FAQ endpoint; FAQs have no audience                      | Low      | Help answers are written in the app                 |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1406,3 +1407,19 @@ to the export, and mark a capped file (or page it).
 
 **What the web app does meanwhile.** The screen's detail drawer shows the before and after
 values; the export is the server's file as it is.
+
+## HELP-01 — Hospitals have no FAQ endpoint; FAQs have no audience
+
+**New finding (live check of System → Help & Support, 8 Oct 2026).**
+
+**What fails.** Medibook keeps FAQs in `faq_entries` (`category, question, answer_md,
+sort_order, is_published` — `platform/models/faq_entry.py`), edited at
+`/platform/config/faqs` and served to patients at `/patient/faqs`. There is no hospital
+endpoint, and an entry has no audience, so patient answers and hospital-staff answers
+cannot be kept apart.
+
+**What the backend needs.** An `audience` (patient / hospital) on FAQ entries and
+`GET /hospital/faqs` for the published hospital ones.
+
+**What the web app does meanwhile.** The help answers are written in the app and change
+with the features they describe (OBS-07).
