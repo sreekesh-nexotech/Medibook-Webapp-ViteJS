@@ -560,6 +560,18 @@ const SPEC = [
   },
   { key: 'ops-reports.reportListResponseSchema', surface: 'platform', path: '/platform/reports' },
   {
+    key: 'ops-reports.reportResultResponseSchema',
+    surface: 'platform',
+    path: '/platform/reports/bookings',
+    params: { page: 1, page_size: 5, booking_date_from: '2026-01-01' },
+  },
+  {
+    key: 'ops-reports.reportSchedulePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/report-schedules',
+    params: LIST,
+  },
+  {
     key: 'ops-analytics.overviewResponseSchema',
     surface: 'platform',
     path: '/platform/analytics/overview',
