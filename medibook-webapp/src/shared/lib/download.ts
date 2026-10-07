@@ -27,12 +27,37 @@ const REVOKE_DELAY_MS = 1000;
 export type CsvCell = string | number | null | undefined;
 
 /**
- * RFC-4180 cell: empty for nullish, always quoted, embedded `"` doubled.
- * Quoting unconditionally means commas, newlines and leading zeros survive.
+ * Characters that make a spreadsheet read a cell as a formula (or, for TAB and
+ * CR, as a cell break that can smuggle one in): `= + - @ \t \r` (OWASP CSV
+ * injection, UAT-75).
+ */
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+/** A plain number written as text ("-250", "+12.5") is data, not a formula. */
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
+
+/** Prefix that makes Excel, Sheets and LibreOffice show the cell as literal text. */
+const FORMULA_ESCAPE = "'";
+
+/**
+ * Neutralise a cell a spreadsheet would otherwise evaluate: user text such as
+ * a patient name `=HYPERLINK(…)` or `@SUM(…)` is prefixed with `'` so it opens
+ * as text (UAT-75). Numbers, and numeric strings like "-250", are left alone
+ * so amounts and refunds still sum.
+ */
+export function neutraliseCsvFormula(cell: CsvCell): string {
+  if (cell == null) return '';
+  if (typeof cell === 'number') return String(cell);
+  return FORMULA_TRIGGER.test(cell) && !PLAIN_NUMBER.test(cell) ? `${FORMULA_ESCAPE}${cell}` : cell;
+}
+
+/**
+ * RFC-4180 cell: empty for nullish, always quoted, embedded `"` doubled, and
+ * formula prefixes neutralised. Quoting unconditionally means commas,
+ * newlines and leading zeros survive.
  */
 function csvCell(cell: CsvCell): string {
-  if (cell == null) return '""';
-  return `"${String(cell).replace(/"/g, '""')}"`;
+  return `"${neutraliseCsvFormula(cell).replace(/"/g, '""')}"`;
 }
 
 /** Serialise rows to an RFC-4180 CSV body (no BOM — `downloadCsv` adds it). */
