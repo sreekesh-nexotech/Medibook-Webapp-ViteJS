@@ -117,6 +117,11 @@ const SPEC = [
     path: '/hospital/dashboard/reception',
   },
   {
+    key: 'notifications.hospitalAlertFeedResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/notifications',
+  },
+  {
     key: 'patients.hospitalPatientPageResponseSchema',
     surface: 'hospital',
     path: '/hospital/patients',
@@ -373,6 +378,25 @@ const SPEC = [
     }),
   },
   {
+    key: 'ops-hospitals.numberingSeriesResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/numbering/booking',
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
+    key: 'ops-hospitals.commissionHistoryResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/commission-history',
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
+    key: 'ops-hospitals.payoutBankAccountPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/bank-accounts',
+    params: LIST,
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
     key: 'ops-hospitals.caseListResponseSchema',
     surface: 'platform',
     path: '/platform/onboarding/cases',
@@ -411,6 +435,13 @@ const SPEC = [
     needs: (fx) => ({ id: first(fx, 'ops-plans.planPageResponseSchema')?.id }),
   },
   {
+    key: 'ops-plans.subscriberRowsPageSchema',
+    surface: 'platform',
+    path: '/platform/plans/{id}/subscribers',
+    params: { ...LIST, status: 'trialing,active,past_due,grace,read_only' },
+    needs: (fx) => ({ id: first(fx, 'ops-plans.planPageResponseSchema')?.id }),
+  },
+  {
     key: 'ops-billing.invoicePageSchema',
     surface: 'platform',
     path: '/platform/billing/invoices',
@@ -429,6 +460,23 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-billing.paymentSchema',
+    surface: 'platform',
+    path: '/platform/billing/payments/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-billing.paymentPageSchema')?.id }),
+  },
+  {
+    key: 'ops-billing.billingSummarySchema',
+    surface: 'platform',
+    path: '/platform/billing/summary',
+  },
+  {
+    key: 'ops-billing.subscriptionPageSchema',
+    surface: 'platform',
+    path: '/platform/billing/subscriptions',
+    params: LIST,
+  },
+  {
     key: 'ops-billing.dunningPageSchema',
     surface: 'platform',
     path: '/platform/billing/dunning',
@@ -441,6 +489,13 @@ const SPEC = [
     needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.subscription?.id }),
   },
   {
+    key: 'ops-billing.prorationPreviewSchema',
+    surface: 'platform',
+    path: '/platform/billing/subscriptions/{id}/proration-preview',
+    params: { billing_period: 'yearly' },
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.subscription?.id }),
+  },
+  {
     key: 'ops-billing.planChangePageSchema',
     surface: 'platform',
     path: '/platform/billing/plan-change-requests',
@@ -450,6 +505,18 @@ const SPEC = [
     key: 'ops-settlements.periodPageResponseSchema',
     surface: 'platform',
     path: '/platform/settlements/periods',
+    params: LIST,
+  },
+  {
+    key: 'ops-settlements.periodDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/settlements/periods/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-settlements.periodPageResponseSchema')?.id }),
+  },
+  {
+    key: 'ops-settlements.payoutPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/settlements/payouts',
     params: LIST,
   },
   {
