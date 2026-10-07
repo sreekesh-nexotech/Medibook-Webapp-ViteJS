@@ -193,6 +193,22 @@ export function hospitalBookForPatientPath(role: HospitalRole, mrn: string): str
   return `${hospitalPath(role, 'create')}?${new URLSearchParams({ [BOOK_FOR_MRN_PARAM]: mrn })}`;
 }
 
+/** Query param selecting a tab of the Patients screen. */
+export const PATIENTS_TAB_PARAM = 'tab';
+
+/** `PATIENTS_TAB_PARAM` value of the patient approvals queue (D-29). */
+export const PATIENTS_APPROVALS_TAB = 'approvals';
+
+/** One patient's detail page; the MRN is encoded, since a hospital's MRN format may use `/` or `#`. */
+export function hospitalPatientPath(role: HospitalRole, mrn: string): string {
+  return `/${role}/${HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(':mrn', encodeURIComponent(mrn))}`;
+}
+
+/** The Patients screen on its approvals queue. */
+export function hospitalPatientApprovalsPath(role: HospitalRole): string {
+  return `${hospitalPath(role, 'patients')}?${new URLSearchParams({ [PATIENTS_TAB_PARAM]: PATIENTS_APPROVALS_TAB })}`;
+}
+
 /** Token Management, filtered to one department. */
 export function hospitalTokenForDeptPath(role: HospitalRole, dept: string): string {
   return `${hospitalPath(role, 'token')}?${new URLSearchParams({ [TOKEN_DEPT_PARAM]: dept })}`;

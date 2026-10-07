@@ -2,9 +2,12 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  PatientApproval,
+  PatientApprovalListParams,
   PatientAppointmentHistory,
   PatientChangeDecision,
   PatientCreateOutcome,
+  PatientDeleteOutcome,
   PatientDemographics,
   PatientEditOutcome,
   PatientListParams,
@@ -24,10 +27,14 @@ export interface PatientsRepository {
     changes: Partial<PatientDemographics>,
     version: number,
   ): Promise<Result<PatientEditOutcome>>;
+  /** Soft-deletes at once, or becomes a change request when the hospital requires approval. */
+  deletePatient(id: string, version: number): Promise<Result<PatientDeleteOutcome>>;
   /** The latest `limit` appointments, plus the total on record. */
   listPatientAppointments(id: string, limit: number): Promise<Result<PatientAppointmentHistory>>;
   /** Consultations the patient actually attended here (completed appointments). */
   countCompletedVisits(id: string): Promise<Result<number>>;
+  /** One page of the approvals queue. */
+  listApprovals(params: PatientApprovalListParams): Promise<Result<Page<PatientApproval>>>;
   approvePatientChange(requestId: string): Promise<Result<PatientChangeDecision>>;
   rejectPatientChange(requestId: string, note: string): Promise<Result<PatientChangeDecision>>;
 }

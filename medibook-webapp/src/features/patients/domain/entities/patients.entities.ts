@@ -11,6 +11,16 @@ export type PatientSource = 'desk' | 'online';
 
 export type PatientChangeKind = 'edit' | 'delete';
 
+/** One field an edit request would change: what the record holds now, and what it would hold. */
+export interface PatientFieldChange {
+  /** API field name, e.g. `phone_e164`. */
+  readonly field: string;
+  /** Display text of the current value; `null` when unset. */
+  readonly before: string | null;
+  /** Display text of the proposed value; `null` when it would be cleared. */
+  readonly after: string | null;
+}
+
 /**
  * An edit or delete waiting for an admin (D-29). Only the detail read
  * carries it; list rows always have `null`.
@@ -21,6 +31,12 @@ export interface PendingPatientChange {
   readonly requestedAt: string;
   /** API field names the change would alter (empty for a delete). */
   readonly changedFields: readonly string[];
+  /** Old → new value per changed field (empty for a delete). */
+  readonly changes: readonly PatientFieldChange[];
+  /** Who asked for it, when the server names them. */
+  readonly requestedByName: string | null;
+  /** The requester's user id, when the server sends it (to hide Approve on one's own request). */
+  readonly requestedByUserId: string | null;
 }
 
 export interface PatientRecord {
@@ -43,8 +59,14 @@ export interface PatientRecord {
   readonly state: string | null;
   readonly pincode: string | null;
   readonly source: PatientSource;
-  /** Linked to a Medibook app account. */
+  /**
+   * The server says the record is this same person's Medibook account
+   * (decision 6: link status is disclosed only on a same-person match).
+   */
   readonly isLinked: boolean;
+  /** How the link was made (`phone_auto`, `booking`, …), when disclosed. */
+  readonly linkMethod: string | null;
+  readonly linkedAt: string | null;
   readonly pendingChange: PendingPatientChange | null;
   readonly createdAt: string;
   /** Row version for `If-Match`. */
@@ -61,6 +83,14 @@ export interface PatientDemographics {
   readonly dateOfBirth: string | null;
   readonly gender: PatientGender | null;
   readonly addressLine1: string | null;
+  readonly addressLine2: string | null;
+  readonly addressLine3: string | null;
+  readonly city: string | null;
+  readonly state: string | null;
+  /** Six digits. */
+  readonly pincode: string | null;
+  /** The hospital's number from before Medibook (O-05): searchable, never primary. */
+  readonly legacyMrn: string | null;
 }
 
 export type PatientSortField = 'full_name' | 'mrn' | 'created_at';
@@ -86,6 +116,10 @@ export interface PatientCreateOutcome {
 
 export type PatientEditOutcome =
   | { readonly status: 'applied'; readonly patient: PatientRecord }
+  | { readonly status: 'pendingApproval'; readonly requestId: string };
+
+export type PatientDeleteOutcome =
+  | { readonly status: 'deleted' }
   | { readonly status: 'pendingApproval'; readonly requestId: string };
 
 export type AppointmentStatus =
@@ -130,6 +164,41 @@ export type PatientChangeStatus = 'pending' | 'approved' | 'rejected';
 
 export interface PatientChangeDecision {
   readonly id: string;
+  readonly kind: PatientChangeKind;
   readonly status: PatientChangeStatus;
   readonly hospitalPatientId: string;
+}
+
+/** The record a change request is about, as the approvals queue names it. */
+export interface PatientApprovalSubject {
+  readonly id: string;
+  readonly mrn: string;
+  readonly fullName: string;
+  /** Soft-deleted since (an approved delete). */
+  readonly isDeleted: boolean;
+}
+
+/** One row of the patient approvals queue (D-29). */
+export interface PatientApproval {
+  readonly id: string;
+  readonly kind: PatientChangeKind;
+  readonly status: PatientChangeStatus;
+  readonly patient: PatientApprovalSubject;
+  /** Old → new value per changed field (empty for a delete). */
+  readonly changes: readonly PatientFieldChange[];
+  readonly requestedByName: string | null;
+  readonly requestedByUserId: string | null;
+  readonly requestedAt: string;
+  readonly reviewedByName: string | null;
+  readonly reviewedAt: string | null;
+  readonly reviewNote: string | null;
+}
+
+/** Server filters for the approvals queue. */
+export interface PatientApprovalListParams {
+  /** One-based. */
+  readonly page: number;
+  readonly pageSize: number;
+  readonly statuses: readonly PatientChangeStatus[];
+  readonly kind: PatientChangeKind | null;
 }

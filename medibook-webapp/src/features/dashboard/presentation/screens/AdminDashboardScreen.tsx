@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
+import {
+  hospitalPatientApprovalsPath,
+  hospitalPath,
+  isHospitalRole,
+  type HospitalStaticView,
+} from '@/app/router/paths';
 import { cn } from '@/shared/lib/cn';
 import { money, moneyShort } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
@@ -73,6 +78,8 @@ interface Alert {
   readonly t: string;
   readonly s: string;
   readonly go: HospitalStaticView;
+  /** A more precise target than the view itself (e.g. a tab of it). */
+  readonly href?: string;
 }
 
 function plural(n: number, word: string): string {
@@ -245,8 +252,9 @@ export function AdminDashboardScreen() {
       icon: 'users',
       iconClass: 'bg-p-100 text-p-500',
       t: `${plural(alerts.pendingPatientChanges, 'patient change')} to review`,
-      s: 'Profile edits patients asked for',
+      s: 'Desk edits and deletions waiting for an administrator',
       go: 'patients',
+      href: hospitalPatientApprovalsPath(activeRole),
     });
   }
   if (alerts && alerts.cashSessionsToReconcile > 0) {
@@ -362,7 +370,7 @@ export function AdminDashboardScreen() {
                 <button
                   type="button"
                   key={a.t}
-                  onClick={() => go(a.go)}
+                  onClick={() => (a.href ? navigate(a.href) : go(a.go))}
                   className="border-border-soft hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 rounded-md border p-3 text-left transition-colors duration-150"
                 >
                   <div

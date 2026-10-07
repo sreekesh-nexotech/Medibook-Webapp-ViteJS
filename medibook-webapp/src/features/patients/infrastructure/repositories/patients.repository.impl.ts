@@ -4,6 +4,8 @@ import { clientFailure } from '@/core/error/toFailure';
 
 import type { PatientsRepository } from '@/features/patients/domain/repositories/patients.repository';
 import {
+  deletePatient,
+  getApprovals,
   getPatient,
   getPatientAppointments,
   getPatients,
@@ -14,6 +16,7 @@ import {
 } from '@/features/patients/infrastructure/data-sources/remote/patients.api';
 import { toPatientRequestBody } from '@/features/patients/infrastructure/data-sources/remote/patients.request';
 import {
+  toPatientApproval,
   toPatientAppointment,
   toPatientChangeDecision,
   toPatientRecord,
@@ -31,8 +34,9 @@ export const patientsRepository: PatientsRepository = {
   listPatients: (params) => attempt(async () => toPage(await getPatients(params), toPatientRecord)),
 
   // The route carries the MRN; the API is keyed by UUID. Resolve it through
-  // the search (which also matches partial MRNs), then read the detail, which
-  // is the only read that carries the pending change request.
+  // the exact MRN filter (or, on an older backend, the search, which also
+  // matches partial MRNs), then read the detail, which is the only read that
+  // carries the pending change request.
   getPatientByMrn: (mrn) =>
     attempt(async () => {
       const wanted = mrn.trim().toUpperCase();
@@ -55,6 +59,17 @@ export const patientsRepository: PatientsRepository = {
         ? { status: 'pendingApproval' as const, requestId: outcome.request.request_id }
         : { status: 'applied' as const, patient: toPatientRecord(outcome.patient) };
     }),
+
+  deletePatient: (id, version) =>
+    attempt(async () => {
+      const outcome = await deletePatient(id, version);
+      return outcome.kind === 'requested'
+        ? { status: 'pendingApproval' as const, requestId: outcome.request.request_id }
+        : { status: 'deleted' as const };
+    }),
+
+  listApprovals: (params) =>
+    attempt(async () => toPage(await getApprovals(params), toPatientApproval)),
 
   // Cancelled, no-show and upcoming bookings are not visits.
   countCompletedVisits: (id) =>

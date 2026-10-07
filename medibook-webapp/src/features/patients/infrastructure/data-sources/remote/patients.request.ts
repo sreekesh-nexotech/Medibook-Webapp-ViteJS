@@ -4,7 +4,8 @@ import type { PatientDemographics } from '@/features/patients/domain/entities/pa
  * Request DTOs for `POST /hospital/patients` (`HospitalPatientCreateRequest`)
  * and `PATCH /hospital/patients/{id}` (`PatchedHospitalPatientEditRequest`).
  * Only keys present in the input are sent, so an edit carries just the fields
- * that changed (the backend rejects an edit with nothing to change).
+ * that changed (the backend rejects an edit with nothing to change, and with
+ * D-29 approval on every key sent becomes part of the request).
  */
 
 export interface PatientRequestBody {
@@ -15,16 +16,36 @@ export interface PatientRequestBody {
   date_of_birth?: string | null;
   gender?: PatientDemographics['gender'];
   address_line1?: string | null;
+  address_line2?: string | null;
+  address_line3?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  legacy_mrn?: string | null;
 }
 
+/** Entity key → API key, for every demographic the desk can send. */
+const REQUEST_KEYS: Readonly<Record<keyof PatientDemographics, keyof PatientRequestBody>> = {
+  firstName: 'first_name',
+  lastName: 'last_name',
+  phone: 'phone_e164',
+  email: 'email',
+  dateOfBirth: 'date_of_birth',
+  gender: 'gender',
+  addressLine1: 'address_line1',
+  addressLine2: 'address_line2',
+  addressLine3: 'address_line3',
+  city: 'city',
+  state: 'state',
+  pincode: 'pincode',
+  legacyMrn: 'legacy_mrn',
+};
+
 export function toPatientRequestBody(input: Partial<PatientDemographics>): PatientRequestBody {
-  const body: PatientRequestBody = {};
-  if (input.firstName !== undefined) body.first_name = input.firstName;
-  if (input.lastName !== undefined) body.last_name = input.lastName;
-  if (input.phone !== undefined) body.phone_e164 = input.phone;
-  if (input.email !== undefined) body.email = input.email;
-  if (input.dateOfBirth !== undefined) body.date_of_birth = input.dateOfBirth;
-  if (input.gender !== undefined) body.gender = input.gender;
-  if (input.addressLine1 !== undefined) body.address_line1 = input.addressLine1;
-  return body;
+  const body: Record<string, unknown> = {};
+  for (const [key, apiKey] of Object.entries(REQUEST_KEYS)) {
+    const value = input[key as keyof PatientDemographics];
+    if (value !== undefined) body[apiKey] = value;
+  }
+  return body as PatientRequestBody;
 }

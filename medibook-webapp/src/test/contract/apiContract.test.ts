@@ -272,6 +272,9 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
   reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
+  // New reads of fix wave 1 (fe/f3). Their recorder entries are in place;
+  // record them against the merged backend and move them to CONTRACTS.
+  approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */
