@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  OpsAssignableStaff,
   OpsPermission,
   OpsStaffMember,
   OpsStaffRole,
@@ -31,6 +32,14 @@ const staffSchema = z.object({
   version: z.number().int(),
 });
 
+/** `platform/serializers/staff_assignable.py` — active staff only, no email or phone. */
+const assignableStaffSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  status: z.string(),
+});
+
 const roleSchema = z.object({
   id: z.string(),
   code: z.string(),
@@ -42,6 +51,7 @@ const roleSchema = z.object({
 
 export const staffResponseSchema = staffSchema;
 export const staffPageResponseSchema = paginatedSchema(staffSchema);
+export const assignableStaffPageResponseSchema = paginatedSchema(assignableStaffSchema);
 export const roleResponseSchema = roleSchema;
 export const rolePageResponseSchema = paginatedSchema(roleSchema);
 
@@ -59,6 +69,8 @@ export const permissionsResponseSchema = z.object({
 
 export type StaffResponse = z.infer<typeof staffSchema>;
 export type StaffPageResponse = z.infer<typeof staffPageResponseSchema>;
+export type AssignableStaffResponse = z.infer<typeof assignableStaffSchema>;
+export type AssignableStaffPageResponse = z.infer<typeof assignableStaffPageResponseSchema>;
 export type RoleResponse = z.infer<typeof roleSchema>;
 export type RolePageResponse = z.infer<typeof rolePageResponseSchema>;
 export type PermissionsResponse = z.infer<typeof permissionsResponseSchema>;
@@ -99,4 +111,8 @@ export function toPermissions(dto: PermissionsResponse): readonly OpsPermission[
       moduleLabel: dot > 0 ? p.label.slice(0, dot) : p.module,
     };
   });
+}
+
+export function toAssignableStaff(dto: AssignableStaffResponse): OpsAssignableStaff {
+  return { id: dto.id, name: dto.name, role: dto.role };
 }

@@ -115,7 +115,6 @@ function priceFor(plan: BillingPlan, period: string): { paise: number; suffix: s
  */
 export function PlanBilling() {
   const { can } = usePermission();
-  const canEdit = can('Billing & Settlements.edit');
 
   const subscriptionQuery = useSubscriptionQuery();
   const usageQuery = useBillingUsageQuery();
@@ -124,8 +123,8 @@ export function PlanBilling() {
   // The newest invoices, whatever page the table is on — the source of the
   // "payment due" banner.
   const latestInvoicesQuery = useInvoicesQuery(1, INVOICE_PAGE_SIZE);
-  // The hospital route stays on `billing_settlements.edit` (only the ops list moved to view).
-  const requestsQuery = usePlanChangeRequestsQuery(canEdit);
+  // Reading the requests needs `billing_settlements.view` (decision 13); raising one needs `.edit`.
+  const requestsQuery = usePlanChangeRequestsQuery(can('Billing & Settlements.view'));
   const requestMutation = useRequestPlanChangeMutation();
   const creditNotesQuery = useCreditNotesQuery();
 

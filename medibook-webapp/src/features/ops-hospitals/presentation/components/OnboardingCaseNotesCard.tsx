@@ -12,7 +12,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { OnboardingCaseDetail } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
 import { useUpdateOnboardingCaseMutation } from '@/features/ops-hospitals/application/queries/useUpdateOnboardingCaseMutation';
-import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
+import { useAssignableStaffQuery } from '@/features/ops-users/application/queries/useAssignableStaffQuery';
 
 /** `OnboardingCaseUpdateSerializer.notes` max length. */
 const NOTES_MAX = 5000;
@@ -26,18 +26,17 @@ interface OnboardingCaseNotesCardProps {
 /**
  * Internal notes and the operator working the case (10·R12, `PATCH
  * /platform/onboarding/cases/{id} {notes, assigned_to_id}`, If-Match).
- * Choosing an assignee needs the staff list (`staff.view`); other roles see
- * whether the case is assigned.
+ * The picker lists active staff from `GET /platform/staff/assignable`, which
+ * `onboarding.edit` may read without the full staff list (`staff.view`).
  */
 export function OnboardingCaseNotesCard({ detail }: OnboardingCaseNotesCardProps) {
   const { can } = useOpsPermission();
   const canEdit = can('onboarding.edit');
-  const canListStaff = can('staff.view');
-  const staff = useOpsStaffQuery(canListStaff);
+  const staff = useAssignableStaffQuery();
   const update = useUpdateOnboardingCaseMutation();
   const [notes, setNotes] = useState(detail.notes ?? '');
 
-  const active = (staff.data?.items ?? []).filter((m) => m.status === 'active');
+  const active = staff.data?.items ?? [];
   const assignee = active.find((m) => m.id === detail.assignedToId) ?? null;
   const isNotesDirty = notes.trim() !== (detail.notes ?? '').trim();
 
@@ -90,11 +89,8 @@ export function OnboardingCaseNotesCard({ detail }: OnboardingCaseNotesCardProps
             </div>
           )}
         </div>
-        <OpsField
-          label="Assigned to"
-          hint={canListStaff ? undefined : 'Assigning needs access to the staff list.'}
-        >
-          {canEdit && canListStaff ? (
+        <OpsField label="Assigned to">
+          {canEdit ? (
             <Select
               value={assignee?.name ?? UNASSIGNED}
               options={[UNASSIGNED, ...active.map((m) => m.name)]}

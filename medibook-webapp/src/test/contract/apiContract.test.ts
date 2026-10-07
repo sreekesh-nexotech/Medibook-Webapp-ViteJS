@@ -332,6 +332,8 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
   creditNotePageResponseSchema: 'New in wave 1 — record against the merged backend.',
   statementPdfLinkSchema: 'Reading it renders and stores the statement PDF (SET-02).',
+  assignableStaffPageResponseSchema:
+    'New at integration (B10): GET /platform/staff/assignable — record against the merged backend.',
   // New to the web app in fe/f4 (shells, ops hospitals, billing, plans, settlements). The
   // recorder's SPEC lists each one; record against the merged backend at integration (several
   // come from the B4 / B9 contracts and are not served by the recorded backend yet).
