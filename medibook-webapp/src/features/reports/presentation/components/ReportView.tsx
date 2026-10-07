@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { dateRange } from '@/shared/lib/validate';
@@ -30,7 +29,7 @@ import type { ReportCatalogItem } from '../reports.design';
 import { ReportDataTable } from './ReportDataTable';
 import { ReportFilterControls } from './ReportFilterControls';
 import { ReportQueuedExport } from './ReportQueuedExport';
-import { kpiTile } from './reportsFormat';
+import { kpiTile, reportFailureText } from './reportsFormat';
 import { saveBlob } from './reportsDownload';
 
 const EXPORT_FAILED = 'Could not export the report. Please try again.';
@@ -138,7 +137,7 @@ export function ReportView({ report }: ReportViewProps) {
             );
           }
         },
-        onError: (failure) => toast(isFailure(failure) ? failure.message : EXPORT_FAILED, 'error'),
+        onError: (failure) => toast(reportFailureText(failure, EXPORT_FAILED), 'error'),
       },
     );
   };
@@ -157,7 +156,7 @@ export function ReportView({ report }: ReportViewProps) {
     : result.isError && !data
       ? {
           kind: 'error',
-          message: isFailure(result.error) ? result.error.message : REPORT_FAILED,
+          message: reportFailureText(result.error, REPORT_FAILED),
           onRetry: () => void result.refetch(),
         }
       : !data || result.isPlaceholderData
@@ -282,7 +281,7 @@ export function ReportView({ report }: ReportViewProps) {
         {result.isError && data ? (
           <ErrorState
             inline
-            message={isFailure(result.error) ? result.error.message : REPORT_FAILED}
+            message={reportFailureText(result.error, REPORT_FAILED)}
             onRetry={() => void result.refetch()}
           />
         ) : (

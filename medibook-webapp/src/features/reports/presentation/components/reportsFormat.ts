@@ -1,3 +1,4 @@
+import { isFailure } from '@/core/error/failure';
 import { fmtDate, money } from '@/shared/lib/format';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
@@ -128,4 +129,16 @@ export function fileSizeCopy(bytes: number): string {
   if (bytes < BYTES_PER_KB) return `${bytes} B`;
   const kb = bytes / BYTES_PER_KB;
   return kb < BYTES_PER_KB ? `${kb.toFixed(1)} KB` : `${(kb / BYTES_PER_KB).toFixed(1)} MB`;
+}
+
+/**
+ * What to say when a report read or export is refused. A date outside
+ * 2000–2100 or a range wider than the report allows comes back as field
+ * errors under a generic message (backend B7, M-39), so those sentences are
+ * shown instead; anything else keeps the server's message.
+ */
+export function reportFailureText(error: unknown, fallback: string): string {
+  if (!isFailure(error)) return fallback;
+  const details = [...new Set(Object.values(error.fieldErrors).flat())];
+  return details.length > 0 ? details.join(' ') : error.message;
 }

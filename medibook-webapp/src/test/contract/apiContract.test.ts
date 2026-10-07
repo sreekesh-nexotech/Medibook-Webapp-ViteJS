@@ -269,8 +269,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
 const NOT_RECORDED: Readonly<Record<string, string>> = {
   receiptPdfResponseSchema: 'Reading it generates and stores the receipt PDF.',
   auditLogExportResponseSchema: 'Reading it starts an export file.',
-  reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
-  reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
+  reportExportDeferredResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
+  reportExportQueuedResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
   // New reads of fix wave 1 (fe/f3). Their recorder entries are in place;
   // record them against the merged backend and move them to CONTRACTS.
