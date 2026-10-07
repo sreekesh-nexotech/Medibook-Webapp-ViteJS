@@ -281,6 +281,7 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
 const COVERED_BY_PAGE: Readonly<Record<string, string>> = {
   loginEventResponseSchema: 'loginEventPageSchema',
   configChangeResponseSchema: 'configChangePageSchema',
+  deliveryResponseSchema: 'deliveryPageResponseSchema',
 };
 
 const fixtures = import.meta.glob<unknown>('./fixtures/*.json', { eager: true, import: 'default' });

@@ -18,6 +18,9 @@ export interface DeliveryQueryParams {
   readonly sort: string;
   readonly status?: string;
   readonly channel?: string;
+  readonly date_from?: string;
+  readonly date_to?: string;
+  readonly q?: string;
 }
 
 export function toMessageSendRequest(input: MessageSendInput): MessageSendRequest {
@@ -29,10 +32,15 @@ export function toMessageSendRequest(input: MessageSendInput): MessageSendReques
 }
 
 /** Filters only — omitted rather than sent empty. */
-function filterParams(filters: DeliveryFilters): Pick<DeliveryQueryParams, 'status' | 'channel'> {
+function filterParams(
+  filters: DeliveryFilters,
+): Pick<DeliveryQueryParams, 'status' | 'channel' | 'date_from' | 'date_to' | 'q'> {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.channel ? { channel: filters.channel } : {}),
+    ...(filters.dateFrom ? { date_from: filters.dateFrom } : {}),
+    ...(filters.dateTo ? { date_to: filters.dateTo } : {}),
+    ...(filters.q.trim() ? { q: filters.q.trim() } : {}),
   };
 }
 

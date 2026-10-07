@@ -16,6 +16,8 @@ export interface MessagingRepository {
   listTemplates(channel: PatientChannel): Promise<Result<readonly MessagingTemplate[]>>;
   /** One outbox page. */
   listDeliveries(params: DeliveryListParams): Promise<Result<Page<MessageDelivery>>>;
+  /** One outbox row in full. */
+  getDelivery(id: string): Promise<Result<MessageDelivery>>;
   /** Every outbox row matching `filters`, newest first — for export. */
   listAllDeliveries(filters: DeliveryFilters): Promise<Result<readonly MessageDelivery[]>>;
   /**

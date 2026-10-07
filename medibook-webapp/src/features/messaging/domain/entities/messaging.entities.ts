@@ -42,6 +42,7 @@ export interface MessagingTemplate {
 
 export const DELIVERY_STATUSES = [
   'queued',
+  'sending',
   'sent',
   'delivered',
   'failed',
@@ -52,13 +53,22 @@ export const DELIVERY_STATUSES = [
 
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
+/**
+ * Where the address came from (backend B7): the booking account's phone (every
+ * app booking, dependants included), the hospital record's phone (a walk-in
+ * without an app account), the account's devices (push) or a staff email.
+ */
+export type RecipientSource = 'account' | 'hospital_record' | 'devices' | 'staff';
+
 /** One outbox row — a message to one recipient on one channel. */
 export interface MessageDelivery {
   readonly id: string;
   readonly channel: MessagingChannel;
   readonly eventCode: string;
-  /** Phone number, email address or device the channel uses. */
+  /** Phone number, email address or device the channel actually used. */
   readonly recipientAddress: string;
+  /** `null` on an older backend. */
+  readonly recipientSource: RecipientSource | null;
   readonly status: DeliveryStatus;
   readonly renderedSubject: string | null;
   /** ISO date-time it was queued. */
@@ -68,8 +78,15 @@ export interface MessageDelivery {
   readonly failedAt: string | null;
   /** Provider's reason for a failure, when one was given. */
   readonly errorMessage: string | null;
+  /** Machine code for a failure or a hold (`OUTCOME_UNKNOWN`, `NO_RECIPIENT`, …). */
+  readonly errorCode: string | null;
   /** `staff` for a desk send, otherwise the automatic trigger. */
   readonly triggeredByKind: string | null;
+  /** Held back (quiet hours or a retry backoff) until then; `null` otherwise. */
+  readonly deferredUntil: string | null;
+  readonly provider: string | null;
+  readonly providerMessageId: string | null;
+  readonly attempts: number | null;
 }
 
 export type DeliverySortField = 'queued_at' | 'sent_at';
@@ -80,6 +97,11 @@ export type DeliverySortDirection = 'asc' | 'desc';
 export interface DeliveryFilters {
   readonly status: DeliveryStatus | null;
   readonly channel: MessagingChannel | null;
+  /** Hospital-local `yyyy-mm-dd` the message was queued, inclusive; blank = no bound. */
+  readonly dateFrom: string;
+  readonly dateTo: string;
+  /** Exact phone (10 digits are tried as +91), provider message id or event code. */
+  readonly q: string;
 }
 
 /** One outbox page request. */

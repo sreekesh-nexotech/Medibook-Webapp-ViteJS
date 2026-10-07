@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
@@ -16,6 +16,7 @@ import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
+import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SegTabs } from '@/shared/ui/SegTabs';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
@@ -43,11 +44,14 @@ import {
   type MessagingTemplate,
   type PatientChannel,
 } from '@/features/messaging/domain/entities/messaging.entities';
+import { MessageDeliveryDrawer } from '@/features/messaging/presentation/components/MessageDeliveryDrawer';
 import { MessagePreview } from '@/features/messaging/presentation/components/MessagePreview';
 import {
   MESSAGING_PLACEHOLDERS,
   PATIENT_TEMPLATE_EVENTS,
   channelLabel,
+  deliveryErrorText,
+  deliveryStatusBadge,
   deliveryStatusLabel,
   eventLabel,
   fmtLocalDateTime,
@@ -59,9 +63,13 @@ import {
   type SendReview,
 } from '@/features/messaging/presentation/components/SendMessageModal';
 
-type MessagingTab = 'Templates' | 'Send & Outbox' | 'Announcements';
+type MessagingTab = 'Templates' | 'Send & Outbox';
 
-const TABS: readonly MessagingTab[] = ['Templates', 'Send & Outbox', 'Announcements'];
+/** Announcements were removed in v2 (CLAUDE.md §12), so there is no tab for them (UAT-52). */
+const TABS: readonly MessagingTab[] = ['Templates', 'Send & Outbox'];
+
+const DATE_INPUT_CLASS =
+  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
 
 const OUTBOX_PAGE_SIZE = 8;
 
@@ -84,6 +92,9 @@ const QUEUED_COUNT_PARAMS: DeliveryListParams = {
   pageSize: COUNT_PAGE_SIZE,
   status: 'queued',
   channel: null,
+  dateFrom: '',
+  dateTo: '',
+  q: '',
   sortField: 'queued_at',
   sortDirection: 'desc',
 };
@@ -111,8 +122,8 @@ function patientTemplates(templates: readonly MessagingTemplate[]): readonly Mes
  *   (Q112), each rendered with sample data, plus the placeholder vocabulary.
  * - **Send & Outbox:** queue a confirmation or reminder for one appointment
  *   (`POST /messaging/send`), and the delivery history with server-side
- *   status / channel filters, sort and paging.
- * - **Announcements:** no backend endpoint exists yet, so the tab says so.
+ *   status / channel / date filters, exact search, sort, paging and a detail
+ *   drawer.
  *
  * Nothing here claims delivery: a queued message reads **Queued** until the
  * gateway reports otherwise (THE LAW).
@@ -125,6 +136,11 @@ export function MessagingScreen() {
   const [channel, setChannel] = useState<PatientChannel>('sms');
   const [statusFilter, setStatusFilter] = useState(ANY_STATUS);
   const [channelFilter, setChannelFilter] = useState(ANY_CHANNEL);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [qDraft, setQDraft] = useState('');
+  const [q, setQ] = useState('');
+  const [openedId, setOpenedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [sendOpen, setSendOpen] = useState(false);
   /** The send awaiting confirmation, with the replay key minted for it. */
@@ -138,6 +154,9 @@ export function MessagingScreen() {
   const filters: DeliveryFilters = {
     status: statusFromLabel(statusFilter),
     channel: channelFromLabel(channelFilter),
+    dateFrom,
+    dateTo,
+    q,
   };
   const outboxParams: DeliveryListParams = {
     ...filters,
@@ -153,7 +172,12 @@ export function MessagingScreen() {
   const sendMutation = useSendMessageMutation();
   const exportMutation = useExportMessageDeliveriesMutation();
 
-  const hasOutboxFilters = statusFilter !== ANY_STATUS || channelFilter !== ANY_CHANNEL;
+  const hasOutboxFilters =
+    statusFilter !== ANY_STATUS ||
+    channelFilter !== ANY_CHANNEL ||
+    dateFrom !== '' ||
+    dateTo !== '' ||
+    q !== '';
   const outboxRows = outboxQuery.data?.items ?? [];
   const outboxTotal = outboxQuery.data?.total ?? 0;
   const queuedCount = queuedQuery.data?.total;
@@ -162,7 +186,26 @@ export function MessagingScreen() {
   const clearOutboxFilters = (): void => {
     setStatusFilter(ANY_STATUS);
     setChannelFilter(ANY_CHANNEL);
+    setDateFrom('');
+    setDateTo('');
+    setQDraft('');
+    setQ('');
     setPage(0);
+  };
+
+  const handleSearchSubmit = (e: FormEvent<HTMLFormElement>): void => {
+    e.preventDefault();
+    setQ(qDraft.trim());
+    setPage(0);
+  };
+
+  const handleSearchChange = (value: string): void => {
+    setQDraft(value);
+    // Clearing the box clears the filter at once; a new term waits for Enter.
+    if (value.trim() === '' && q !== '') {
+      setQ('');
+      setPage(0);
+    }
   };
 
   const refreshOutbox = async (): Promise<void> => {
@@ -176,6 +219,7 @@ export function MessagingScreen() {
           [
             'Queued',
             'Recipient',
+            'Address from',
             'Message',
             'Event code',
             'Channel',
@@ -184,12 +228,14 @@ export function MessagingScreen() {
             'Sent',
             'Delivered',
             'Failed',
+            'Error code',
             'Error',
             'Triggered by',
           ],
           ...rows.map((m) => [
             m.queuedAt,
             m.recipientAddress,
+            m.recipientSource ?? '',
             eventLabel(m.eventCode),
             m.eventCode,
             channelLabel(m.channel),
@@ -198,6 +244,7 @@ export function MessagingScreen() {
             m.sentAt ?? '',
             m.deliveredAt ?? '',
             m.failedAt ?? '',
+            m.errorCode ?? '',
             m.errorMessage ?? '',
             m.triggeredByKind ?? '',
           ]),
@@ -229,12 +276,16 @@ export function MessagingScreen() {
         onSuccess: (deliveries) => {
           if (deliveries.length === 0) {
             toast(
-              `Nothing was queued — ${review.patientName} has no reachable ${channelLabel(review.channel)} address.`,
+              `Nothing was queued — ${review.patientName} has no reachable ${channelLabel(review.channel)} address for this booking.`,
               'info',
             );
           } else {
+            // The address the server actually used (B7), not the one guessed here.
+            const to = [...new Set(deliveries.map((d) => d.recipientAddress))].join(', ');
             toast(
-              `${eventLabel(review.eventCode)} queued for ${review.patientName} by ${channelLabel(review.channel)}`,
+              `${eventLabel(review.eventCode)} queued for ${review.patientName} by ${channelLabel(review.channel)}${
+                review.channel === 'push' ? '' : ` to ${to}`
+              }`,
               'success',
             );
             setTab('Send & Outbox');
@@ -415,8 +466,41 @@ export function MessagingScreen() {
             </Button>
           </div>
 
+          <form className="mb-4" onSubmit={handleSearchSubmit} role="search">
+            <SearchField
+              value={qDraft}
+              onChange={handleSearchChange}
+              placeholder="Exact phone number, provider message ID or event code — press Enter"
+              aria-label="Search the outbox by exact value"
+            />
+          </form>
+
           <div className="mb-4.5 flex flex-wrap items-center gap-3">
             <RefreshBtn onRefresh={refreshOutbox} title="Refresh the outbox" />
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(0);
+              }}
+              aria-label="Queued from"
+              title="Queued from"
+              className={DATE_INPUT_CLASS}
+            />
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(0);
+              }}
+              aria-label="Queued to"
+              title="Queued to"
+              className={DATE_INPUT_CLASS}
+            />
             <FilterSelect
               value={statusFilter}
               options={[ANY_STATUS, ...DELIVERY_STATUSES.map(deliveryStatusLabel)]}
@@ -464,7 +548,11 @@ export function MessagingScreen() {
             scrollLabel="Message outbox"
           >
             {outboxRows.map((m) => (
-              <tr key={m.id}>
+              <tr
+                key={m.id}
+                onClick={() => setOpenedId(m.id)}
+                className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+              >
                 <td className={tdClass}>
                   <div className="flex flex-col">
                     <span className="text-text-strong font-medium tabular-nums">
@@ -472,6 +560,7 @@ export function MessagingScreen() {
                     </span>
                     <span className="text-caption text-text-muted">
                       {m.triggeredByKind === 'staff' ? 'Sent by the desk' : 'Automatic'}
+                      {m.recipientSource === 'account' ? ' · booking account' : ''}
                     </span>
                   </div>
                 </td>
@@ -491,9 +580,18 @@ export function MessagingScreen() {
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-1">
-                    <Badge status={deliveryStatusLabel(m.status)} />
-                    {m.errorMessage && (
-                      <span className="text-caption text-text-muted">{m.errorMessage}</span>
+                    <Badge status={deliveryStatusBadge(m.status).status}>
+                      {deliveryStatusBadge(m.status).label}
+                    </Badge>
+                    {m.deferredUntil && m.status === 'queued' && (
+                      <span className="text-caption text-text-muted">
+                        Held until {fmtLocalDateTime(m.deferredUntil)}
+                      </span>
+                    )}
+                    {(m.errorMessage || deliveryErrorText(m.errorCode)) && (
+                      <span className="text-caption text-text-muted">
+                        {m.errorMessage ?? deliveryErrorText(m.errorCode)}
+                      </span>
                     )}
                   </div>
                 </td>
@@ -511,24 +609,11 @@ export function MessagingScreen() {
         </Card>
       )}
 
-      {tab === 'Announcements' && (
-        <Card>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <SectionTitle>Announcements</SectionTitle>
-          </div>
-          <EmptyState
-            icon="megaphone"
-            title="Announcements aren't available yet."
-            message="Medibook can't send a notice to a whole audience yet. To reach a patient about their visit, use Send & Outbox."
-            actionLabel="Go to Send & Outbox"
-            onAction={() => setTab('Send & Outbox')}
-          />
-        </Card>
-      )}
-
       {sendOpen && (
         <SendMessageModal open onClose={() => setSendOpen(false)} onReview={onReviewSend} />
       )}
+
+      <MessageDeliveryDrawer deliveryId={openedId} onClose={() => setOpenedId(null)} />
 
       <ConfirmModal
         open={pendingSend != null}
