@@ -1,4 +1,7 @@
-import type { CatalogPlanDraft } from '@/features/ops-plans/domain/entities/plans.catalog';
+import type {
+  CatalogPlanDraft,
+  PlanHardLimit,
+} from '@/features/ops-plans/domain/entities/plans.catalog';
 import { PAISE_PER_RUPEE } from '@/features/ops-plans/infrastructure/data-sources/remote/plans.response';
 
 /** `PlanWriteRequest` minus `code` — the fields both create and edit send. */
@@ -10,7 +13,16 @@ export interface PlanWriteRequest {
   readonly limit_users: number | null;
   readonly limit_doctors: number | null;
   readonly limit_storage_gb: number | null;
+  readonly hard_limits: readonly PlanHardLimit[];
+  readonly gst_rate_bp: number;
+  readonly trial_days: number;
+  readonly sort_order: number;
   readonly is_public: boolean;
+}
+
+/** Re-open an archived plan on a backend without `POST …/unarchive`. */
+export interface PlanReactivateRequest {
+  readonly is_active: true;
 }
 
 /** `POST /platform/plans` also needs the immutable plan code. */
@@ -53,6 +65,10 @@ export function toPlanWriteRequest(draft: CatalogPlanDraft): PlanWriteRequest {
     limit_users: draft.limits.staff,
     limit_doctors: draft.limits.doctors,
     limit_storage_gb: draft.limits.storageGb,
+    hard_limits: [...draft.hardLimits].sort(),
+    gst_rate_bp: draft.gstRateBp,
+    trial_days: draft.trialDays,
+    sort_order: draft.sortOrder,
     is_public: draft.isPublic,
   };
 }

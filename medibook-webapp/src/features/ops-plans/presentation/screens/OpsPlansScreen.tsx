@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Button } from '@/shared/ui/Button';
 import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
@@ -16,9 +17,11 @@ import { PlanChangesPanel } from '@/features/ops-billing/presentation/components
 import { useArchivePlanMutation } from '@/features/ops-plans/application/queries/useArchivePlanMutation';
 import { useDeletePlanMutation } from '@/features/ops-plans/application/queries/useDeletePlanMutation';
 import { usePlansQuery } from '@/features/ops-plans/application/queries/usePlansQuery';
+import { useUnarchivePlanMutation } from '@/features/ops-plans/application/queries/useUnarchivePlanMutation';
 import type { CatalogPlan } from '@/features/ops-plans/domain/entities/plans.catalog';
 import { PlanCard } from '@/features/ops-plans/presentation/components/PlanCard';
 import { PlanModal } from '@/features/ops-plans/presentation/components/PlanModal';
+import { PlanSubscribersDrawer } from '@/features/ops-plans/presentation/components/PlanSubscribersDrawer';
 
 /** A plan picked for archiving, with its subscriber count when known. */
 interface ArchiveTarget {
@@ -36,20 +39,25 @@ const failureMessage = (error: unknown, fallback: string): string =>
  * Decline.
  *
  * The catalog is live (`/platform/plans`): each card carries both billing
- * periods and the three ceilings the backend stores (users, doctors,
- * storage), plus Archive for plans that have had subscribers and so cannot be
- * deleted. Plan-change requests use the billing module's panel (approve / reject
- * on `billing/plan-change-requests`).
+ * periods, GST and trial, and the three ceilings the backend stores (users,
+ * doctors, storage), plus Archive for plans that have had subscribers and so
+ * cannot be deleted, and Restore for archived ones (UAT-57). "View Hospitals"
+ * lists the live subscribers (11·R9). Plan-change requests use the billing
+ * module's panel, readable with `billing.view` (decision 13; 11·F23).
  */
 export function OpsPlansScreen() {
+  const { can } = useOpsPermission();
   const plansQuery = usePlansQuery();
   const plans = plansQuery.data;
   const deleteMutation = useDeletePlanMutation();
   const archiveMutation = useArchivePlanMutation();
+  const unarchiveMutation = useUnarchivePlanMutation();
 
   const [modal, setModal] = useState<CatalogPlan | 'new' | null>(null);
   const [delPlan, setDelPlan] = useState<CatalogPlan | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
+  const [restorePlan, setRestorePlan] = useState<CatalogPlan | null>(null);
+  const [subscribersOf, setSubscribersOf] = useState<CatalogPlan | null>(null);
 
   /** Guard on the live count; the server refuses any plan that ever had subscribers. */
   const handleDeleteClick = (plan: CatalogPlan, subscribers: number | null) => {
@@ -80,6 +88,19 @@ export function OpsPlansScreen() {
       onError: (error) => toast(failureMessage(error, 'Could not archive the plan.'), 'error'),
       onSettled: () => setArchiveTarget(null),
     });
+  };
+
+  const confirmRestore = () => {
+    if (!restorePlan) return;
+    const { name } = restorePlan;
+    unarchiveMutation.mutate(
+      { planId: restorePlan.id, version: restorePlan.version },
+      {
+        onSuccess: () => toast(`Plan "${name}" is open to new subscriptions again.`),
+        onError: (error) => toast(failureMessage(error, 'Could not restore the plan.'), 'error'),
+        onSettled: () => setRestorePlan(null),
+      },
+    );
   };
 
   return (
@@ -117,10 +138,14 @@ export function OpsPlansScreen() {
             icon="layers"
             title="No plan tiers in the catalog."
             message="Hospitals cannot be billed until at least one plan exists."
-            actionLabel="Create the first plan"
-            actionIcon="plus"
-            actionVariant="button"
-            onAction={() => setModal('new')}
+            {...(can('plans.add')
+              ? {
+                  actionLabel: 'Create the first plan',
+                  actionIcon: 'plus' as const,
+                  actionVariant: 'button' as const,
+                  onAction: () => setModal('new'),
+                }
+              : {})}
           />
         </Card>
       ) : (
@@ -132,17 +157,25 @@ export function OpsPlansScreen() {
               onEdit={setModal}
               onDelete={handleDeleteClick}
               onArchive={(plan, subscribers) => setArchiveTarget({ plan, subscribers })}
+              onUnarchive={setRestorePlan}
+              onSubscribers={setSubscribersOf}
             />
           ))}
         </div>
       )}
 
-      <Card>
-        <div className="mb-4 flex items-center justify-between">
-          <SectionTitle>Plan Change Requests</SectionTitle>
-        </div>
-        <PlanChangesPanel />
-      </Card>
+      <CanOps perm="billing.view">
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <SectionTitle>Plan Change Requests</SectionTitle>
+          </div>
+          <PlanChangesPanel />
+        </Card>
+      </CanOps>
+
+      {subscribersOf && (
+        <PlanSubscribersDrawer plan={subscribersOf} onClose={() => setSubscribersOf(null)} />
+      )}
 
       {modal && (
         <PlanModal
@@ -186,6 +219,21 @@ export function OpsPlansScreen() {
         confirmLabel={archiveMutation.isPending ? 'Archiving…' : 'Archive Plan'}
         busy={archiveMutation.isPending}
         onConfirm={confirmArchive}
+      />
+      <OpsConfirm
+        open={!!restorePlan}
+        onClose={() => setRestorePlan(null)}
+        icon="rotate-ccw"
+        tone="success"
+        title="Restore this plan?"
+        body={
+          restorePlan
+            ? `"${restorePlan.name}" opens to new subscriptions and plan changes again, at its current price and limits.`
+            : ''
+        }
+        confirmLabel={unarchiveMutation.isPending ? 'Restoring…' : 'Restore Plan'}
+        busy={unarchiveMutation.isPending}
+        onConfirm={confirmRestore}
       />
     </div>
   );
