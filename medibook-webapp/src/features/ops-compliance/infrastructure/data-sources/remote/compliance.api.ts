@@ -15,6 +15,7 @@ import {
   dataRequestResponseSchema,
   loginEventPageSchema,
   loginEventResponseSchema,
+  phiAccessPageSchema,
   type ConfigChangeResponse,
   type DataRequestResponse,
   type LoginEventResponse,
@@ -23,6 +24,7 @@ import {
 const LOGIN_HISTORY_PATH = '/compliance/login-history';
 const CONFIG_CHANGES_PATH = '/compliance/config-changes';
 const DATA_REQUESTS_PATH = '/compliance/data-requests';
+const PHI_ACCESS_PATH = '/compliance/phi-access';
 
 /** CSV exports stop after this many rows (50 pages) so one click cannot run unbounded. */
 export const COMPLIANCE_EXPORT_MAX_ROWS = 5000;
@@ -122,4 +124,10 @@ export async function postRejectDataRequest(
     { reason },
   );
   return dataRequestResponseSchema.parse(response.data);
+}
+
+/** `GET /platform/compliance/phi-access` (B6, `compliance.view`) — the PHI read audit. */
+export async function getPhiAccess(params: ComplianceQueryParams) {
+  const response = await platformApi.get(PHI_ACCESS_PATH, { params });
+  return phiAccessPageSchema.parse(response.data);
 }

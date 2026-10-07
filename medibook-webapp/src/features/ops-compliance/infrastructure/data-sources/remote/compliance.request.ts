@@ -6,6 +6,7 @@ import type {
   DataRequestParams,
   LoginHistoryFilters,
   LoginHistoryParams,
+  PhiAccessParams,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** Query params the compliance lists accept; absent filters are omitted. */
@@ -84,4 +85,21 @@ export function toConfigChangeParams(params: ConfigChangeParams): ComplianceQuer
 
 export function toDataExportCreateRequest(draft: DataExportDraft): DataExportCreateRequest {
   return { subject_user_id: draft.subjectUserId, kind: 'export', subject_kind: draft.subjectKind };
+}
+
+/** `GET /platform/compliance/phi-access` params (B6); absent filters are omitted. */
+export function toPhiAccessParams(params: PhiAccessParams): ComplianceQueryParams {
+  const search = params.search?.trim();
+  return {
+    ...dateParams(params),
+    ...(params.principals.length > 0 ? { principal: params.principals.join(',') } : {}),
+    ...(params.subjectKind ? { subject_kind: params.subjectKind } : {}),
+    ...(params.hospitalId ? { hospital_id: params.hospitalId } : {}),
+    ...(params.actorUserId ? { actor_user_id: params.actorUserId } : {}),
+    ...(params.subjectId ? { subject_id: params.subjectId } : {}),
+    ...(search ? { search } : {}),
+    page: params.page,
+    page_size: params.pageSize,
+    sort: sortParam('occurred_at', params.sortDirection),
+  };
 }

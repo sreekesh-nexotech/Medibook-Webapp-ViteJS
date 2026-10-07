@@ -4,11 +4,15 @@ import type { DataRequest } from '@/features/ops-compliance/domain/entities/comp
 import {
   toDataRequestParams,
   toLoginFilterParams,
+  toPhiAccessParams,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.request';
 import {
   dataRequestActions,
   dataRequestNote,
+  isFullUuid,
   loginInstanceLabel,
+  phiReadLabel,
+  phiResultLabel,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
 
 const BASE: DataRequest = {
@@ -176,5 +180,57 @@ describe('request params', () => {
       principal: 'hospital,platform',
     });
     expect(toLoginFilterParams({ ...base, principals: [] })).toEqual({});
+  });
+});
+
+describe('patient record access (B6, H-07)', () => {
+  it('names logged reads by their route', () => {
+    const read = (endpoint: string, searchParam: string | null = null) =>
+      phiReadLabel({ endpoint, method: 'GET', searchParam });
+    expect(read('api/v1/hospital/patients/<uuid:patient_id>')).toBe('Opened a patient record');
+    expect(read('api/v1/hospital/patients/<uuid:patient_id>/appointments')).toBe(
+      'Viewed a patient’s appointments',
+    );
+    expect(read('api/v1/hospital/patients', 'q')).toBe('Searched patient records');
+    expect(read('api/v1/hospital/patients')).toBe('Listed patient records');
+    expect(read('api/v1/platform/users/<uuid:user_id>')).toBe('Opened a patient account');
+    expect(read('api/v1/hospital/somewhere')).toBe('GET api/v1/hospital/somewhere');
+  });
+
+  it('counts returned records', () => {
+    expect(phiResultLabel(0)).toBe('No records');
+    expect(phiResultLabel(1)).toBe('1 record');
+    expect(phiResultLabel(1200)).toBe('1,200 records');
+  });
+
+  it('takes only full UUIDs for id filters', () => {
+    expect(isFullUuid('01929b2e-0000-7000-8000-000000000001')).toBe(true);
+    expect(isFullUuid('01929b2e')).toBe(false);
+  });
+
+  it('sends only the filters in use', () => {
+    expect(
+      toPhiAccessParams({
+        page: 1,
+        pageSize: 15,
+        sortDirection: 'desc',
+        dateFrom: '2026-10-01',
+        dateTo: '',
+        principals: ['hospital', 'platform'],
+        subjectKind: 'hospital_patient',
+        hospitalId: null,
+        actorUserId: null,
+        subjectId: null,
+        search: ' 9812345678 ',
+      }),
+    ).toEqual({
+      date_from: '2026-10-01',
+      principal: 'hospital,platform',
+      subject_kind: 'hospital_patient',
+      search: '9812345678',
+      page: 1,
+      page_size: 15,
+      sort: '-occurred_at',
+    });
   });
 });

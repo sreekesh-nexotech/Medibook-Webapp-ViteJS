@@ -6,6 +6,8 @@ import { paginatedSchema } from '@/core/api/pagination';
 import {
   DATA_REQUEST_STATUSES,
   LOGIN_RESULTS,
+  PHI_SUBJECT_KINDS,
+  type PhiAccessEntry,
   type ConfigChangeRecord,
   type DataRequest,
   type DataRequestAction,
@@ -145,4 +147,49 @@ export function toDataRequest(dto: DataRequestResponse): DataRequest {
 /** Keep the actions this console knows; an unknown one is ignored, not a parse failure. */
 function toActions(values: readonly string[]): DataRequestAction[] {
   return values.filter((v): v is DataRequestAction => v === 'process' || v === 'reject');
+}
+
+/** `PhiAccessLogSerializer` + names (B6, `GET /platform/compliance/phi-access`). */
+export const phiAccessResponseSchema = z.object({
+  id: z.string(),
+  occurred_at: z.string(),
+  request_id: z.string(),
+  principal: z.string(),
+  actor_user_id: z.string().nullable(),
+  actor_name: z.string().nullable().optional(),
+  hospital_id: z.string().nullable(),
+  hospital_name: z.string().nullable().optional(),
+  ip: z.string().nullable(),
+  method: z.string(),
+  endpoint: z.string(),
+  subject_kind: z.enum(PHI_SUBJECT_KINDS),
+  subject_ids: z.array(z.string()),
+  result_count: z.number().int(),
+  search_param: z.string().nullable(),
+  search_hash: z.string().nullable().optional(),
+  meta: z.unknown().optional(),
+});
+
+export const phiAccessPageSchema = paginatedSchema(phiAccessResponseSchema);
+
+export type PhiAccessResponse = z.infer<typeof phiAccessResponseSchema>;
+
+export function toPhiAccessEntry(dto: PhiAccessResponse): PhiAccessEntry {
+  return {
+    id: dto.id,
+    occurredAt: dto.occurred_at,
+    requestId: dto.request_id,
+    principal: dto.principal,
+    actorUserId: dto.actor_user_id,
+    actorName: dto.actor_name ?? null,
+    hospitalId: dto.hospital_id,
+    hospitalName: dto.hospital_name ?? null,
+    ip: dto.ip,
+    method: dto.method,
+    endpoint: dto.endpoint,
+    subjectKind: dto.subject_kind,
+    subjectIds: dto.subject_ids,
+    resultCount: dto.result_count,
+    searchParam: dto.search_param,
+  };
 }

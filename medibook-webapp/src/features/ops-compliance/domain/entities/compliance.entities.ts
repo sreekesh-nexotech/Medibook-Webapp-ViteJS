@@ -206,3 +206,56 @@ export interface ComplianceExportRows<T> {
   /** True when the cap stopped the walk before the last page. */
   readonly truncated: boolean;
 }
+
+/* -------------------------------------------------- PHI read audit (B6, H-07) */
+
+/** What a logged read returned: a hospital's patient record, an appointment, or a patient account. */
+export const PHI_SUBJECT_KINDS = ['hospital_patient', 'appointment', 'user'] as const;
+
+export type PhiSubjectKind = (typeof PHI_SUBJECT_KINDS)[number];
+
+export const PHI_PRINCIPALS = ['hospital', 'platform'] as const;
+
+export type PhiPrincipal = (typeof PHI_PRINCIPALS)[number];
+
+/** One successful read of patient-identifying data (`phi_access_log`). */
+export interface PhiAccessEntry {
+  readonly id: string;
+  readonly occurredAt: string;
+  readonly requestId: string;
+  readonly principal: string;
+  readonly actorUserId: string | null;
+  readonly actorName: string | null;
+  /** The reader's hospital, for hospital staff. */
+  readonly hospitalId: string | null;
+  readonly hospitalName: string | null;
+  readonly ip: string | null;
+  readonly method: string;
+  /** The URL route read, e.g. `hospital/patients/<uuid:patient_id>`. */
+  readonly endpoint: string;
+  readonly subjectKind: PhiSubjectKind;
+  readonly subjectIds: readonly string[];
+  readonly resultCount: number;
+  /** Which query parameter carried a search, when the read was a search (the term is never kept). */
+  readonly searchParam: string | null;
+}
+
+/** Server-side filters on the PHI read audit. */
+export interface PhiAccessFilters extends ComplianceDateRange {
+  /** Any of these; empty = both. */
+  readonly principals: readonly PhiPrincipal[];
+  readonly subjectKind: PhiSubjectKind | null;
+  readonly hospitalId: string | null;
+  /** Full user id (UUID) of the reader. */
+  readonly actorUserId: string | null;
+  /** Full id (UUID) of a record that appears in the read's results. */
+  readonly subjectId: string | null;
+  /** A plain search term; the server hashes it and finds reads that searched for it. */
+  readonly search: string | null;
+}
+
+export interface PhiAccessParams extends PhiAccessFilters {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sortDirection: ComplianceSortDirection;
+}

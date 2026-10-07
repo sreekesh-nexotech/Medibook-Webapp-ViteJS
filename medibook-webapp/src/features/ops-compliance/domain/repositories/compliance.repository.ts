@@ -13,6 +13,8 @@ import type {
   LoginEvent,
   LoginHistoryFilters,
   LoginHistoryParams,
+  PhiAccessEntry,
+  PhiAccessParams,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** The platform's compliance records. */
@@ -38,4 +40,6 @@ export interface ComplianceRepository {
    */
   processDataRequest(id: string, notes?: string): Promise<Result<DataRequestProcessOutcome>>;
   rejectDataRequest(id: string, reason: string): Promise<Result<DataRequest>>;
+  /** One page of the PHI read audit (B6). */
+  listPhiAccess(params: PhiAccessParams): Promise<Result<Page<PhiAccessEntry>>>;
 }

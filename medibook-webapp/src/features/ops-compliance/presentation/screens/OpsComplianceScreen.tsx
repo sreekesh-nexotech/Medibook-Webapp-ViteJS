@@ -22,12 +22,15 @@ import {
 } from '@/features/ops-compliance/presentation/components/ExportRequestForm';
 import { ExportRequestsCard } from '@/features/ops-compliance/presentation/components/ExportRequestsCard';
 import { LoginHistoryCard } from '@/features/ops-compliance/presentation/components/LoginHistoryCard';
+import { PhiAccessCard } from '@/features/ops-compliance/presentation/components/PhiAccessCard';
 
-type ComplianceTab = 'Staff Logins' | 'Configuration Changes' | 'Export on Request';
+type ComplianceTab =
+  'Staff Logins' | 'Configuration Changes' | 'Patient Record Access' | 'Export on Request';
 
 const TABS: readonly ComplianceTab[] = [
   'Staff Logins',
   'Configuration Changes',
+  'Patient Record Access',
   'Export on Request',
 ];
 
@@ -49,8 +52,8 @@ function announceOutcome(requestNo: string, outcome: DataRequestProcessOutcome):
 
 /**
  * Compliance (audit 2.5 / SA-06) on `/platform/compliance/*` — staff login
- * history, configuration-change detail with before → after values, and
- * data-subject export requests.
+ * history, configuration-change detail with before → after values, the
+ * patient-record read audit (B6, H-07), and data-subject export requests.
  *
  * Each card owns its own server-side query; Refresh refetches them all.
  * Table and filter treatment matches `OpsLogsScreen`, so the log screens read
@@ -125,6 +128,7 @@ export function OpsComplianceScreen() {
 
       {tab === 'Staff Logins' && <LoginHistoryCard />}
       {tab === 'Configuration Changes' && <ConfigChangesCard />}
+      {tab === 'Patient Record Access' && <PhiAccessCard />}
       {tab === 'Export on Request' && (
         <>
           <CanOps perm="compliance.add">

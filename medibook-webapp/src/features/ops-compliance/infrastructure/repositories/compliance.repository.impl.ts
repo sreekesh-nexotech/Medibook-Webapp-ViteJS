@@ -10,6 +10,7 @@ import {
   getDataRequest,
   getDataRequests,
   getLoginHistory,
+  getPhiAccess,
   postDataRequest,
   postProcessDataRequest,
   postRejectDataRequest,
@@ -21,11 +22,13 @@ import {
   toDataRequestParams,
   toLoginFilterParams,
   toLoginHistoryParams,
+  toPhiAccessParams,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.request';
 import {
   toConfigChange,
   toDataRequest,
   toLoginEvent,
+  toPhiAccessEntry,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 
 /** The backend answers 501 when the export renderer only runs in the nightly worker. */
@@ -73,4 +76,7 @@ export const complianceRepository: ComplianceRepository = {
 
   rejectDataRequest: (id, reason) =>
     attempt(async () => toDataRequest(await postRejectDataRequest(id, reason))),
+
+  listPhiAccess: (params) =>
+    attempt(async () => toPage(await getPhiAccess(toPhiAccessParams(params)), toPhiAccessEntry)),
 };

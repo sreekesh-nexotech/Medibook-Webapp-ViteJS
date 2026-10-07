@@ -12,6 +12,8 @@ import type {
   DataSubjectKind,
   LoginEvent,
   LoginResult,
+  PhiAccessEntry,
+  PhiSubjectKind,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** A label plus the `Badge` status token whose tint means the same thing. */
@@ -218,4 +220,50 @@ export function exportedMessage(count: number, noun: string, truncated: boolean)
   return truncated
     ? `Exported the newest ${count.toLocaleString('en-IN')} ${noun} as CSV — narrow the dates to export the rest.`
     : `Exported ${count.toLocaleString('en-IN')} ${noun} as CSV.`;
+}
+
+/* -------------------------------------------------- PHI read audit (B6, H-07) */
+
+export const PHI_SUBJECT_LABEL: Readonly<Record<PhiSubjectKind, string>> = {
+  hospital_patient: 'Patient records',
+  appointment: 'Appointments',
+  user: 'Patient accounts',
+};
+
+/** Logged routes (B6 `audit_reads` views) in plain words; the route's tail decides. */
+const PHI_READS: readonly (readonly [RegExp, string])[] = [
+  [/patients\/<[^>]+>\/appointments\/?$/, 'Viewed a patient’s appointments'],
+  [/patients\/<[^>]+>\/?$/, 'Opened a patient record'],
+  [/patients\/?$/, 'Listed patient records'],
+  [/appointments\/<[^>]+>\/token-slip\/?$/, 'Opened a token slip'],
+  [/appointments\/<[^>]+>\/?$/, 'Opened an appointment'],
+  [/appointments\/?$/, 'Searched appointments'],
+  [/visits\/<[^>]+>\/?$/, 'Opened a visit'],
+  [/users\/<[^>]+>\/?$/, 'Opened a patient account'],
+  [/users\/?$/, 'Listed patient accounts'],
+];
+
+/** What a logged read did, e.g. "Searched patient records"; the raw route when unknown. */
+export function phiReadLabel(
+  entry: Pick<PhiAccessEntry, 'endpoint' | 'method' | 'searchParam'>,
+): string {
+  const match = PHI_READS.find(([pattern]) => pattern.test(entry.endpoint));
+  if (!match) return `${entry.method} ${entry.endpoint}`;
+  const label = match[1];
+  return entry.searchParam && label.startsWith('Listed')
+    ? label.replace('Listed', 'Searched')
+    : label;
+}
+
+/** "3 records" / "1 record" / "No records". */
+export function phiResultLabel(count: number): string {
+  if (count === 0) return 'No records';
+  return `${count.toLocaleString('en-IN')} ${count === 1 ? 'record' : 'records'}`;
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The id filters take a full UUID only (the server refuses anything else). */
+export function isFullUuid(value: string): boolean {
+  return UUID_PATTERN.test(value.trim());
 }
