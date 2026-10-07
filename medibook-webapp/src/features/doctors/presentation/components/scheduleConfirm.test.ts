@@ -30,9 +30,10 @@ const booking = (id: string): AffectedBooking => ({
   scheduledStartAt: '2026-10-08T04:30:00Z',
 });
 
-describe('confirm bound to its preview (BE-33)', () => {
+describe('confirm bound to its preview (L-17, BE-33)', () => {
   it('recognises the stale-preview 409 by code or by the new list in meta', () => {
-    expect(isPreviewStale(conflict('PREVIEW_STALE'))).toBe(true);
+    expect(isPreviewStale(conflict('PREVIEW_TOKEN_STALE'))).toBe(true);
+    expect(isPreviewStale(conflict('PREVIEW_TOKEN_REQUIRED'))).toBe(true);
     expect(isPreviewStale(conflict('STATE_CONFLICT', { affected_bookings: [] }))).toBe(true);
     expect(isPreviewStale(conflict('CONFLICT_VERSION'))).toBe(false);
     expect(isPreviewStale(new Error('x'))).toBe(false);

@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { isFailure } from '@/core/error/failure';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
@@ -19,7 +21,10 @@ import { useNumberingPreviewQuery } from '@/features/settings/application/querie
 import { useUpdateNumberingMutation } from '@/features/settings/application/queries/useUpdateNumberingMutation';
 import {
   NUMBERING_TOKENS,
+  bookingSeriesErrors,
   formatError,
+  numberingLiteralText,
+  numberingPeriodError,
   renderNumberingSample,
 } from '@/features/settings/application/store/settings.rules';
 
@@ -54,16 +59,49 @@ interface NumberingForm {
   fyStartMonth: string;
 }
 
-const VALIDATORS: FormValidators<NumberingForm> = {
-  format: (v) => formatError(v, NUMBERING_TOKENS),
-  prefix: (v) => (v.length > MAX_PREFIX ? `Use at most ${MAX_PREFIX} characters.` : undefined),
-  padWidth: (v) => {
-    const n = Number(v);
-    return /^\d+$/.test(v) && n >= 1 && n <= MAX_PAD
-      ? undefined
-      : `Digits must be between 1 and ${MAX_PAD}.`;
-  },
-};
+const ISSUED_NEEDS_NEW_TEXT =
+  'This series has issued numbers: change the fixed text of the format too (e.g. add a letter) so new numbers cannot repeat old ones.';
+
+/**
+ * The backend's checks for one series (B4: M-21, H-02), so the admin hears
+ * about them before saving. Like the server, a legacy series is only
+ * re-checked on the fields this edit touches.
+ */
+function validatorsFor(series: NumberingSeries): FormValidators<NumberingForm> {
+  const periodTouched = (f: NumberingForm): boolean =>
+    f.format !== series.format ||
+    f.reset !== series.reset ||
+    f.fyStartMonth !== String(series.fyStartMonth);
+  const shapeTouched = (f: NumberingForm): boolean =>
+    f.format !== series.format || f.prefix !== (series.prefix ?? '');
+  const isBooking = series.kind === 'booking';
+  const periodMoved = (f: NumberingForm): boolean =>
+    f.reset !== series.reset || f.fyStartMonth !== String(series.fyStartMonth);
+  return {
+    format: (v, f) =>
+      formatError(v, NUMBERING_TOKENS) ??
+      (periodTouched(f) ? numberingPeriodError(v, f.reset, Number(f.fyStartMonth)) : undefined) ??
+      (isBooking && shapeTouched(f) ? bookingSeriesErrors(v, f.prefix).format : undefined),
+    prefix: (v, f) =>
+      v.length > MAX_PREFIX
+        ? `Use at most ${MAX_PREFIX} characters.`
+        : isBooking && shapeTouched(f)
+          ? bookingSeriesErrors(f.format, v).prefix
+          : undefined,
+    padWidth: (v) => {
+      const n = Number(v);
+      return /^\d+$/.test(v) && n >= 1 && n <= MAX_PAD
+        ? undefined
+        : `Digits must be between 1 and ${MAX_PAD}.`;
+    },
+    reset: (_, f) =>
+      series.hasAllocated &&
+      periodMoved(f) &&
+      numberingLiteralText(f.format) === numberingLiteralText(series.format)
+        ? ISSUED_NEEDS_NEW_TEXT
+        : undefined,
+  };
+}
 
 const SERVER_FIELDS = {
   format: 'format',
@@ -93,6 +131,7 @@ export function NumberingModal({ series, onClose }: NumberingModalProps) {
   const update = useUpdateNumberingMutation();
   const savedPreview = useNumberingPreviewQuery(series.kind, series.version, true);
   const isMrn = series.kind === 'mrn';
+  const validate = useMemo(() => validatorsFor(series), [series]);
   const form = useForm<NumberingForm>({
     initial: {
       format: series.format,
@@ -101,7 +140,7 @@ export function NumberingModal({ series, onClose }: NumberingModalProps) {
       reset: isNumberingReset(series.reset) ? series.reset : 'never',
       fyStartMonth: String(series.fyStartMonth),
     },
-    validate: VALIDATORS,
+    validate,
     onSubmit: async (v) => {
       const changes: NumberingChanges = {
         ...(v.format !== series.format && { format: v.format.trim() }),

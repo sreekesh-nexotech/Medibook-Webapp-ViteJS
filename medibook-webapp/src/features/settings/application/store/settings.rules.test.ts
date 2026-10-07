@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bookingSeriesErrors,
   bpToPercentInput,
   durationCopy,
   fiscalYearToken,
@@ -8,6 +9,8 @@ import {
   labelShowsSource,
   labelsCollideAcrossDepartments,
   NUMBERING_TOKENS,
+  numberingLiteralText,
+  numberingPeriodError,
   percentInputToBp,
   renderNumberingSample,
   renderTokenLabel,
@@ -132,5 +135,32 @@ describe('numbering samples (numbering.render)', () => {
     expect(renderNumberingSample({ ...base, prefix: null, format: '{PREFIX}{YY}{SEQ:4}' })).toBe(
       '260042',
     );
+  });
+});
+
+describe('numbering series rules (B4: M-21, H-02)', () => {
+  it('needs the period a resetting series restarts in', () => {
+    expect(numberingPeriodError('{PREFIX}{SEQ:5}', 'never', 4)).toBeUndefined();
+    expect(numberingPeriodError('{PREFIX}/{FY}/{SEQ}', 'fiscal_year', 4)).toBeUndefined();
+    expect(numberingPeriodError('{PREFIX}{YYYY}{MM}{SEQ}', 'fiscal_year', 4)).toBeUndefined();
+    expect(numberingPeriodError('{PREFIX}{YYYY}{SEQ}', 'fiscal_year', 1)).toBeUndefined();
+    expect(numberingPeriodError('{PREFIX}{YYYY}{SEQ}', 'fiscal_year', 4)).toMatch(/\{FY\}/);
+    expect(numberingPeriodError('{PREFIX}{SEQ}', 'calendar_year', 4)).toMatch(/\{YYYY\}/);
+    expect(numberingPeriodError('{FY}{MM}{SEQ}', 'calendar_year', 4)).toBeUndefined();
+    expect(numberingPeriodError('{YY}{SEQ}', 'monthly', 4)).toMatch(/\{MM\}/);
+    expect(numberingPeriodError('{YY}{MM}{SEQ}', 'monthly', 4)).toBeUndefined();
+  });
+
+  it('keeps booking references unique across hospitals', () => {
+    expect(bookingSeriesErrors('{PREFIX}-{YY}-{SEQ:6}', 'CC')).toEqual({});
+    expect(bookingSeriesErrors('{PREFIX}{SEQ:6}', 'CC').format).toMatch(/separator/);
+    expect(bookingSeriesErrors('BK-{SEQ:6}', 'CC').format).toBeDefined();
+    expect(bookingSeriesErrors('{PREFIX}-{SEQ}', '').prefix).toMatch(/1–16/);
+    expect(bookingSeriesErrors('{PREFIX}-{SEQ}', 'C-C').prefix).toBeDefined();
+  });
+
+  it('compares the fixed text of two formats', () => {
+    expect(numberingLiteralText('{PREFIX}-{SEQ:5}')).toBe(numberingLiteralText('{PREFIX}-{SEQ}'));
+    expect(numberingLiteralText('{PREFIX}-{SEQ}')).not.toBe(numberingLiteralText('{PREFIX}/{SEQ}'));
   });
 });

@@ -158,12 +158,16 @@ export const NO_SHOW_ATTEMPT_OPTIONS: readonly string[] = Array.from(
 
 export const RECEIPT_PAPER_OPTIONS: readonly ReceiptPaper[] = ['A5', '80mm', 'A4'];
 
-/** Desk methods a hospital can accept (`Payment.Method` minus online-only ones). */
+/** Desk methods a hospital can accept (`DESK_PAYMENT_METHOD_CHOICES`, APPT-03). */
 export const DESK_PAYMENT_METHODS: readonly { readonly value: string; readonly label: string }[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
   { value: 'card', label: 'Card' },
   { value: 'pos', label: 'POS terminal' },
+  { value: 'netbanking', label: 'Net banking' },
+  { value: 'wallet', label: 'Wallet' },
+  { value: 'emi', label: 'EMI' },
+  { value: 'paylater', label: 'Pay later' },
   { value: 'other', label: 'Other' },
 ];
 

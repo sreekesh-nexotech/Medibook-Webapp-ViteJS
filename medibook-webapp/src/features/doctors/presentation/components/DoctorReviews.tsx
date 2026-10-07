@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { isFailure } from '@/core/error/failure';
 
 import { DEFAULT_PAGE_SIZE } from '@/core/api/pagination';
-import { fmtDate } from '@/shared/lib/format';
 import { describeFailure } from '@/shared/lib/serverErrors';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -11,15 +10,19 @@ import { Pager } from '@/shared/ui/Pager';
 import { SkeletonLine } from '@/shared/ui/Skeleton';
 
 import { useDoctorReviewsQuery } from '@/features/doctors/application/queries/useDoctorReviewsQuery';
+import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 
 import { Stars } from './Stars';
 
 /** Answers that mean "this backend has no hospital review list yet" (DOC-01 pending). */
 const NOT_BUILT_STATUSES: ReadonlySet<number> = new Set([404, 405, 501]);
 
-/** The calendar date of an ISO date-time, for the review line. */
-function reviewDate(iso: string | null): string {
-  return iso ? fmtDate(iso.slice(0, 10)) : '';
+/** The day a review was written, in the hospital's zone (D-09; the API sends UTC). */
+function reviewDate(iso: string | null, timeZone: string | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone }).format(date);
 }
 
 interface DoctorReviewsProps {
@@ -35,6 +38,7 @@ interface DoctorReviewsProps {
 export function DoctorReviews({ doctorId }: DoctorReviewsProps) {
   const [page, setPage] = useState(0);
   const reviews = useDoctorReviewsQuery(doctorId, page + 1);
+  const timeZone = useHospitalProfileQuery().data?.timezone ?? undefined;
 
   if (reviews.isPending) {
     return (
@@ -85,7 +89,9 @@ export function DoctorReviews({ doctorId }: DoctorReviewsProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Stars r={r.rating} />
               <span className="text-caption text-text-muted">
-                {[r.author, reviewDate(r.createdAt), r.bookingRef].filter(Boolean).join(' · ')}
+                {[r.patientInitials, reviewDate(r.reviewedAt, timeZone)]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             </div>
             {r.comment ? (

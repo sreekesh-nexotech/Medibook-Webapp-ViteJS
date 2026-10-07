@@ -49,6 +49,8 @@ export interface AffectedBooking {
 export interface ScheduleChange {
   readonly dryRun: boolean;
   readonly affectedBookings: readonly AffectedBooking[];
+  /** Bookings already in consultation or completed — kept, never cancelled (L-21). */
+  readonly notCancellableBookings: readonly AffectedBooking[];
   readonly result: null;
   /** The dry run's fingerprint, echoed on confirm (BE-33); `null` when not issued. */
   readonly previewToken: string | null;

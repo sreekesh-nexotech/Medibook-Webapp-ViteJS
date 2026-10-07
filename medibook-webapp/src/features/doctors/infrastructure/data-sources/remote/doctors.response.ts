@@ -155,19 +155,24 @@ export const scheduleChangeResponseSchema = z.object({
   dry_run: z.boolean(),
   result: z.unknown().nullable(),
   affected_bookings: z.array(affectedBookingSchema),
-  // Confirm-bound-to-preview (BE-33): optional until the backend issues it.
+  // L-21: in consultation / completed — kept. Optional for an older backend.
+  not_cancellable_bookings: z.array(affectedBookingSchema).optional(),
+  // Confirm-bound-to-preview (L-17, BE-33).
   preview_token: z.string().nullable().optional(),
   rematerialisation_queued: z.boolean().optional(),
 });
 
-/** `GET /doctors/{id}/reviews` row (DOC-01). Lenient: only `rating` is required to show it. */
+/**
+ * `GET /hospital/doctors/{id}/reviews` row (DOC-01, B9 contract:
+ * `HospitalDoctorReviewSerializer`) — approved reviews only, the patient
+ * named by initials.
+ */
 export const doctorReviewResponseSchema = z.object({
   id: z.string(),
   rating: z.number(),
   comment: z.string().nullable().optional(),
-  created_at: z.string().nullable().optional(),
-  patient_display_name: z.string().nullable().optional(),
-  booking_ref: z.string().nullable().optional(),
+  patient_initials: z.string().nullable().optional(),
+  reviewed_at: z.string().nullable().optional(),
 });
 
 export type DepartmentResponse = z.infer<typeof departmentResponseSchema>;
@@ -291,18 +296,28 @@ export function toDoctorReview(dto: DoctorReviewResponse): DoctorReview {
     id: dto.id,
     rating: dto.rating,
     comment: dto.comment ?? '',
-    createdAt: dto.created_at ?? null,
-    author: dto.patient_display_name ?? null,
-    bookingRef: dto.booking_ref ?? null,
+    reviewedAt: dto.reviewed_at ?? null,
+    patientInitials: dto.patient_initials || null,
   };
 }
 
-export function toAffectedBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
-  return dto.affected_bookings.map((b) => ({
+type AffectedBookingResponse = z.infer<typeof affectedBookingSchema>;
+
+function toAffectedBooking(b: AffectedBookingResponse): AffectedBooking {
+  return {
     appointmentId: b.appointment_id,
     bookingRef: b.booking_ref,
     tokenLabel: b.token_label,
     patientName: b.patient_name,
     scheduledStartAt: b.scheduled_start_at,
-  }));
+  };
+}
+
+export function toAffectedBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
+  return dto.affected_bookings.map(toAffectedBooking);
+}
+
+/** Bookings the change leaves alone because they are under way or done (L-21). */
+export function toNotCancellableBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
+  return (dto.not_cancellable_bookings ?? []).map(toAffectedBooking);
 }

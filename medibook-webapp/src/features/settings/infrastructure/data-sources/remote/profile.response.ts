@@ -55,23 +55,30 @@ const affectedBookingSchema = z.object({
 export const scheduleChangeResponseSchema = z.object({
   dry_run: z.boolean(),
   affected_bookings: z.array(affectedBookingSchema),
-  // Confirm-bound-to-preview (BE-33); optional until the backend issues it.
+  // L-21: in consultation / completed — kept. Optional for an older backend.
+  not_cancellable_bookings: z.array(affectedBookingSchema).optional(),
+  // Confirm-bound-to-preview (L-17, BE-33).
   preview_token: z.string().nullable().optional(),
   rematerialisation_queued: z.boolean().optional(),
 });
 
 export type ScheduleChangeResponse = z.infer<typeof scheduleChangeResponseSchema>;
 
+function toAffectedBooking(b: z.infer<typeof affectedBookingSchema>): AffectedBooking {
+  return {
+    appointmentId: b.appointment_id,
+    bookingRef: b.booking_ref,
+    tokenLabel: b.token_label ?? null,
+    patientName: b.patient_name,
+    scheduledStartAt: b.scheduled_start_at,
+  };
+}
+
 export function toScheduleChange(dto: ScheduleChangeResponse): ScheduleChange {
   return {
     dryRun: dto.dry_run,
-    affectedBookings: dto.affected_bookings.map((b): AffectedBooking => ({
-      appointmentId: b.appointment_id,
-      bookingRef: b.booking_ref,
-      tokenLabel: b.token_label ?? null,
-      patientName: b.patient_name,
-      scheduledStartAt: b.scheduled_start_at,
-    })),
+    affectedBookings: dto.affected_bookings.map(toAffectedBooking),
+    notCancellableBookings: (dto.not_cancellable_bookings ?? []).map(toAffectedBooking),
     result: null,
     previewToken: dto.preview_token ?? null,
     rematerialisationQueued: dto.rematerialisation_queued ?? false,

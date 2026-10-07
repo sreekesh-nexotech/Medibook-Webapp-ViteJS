@@ -17,6 +17,7 @@ import {
   toDoctorReview,
   toDateException,
   toLeave,
+  toNotCancellableBookings,
   toSchedule,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
 
@@ -25,6 +26,7 @@ function toChange(dto: ScheduleChangeResponse): ScheduleChange {
   return {
     dryRun: dto.dry_run,
     affectedBookings: toAffectedBookings(dto),
+    notCancellableBookings: toNotCancellableBookings(dto),
     result: null,
     previewToken: dto.preview_token ?? null,
     rematerialisationQueued: dto.rematerialisation_queued ?? false,

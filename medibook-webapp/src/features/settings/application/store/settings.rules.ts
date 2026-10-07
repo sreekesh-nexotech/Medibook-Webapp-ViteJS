@@ -183,3 +183,68 @@ export function renderNumberingSample(input: NumberingSampleInput): string {
     }
   });
 }
+
+/** When a series starts again at 1 (`NumberingSeries.Reset`). */
+export type NumberingResetRule = 'never' | 'fiscal_year' | 'calendar_year' | 'monthly';
+
+const JANUARY = 1;
+
+function placeholdersIn(format: string): ReadonlySet<string> {
+  return new Set([...format.matchAll(PLACEHOLDER_PATTERN)].map((m) => m[1] ?? ''));
+}
+
+/**
+ * M-21 (`numbering.period_error`): a series that starts again at 1 must
+ * print the period it restarts in, or numbers would repeat.
+ */
+export function numberingPeriodError(
+  format: string,
+  reset: NumberingResetRule,
+  fyStartMonth: number,
+): string | undefined {
+  const t = placeholdersIn(format);
+  const year = t.has('YYYY') || t.has('YY');
+  switch (reset) {
+    case 'fiscal_year':
+      return t.has('FY') || (year && t.has('MM')) || (year && fyStartMonth === JANUARY)
+        ? undefined
+        : 'A series that starts again every fiscal year needs {FY} (or a year with {MM}).';
+    case 'calendar_year':
+      return year || (t.has('FY') && t.has('MM'))
+        ? undefined
+        : 'A series that starts again every calendar year needs {YYYY} or {YY}.';
+    case 'monthly':
+      return t.has('MM') && (year || t.has('FY'))
+        ? undefined
+        : 'A series that starts again every month needs {MM} and a year ({YYYY}, {YY} or {FY}).';
+    default:
+      return undefined;
+  }
+}
+
+const BOOKING_PREFIX = /^[A-Za-z0-9]{1,16}$/;
+const BOOKING_FORMAT = /^\{PREFIX\}[^A-Za-z0-9{]/;
+
+/**
+ * H-02 (`numbering.booking_errors`): booking references are unique across
+ * hospitals, so the format starts with the hospital's prefix and a separator.
+ */
+export function bookingSeriesErrors(
+  format: string,
+  prefix: string,
+): { readonly format?: string; readonly prefix?: string } {
+  return {
+    ...(!BOOKING_PREFIX.test(prefix.trim()) && {
+      prefix: 'Booking references need a prefix of 1–16 letters or digits.',
+    }),
+    ...(!BOOKING_FORMAT.test(format.trim()) && {
+      format:
+        'Start with {PREFIX} and a separator that is not a letter or digit, e.g. {PREFIX}-{YY}-{SEQ:6}.',
+    }),
+  };
+}
+
+/** The format's fixed text — what must change with the reset once numbers are issued (M-21). */
+export function numberingLiteralText(format: string): string {
+  return format.trim().replace(PLACEHOLDER_PATTERN, '\u0000');
+}

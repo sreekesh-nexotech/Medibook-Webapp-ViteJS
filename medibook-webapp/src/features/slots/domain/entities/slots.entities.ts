@@ -108,6 +108,8 @@ export interface BulkSlotResult {
   readonly skippedBooked: number;
   readonly skippedPast: number;
   readonly affectedBookings: readonly AffectedBooking[];
+  /** Booked slots left alone because the patient is in consultation or done (L-21). */
+  readonly notCancellableBookings: readonly AffectedBooking[];
   /** The dry run's fingerprint, sent back on confirm (BE-33); `null` when not issued. */
   readonly previewToken: string | null;
 }

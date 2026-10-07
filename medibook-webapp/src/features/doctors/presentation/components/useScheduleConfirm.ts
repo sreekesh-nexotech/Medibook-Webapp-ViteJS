@@ -24,6 +24,8 @@ export interface ScheduleWriteRequest<T> {
 
 interface Pending {
   readonly affected: readonly AffectedBooking[];
+  /** Under way or done — the change keeps them (L-21). */
+  readonly kept: readonly AffectedBooking[];
   /** The server refused the first confirm because the affected bookings changed. */
   readonly changed: boolean;
   readonly confirm: () => Promise<void>;
@@ -41,9 +43,10 @@ function newKey(): string {
  * The dry-run → confirm flow every booking-affecting write uses (Q32, Q73):
  * 1. dry run (its own fresh `Idempotency-Key`);
  * 2. applied already (an edit that touches no schedule) → done;
- * 3. nothing affected → confirm straight away;
+ * 3. nothing affected or kept → confirm straight away;
  * 4. otherwise hold it and let `ScheduleChangeModal` name the bookings that
- *    confirming cancels (with a full refund).
+ *    confirming cancels (with a full refund) and those it keeps because the
+ *    patient is already in consultation or done (L-21).
  *
  * The confirm is sent with the dry run's preview token (BE-33) and one
  * `Idempotency-Key` per user action: if Apply fails (network, 5xx) the modal
@@ -103,11 +106,12 @@ export function useScheduleConfirm() {
           setIsApplying(false);
         }
       };
-      if (dry.affectedBookings.length === 0 && !changed) {
+      const kept = dry.notCancellableBookings;
+      if (dry.affectedBookings.length === 0 && kept.length === 0 && !changed) {
         await apply();
         return;
       }
-      setPending({ affected: dry.affectedBookings, changed, confirm: apply });
+      setPending({ affected: dry.affectedBookings, kept, changed, confirm: apply });
     };
     try {
       await preview(false);
@@ -120,6 +124,7 @@ export function useScheduleConfirm() {
     run,
     modal: {
       affected: pending?.affected ?? null,
+      kept: pending?.kept ?? [],
       changed: pending?.changed ?? false,
       isApplying,
       onConfirm: () => void pending?.confirm(),

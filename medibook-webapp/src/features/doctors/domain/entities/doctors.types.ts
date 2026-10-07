@@ -142,6 +142,11 @@ export interface AffectedBooking {
 export interface ScheduleChange<T = null> {
   readonly dryRun: boolean;
   readonly affectedBookings: readonly AffectedBooking[];
+  /**
+   * Bookings already in consultation or completed in the changed time —
+   * kept, never cancelled (L-21); empty from an older backend.
+   */
+  readonly notCancellableBookings: readonly AffectedBooking[];
   /** The written record when the change was applied and the API returns one. */
   readonly result: T | null;
   /**
@@ -228,10 +233,10 @@ export interface DoctorReview {
   /** 1–5. */
   readonly rating: number;
   readonly comment: string;
-  readonly createdAt: string | null;
-  /** How the patient is named (never a full name), when the server sends one. */
-  readonly author: string | null;
-  readonly bookingRef: string | null;
+  /** ISO date-time the patient wrote it. */
+  readonly reviewedAt: string | null;
+  /** "A.R." — reviews never name the patient in full. */
+  readonly patientInitials: string | null;
 }
 
 /** One page of a doctor's reviews. */

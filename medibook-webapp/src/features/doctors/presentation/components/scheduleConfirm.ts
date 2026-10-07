@@ -10,17 +10,14 @@ import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors
 
 /**
  * 409 codes the backend uses when a confirm no longer matches its dry run
- * (BE-33: "confirm is bound to the preview … 409 with the new list on
- * mismatch"). Several spellings are accepted until the contract settles; a
- * 409 that carries `affected_bookings` in its `meta` counts too.
+ * (B5 contract, L-17/BE-33): `PREVIEW_TOKEN_STALE` (the affected bookings
+ * changed since the preview) and `PREVIEW_TOKEN_REQUIRED` (a confirm that
+ * would cancel bookings arrived without a token). Both carry the new list
+ * and token in `meta`; a 409 with that `meta` counts too.
  */
 export const PREVIEW_STALE_CODES: ReadonlySet<string> = new Set([
-  'PREVIEW_STALE',
-  'PREVIEW_MISMATCH',
-  'PREVIEW_EXPIRED',
-  'PREVIEW_TOKEN_INVALID',
-  'AFFECTED_BOOKINGS_CHANGED',
-  'AFFECTED_SET_CHANGED',
+  'PREVIEW_TOKEN_STALE',
+  'PREVIEW_TOKEN_REQUIRED',
 ]);
 
 const PREVIEW_META_KEYS = ['affected_bookings', 'preview_token'] as const;

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  doctorReviewResponseSchema,
+  scheduleChangeResponseSchema,
   scheduleResponseSchema,
+  toAffectedBookings,
+  toDoctorReview,
+  toNotCancellableBookings,
   toSchedule,
   toWallClockHhmm,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
@@ -81,6 +86,69 @@ describe('resolved next-14-days sessions', () => {
     expect(toSchedule(dto).upcoming[0]?.sessions[0]).toMatchObject({
       startsAt: '18:00',
       endsAt: '20:00',
+    });
+  });
+});
+
+const row = (id: string, status: string) => ({
+  appointment_id: id,
+  booking_ref: `BK-${id}`,
+  token_label: null,
+  status,
+  scheduled_start_at: '2026-10-08T04:30:00Z',
+  scheduled_date: '2026-10-08',
+  start_time: '10:00',
+  patient_name: `Patient ${id}`,
+  doctor_id: 'd-1',
+});
+
+describe('schedule-change envelope (B5: L-17, L-21)', () => {
+  it('reads the preview token and the bookings it keeps', () => {
+    const dto = scheduleChangeResponseSchema.parse({
+      dry_run: true,
+      result: null,
+      affected_bookings: [row('a', 'confirmed')],
+      not_cancellable_bookings: [row('b', 'in_consultation')],
+      preview_token: 'tok-1',
+      created_count: 0,
+      updated_count: 0,
+      closed_count: 1,
+      preserved_count: 0,
+      rematerialisation_queued: false,
+    });
+    expect(dto.preview_token).toBe('tok-1');
+    expect(toAffectedBookings(dto).map((b) => b.appointmentId)).toEqual(['a']);
+    expect(toNotCancellableBookings(dto).map((b) => b.appointmentId)).toEqual(['b']);
+  });
+
+  it('treats an older envelope without the kept list as keeping nothing', () => {
+    const dto = scheduleChangeResponseSchema.parse({
+      dry_run: false,
+      result: null,
+      affected_bookings: [],
+    });
+    expect(toNotCancellableBookings(dto)).toEqual([]);
+  });
+});
+
+describe('doctor reviews (DOC-01)', () => {
+  it('names the patient by initials only', () => {
+    const review = toDoctorReview(
+      doctorReviewResponseSchema.parse({
+        id: 'r-1',
+        doctor_id: 'd-1',
+        rating: 4,
+        comment: null,
+        patient_initials: 'A.R.',
+        reviewed_at: '2026-10-06T20:00:00Z',
+      }),
+    );
+    expect(review).toEqual({
+      id: 'r-1',
+      rating: 4,
+      comment: '',
+      reviewedAt: '2026-10-06T20:00:00Z',
+      patientInitials: 'A.R.',
     });
   });
 });

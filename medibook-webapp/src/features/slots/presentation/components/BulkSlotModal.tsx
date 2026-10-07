@@ -203,6 +203,8 @@ export function BulkSlotModal({
   const result: BulkSlotResult | null = preview.data ?? null;
   const count = result?.affectedCount ?? 0;
   const bookings = result?.affectedBookings ?? [];
+  // L-21: patients already in consultation or done keep their slot.
+  const kept = result?.notCancellableBookings ?? [];
   const verb = values.action === 'Block' ? 'blocked' : 'opened';
 
   const doctorName = doctors.find((d) => d.id === values.doctorId)?.name ?? 'this doctor';
@@ -218,6 +220,9 @@ export function BulkSlotModal({
         result.skippedPast > 0 ? `${plural(result.skippedPast, 'past slot')} skipped` : '',
         values.action === 'Open' && result.skippedBooked > 0
           ? `${plural(result.skippedBooked, 'booked slot')} left as they are`
+          : '',
+        values.action === 'Block' && kept.length > 0
+          ? `${plural(kept.length, 'booking')} already in consultation or completed kept`
           : '',
       ]
         .filter(Boolean)

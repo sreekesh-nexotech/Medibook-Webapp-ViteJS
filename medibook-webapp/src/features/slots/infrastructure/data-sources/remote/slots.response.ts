@@ -89,7 +89,9 @@ export const bulkSlotResponseSchema = z.object({
   skipped_booked: z.number().int(),
   skipped_past: z.number().int(),
   affected_bookings: z.array(affectedBookingResponseSchema),
-  // Confirm-bound-to-preview (BE-33); optional until the backend issues it.
+  // L-21: in consultation / completed — kept (counted in `skipped_booked`).
+  not_cancellable_bookings: z.array(affectedBookingResponseSchema).optional(),
+  // Confirm-bound-to-preview (L-17, BE-33).
   preview_token: z.string().nullable().optional(),
 });
 
@@ -182,6 +184,7 @@ export function toBulkSlotResult(dto: z.infer<typeof bulkSlotResponseSchema>): B
     skippedBooked: dto.skipped_booked,
     skippedPast: dto.skipped_past,
     affectedBookings: dto.affected_bookings.map(toAffectedBooking),
+    notCancellableBookings: (dto.not_cancellable_bookings ?? []).map(toAffectedBooking),
     previewToken: dto.preview_token ?? null,
   };
 }

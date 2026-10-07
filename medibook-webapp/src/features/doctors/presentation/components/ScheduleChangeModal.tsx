@@ -22,6 +22,8 @@ function when(iso: string, timeZone: string | undefined): string {
 interface ScheduleChangeModalProps {
   /** `null` = closed. */
   affected: readonly AffectedBooking[] | null;
+  /** Bookings in consultation or completed in that time — kept, never cancelled (L-21). */
+  kept?: readonly AffectedBooking[];
   /** The list was refreshed because the bookings changed since the first preview. */
   changed?: boolean;
   isApplying: boolean;
@@ -32,6 +34,7 @@ interface ScheduleChangeModalProps {
 /** Asks before a schedule change cancels existing bookings (refunded in full). */
 export function ScheduleChangeModal({
   affected,
+  kept = [],
   changed = false,
   isApplying,
   onConfirm,
@@ -71,7 +74,9 @@ export function ScheduleChangeModal({
       )}
       {count === 0 ? (
         <p className="text-body text-text-body">
-          No bookings are affected any more. Applying the change cancels nothing.
+          {changed
+            ? 'No bookings are affected any more. Applying the change cancels nothing.'
+            : 'Applying the change cancels no bookings.'}
         </p>
       ) : (
         <>
@@ -99,6 +104,33 @@ export function ScheduleChangeModal({
             </p>
           )}
         </>
+      )}
+      {kept.length > 0 && (
+        <div className="mt-4">
+          <p className="text-body text-text-body mb-2">
+            {kept.length} booking{kept.length === 1 ? ' is' : 's are'} already in consultation or
+            completed in that time. {kept.length === 1 ? 'It stays' : 'They stay'} as{' '}
+            {kept.length === 1 ? 'it is' : 'they are'} — nothing is cancelled or refunded.
+          </p>
+          <ul className="divide-border-soft border-border-soft divide-y rounded-md border">
+            {kept.slice(0, LISTED_BOOKINGS).map((b) => (
+              <li key={b.appointmentId} className="flex items-center gap-3 px-3.5 py-2.5">
+                <span className="text-body text-text-strong flex-1 font-medium">
+                  {b.patientName}
+                </span>
+                <span className="text-caption text-text-muted">
+                  {b.tokenLabel ? `${b.tokenLabel} · ` : ''}
+                  {b.bookingRef} · {when(b.scheduledStartAt, timeZone)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {kept.length > LISTED_BOOKINGS && (
+            <p className="text-caption text-text-muted mt-2">
+              and {kept.length - LISTED_BOOKINGS} more.
+            </p>
+          )}
+        </div>
       )}
     </Modal>
   );
