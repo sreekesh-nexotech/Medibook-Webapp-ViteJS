@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { toPlatformSettingsRequest } from '@/features/ops-settings/infrastructure/data-sources/remote/opsSettings.request';
+import {
+  toFeatureFlagPatchBody,
+  toPlatformSettingsRequest,
+} from '@/features/ops-settings/infrastructure/data-sources/remote/opsSettings.request';
 import { toPlatformSettings } from '@/features/ops-settings/infrastructure/data-sources/remote/opsSettings.response';
 import {
   formatReminderOffsets,
@@ -159,5 +162,16 @@ describe('tax rate applies-to choices (BE-18)', () => {
       await import('@/features/ops-settings/presentation/components/opsSettingsFormat');
     expect(appliesToOptionsFor('service')).toEqual(['consultation', 'service', 'all']);
     expect(appliesToOptionsFor('convenience_fee')[0]).toBe('convenience_fee');
+  });
+});
+
+describe('feature flag changes', () => {
+  it('patches only the fields that change, with the backend names', () => {
+    expect(toFeatureFlagPatchBody({ enabled: false })).toEqual({ enabled: false });
+    expect(toFeatureFlagPatchBody({ description: 'New booking flow', isPublic: true })).toEqual({
+      description: 'New booking flow',
+      is_public: true,
+    });
+    expect(toFeatureFlagPatchBody({})).toEqual({});
   });
 });

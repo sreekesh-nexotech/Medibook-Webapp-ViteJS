@@ -1,8 +1,11 @@
+import { useState } from 'react';
+
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
+import { IconBtn } from '@/shared/ui/IconBtn';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonLine } from '@/shared/ui/Skeleton';
 import { Toggle } from '@/shared/ui/Toggle';
@@ -11,24 +14,28 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import { useOpsFeatureFlagsQuery } from '@/features/ops-settings/application/queries/useOpsFeatureFlagsQuery';
-import { useSetOpsFeatureFlagMutation } from '@/features/ops-settings/application/queries/useSetOpsFeatureFlagMutation';
+import { useUpdateOpsFeatureFlagMutation } from '@/features/ops-settings/application/queries/useUpdateOpsFeatureFlagMutation';
+import type { FeatureFlag } from '@/features/ops-settings/domain/entities/opsSettings.entity';
+import { OpsFeatureFlagModal } from '@/features/ops-settings/presentation/components/OpsFeatureFlagModal';
 
 /** Shimmer rows while the flags load. */
 const LOADING_ROWS = 3;
 
 /**
  * Platform feature flags — each toggle saves on its own through
- * `PATCH /platform/feature-flags/{key}` (logged to the config change trail).
+ * `PATCH /platform/feature-flags/{key}` (logged to the config change trail);
+ * the pencil edits the description and whether the apps may read the flag.
  */
 export function OpsSettingsFlagsCard() {
   const flags = useOpsFeatureFlagsQuery();
-  const setFlag = useSetOpsFeatureFlagMutation();
+  const setFlag = useUpdateOpsFeatureFlagMutation();
+  const [editing, setEditing] = useState<FeatureFlag | null>(null);
   // SEC-05: switching a flag needs settings.edit.
   const canEdit = useOpsPermission().can('settings.edit');
 
   const handleToggle = (key: string, enabled: boolean) => {
     setFlag.mutate(
-      { key, enabled },
+      { key, changes: { enabled } },
       {
         onSuccess: (flag) =>
           toast(`${flag.key} ${flag.enabled ? 'switched on' : 'switched off'}.`, 'success'),
@@ -77,13 +84,24 @@ export function OpsSettingsFlagsCard() {
               label={flag.key}
               disabled={!canEdit || (setFlag.isPending && setFlag.variables.key === flag.key)}
             />
-            <div className="flex flex-col gap-0.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-body text-text-strong flex items-center gap-2 font-medium">
                 {flag.key}
                 {flag.isPublic && <Badge status="Info">Public</Badge>}
               </span>
-              <span className="text-caption text-text-muted">{flag.description}</span>
+              <span className="text-caption text-text-muted">
+                {flag.description || 'No description yet.'}
+              </span>
             </div>
+            {canEdit && (
+              <IconBtn
+                name="pencil"
+                box={32}
+                size={14}
+                label={`Edit ${flag.key}`}
+                onClick={() => setEditing(flag)}
+              />
+            )}
           </div>
         ))}
         {total > items.length && (
@@ -99,6 +117,9 @@ export function OpsSettingsFlagsCard() {
     <Card>
       <SectionTitle className="mb-4.5">Feature Flags</SectionTitle>
       {body}
+      {editing && (
+        <OpsFeatureFlagModal key={editing.key} flag={editing} onClose={() => setEditing(null)} />
+      )}
     </Card>
   );
 }

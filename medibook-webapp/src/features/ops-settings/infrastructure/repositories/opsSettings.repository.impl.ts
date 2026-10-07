@@ -45,8 +45,8 @@ export const opsSettingsRepository: OpsSettingsRepository = {
   listFeatureFlags: () =>
     attempt(async () => toConfigList(await api.getFeatureFlags(), toFeatureFlag)),
 
-  setFeatureFlagEnabled: (key, enabled) =>
-    attempt(async () => toFeatureFlag(await api.patchFeatureFlag(key, enabled))),
+  updateFeatureFlag: (key, changes) =>
+    attempt(async () => toFeatureFlag(await api.patchFeatureFlag(key, changes))),
 
   listTaxRates: () => attempt(async () => toConfigList(await api.getTaxRates(), toTaxRate)),
 

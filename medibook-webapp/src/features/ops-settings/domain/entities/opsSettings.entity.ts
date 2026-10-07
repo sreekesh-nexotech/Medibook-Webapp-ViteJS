@@ -67,6 +67,13 @@ export interface FeatureFlag {
   readonly updatedAt: string;
 }
 
+/** What may change on a flag (`PATCH /platform/feature-flags/{key}`); the key is fixed. */
+export interface FeatureFlagChanges {
+  readonly enabled?: boolean;
+  readonly description?: string;
+  readonly isPublic?: boolean;
+}
+
 /** A page of a platform config list, as far as the screen reads it. */
 export interface ConfigList<T> {
   readonly items: readonly T[];

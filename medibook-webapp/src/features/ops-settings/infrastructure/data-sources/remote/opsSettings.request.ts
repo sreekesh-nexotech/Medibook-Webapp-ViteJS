@@ -1,4 +1,5 @@
 import type {
+  FeatureFlagChanges,
   PlatformSettingsValues,
   TaxRateValues,
 } from '@/features/ops-settings/domain/entities/opsSettings.entity';
@@ -141,3 +142,12 @@ export const TAX_RATE_FIELD: Readonly<Record<string, keyof TaxRateValues>> = {
   applies_to: 'appliesTo',
   is_active: 'isActive',
 };
+
+/** `PATCH /platform/feature-flags/{key}` body: only the fields that change. */
+export function toFeatureFlagPatchBody(changes: FeatureFlagChanges): Record<string, unknown> {
+  return {
+    ...(changes.enabled !== undefined ? { enabled: changes.enabled } : {}),
+    ...(changes.description !== undefined ? { description: changes.description } : {}),
+    ...(changes.isPublic !== undefined ? { is_public: changes.isPublic } : {}),
+  };
+}

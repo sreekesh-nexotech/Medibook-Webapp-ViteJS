@@ -2,9 +2,11 @@ import { ifMatch } from '@/core/api/headers';
 import { platformApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
 
-import type {
-  PlatformSettingsRequest,
-  TaxRateRequest,
+import type { FeatureFlagChanges } from '@/features/ops-settings/domain/entities/opsSettings.entity';
+import {
+  toFeatureFlagPatchBody,
+  type PlatformSettingsRequest,
+  type TaxRateRequest,
 } from '@/features/ops-settings/infrastructure/data-sources/remote/opsSettings.request';
 import type {
   FeatureFlagPageResponse,
@@ -45,13 +47,15 @@ export async function getFeatureFlags(): Promise<FeatureFlagPageResponse> {
   return featureFlagPageResponseSchema.parse(response.data);
 }
 
+/** `PATCH /platform/feature-flags/{key}` (`settings.edit`) — only the fields that change. */
 export async function patchFeatureFlag(
   key: string,
-  enabled: boolean,
+  changes: FeatureFlagChanges,
 ): Promise<FeatureFlagResponse> {
-  const response = await platformApi.patch(`/feature-flags/${encodeURIComponent(key)}`, {
-    enabled,
-  });
+  const response = await platformApi.patch(
+    `/feature-flags/${encodeURIComponent(key)}`,
+    toFeatureFlagPatchBody(changes),
+  );
   return featureFlagResponseSchema.parse(response.data);
 }
 
