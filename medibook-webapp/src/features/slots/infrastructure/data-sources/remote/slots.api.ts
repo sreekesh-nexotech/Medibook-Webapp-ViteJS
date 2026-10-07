@@ -1,6 +1,6 @@
 import { idempotencyKey } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/core/api/pagination';
 
 import type { SlotGridParams } from '@/features/slots/domain/entities/slots.entities';
 import type { SlotBulkRequestBody } from '@/features/slots/infrastructure/data-sources/remote/slots.request';
@@ -17,8 +17,8 @@ import {
 
 const SLOTS_PATH = '/slots';
 
-/** `?confirm=true` executes a schedule write; without it the backend dry-runs. */
-const CONFIRM_PARAMS = { confirm: true } as const;
+/** Query parameter carrying the dry run's preview token on confirm (BE-33). */
+export const PREVIEW_TOKEN_PARAM = 'preview_token';
 
 /** The grid pages by doctor; read the widest page the backend allows. */
 export async function getSlotGrid(params: SlotGridParams) {
@@ -50,11 +50,19 @@ export async function postSlotOpen(slotId: string) {
 
 /**
  * Dry run unless `confirm`. Every call needs an Idempotency-Key, so a dry run
- * takes a fresh one each time; an execution takes the caller's.
+ * takes a fresh one each time; an execution takes the caller's (one per
+ * confirmation) and echoes the dry run's preview token when it had one.
  */
-export async function postSlotBulk(body: SlotBulkRequestBody, key: string, confirm: boolean) {
+export async function postSlotBulk(
+  body: SlotBulkRequestBody,
+  key: string,
+  confirm: boolean,
+  previewToken: string | null = null,
+) {
   const response = await hospitalApi.post(`${SLOTS_PATH}/bulk`, body, {
-    params: confirm ? CONFIRM_PARAMS : undefined,
+    params: confirm
+      ? { confirm: true, ...(previewToken ? { [PREVIEW_TOKEN_PARAM]: previewToken } : {}) }
+      : undefined,
     headers: idempotencyKey(key),
   });
   return bulkSlotResponseSchema.parse(response.data);
@@ -71,6 +79,14 @@ export async function postSlotRegenerate(doctorId: string | null) {
 export async function getLatestGenerationRun() {
   const response = await hospitalApi.get(`${SLOTS_PATH}/generation-runs`, {
     params: { page_size: 1 },
+  });
+  return generationRunPageResponseSchema.parse(response.data);
+}
+
+/** One page of runs, newest first; `doctor_id` narrows to one doctor's runs. */
+export async function getGenerationRuns(doctorId: string | null, page: number) {
+  const response = await hospitalApi.get(`${SLOTS_PATH}/generation-runs`, {
+    params: { page, page_size: DEFAULT_PAGE_SIZE, doctor_id: doctorId ?? undefined },
   });
   return generationRunPageResponseSchema.parse(response.data);
 }

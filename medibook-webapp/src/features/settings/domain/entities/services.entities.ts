@@ -32,6 +32,14 @@ export interface DoctorServiceLink {
   readonly priceOverrideRupees: number | null;
 }
 
+/** Link a doctor to a service (`POST /doctor-services`). */
+export interface DoctorServiceLinkInput {
+  readonly doctorId: string;
+  readonly serviceId: string;
+  /** Whole rupees; `null` = the service's own price. */
+  readonly priceOverrideRupees: number | null;
+}
+
 /** One booking a coupon was used on. */
 export interface CouponRedemption {
   readonly id: string;
@@ -59,7 +67,22 @@ export interface ServiceTaxRate {
   readonly isActive: boolean;
   /** Set by Medibook for every hospital — read-only here. */
   readonly isPlatformDefault: boolean;
+  /**
+   * Live services of this hospital billed with the rate (BE-10); `null` from
+   * a backend that does not count them.
+   */
+  readonly servicesCount: number | null;
   readonly version: number;
+}
+
+/**
+ * Why a tax rate could not be deleted, switched off or narrowed: services
+ * still bill with it (409 `TAX_RATE_IN_USE`, BE-10).
+ */
+export interface TaxRateInUse {
+  readonly serviceCount: number;
+  /** Up to 50 of them, by name. */
+  readonly serviceNames: readonly string[];
 }
 
 export type CouponKind = 'percent' | 'flat';
@@ -81,19 +104,25 @@ export interface HospitalCoupon {
   readonly usedCount: number;
   /** Ceiling on a percent discount, whole rupees; `null` = none. */
   readonly maxDiscountRupees: number | null;
-  /** Only redeemable on bookings made in the patient app. */
-  readonly onlineOnly: boolean;
   /** Minimum order value in whole rupees. */
   readonly minOrderRupees: number;
   /** Department scope (empty = every department). */
   readonly departmentIds: readonly string[];
-  /** Service scope (empty = every service). */
-  readonly serviceIds: readonly string[];
+  /**
+   * Service limits left from before decision 7 — never applied (coupons are
+   * department-scoped only, BE-25); saving the coupon drops them.
+   */
+  readonly legacyServiceIds: readonly string[];
   readonly isActive: boolean;
   readonly version: number;
 }
 
 export interface ServiceInput {
+  /**
+   * A short code of the admin's own; empty = keep the stored one (or, on
+   * create, let the server make one from the name — UAT-49, BE-33).
+   */
+  readonly code?: string;
   readonly name: string;
   readonly departmentId: string | null;
   readonly description: string;
@@ -109,6 +138,8 @@ export interface ServiceInput {
 }
 
 export interface TaxRateInput {
+  /** Empty = keep / let the server make one (UAT-49, BE-33). */
+  readonly code?: string;
   readonly name: string;
   readonly percent: number;
   readonly isInclusive: boolean;
@@ -125,9 +156,8 @@ export interface CouponInput {
   readonly usageCap: number | null;
   readonly perUserCap: number | null;
   readonly maxDiscountRupees: number | null;
-  readonly onlineOnly: boolean;
   readonly minOrderRupees: number;
+  /** Coupons are limited to departments only (decision 7). */
   readonly departmentIds: readonly string[];
-  readonly serviceIds: readonly string[];
   readonly isActive: boolean;
 }

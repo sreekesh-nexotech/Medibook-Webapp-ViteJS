@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { hospitalPath, isHospitalRole } from '@/app/router/paths';
+import {
+  hospitalDoctorAvailabilityPath,
+  hospitalHolidaysPath,
+  hospitalPath,
+  isHospitalRole,
+} from '@/app/router/paths';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import {
@@ -13,6 +18,7 @@ import {
   minutesToTimeLabel,
   timeLabelToMinutes,
   todayIso,
+  todayIsoIn,
 } from '@/features/doctors/domain/calendar';
 import { useHolidaysQuery } from '@/features/settings/application/queries/useHolidaysQuery';
 import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
@@ -22,14 +28,14 @@ import { useLatestGenerationRunQuery } from '@/features/slots/application/querie
 import { useRegenerateSlotsMutation } from '@/features/slots/application/queries/useRegenerateSlotsMutation';
 import { useSlotGridQuery } from '@/features/slots/application/queries/useSlotGridQuery';
 import { useToggleSlotMutation } from '@/features/slots/application/queries/useToggleSlotMutation';
-import type { SlotGenerationRun } from '@/features/slots/domain/entities/slots.entities';
+import type { SlotRegenerateResult } from '@/features/slots/domain/entities/slots.entities';
 import {
   toSlotGridView,
   type SlotCellView,
   type SlotRowView,
 } from '@/features/slots/presentation/components/slotsGridView';
-import { isFailure } from '@/core/error/failure';
 import { useCan } from '@/shared/hooks/usePermission';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
@@ -46,8 +52,11 @@ import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { BulkSlotModal } from '../components/BulkSlotModal';
+import { GenerationRunsDrawer } from '../components/GenerationRunsDrawer';
+import { RegenerateResultModal } from '../components/RegenerateResultModal';
 import { SlotGrid } from '../components/SlotGrid';
 import { SlotLegend } from '../components/SlotLegend';
+import { regenerateCopy, runCopy } from '../components/slotsRuns.view';
 
 const ALL_DEPTS = 'All Departments';
 const ALL_DOCTORS = 'All Doctors';
@@ -56,38 +65,7 @@ const TOGGLE_FAILED = 'The slot could not be changed. Please try again.';
 const REGENERATE_FAILED = 'Slots could not be regenerated. Please try again.';
 
 function errorText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
-}
-
-function runTime(iso: string, timeZone: string | null): string {
-  return new Date(iso).toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timeZone ?? undefined,
-  });
-}
-
-/** How the last generation run is described, from the run record. */
-function runCopy(run: SlotGenerationRun, timeZone: string | null): string {
-  const when = runTime(run.startedAt, timeZone);
-  if (run.error) return `Slot generation on ${when} failed: ${run.error}`;
-  if (!run.finishedAt) return `Slots are being generated (started ${when})…`;
-  const how = run.trigger === 'nightly' ? 'nightly run' : `${run.trigger.replace(/_/g, ' ')} run`;
-  const range =
-    run.horizonFrom && run.horizonTo
-      ? ` · covers ${formatIsoDayLabel(run.horizonFrom)} – ${formatIsoDayLabel(run.horizonTo)}`
-      : '';
-  const changes = [
-    `${run.createdCount} created`,
-    run.updatedCount ? `${run.updatedCount} updated` : '',
-    run.closedCount ? `${run.closedCount} closed` : '',
-    run.preservedCount ? `${run.preservedCount} kept for bookings` : '',
-  ]
-    .filter(Boolean)
-    .join(', ');
-  return `Slots last generated ${when} (${how})${range} · ${changes}`;
+  return describeFailure(error, fallback);
 }
 
 /** Slots & Availability — the hospital's slot grid, open/block and bulk update (HA-08). */
@@ -104,12 +82,16 @@ export function SlotsScreen() {
   const profileQuery = useHospitalProfileQuery();
   const holidaysQuery = useHolidaysQuery();
   const timeZone = profileQuery.data?.timezone ?? null;
+  // "Today" is the hospital's calendar day, not the browser's (D-09, UAT-47).
+  const today = todayIsoIn(timeZone);
   const canEdit = useCan('Doctors & Departments.edit');
 
   const [date, setDate] = useState(todayIso);
   const [deptF, setDeptF] = useState(ALL_DEPTS);
   const [doctorF, setDoctorF] = useState(ALL_DOCTORS);
   const [bulk, setBulk] = useState<{ doctorId: string | null } | null>(null);
+  const [regenResult, setRegenResult] = useState<SlotRegenerateResult | null>(null);
+  const [runsOpen, setRunsOpen] = useState(false);
 
   const docs = useMemo(() => doctorsQuery.data ?? [], [doctorsQuery.data]);
   const depts = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
@@ -122,6 +104,7 @@ export function SlotsScreen() {
     [docs, departmentId],
   );
   const doctorId = doctorOptions.find((d) => d.name === doctorF)?.id ?? null;
+  const doctorNames = useMemo(() => new Map(docs.map((d) => [d.id, d.name])), [docs]);
 
   const gridQuery = useSlotGridQuery({ date, departmentId, doctorId });
   const latestRun = useLatestGenerationRunQuery();
@@ -144,7 +127,7 @@ export function SlotsScreen() {
   const horizonDays = rulesQuery.data?.bookingWindowDays ?? null;
   const lastBookableIso =
     rulesQuery.data?.derived.bookingWindowEndDate ??
-    (horizonDays === null ? null : addIsoDays(todayIso(), Math.max(0, horizonDays - 1)));
+    (horizonDays === null ? null : addIsoDays(today, Math.max(0, horizonDays - 1)));
   const holiday = (holidaysQuery.data ?? []).find(
     (h) => h.departmentId === null && h.from <= date && date <= h.to,
   );
@@ -154,11 +137,11 @@ export function SlotsScreen() {
   const hospitalClosed = dayHours?.isClosed === true;
   const hoursCopy = hoursLabel(dayHours?.opensAt ?? null, dayHours?.closesAt ?? null);
   const onlineBookingOff = profileQuery.data?.onlineBookingEnabled === false;
-  const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== todayIso();
+  const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== today;
   const clearFilters = (): void => {
     setDeptF(ALL_DEPTS);
     setDoctorF(ALL_DOCTORS);
-    setDate(todayIso());
+    setDate(today);
   };
   const refresh = async (): Promise<void> => {
     await Promise.all([gridQuery.refetch(), latestRun.refetch()]);
@@ -181,11 +164,16 @@ export function SlotsScreen() {
 
   const handleRegenerate = (): void => {
     regenerate.mutate(doctorId, {
-      onSuccess: (res) =>
-        toast(
-          `Slots regenerated — ${res.createdCount} created, ${res.updatedCount} updated`,
-          'success',
-        ),
+      onSuccess: (res) => {
+        if (res.queued) {
+          // Run as a background task (BE-33): follow it in the runs drawer.
+          toast(regenerateCopy(res), 'info');
+          setRunsOpen(true);
+          return;
+        }
+        // Counts and any booking left on a slot the rules no longer produce (UAT-73).
+        setRegenResult(res);
+      },
       onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error'),
     });
   };
@@ -213,7 +201,7 @@ export function SlotsScreen() {
               type="date"
               height={40}
               aria-label="Slot grid date"
-              onChange={(v) => setDate(v || todayIso())}
+              onChange={(v) => setDate(v || today)}
             />
           </div>
           <IconBtn
@@ -224,7 +212,7 @@ export function SlotsScreen() {
             disabled={atHorizon}
             onClick={() => setDate(addIsoDays(date, 1))}
           />
-          <Button size="sm" variant="secondary" onClick={() => setDate(todayIso())}>
+          <Button size="sm" variant="secondary" onClick={() => setDate(today)}>
             Today
           </Button>
         </div>
@@ -263,7 +251,7 @@ export function SlotsScreen() {
               : hoursCopy
                 ? `Hospital hours ${hoursCopy}`
                 : 'Hospital hours not set'}
-            <InfoDot text="Opening hours and holidays come from Hospital Settings. Each doctor's slot length and weekly sessions are set on their profile (Availability tab), and their leave and date exceptions narrow the slots further. Times are in the hospital's time zone." />
+            <InfoDot text="Opening hours come from Hospital Settings and closures from the Holiday Calendar in Hospital Profile. Each doctor's slot length and weekly sessions are set on their profile (Availability tab), and their leave and date exceptions narrow the slots further. Times are in the hospital's time zone." />
           </div>
           <div className="text-caption text-text-muted mt-1 flex flex-wrap items-center gap-1.5">
             <Icon name="refresh-cw" size={13} />
@@ -274,6 +262,13 @@ export function SlotsScreen() {
                 : latestRun.data
                   ? runCopy(latestRun.data, timeZone)
                   : 'Slots have not been generated yet.'}
+            <button
+              type="button"
+              onClick={() => setRunsOpen(true)}
+              className="text-caption text-blue cursor-pointer underline"
+            >
+              Generation runs
+            </button>
             {canEdit && (
               <button
                 type="button"
@@ -308,10 +303,10 @@ export function SlotsScreen() {
           <Button
             size="sm"
             variant="ghost"
-            icon="settings"
-            onClick={() => navigate(hospitalPath(role, 'settings'))}
+            icon="calendar-days"
+            onClick={() => navigate(hospitalHolidaysPath(role))}
           >
-            Holidays in Hospital Settings
+            Holiday Calendar
           </Button>
         </Card>
       )}
@@ -398,7 +393,7 @@ export function SlotsScreen() {
             busySlotId={toggle.isPending ? (toggle.variables?.slotId ?? null) : null}
             onToggleSlot={canEdit ? toggleSlot : undefined}
             onBulkForDoctor={canEdit ? (id) => setBulk({ doctorId: id }) : undefined}
-            onOpenDoctor={(id) => navigate(`${hospitalPath(role, 'doctors')}/${id}`)}
+            onOpenDoctor={(id) => navigate(hospitalDoctorAvailabilityPath(role, id))}
           />
           {isTruncated && doctorsPage && (
             <div className="text-caption text-text-muted">
@@ -415,9 +410,27 @@ export function SlotsScreen() {
           departmentId={departmentId}
           initialDoctorId={bulk.doctorId}
           doctors={doctorOptions.map((d) => ({ id: d.id, name: d.name }))}
+          timeZone={timeZone}
           onClose={() => setBulk(null)}
         />
       )}
+      <RegenerateResultModal
+        result={regenResult}
+        timeZone={timeZone}
+        onClose={() => setRegenResult(null)}
+        onShowRuns={() => {
+          setRegenResult(null);
+          setRunsOpen(true);
+        }}
+      />
+      <GenerationRunsDrawer
+        open={runsOpen}
+        onClose={() => setRunsOpen(false)}
+        doctorId={doctorId}
+        doctorName={doctorId ? doctorF : null}
+        doctorNames={doctorNames}
+        timeZone={timeZone}
+      />
     </div>
   );
 }

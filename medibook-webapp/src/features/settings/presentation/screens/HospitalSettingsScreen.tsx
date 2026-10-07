@@ -9,7 +9,6 @@ import { useHospitalHoursQuery } from '@/features/settings/application/queries/u
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
 import { useTokenPolicyQuery } from '@/features/settings/application/queries/useTokenPolicyQuery';
-import { payoutAccountOf } from '@/features/settings/application/store/settings.form';
 
 import { type BankAccountsState, SettingsEditor } from '../components/SettingsEditor';
 
@@ -22,9 +21,10 @@ const CARD_SKELETON_PAD = 28;
 /**
  * Hospital Settings (module H2) — loads the hospital's profile, rulebook,
  * working hours and token policy from the API, then hands them to
- * `SettingsEditor`. The payout account loads on its own (it needs the
+ * `SettingsEditor`. The payout accounts load on their own (they need the
  * Billing & Settlements permission), so a refusal there never blocks the
- * rest of the screen.
+ * rest of the screen; numbering, counters, templates and display screens
+ * load inside their own sections.
  */
 export function HospitalSettingsScreen() {
   const { can } = usePermission();
@@ -78,7 +78,7 @@ export function HospitalSettingsScreen() {
     : bankAccounts.isError
       ? { status: 'error', retry: () => void bankAccounts.refetch() }
       : bankAccounts.data
-        ? { status: 'ready', account: payoutAccountOf(bankAccounts.data) }
+        ? { status: 'ready', accounts: bankAccounts.data }
         : { status: 'loading' };
 
   return (

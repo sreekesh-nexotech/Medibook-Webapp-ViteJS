@@ -7,6 +7,14 @@ export const settingsKeys = {
   tokenPolicy: () => [...settingsKeys.all, 'token-policy'] as const,
   bankAccounts: () => [...settingsKeys.all, 'bank-accounts'] as const,
   imageUrl: (fileId: string) => [...settingsKeys.all, 'image-url', fileId] as const,
+  numbering: () => [...settingsKeys.all, 'numbering'] as const,
+  numberingPreview: (kind: string, version: number) =>
+    [...settingsKeys.numbering(), 'preview', kind, version] as const,
+  counters: () => [...settingsKeys.all, 'counters'] as const,
+  printTemplates: () => [...settingsKeys.all, 'print-templates'] as const,
+  printPreview: (id: string, version: number) =>
+    [...settingsKeys.printTemplates(), 'preview', id, version] as const,
+  displayDevices: () => [...settingsKeys.all, 'display-devices'] as const,
 };
 
 /** Settings change rarely and only from this screen; a minute keeps tabs in step. */

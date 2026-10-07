@@ -1,6 +1,6 @@
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
 
 import type {
   DateExceptionInput,
@@ -8,6 +8,7 @@ import type {
   DoctorFilters,
   DoctorInput,
   LeaveInput,
+  ScheduleWriteMode,
   WeeklySession,
 } from '@/features/doctors/domain/entities/doctors.types';
 import type {
@@ -20,8 +21,8 @@ import {
   dateExceptionSchema,
   departmentResponseSchema,
   doctorResponseSchema,
+  doctorReviewResponseSchema,
   leaveSchema,
-  PAISE_PER_RUPEE,
   scheduleChangeResponseSchema,
   scheduleResponseSchema,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
@@ -30,25 +31,36 @@ import {
  * Doctors & Departments endpoints (`/api/v1/hospital/…`). Lists are
  * paginated server-side (despite `schema.yml` typing them as arrays); the
  * catalogue is small, so every page is fetched. Writes that can cancel
- * bookings carry a fresh `Idempotency-Key` per call and `?confirm=`.
+ * bookings take a `ScheduleWriteMode`: `?confirm=`, the caller's
+ * `Idempotency-Key` and, on confirm, the dry run's preview token.
  */
 
 export const departmentPageSchema = paginatedSchema(departmentResponseSchema);
 export const doctorPageSchema = paginatedSchema(doctorResponseSchema);
 export const leavePageSchema = paginatedSchema(leaveSchema);
 export const dateExceptionPageSchema = paginatedSchema(dateExceptionSchema);
+export const doctorReviewPageSchema = paginatedSchema(doctorReviewResponseSchema);
 
-/** Non-alphanumeric runs collapse to one dash. */
-const SLUG_SEPARATOR_PATTERN = /[^a-z0-9]+/g;
-const SLUG_TRIM_PATTERN = /^-+|-+$/g;
+/**
+ * Query parameter that carries the dry run's preview token on confirm
+ * (BE-33: confirm is refused with 409 when the affected bookings changed).
+ */
+export const PREVIEW_TOKEN_PARAM = 'preview_token';
 
-/** A URL-safe key from a display name ("Dr. Asha Verma" → "dr-asha-verma"). */
-function slugify(value: string): string {
-  return value.toLowerCase().replace(SLUG_SEPARATOR_PATTERN, '-').replace(SLUG_TRIM_PATTERN, '');
+/** `?confirm=` plus the preview token on confirm (only when the dry run issued one). */
+function writeParams(mode: ScheduleWriteMode) {
+  return {
+    confirm: mode.confirm,
+    ...(mode.confirm && mode.previewToken ? { [PREVIEW_TOKEN_PARAM]: mode.previewToken } : {}),
+  };
 }
 
-function confirmParams(confirm: boolean) {
-  return { confirm };
+/** The write's replay key, plus `If-Match` when the row is versioned. */
+function writeHeaders(mode: ScheduleWriteMode, version?: number) {
+  return {
+    ...(version === undefined ? {} : ifMatch(version)),
+    ...idempotencyKey(mode.idempotencyKey),
+  };
 }
 
 /** Fetch every page of a list, in order. */
@@ -74,29 +86,31 @@ export function getDepartments(): Promise<DepartmentResponse[]> {
   });
 }
 
+/** `code` only when the user typed one — the server makes it otherwise (BE-33, UAT-49). */
 function departmentBody(input: DepartmentInput) {
   return {
     name: input.name,
     description: input.description || null,
     is_active: input.isActive,
+    ...(input.code !== undefined && { code: input.code }),
   };
 }
 
 export async function postDepartment(input: DepartmentInput): Promise<DepartmentResponse> {
-  const response = await hospitalApi.post('/departments', {
-    ...departmentBody(input),
-    code: slugify(input.name),
-  });
+  const response = await hospitalApi.post('/departments', departmentBody(input));
   return departmentResponseSchema.parse(response.data);
 }
 
+/** `update_department` calls `require_version`: `If-Match` is mandatory (UAT-06). */
 export async function patchDepartment(
   id: string,
   input: DepartmentInput,
+  version: number,
 ): Promise<DepartmentResponse> {
   const response = await hospitalApi.patch(
     `/departments/${encodeURIComponent(id)}`,
     departmentBody(input),
+    { headers: ifMatch(version) },
   );
   return departmentResponseSchema.parse(response.data);
 }
@@ -139,24 +153,21 @@ function doctorBody(input: DoctorInput) {
     experience_years: input.experienceYears,
     bio: input.bio || null,
     room: input.room || null,
-    consultation_fee_paise: Math.round(input.feeRupees * PAISE_PER_RUPEE),
-    follow_up_fee_paise:
-      input.followUpFeeRupees === null
-        ? null
-        : Math.round(input.followUpFeeRupees * PAISE_PER_RUPEE),
+    // Integer paise end to end: ₹499.50 is 49950, never re-derived from rupees (UAT-08).
+    consultation_fee_paise: input.feePaise,
+    follow_up_fee_paise: input.followUpFeePaise,
     expected_consult_minutes: input.expectedConsultMinutes,
     slot_length_min: input.slotLengthMin,
     is_bookable_online: input.isBookableOnline,
     status: input.status,
     photo_file_id: input.photoFileId,
+    // Only a slug the user typed; the server makes one from the name (BE-33, UAT-49).
+    ...(input.slug !== undefined && { slug: input.slug }),
   };
 }
 
 export async function postDoctor(input: DoctorInput): Promise<DoctorResponse> {
-  const response = await hospitalApi.post('/doctors', {
-    ...doctorBody(input),
-    slug: slugify(input.name),
-  });
+  const response = await hospitalApi.post('/doctors', doctorBody(input));
   return doctorResponseSchema.parse(response.data);
 }
 
@@ -164,25 +175,33 @@ export async function patchDoctor(
   id: string,
   input: DoctorInput,
   version: number,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(
     `/doctors/${encodeURIComponent(id)}`,
     doctorBody(input),
-    {
-      params: confirmParams(confirm),
-      headers: { ...ifMatch(version), ...idempotencyKey() },
-    },
+    { params: writeParams(mode), headers: writeHeaders(mode, version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
-export async function deleteDoctor(id: string, confirm: boolean): Promise<ScheduleChangeResponse> {
+export async function deleteDoctor(
+  id: string,
+  mode: ScheduleWriteMode,
+): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.delete(`/doctors/${encodeURIComponent(id)}`, {
-    params: confirmParams(confirm),
-    headers: idempotencyKey(),
+    params: writeParams(mode),
+    headers: writeHeaders(mode),
   });
   return scheduleChangeResponseSchema.parse(response.data);
+}
+
+/** One page of a doctor's approved reviews, newest first (DOC-01). */
+export async function getDoctorReviews(doctorId: string, page: number) {
+  const response = await hospitalApi.get(`/doctors/${encodeURIComponent(doctorId)}/reviews`, {
+    params: { page, page_size: DEFAULT_PAGE_SIZE },
+  });
+  return doctorReviewPageSchema.parse(response.data);
 }
 
 /* ------------------------------------------------------------------- schedule */
@@ -220,7 +239,7 @@ export async function putWeeklySessions(
   doctorId: string,
   sessions: readonly WeeklySession[],
   version: number,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.put(
     `/doctors/${encodeURIComponent(doctorId)}/weekly-sessions`,
@@ -234,7 +253,7 @@ export async function putWeeklySessions(
         is_active: true,
       })),
     },
-    { params: confirmParams(confirm), headers: { ...ifMatch(version), ...idempotencyKey() } },
+    { params: writeParams(mode), headers: writeHeaders(mode, version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
@@ -251,15 +270,12 @@ function leaveBody(input: LeaveInput) {
 export async function postLeave(
   doctorId: string,
   input: LeaveInput,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.post(
     `/doctors/${encodeURIComponent(doctorId)}/leaves`,
     leaveBody(input),
-    {
-      params: confirmParams(confirm),
-      headers: idempotencyKey(),
-    },
+    { params: writeParams(mode), headers: writeHeaders(mode) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
@@ -269,27 +285,25 @@ export async function patchLeave(
   leaveId: string,
   input: LeaveInput,
   version: number,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(
     `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leaveId)}`,
     leaveBody(input),
-    { params: confirmParams(confirm), headers: { ...ifMatch(version), ...idempotencyKey() } },
+    { params: writeParams(mode), headers: writeHeaders(mode, version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
 export async function deleteLeave(
   doctorId: string,
-  leaveId: string,
-  confirm: boolean,
+  leave: { readonly id: string; readonly version: number },
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
+  // DELETE honours `If-Match` when sent (`check_version_if_sent`): a stale row is refused.
   const response = await hospitalApi.delete(
-    `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leaveId)}`,
-    {
-      params: confirmParams(confirm),
-      headers: idempotencyKey(),
-    },
+    `/doctors/${encodeURIComponent(doctorId)}/leaves/${encodeURIComponent(leave.id)}`,
+    { params: writeParams(mode), headers: writeHeaders(mode, leave.version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
@@ -314,12 +328,12 @@ function exceptionBody(input: DateExceptionInput) {
 export async function postDateException(
   doctorId: string,
   input: DateExceptionInput,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.post(
     `/doctors/${encodeURIComponent(doctorId)}/date-exceptions`,
     exceptionBody(input),
-    { params: confirmParams(confirm), headers: idempotencyKey() },
+    { params: writeParams(mode), headers: writeHeaders(mode) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
@@ -329,27 +343,24 @@ export async function patchDateException(
   exceptionId: string,
   input: DateExceptionInput,
   version: number,
-  confirm: boolean,
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.patch(
     `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exceptionId)}`,
     exceptionBody(input),
-    { params: confirmParams(confirm), headers: { ...ifMatch(version), ...idempotencyKey() } },
+    { params: writeParams(mode), headers: writeHeaders(mode, version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
 export async function deleteDateException(
   doctorId: string,
-  exceptionId: string,
-  confirm: boolean,
+  exception: { readonly id: string; readonly version: number },
+  mode: ScheduleWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.delete(
-    `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exceptionId)}`,
-    {
-      params: confirmParams(confirm),
-      headers: idempotencyKey(),
-    },
+    `/doctors/${encodeURIComponent(doctorId)}/date-exceptions/${encodeURIComponent(exception.id)}`,
+    { params: writeParams(mode), headers: writeHeaders(mode, exception.version) },
   );
   return scheduleChangeResponseSchema.parse(response.data);
 }

@@ -1,12 +1,14 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-import { isFailure } from '@/core/error/failure';
+import { PROFILE_TAB_BANNERS, PROFILE_TAB_HOLIDAYS, PROFILE_TAB_PARAM } from '@/app/router/paths';
 
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
 import { addDaysISO, fmtDate, todayISO } from '@/shared/lib/format';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -27,13 +29,14 @@ import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { ScheduleChangeModal } from '@/features/doctors/presentation/components/ScheduleChangeModal';
+import { useScheduleConfirm } from '@/features/doctors/presentation/components/useScheduleConfirm';
 import type {
-  AffectedBooking,
   BannerInput,
   Holiday,
   HolidayInput,
+  HolidayRef,
   HospitalBanner,
-  ScheduleChange,
 } from '@/features/settings/domain/entities/profile.entities';
 import { useBannerImageUrlsQuery } from '@/features/settings/application/queries/useBannerImageUrlsQuery';
 import { useBannersQuery } from '@/features/settings/application/queries/useBannersQuery';
@@ -47,22 +50,31 @@ import { useUpdateBannerMutation } from '@/features/settings/application/queries
 import {
   BANNER_AUDIENCE_LABEL,
   HOLIDAY_SCOPE_OPTIONS,
-  affectedBookingsCopy,
   bannerStatusAt,
   bannerWindow,
+  closedDaysWithin,
   holidayAppliesTo,
   holidayDayCount,
-  holidayDaysWithin,
   holidayScopeOf,
   moved,
 } from '@/features/settings/application/store/profile.form';
-import { HolidayModal } from '@/features/settings/presentation/components/HolidayModal';
+import {
+  HolidayModal,
+  type HolidaySaveOutcome,
+} from '@/features/settings/presentation/components/HolidayModal';
 import { PatientBannerModal } from '@/features/settings/presentation/components/PatientBannerModal';
 import { PatientBannerThumb } from '@/features/settings/presentation/components/PatientBannerThumb';
 
-type ProfileTab = 'Branches' | 'Holiday Calendar' | 'Patient App Banners';
+// Branches are a removed concept (D-02, CLAUDE.md §12): one hospital = one location.
+type ProfileTab = 'Holiday Calendar' | 'Patient App Banners';
 
-const TABS: readonly ProfileTab[] = ['Branches', 'Holiday Calendar', 'Patient App Banners'];
+const TABS: readonly ProfileTab[] = ['Holiday Calendar', 'Patient App Banners'];
+
+/** `?tab=` values → tab (`hospitalHolidaysPath` links here from Slots, UAT-73). */
+const TAB_FROM_PARAM: Readonly<Record<string, ProfileTab>> = {
+  [PROFILE_TAB_HOLIDAYS]: 'Holiday Calendar',
+  [PROFILE_TAB_BANNERS]: 'Patient App Banners',
+};
 
 /** Window the "closures ahead" summary counts over. */
 const HORIZON_DAYS = 90;
@@ -85,42 +97,41 @@ const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 interface DeleteTarget {
   readonly kind: 'holiday' | 'banner';
   readonly id: string;
-  /** Row version for `If-Match`; holidays have none. */
-  readonly version: number | null;
+  /** Row version for `If-Match` (holidays and banners both have one). */
+  readonly version: number;
   readonly label: string;
   readonly body: string;
 }
 
 /** A calendar write, replayable as a dry run and then for real. */
 type HolidayOp =
-  | { readonly kind: 'save'; readonly id: string | null; readonly input: HolidayInput }
-  | { readonly kind: 'remove'; readonly id: string; readonly name: string };
-
-/** A calendar write waiting on the user because it would cancel bookings. */
-interface PendingImpact {
-  readonly op: HolidayOp;
-  readonly bookings: readonly AffectedBooking[];
-}
+  | { readonly kind: 'save'; readonly existing: HolidayRef | null; readonly input: HolidayInput }
+  | { readonly kind: 'remove'; readonly holiday: HolidayRef; readonly name: string };
 
 function errorCopy(error: unknown): string {
-  return isFailure(error) ? error.message : FALLBACK_ERROR;
+  return describeFailure(error, FALLBACK_ERROR);
 }
 
-function holidayOpSuccessCopy(op: HolidayOp): string {
-  if (op.kind === 'remove') return 'Holiday removed — the day is bookable again';
-  return op.id === null ? 'Holiday added — slots will not be generated' : 'Holiday saved';
+/** What the applied write did, including the bookings it cancelled (07·P-F7). */
+function holidayOpSuccessCopy(op: HolidayOp, cancelled: number): string {
+  const done =
+    op.kind === 'remove'
+      ? 'Holiday removed — the day is bookable again'
+      : op.existing === null
+        ? 'Holiday added — slots will not be generated'
+        : 'Holiday saved';
+  return cancelled === 0
+    ? done
+    : `${done} — ${cancelled} ${cancelled === 1 ? 'booking' : 'bookings'} cancelled with a full refund`;
 }
 
 /**
- * Hospital Profile (module H4) — audit HA-03 (§2.4): "Branches and holiday
- * calendar have no screen. Hospital-published banners for the patient app
- * have no screen."
+ * Hospital Profile (module H4) — the holiday calendar and the banners the
+ * hospital publishes to the patient app, both on the hospital API.
  *
- * The holiday calendar and the patient-app banners run on the hospital API.
  * Every closure write is checked with a dry run first: if it would cancel
  * booked appointments, nothing is applied until the user confirms the list.
- * Branches have no backend yet, so that tab says so instead of showing
- * rows that are not real.
+ * There is no Branches tab: one hospital is one location (D-02, UAT-52).
  */
 export function HospitalProfileScreen() {
   const { can } = usePermission();
@@ -137,15 +148,18 @@ export function HospitalProfileScreen() {
   const updateBanner = useUpdateBannerMutation();
   const deleteBanner = useDeleteBannerMutation();
   const reorderBanners = useReorderBannersMutation();
+  const holidayConfirm = useScheduleConfirm();
+  const [searchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<ProfileTab>('Holiday Calendar');
+  const [tab, setTab] = useState<ProfileTab>(
+    () => TAB_FROM_PARAM[searchParams.get(PROFILE_TAB_PARAM) ?? ''] ?? 'Holiday Calendar',
+  );
   const [scopeFilter, setScopeFilter] = useState(ANY_SCOPE);
   const [whenFilter, setWhenFilter] = useState(ANY_WHEN);
 
   const [holidayEdit, setHolidayEdit] = useState<{ holiday: Holiday | null } | null>(null);
   const [bannerEdit, setBannerEdit] = useState<{ banner: HospitalBanner | null } | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
-  const [impact, setImpact] = useState<PendingImpact | null>(null);
 
   const holidays = holidaysQuery.data ?? [];
   const banners = bannersQuery.data ?? [];
@@ -161,10 +175,13 @@ export function HospitalProfileScreen() {
   const now = new Date();
   const horizonEnd = addDaysISO(today, HORIZON_DAYS);
   const upcoming = holidays.filter((h) => h.to >= today && h.from <= horizonEnd);
-  const closedDaysAhead = upcoming.reduce(
-    (sum, h) => sum + holidayDaysWithin(h, today, horizonEnd),
-    0,
+  // Distinct whole-hospital days; department closures are counted apart (07·P-F3).
+  const closedDaysAhead = closedDaysWithin(
+    upcoming.filter((h) => h.departmentId === null),
+    today,
+    horizonEnd,
   );
+  const departmentClosuresAhead = upcoming.filter((h) => h.departmentId !== null).length;
   const nextClosure = [...upcoming].sort((a, b) => a.from.localeCompare(b.from))[0] ?? null;
 
   const statuses = new Map(banners.map((b) => [b.id, bannerStatusAt(b, now)]));
@@ -209,69 +226,54 @@ export function HospitalProfileScreen() {
     toast(`Exported ${orderedHolidays.length} closures as CSV`, 'success');
   };
 
-  /* ---- holiday writes: dry run first, confirm only when nothing is cancelled ---- */
+  /* ---- holiday writes: dry run first; bookings it would cancel are confirmed ---- */
 
-  const runHolidayOp = (op: HolidayOp, confirm: boolean): Promise<ScheduleChange> =>
-    op.kind === 'save'
-      ? saveHoliday.mutateAsync({ id: op.id, input: op.input, confirm })
-      : removeHoliday.mutateAsync({ id: op.id, confirm });
-
-  /** Resolves `true` once the op is applied or handed to the impact confirm. */
-  const startHolidayOp = async (op: HolidayOp): Promise<boolean> => {
-    try {
-      const preview = await runHolidayOp(op, false);
-      if (preview.affectedBookings.length > 0) {
-        setImpact({ op, bookings: preview.affectedBookings });
-        return true;
-      }
-      await runHolidayOp(op, true);
-      toast(holidayOpSuccessCopy(op), 'success');
-      return true;
-    } catch (error) {
-      toast(errorCopy(error), 'error');
-      return false;
-    }
-  };
-
-  const confirmImpact = async (): Promise<void> => {
-    if (!impact) return;
-    const { op } = impact;
-    setImpact(null);
-    try {
-      const applied = await runHolidayOp(op, true);
-      const cancelled = applied.affectedBookings.length;
-      toast(
-        `${holidayOpSuccessCopy(op)} — ${cancelled} ${
-          cancelled === 1 ? 'booking' : 'bookings'
-        } cancelled with a full refund`,
-        'success',
-      );
-    } catch (error) {
-      toast(errorCopy(error), 'error');
-    }
+  /**
+   * Dry run, then confirm — straight away when nothing is affected, else
+   * after the user approves the named bookings. The confirm carries one
+   * `Idempotency-Key` per action (07·P-F9) and the preview token (BE-33).
+   * Resolves `failed` only for an error before any confirmation was asked
+   * (the modal then shows it on its fields); later errors are toasted.
+   */
+  const startHolidayOp = async (op: HolidayOp): Promise<HolidaySaveOutcome> => {
+    // Filled from the callbacks below (a holder object, so TypeScript keeps its type).
+    const state: { asking: boolean; early: HolidaySaveOutcome | null } = {
+      asking: false,
+      early: null,
+    };
+    await holidayConfirm.run({
+      attempt: (mode) => {
+        state.asking = state.asking || mode.confirm;
+        return op.kind === 'save'
+          ? saveHoliday.mutateAsync({ existing: op.existing, input: op.input, mode })
+          : removeHoliday.mutateAsync({ holiday: op.holiday, mode });
+      },
+      onApplied: (change) =>
+        toast(holidayOpSuccessCopy(op, change.affectedBookings.length), 'success'),
+      onError: (error) => {
+        if (!state.asking && state.early === null) state.early = { status: 'failed', error };
+        else toast(errorCopy(error), 'error');
+      },
+    });
+    return state.early ?? { status: 'done' };
   };
 
   /* ---- banners ---- */
 
-  const saveBannerInput = async (input: BannerInput): Promise<boolean> => {
+  /** Rejects with the failure: the modal maps its field errors (UAT-48). */
+  const saveBannerInput = async (input: BannerInput): Promise<void> => {
     const editing = bannerEdit?.banner ?? null;
-    try {
-      if (editing) {
-        await updateBanner.mutateAsync({
-          id: editing.id,
-          changes: input,
-          version: editing.version,
-        });
-        toast('Banner saved', 'success');
-      } else {
-        const nextOrder = banners.reduce((max, b) => Math.max(max, b.sortOrder + 1), 0);
-        await createBanner.mutateAsync({ input, sortOrder: nextOrder });
-        toast('Banner scheduled — it goes live on its start date', 'success');
-      }
-      return true;
-    } catch (error) {
-      toast(errorCopy(error), 'error');
-      return false;
+    if (editing) {
+      await updateBanner.mutateAsync({
+        id: editing.id,
+        changes: input,
+        version: editing.version,
+      });
+      toast('Banner saved', 'success');
+    } else {
+      const nextOrder = banners.reduce((max, b) => Math.max(max, b.sortOrder + 1), 0);
+      await createBanner.mutateAsync({ input, sortOrder: nextOrder });
+      toast('Banner scheduled — it goes live on its start date', 'success');
     }
   };
 
@@ -297,10 +299,15 @@ export function HospitalProfileScreen() {
     const target = toDelete;
     setToDelete(null);
     if (target.kind === 'holiday') {
-      void startHolidayOp({ kind: 'remove', id: target.id, name: target.label });
+      void startHolidayOp({
+        kind: 'remove',
+        holiday: { id: target.id, version: target.version },
+        name: target.label,
+      }).then((outcome) => {
+        if (outcome.status === 'failed') toast(errorCopy(outcome.error), 'error');
+      });
       return;
     }
-    if (target.version === null) return;
     deleteBanner.mutate(
       { id: target.id, version: target.version },
       {
@@ -362,14 +369,23 @@ export function HospitalProfileScreen() {
           </div>
           <div className="text-caption text-text-muted">
             Closures stop slot generation; banners show on the hospital&apos;s page in the patient
-            app. Branches are not yet available from the server.
+            app. The hospital&apos;s name, address and logo are edited in Hospital Settings ›
+            General.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-5">
           <div className="flex flex-col">
-            <span className="text-caption text-text-muted">Closed days (next {HORIZON_DAYS})</span>
+            <span className="text-caption text-text-muted">
+              Hospital closed days (next {HORIZON_DAYS})
+            </span>
             <span className="text-body text-text-strong font-semibold tabular-nums">
               {holidaysQuery.data ? closedDaysAhead : '—'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-caption text-text-muted">Department closures</span>
+            <span className="text-body text-text-strong font-semibold tabular-nums">
+              {holidaysQuery.data ? departmentClosuresAhead : '—'}
             </span>
           </div>
           <div className="flex flex-col">
@@ -399,16 +415,6 @@ export function HospitalProfileScreen() {
           </Can>
         )}
       </Card>
-
-      {tab === 'Branches' && (
-        <Card>
-          <EmptyState
-            icon="building"
-            title="Branches are not yet available from the server"
-            message="The hospital API has no branches endpoint yet, so branches cannot be listed or edited here. The holiday calendar and patient-app banners are live."
-          />
-        </Card>
-      )}
 
       {tab === 'Holiday Calendar' && (
         <Card>
@@ -442,9 +448,13 @@ export function HospitalProfileScreen() {
                 {nextClosure
                   ? `Next closure: ${nextClosure.name} on ${fmtDate(nextClosure.from)}${
                       nextClosure.to !== nextClosure.from ? ` – ${fmtDate(nextClosure.to)}` : ''
-                    } (${holidayAppliesTo(nextClosure, departmentNames)}). ${closedDaysAhead} booking ${
+                    } (${holidayAppliesTo(nextClosure, departmentNames)}). The whole hospital is closed on ${closedDaysAhead} ${
                       closedDaysAhead === 1 ? 'day' : 'days'
-                    } removed over the next ${HORIZON_DAYS} days.`
+                    } over the next ${HORIZON_DAYS} days${
+                      departmentClosuresAhead > 0
+                        ? `, plus ${departmentClosuresAhead} department ${departmentClosuresAhead === 1 ? 'closure' : 'closures'}`
+                        : ''
+                    }.`
                   : `Nothing closed in the next ${HORIZON_DAYS} days — every working day generates slots.`}
               </span>
             </div>
@@ -542,7 +552,7 @@ export function HospitalProfileScreen() {
                             setToDelete({
                               kind: 'holiday',
                               id: h.id,
-                              version: null,
+                              version: h.version,
                               label: h.name,
                               body: `Removing “${h.name}” makes ${days} ${
                                 days === 1 ? 'day' : 'days'
@@ -627,26 +637,32 @@ export function HospitalProfileScreen() {
                         i < banners.length - 1 && 'border-border-soft border-b',
                       )}
                     >
-                      <div className="flex flex-none flex-col gap-0.5">
-                        <IconBtn
-                          name="chevron-up"
-                          label="Move banner up"
-                          title={`Move “${b.title}” up`}
-                          box={26}
-                          size={15}
-                          disabled={i === 0 || reorderBanners.isPending}
-                          onClick={() => moveBanner(i, -1)}
-                        />
-                        <IconBtn
-                          name="chevron-down"
-                          label="Move banner down"
-                          title={`Move “${b.title}” down`}
-                          box={26}
-                          size={15}
-                          disabled={i === banners.length - 1 || reorderBanners.isPending}
-                          onClick={() => moveBanner(i, 1)}
-                        />
-                      </div>
+                      <Can
+                        perm="Hospital Settings.edit"
+                        disableInstead
+                        disabledTitle="Your role cannot change banners"
+                      >
+                        <div className="flex flex-none flex-col gap-0.5">
+                          <IconBtn
+                            name="chevron-up"
+                            label="Move banner up"
+                            title={`Move “${b.title}” up`}
+                            box={26}
+                            size={15}
+                            disabled={i === 0 || reorderBanners.isPending}
+                            onClick={() => moveBanner(i, -1)}
+                          />
+                          <IconBtn
+                            name="chevron-down"
+                            label="Move banner down"
+                            title={`Move “${b.title}” down`}
+                            box={26}
+                            size={15}
+                            disabled={i === banners.length - 1 || reorderBanners.isPending}
+                            onClick={() => moveBanner(i, 1)}
+                          />
+                        </div>
+                      </Can>
                       <span className="text-body text-text-muted w-4.5 flex-none text-center font-medium tabular-nums">
                         {i + 1}
                       </span>
@@ -732,7 +748,13 @@ export function HospitalProfileScreen() {
           departments={departments}
           onClose={() => setHolidayEdit(null)}
           onSave={(input) =>
-            startHolidayOp({ kind: 'save', id: holidayEdit.holiday?.id ?? null, input })
+            startHolidayOp({
+              kind: 'save',
+              existing: holidayEdit.holiday
+                ? { id: holidayEdit.holiday.id, version: holidayEdit.holiday.version }
+                : null,
+              input,
+            })
           }
         />
       )}
@@ -761,23 +783,7 @@ export function HospitalProfileScreen() {
         onConfirm={confirmDelete}
       />
 
-      <ConfirmModal
-        open={impact != null}
-        title="This cancels booked appointments"
-        body={
-          impact
-            ? `${impact.bookings.length} ${
-                impact.bookings.length === 1 ? 'booking falls' : 'bookings fall'
-              } on the closed days: ${affectedBookingsCopy(impact.bookings)}. Confirming cancels ${
-                impact.bookings.length === 1 ? 'it' : 'them'
-              } with a 100% refund and prompts the patients to rebook. Nothing has been changed yet.`
-            : ''
-        }
-        confirmLabel="Cancel bookings and save"
-        danger
-        onClose={() => setImpact(null)}
-        onConfirm={() => void confirmImpact()}
-      />
+      <ScheduleChangeModal {...holidayConfirm.modal} />
     </div>
   );
 }

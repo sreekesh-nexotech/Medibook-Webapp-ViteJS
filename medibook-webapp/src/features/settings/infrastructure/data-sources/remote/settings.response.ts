@@ -9,7 +9,6 @@ import type {
   HospitalRuleSettings,
   SlotsPerSessionEstimate,
   TokenPolicy,
-  TokenScope,
 } from '@/features/settings/domain/entities/settings.entities';
 
 /**
@@ -28,6 +27,7 @@ export const hospitalProfileResponseSchema = z.object({
   registration_no: z.string().nullable(),
   email: z.string(),
   phone_e164: z.string(),
+  website: z.string().nullable().optional(),
   address_line1: z.string(),
   address_line2: z.string().nullable(),
   address_line3: z.string().nullable(),
@@ -38,6 +38,7 @@ export const hospitalProfileResponseSchema = z.object({
   lng: z.number().nullable(),
   logo_file_id: z.string().nullable(),
   cover_file_id: z.string().nullable(),
+  stamp_file_id: z.string().nullable().optional(),
   online_booking_enabled: z.boolean(),
   // IANA zone the hospital's dates and times are kept in; optional for older backends.
   timezone: z.string().optional(),
@@ -55,6 +56,7 @@ export function toHospitalProfile(dto: HospitalProfileResponse): HospitalProfile
     registrationNo: dto.registration_no,
     email: dto.email,
     phoneE164: dto.phone_e164,
+    website: dto.website ?? null,
     addressLine1: dto.address_line1,
     addressLine2: dto.address_line2,
     addressLine3: dto.address_line3,
@@ -65,6 +67,7 @@ export function toHospitalProfile(dto: HospitalProfileResponse): HospitalProfile
     lng: dto.lng,
     logoFileId: dto.logo_file_id,
     coverFileId: dto.cover_file_id,
+    stampFileId: dto.stamp_file_id ?? null,
     onlineBookingEnabled: dto.online_booking_enabled,
     timezone: dto.timezone ?? null,
     version: dto.version,
@@ -81,14 +84,39 @@ const derivedSchema = z.object({
     .object({ min: z.number(), max: z.number(), avg: z.number() })
     .nullable()
     .optional(),
+  token_cancel_rule: z.string().nullable().optional(),
 });
 
+const receiptPaperSchema = z.enum(['A5', '80mm', 'A4']);
+
+/** Backend defaults (`HospitalSettings` model) for fields an older backend omits. */
+const DEFAULT_REFUND_BEFORE_BP = 10_000;
+const DEFAULT_NO_SHOW_ATTEMPTS = 3;
+const DEFAULT_RECEIPT_PAPER = 'A5';
+
+/**
+ * `GET/PUT /settings` (`HospitalSettingsSerializer`). Every field the
+ * screen edits is read; the newer ones are optional so an older backend
+ * still parses. `desk_payment_methods` is APPT-03 (B3) — absent until it lands.
+ */
 export const hospitalSettingsResponseSchema = z.object({
   booking_window_days: z.number().int(),
+  online_requires_approval: z.boolean().optional(),
   hold_timeout_seconds: z.number().int(),
   cancellation_cutoff_hours: z.number().int(),
+  refund_before_cutoff_bp: z.number().int().optional(),
+  refund_after_cutoff_bp: z.number().int().optional(),
+  refund_includes_convenience_fee: z.boolean().optional(),
   follow_up_window_days: z.number().int(),
+  no_show_call_attempts: z.number().int().optional(),
+  token_cancel_limit_min: z.number().int().nullable().optional(),
   expected_consult_minutes: z.number().int().nullable().optional(),
+  patient_notes_enabled: z.boolean().optional(),
+  receipt_paper: receiptPaperSchema.optional(),
+  receipt_show_staff: z.boolean().optional(),
+  patient_edit_requires_approval: z.boolean().optional(),
+  display_show_full_name: z.boolean().optional(),
+  desk_payment_methods: z.array(z.string()).nullable().optional(),
   version: z.number().int(),
   derived: derivedSchema,
 });
@@ -99,15 +127,28 @@ export function toHospitalRuleSettings(dto: HospitalSettingsResponse): HospitalR
   const estimate: SlotsPerSessionEstimate | null = dto.derived.slots_per_session_estimate ?? null;
   return {
     bookingWindowDays: dto.booking_window_days,
+    onlineRequiresApproval: dto.online_requires_approval ?? false,
     holdTimeoutSeconds: dto.hold_timeout_seconds,
     cancellationCutoffHours: dto.cancellation_cutoff_hours,
+    refundBeforeCutoffBp: dto.refund_before_cutoff_bp ?? DEFAULT_REFUND_BEFORE_BP,
+    refundAfterCutoffBp: dto.refund_after_cutoff_bp ?? 0,
+    refundIncludesConvenienceFee: dto.refund_includes_convenience_fee ?? false,
     followUpWindowDays: dto.follow_up_window_days,
+    noShowCallAttempts: dto.no_show_call_attempts ?? DEFAULT_NO_SHOW_ATTEMPTS,
+    tokenCancelLimitMin: dto.token_cancel_limit_min ?? null,
     expectedConsultMinutes: dto.expected_consult_minutes ?? null,
+    patientNotesEnabled: dto.patient_notes_enabled ?? false,
+    receiptPaper: dto.receipt_paper ?? DEFAULT_RECEIPT_PAPER,
+    receiptShowStaff: dto.receipt_show_staff ?? true,
+    patientEditRequiresApproval: dto.patient_edit_requires_approval ?? false,
+    displayShowFullName: dto.display_show_full_name ?? false,
+    deskPaymentMethods: dto.desk_payment_methods ?? null,
     version: dto.version,
     derived: {
       bookingWindowEndDate: dto.derived.booking_window_end_date ?? null,
       cancellationExample: dto.derived.cancellation_example ?? null,
       slotsPerSessionEstimate: estimate,
+      tokenCancelRule: dto.derived.token_cancel_rule ?? null,
     },
   };
 }
@@ -146,17 +187,35 @@ export function toHospitalHours(dto: ScheduleHoursListResponse): readonly Hospit
 /* ------------------------------------------------------------- token policy */
 
 const tokenScopeSchema = z.enum(['doctor', 'department', 'hospital']);
+const tokenResetSchema = z.enum(['session', 'day']);
 
 /** `pending` is `{scope, reset, effective_date}` or null; either key may be null. */
 const pendingSchema = z
   .object({
     scope: tokenScopeSchema.nullable().optional(),
+    reset: tokenResetSchema.nullable().optional(),
     effective_date: z.string().nullable().optional(),
   })
   .nullable();
 
+/** Model defaults (`TokenPolicy`) for fields an older backend omits. */
+const DEFAULT_TOKEN_FORMAT = '{PREFIX}-{SEQ:3}';
+
+/** `GET/PUT /token-policy` (`TokenPolicySerializer`). */
 export const tokenPolicyResponseSchema = z.object({
   scope: tokenScopeSchema,
+  reset: tokenResetSchema.optional(),
+  format: z.string().optional(),
+  prefix: z.string().optional(),
+  online_marker: z.string().optional(),
+  offline_marker: z.string().optional(),
+  separate_ranges: z.boolean().optional(),
+  online_range_start: z.number().int().nullable().optional(),
+  online_range_end: z.number().int().nullable().optional(),
+  offline_range_start: z.number().int().nullable().optional(),
+  offline_range_end: z.number().int().nullable().optional(),
+  reuse_cancelled: z.boolean().optional(),
+  print_template_id: z.string().nullable().optional(),
   pending: pendingSchema,
   version: z.number().int(),
 });
@@ -164,11 +223,26 @@ export const tokenPolicyResponseSchema = z.object({
 export type TokenPolicyResponse = z.infer<typeof tokenPolicyResponseSchema>;
 
 export function toTokenPolicy(dto: TokenPolicyResponse): TokenPolicy {
-  const pendingScope: TokenScope | null = dto.pending?.scope ?? null;
+  const pending = dto.pending ?? null;
+  const pendingScope = pending?.scope ?? null;
+  const pendingReset = pending?.reset ?? null;
   return {
     scope: dto.scope,
+    reset: dto.reset ?? 'session',
+    format: dto.format ?? DEFAULT_TOKEN_FORMAT,
+    prefix: dto.prefix ?? '',
+    onlineMarker: dto.online_marker ?? 'A',
+    offlineMarker: dto.offline_marker ?? 'W',
+    separateRanges: dto.separate_ranges ?? false,
+    onlineRangeStart: dto.online_range_start ?? null,
+    onlineRangeEnd: dto.online_range_end ?? null,
+    offlineRangeStart: dto.offline_range_start ?? null,
+    offlineRangeEnd: dto.offline_range_end ?? null,
+    reuseCancelled: dto.reuse_cancelled ?? true,
+    printTemplateId: dto.print_template_id ?? null,
     pendingScope,
-    pendingEffectiveDate: pendingScope ? (dto.pending?.effective_date ?? null) : null,
+    pendingReset,
+    pendingEffectiveDate: pendingScope || pendingReset ? (pending?.effective_date ?? null) : null,
     version: dto.version,
   };
 }

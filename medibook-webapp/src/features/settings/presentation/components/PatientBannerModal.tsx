@@ -6,6 +6,7 @@ import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { dateRange, minLen, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
@@ -49,6 +50,16 @@ const VALIDATORS: FormValidators<BannerForm> = {
   to: (v, values) => dateRange(values.from, v),
 };
 
+/** Server field → form field (UAT-48). */
+const BANNER_SERVER_FIELDS = {
+  title: 'title',
+  body: 'body',
+  image_file_id: 'imageFileId',
+  starts_at: 'from',
+  ends_at: 'to',
+  audience: 'audience',
+} as const;
+
 interface PatientBannerModalProps {
   open: boolean;
   /** The banner being edited, or null to publish a new one. */
@@ -56,8 +67,8 @@ interface PatientBannerModalProps {
   /** Displayable URL of the banner's current image, when it has one. */
   imageUrl: string | null;
   onClose: () => void;
-  /** Save the banner. Resolves `true` on success (the modal closes). */
-  onSave: (input: BannerInput) => Promise<boolean>;
+  /** Save the banner; rejects with the server's failure so its field errors land on the form. */
+  onSave: (input: BannerInput) => Promise<void>;
 }
 
 /**
@@ -90,15 +101,26 @@ export function PatientBannerModal({
     },
     validate: VALIDATORS,
     onSubmit: async (v) => {
-      const done = await onSave({
-        title: v.title.trim(),
-        body: v.body.trim(),
-        imageFileId: v.imageFileId,
-        audience: audienceForLabel(v.audience),
-        startsAt: dayStartIso(v.from),
-        endsAt: v.to ? dayEndIso(v.to) : null,
-      });
-      if (done) onClose();
+      try {
+        await onSave({
+          title: v.title.trim(),
+          body: v.body.trim(),
+          imageFileId: v.imageFileId,
+          audience: audienceForLabel(v.audience),
+          startsAt: dayStartIso(v.from),
+          endsAt: v.to ? dayEndIso(v.to) : null,
+        });
+        onClose();
+      } catch (error) {
+        toast(
+          form.applyServerErrors(
+            error,
+            { fields: BANNER_SERVER_FIELDS },
+            'The banner could not be saved.',
+          ),
+          'error',
+        );
+      }
     },
   });
 
@@ -140,6 +162,7 @@ export function PatientBannerModal({
       busy={form.submitting || upload.isPending}
     >
       <div className="flex flex-col gap-4">
+        <FormErrorSummary messages={form.serverSummary} />
         <Field label="Banner Title" required error={form.errorFor('title')}>
           <TextInput
             value={form.values.title}

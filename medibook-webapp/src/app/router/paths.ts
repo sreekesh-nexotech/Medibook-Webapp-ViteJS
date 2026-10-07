@@ -114,7 +114,7 @@ export type HospitalView =
   // ---- added this round (screens owned by the feature agents) ----
   /** Doctor slot templates + exceptions. Admin-only. */
   | 'slots'
-  /** Hospital profile: branches, holidays, banners. Admin-only. */
+  /** Hospital profile: holidays and banners (one hospital = one location, D-02). Admin-only. */
   | 'profile'
   /** Services & pricing, taxes, coupons. Admin-only. */
   | 'services'
@@ -229,6 +229,24 @@ export function hospitalSlotsPath(role: HospitalRole): string {
 
 export function hospitalProfilePath(role: HospitalRole): string {
   return hospitalPath(role, 'profile');
+}
+
+/** Query parameter that opens a Hospital Profile tab (`holidays` | `banners`). */
+export const PROFILE_TAB_PARAM = 'tab';
+export const PROFILE_TAB_HOLIDAYS = 'holidays';
+export const PROFILE_TAB_BANNERS = 'banners';
+
+/** Hospital Profile › Holiday Calendar — where closures are maintained (UAT-73). */
+export function hospitalHolidaysPath(role: HospitalRole): string {
+  return `${hospitalProfilePath(role)}?${new URLSearchParams({ [PROFILE_TAB_PARAM]: PROFILE_TAB_HOLIDAYS })}`;
+}
+
+/** Query parameter that opens a doctor profile tab (`availability` | `reviews`). */
+export const DOCTOR_TAB_PARAM = 'tab';
+
+/** A doctor's profile on its Availability tab (UAT-73 "Edit availability"). */
+export function hospitalDoctorAvailabilityPath(role: HospitalRole, doctorId: string): string {
+  return `${hospitalPath(role, 'doctors')}/${encodeURIComponent(doctorId)}?${new URLSearchParams({ [DOCTOR_TAB_PARAM]: 'availability' })}`;
 }
 
 export function hospitalServicesPath(role: HospitalRole): string {

@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 
+import { isFailure } from '@/core/error/failure';
+
+import { mapServerErrors, type ServerErrorOptions } from '@/shared/lib/serverErrors';
 import type { ValidationError } from '@/shared/lib/validate';
 
 /**
@@ -67,7 +70,26 @@ export interface UseFormResult<T extends object> {
   handleSubmit: () => void;
   /** Back to `next` (default: the original `initial`), errors and touches cleared. */
   reset: (next?: T) => void;
+  /**
+   * Show what the server rejected (UAT-48): each mapped field's first message
+   * appears under that field (until the user edits it), the rest goes to
+   * `serverSummary`. Returns the sentence to toast. Anything that is not a
+   * `Failure` returns `fallback`.
+   */
+  applyServerErrors: (
+    error: unknown,
+    options?: ServerErrorOptions<FormFieldKey<T>>,
+    fallback?: string,
+  ) => string;
+  /** Server messages that belong to no field on the form — render with `FormErrorSummary`. */
+  serverSummary: readonly string[];
 }
+
+/** The string keys of a form's values — what server errors can be mapped onto. */
+export type FormFieldKey<T> = Extract<keyof T, string>;
+
+/** Toast text when a submit fails with something that is not a `Failure`. */
+const SUBMIT_FAILED = 'Something went wrong. Please try again.';
 
 export function useForm<T extends object>({
   initial,
@@ -78,6 +100,10 @@ export function useForm<T extends object>({
   const [touched, setTouched] = useState<TouchedMap<T>>(() => ({}) as TouchedMap<T>);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // What the server rejected on the last submit. A field's message is cleared
+  // as soon as the user edits that field; client errors always win.
+  const [serverErrors, setServerErrors] = useState<ErrorMap<T>>(() => ({}) as ErrorMap<T>);
+  const [serverSummary, setServerSummary] = useState<readonly string[]>([]);
 
   // The baseline `isDirty` compares against; `reset(next)` moves it. Held as
   // state rather than a ref so `isDirty` can be derived during render.
@@ -112,23 +138,49 @@ export function useForm<T extends object>({
     });
   };
 
+  const clearServerErrorsFor = (keys: readonly (keyof T)[]): void => {
+    setServerErrors((current) => {
+      if (!keys.some((k) => current[k] !== undefined)) return current;
+      const next: ErrorMap<T> = { ...current };
+      for (const k of keys) delete next[k];
+      return next;
+    });
+  };
+
   const setField = <K extends keyof T>(key: K, value: T[K]): void => {
     setValuesState((v) => ({ ...v, [key]: value }));
     markTouched([key]);
+    clearServerErrorsFor([key]);
   };
 
   const setValues = (patch: Partial<T>): void => {
     setValuesState((v) => ({ ...v, ...patch }));
-    markTouched(Object.keys(patch) as (keyof T)[]);
+    const keys = Object.keys(patch) as (keyof T)[];
+    markTouched(keys);
+    clearServerErrorsFor(keys);
   };
 
   const blurField = (key: keyof T): void => markTouched([key]);
 
   const errorFor = (key: keyof T): string | undefined =>
-    submitted || touched[key] ? errors[key] : undefined;
+    (submitted || touched[key] ? errors[key] : undefined) ?? serverErrors[key];
+
+  const applyServerErrors = (
+    error: unknown,
+    options?: ServerErrorOptions<FormFieldKey<T>>,
+    fallback: string = SUBMIT_FAILED,
+  ): string => {
+    if (!isFailure(error)) return fallback;
+    const mapped = mapServerErrors(error, options);
+    setServerErrors({ ...mapped.fields } as ErrorMap<T>);
+    setServerSummary(mapped.summary);
+    return mapped.headline || fallback;
+  };
 
   const handleSubmit = (): void => {
     setSubmitted(true);
+    setServerErrors({} as ErrorMap<T>);
+    setServerSummary([]);
     if (!isValid || !onSubmit) return;
     const result = onSubmit(values);
     if (result instanceof Promise) {
@@ -144,6 +196,8 @@ export function useForm<T extends object>({
     setTouched({} as TouchedMap<T>);
     setSubmitted(false);
     setSubmitting(false);
+    setServerErrors({} as ErrorMap<T>);
+    setServerSummary([]);
   };
 
   return {
@@ -160,5 +214,7 @@ export function useForm<T extends object>({
     errorFor,
     handleSubmit,
     reset,
+    applyServerErrors,
+    serverSummary,
   };
 }

@@ -6,6 +6,7 @@ import type {
   DoctorDateException,
   DoctorLeaveEntry,
   DoctorProfile,
+  DoctorReview,
   DoctorScheduleData,
   ExceptionSession,
   WeeklySession,
@@ -19,6 +20,26 @@ const HH_MM_LENGTH = 5;
 
 function hhmm(time: string): string {
   return time.slice(0, HH_MM_LENGTH);
+}
+
+/** `HH:MM` or `HH:MM:SS`. */
+const CLOCK_PATTERN = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+/** An ISO date-time with its offset: the clock part is local to that offset. */
+const ISO_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T ](\d{2}:\d{2})/;
+
+/**
+ * The wall-clock `HH:MM` of a schedule time, whether the backend sends a
+ * plain time (`09:00:00`) or a full date-time (`2026-10-07T09:00:00+05:30`,
+ * what the resolved schedule sends). A date-time is written in the
+ * hospital's own offset (`timeutil.combine_local`), so its clock part already
+ * is hospital-local — reading it as written avoids converting through the
+ * browser's zone (UAT-19, D-09). `null` when neither shape matches.
+ */
+export function toWallClockHhmm(value: string | null | undefined): string | null {
+  const raw = (value ?? '').trim();
+  if (CLOCK_PATTERN.test(raw)) return raw.slice(0, HH_MM_LENGTH);
+  const match = ISO_DATE_TIME_PATTERN.exec(raw);
+  return match?.[1] ?? null;
 }
 
 export const departmentResponseSchema = z.object({
@@ -83,6 +104,16 @@ const exceptionSessionSchema = z.object({
   ends_at: z.string(),
 });
 
+/**
+ * A session of the resolved next-14-days view. `starts_at`/`ends_at` are full
+ * ISO date-times; `start_time`/`end_time` are the hospital-local `HH:MM` the
+ * backend adds (BE-33) — optional so the current backend still parses.
+ */
+const resolvedSessionSchema = exceptionSessionSchema.extend({
+  start_time: z.string().nullable().optional(),
+  end_time: z.string().nullable().optional(),
+});
+
 export const dateExceptionSchema = z.object({
   id: z.string(),
   date: z.string(),
@@ -104,7 +135,7 @@ export const scheduleResponseSchema = z.object({
       z.object({
         date: z.string(),
         source: z.string(),
-        sessions: z.array(exceptionSessionSchema),
+        sessions: z.array(resolvedSessionSchema),
       }),
     )
     .optional(),
@@ -113,7 +144,8 @@ export const scheduleResponseSchema = z.object({
 const affectedBookingSchema = z.object({
   appointment_id: z.string(),
   booking_ref: z.string(),
-  token_label: z.string(),
+  // `AffectedBookingSerializer.token_label` is `allow_null` (06·Departments F5).
+  token_label: z.string().nullable(),
   patient_name: z.string(),
   scheduled_start_at: z.string(),
 });
@@ -123,12 +155,31 @@ export const scheduleChangeResponseSchema = z.object({
   dry_run: z.boolean(),
   result: z.unknown().nullable(),
   affected_bookings: z.array(affectedBookingSchema),
+  // L-21: in consultation / completed — kept. Optional for an older backend.
+  not_cancellable_bookings: z.array(affectedBookingSchema).optional(),
+  // Confirm-bound-to-preview (L-17, BE-33).
+  preview_token: z.string().nullable().optional(),
+  rematerialisation_queued: z.boolean().optional(),
+});
+
+/**
+ * `GET /hospital/doctors/{id}/reviews` row (DOC-01, B9 contract:
+ * `HospitalDoctorReviewSerializer`) — approved reviews only, the patient
+ * named by initials.
+ */
+export const doctorReviewResponseSchema = z.object({
+  id: z.string(),
+  rating: z.number(),
+  comment: z.string().nullable().optional(),
+  patient_initials: z.string().nullable().optional(),
+  reviewed_at: z.string().nullable().optional(),
 });
 
 export type DepartmentResponse = z.infer<typeof departmentResponseSchema>;
 export type DoctorResponse = z.infer<typeof doctorResponseSchema>;
 export type ScheduleResponse = z.infer<typeof scheduleResponseSchema>;
 export type ScheduleChangeResponse = z.infer<typeof scheduleChangeResponseSchema>;
+export type DoctorReviewResponse = z.infer<typeof doctorReviewResponseSchema>;
 
 export function toDepartment(dto: DepartmentResponse): Department {
   return {
@@ -155,6 +206,8 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     experienceYears: dto.experience_years,
     bio: dto.bio ?? '',
     photoFileId: dto.photo_file_id,
+    feePaise: dto.consultation_fee_paise,
+    followUpFeePaise: dto.follow_up_fee_paise ?? null,
     feeRupees: dto.consultation_fee_paise / PAISE_PER_RUPEE,
     expectedConsultMinutes: dto.expected_consult_minutes ?? null,
     followUpFeeRupees:
@@ -223,17 +276,48 @@ export function toSchedule(dto: ScheduleResponse): DoctorScheduleData {
     upcoming: (dto.resolved ?? []).map((day) => ({
       date: day.date,
       source: day.source,
-      sessions: day.sessions.map(toExceptionSession),
+      sessions: day.sessions.map(toResolvedSession),
     })),
   };
 }
 
-export function toAffectedBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
-  return dto.affected_bookings.map((b) => ({
+/** A resolved session: the backend's `HH:MM` when sent, else the date-time's clock part. */
+function toResolvedSession(dto: z.infer<typeof resolvedSessionSchema>): ExceptionSession {
+  return {
+    sessionCode: dto.session_code,
+    label: dto.label,
+    startsAt: toWallClockHhmm(dto.start_time) ?? toWallClockHhmm(dto.starts_at) ?? '',
+    endsAt: toWallClockHhmm(dto.end_time) ?? toWallClockHhmm(dto.ends_at) ?? '',
+  };
+}
+
+export function toDoctorReview(dto: DoctorReviewResponse): DoctorReview {
+  return {
+    id: dto.id,
+    rating: dto.rating,
+    comment: dto.comment ?? '',
+    reviewedAt: dto.reviewed_at ?? null,
+    patientInitials: dto.patient_initials || null,
+  };
+}
+
+type AffectedBookingResponse = z.infer<typeof affectedBookingSchema>;
+
+function toAffectedBooking(b: AffectedBookingResponse): AffectedBooking {
+  return {
     appointmentId: b.appointment_id,
     bookingRef: b.booking_ref,
     tokenLabel: b.token_label,
     patientName: b.patient_name,
     scheduledStartAt: b.scheduled_start_at,
-  }));
+  };
+}
+
+export function toAffectedBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
+  return dto.affected_bookings.map(toAffectedBooking);
+}
+
+/** Bookings the change leaves alone because they are under way or done (L-21). */
+export function toNotCancellableBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
+  return (dto.not_cancellable_bookings ?? []).map(toAffectedBooking);
 }

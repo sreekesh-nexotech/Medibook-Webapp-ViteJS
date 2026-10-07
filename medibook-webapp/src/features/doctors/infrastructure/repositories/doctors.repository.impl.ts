@@ -14,21 +14,29 @@ import {
   toAffectedBookings,
   toDepartment,
   toDoctor,
+  toDoctorReview,
   toDateException,
   toLeave,
+  toNotCancellableBookings,
   toSchedule,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
 
 /** The envelope without its `result` (the endpoints whose result the app does not use). */
 function toChange(dto: ScheduleChangeResponse): ScheduleChange {
-  return { dryRun: dto.dry_run, affectedBookings: toAffectedBookings(dto), result: null };
+  return {
+    dryRun: dto.dry_run,
+    affectedBookings: toAffectedBookings(dto),
+    notCancellableBookings: toNotCancellableBookings(dto),
+    result: null,
+    previewToken: dto.preview_token ?? null,
+    rematerialisationQueued: dto.rematerialisation_queued ?? false,
+  };
 }
 
 /** The doctor PATCH envelope — `result` is the updated doctor once applied. */
 function toDoctorChange(dto: ScheduleChangeResponse): ScheduleChange<DoctorProfile> {
   return {
-    dryRun: dto.dry_run,
-    affectedBookings: toAffectedBookings(dto),
+    ...toChange(dto),
     result: dto.result == null ? null : toDoctor(doctorResponseSchema.parse(dto.result)),
   };
 }
@@ -36,8 +44,8 @@ function toDoctorChange(dto: ScheduleChangeResponse): ScheduleChange<DoctorProfi
 export const doctorsRepository: DoctorsRepository = {
   listDepartments: () => attempt(async () => (await api.getDepartments()).map(toDepartment)),
   createDepartment: (input) => attempt(async () => toDepartment(await api.postDepartment(input))),
-  updateDepartment: (id, input) =>
-    attempt(async () => toDepartment(await api.patchDepartment(id, input))),
+  updateDepartment: (id, input, version) =>
+    attempt(async () => toDepartment(await api.patchDepartment(id, input, version))),
   deleteDepartment: (id) =>
     attempt(async () => {
       await api.deleteDepartment(id);
@@ -47,14 +55,20 @@ export const doctorsRepository: DoctorsRepository = {
   listDoctors: (filters) => attempt(async () => (await api.getDoctors(filters)).map(toDoctor)),
   getDoctor: (id) => attempt(async () => toDoctor(await api.getDoctor(id))),
   createDoctor: (input) => attempt(async () => toDoctor(await api.postDoctor(input))),
-  updateDoctor: (id, input, version, confirm) =>
-    attempt(async () => toDoctorChange(await api.patchDoctor(id, input, version, confirm))),
-  deleteDoctor: (id, confirm) => attempt(async () => toChange(await api.deleteDoctor(id, confirm))),
+  updateDoctor: (id, input, version, mode) =>
+    attempt(async () => toDoctorChange(await api.patchDoctor(id, input, version, mode))),
+  deleteDoctor: (id, mode) => attempt(async () => toChange(await api.deleteDoctor(id, mode))),
 
   getPhotoUrl: async (fileId) => {
     const signed = await getFileUrl(fileId);
     return signed.ok ? ok(signed.data.url) : signed;
   },
+
+  listReviews: (doctorId, page) =>
+    attempt(async () => {
+      const dto = await api.getDoctorReviews(doctorId, page);
+      return { items: dto.results.map(toDoctorReview), total: dto.total, hasNext: dto.has_next };
+    }),
 
   getSchedule: (doctorId) => attempt(async () => toSchedule(await api.getSchedule(doctorId))),
   getScheduleHistory: (doctorId) =>
@@ -65,24 +79,26 @@ export const doctorsRepository: DoctorsRepository = {
       ]);
       return { leaves: leaves.map(toLeave), dateExceptions: exceptions.map(toDateException) };
     }),
-  replaceWeeklySessions: (doctorId, sessions, version, confirm) =>
-    attempt(async () =>
-      toChange(await api.putWeeklySessions(doctorId, sessions, version, confirm)),
-    ),
+  replaceWeeklySessions: (doctorId, sessions, version, mode) =>
+    attempt(async () => toChange(await api.putWeeklySessions(doctorId, sessions, version, mode))),
 
-  createLeave: (doctorId, input, confirm) =>
-    attempt(async () => toChange(await api.postLeave(doctorId, input, confirm))),
-  updateLeave: (doctorId, leaveId, input, version, confirm) =>
-    attempt(async () => toChange(await api.patchLeave(doctorId, leaveId, input, version, confirm))),
-  deleteLeave: (doctorId, leaveId, confirm) =>
-    attempt(async () => toChange(await api.deleteLeave(doctorId, leaveId, confirm))),
-
-  createDateException: (doctorId, input, confirm) =>
-    attempt(async () => toChange(await api.postDateException(doctorId, input, confirm))),
-  updateDateException: (doctorId, exceptionId, input, version, confirm) =>
+  createLeave: (doctorId, input, mode) =>
+    attempt(async () => toChange(await api.postLeave(doctorId, input, mode))),
+  updateLeave: (doctorId, leave, input, mode) =>
     attempt(async () =>
-      toChange(await api.patchDateException(doctorId, exceptionId, input, version, confirm)),
+      toChange(await api.patchLeave(doctorId, leave.id, input, leave.version, mode)),
     ),
-  deleteDateException: (doctorId, exceptionId, confirm) =>
-    attempt(async () => toChange(await api.deleteDateException(doctorId, exceptionId, confirm))),
+  deleteLeave: (doctorId, leave, mode) =>
+    attempt(async () => toChange(await api.deleteLeave(doctorId, leave, mode))),
+
+  createDateException: (doctorId, input, mode) =>
+    attempt(async () => toChange(await api.postDateException(doctorId, input, mode))),
+  updateDateException: (doctorId, exception, input, mode) =>
+    attempt(async () =>
+      toChange(
+        await api.patchDateException(doctorId, exception.id, input, exception.version, mode),
+      ),
+    ),
+  deleteDateException: (doctorId, exception, mode) =>
+    attempt(async () => toChange(await api.deleteDateException(doctorId, exception, mode))),
 };

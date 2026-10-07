@@ -20,28 +20,6 @@ export const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as co
 
 export type WeekDayLabel = (typeof WEEK_DAYS)[number];
 
-/**
- * The clock-time labels the hours, shift and slot pickers offer. A time the
- * backend returns off this grid is added to its own picker by the caller.
- */
-export const TIME_OPTS = [
-  '8:00 am',
-  '8:30 am',
-  '9:00 am',
-  '9:30 am',
-  '10:00 am',
-  '11:00 am',
-  '12:00 pm',
-  '1:00 pm',
-  '2:00 pm',
-  '3:00 pm',
-  '4:00 pm',
-  '5:00 pm',
-  '6:00 pm',
-  '7:00 pm',
-  '8:00 pm',
-] as const;
-
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_HALF_DAY = 12;
@@ -60,6 +38,26 @@ export function toIsoDate(date: Date): string {
 /** Today as a local ISO date. */
 export function todayIso(): string {
   return toIsoDate(new Date());
+}
+
+/**
+ * Today's date in `timeZone` (the hospital's, D-09) as ISO `yyyy-mm-dd`;
+ * the browser's own date when the zone is unknown or invalid.
+ */
+export function todayIsoIn(timeZone: string | null | undefined, now: Date = new Date()): string {
+  if (!timeZone) return toIsoDate(now);
+  try {
+    // en-CA formats dates as yyyy-mm-dd.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+  } catch (error) {
+    if (error instanceof RangeError) return toIsoDate(now);
+    throw error;
+  }
 }
 
 /** Parse ISO `yyyy-mm-dd` into a local-midnight `Date` (invalid input → null). */
@@ -154,3 +152,22 @@ export function minutesNow(): number {
   const now = new Date();
   return now.getHours() * MINUTES_PER_HOUR + now.getMinutes();
 }
+
+/** Picker granularity: every quarter hour across the whole day (UAT-50). */
+export const TIME_STEP_MINUTES = 15;
+
+const MINUTES_PER_DAY = 24 * 60;
+
+/**
+ * The clock-time labels the hours, shift and slot pickers offer: every
+ * 15 minutes from 12:00 am to 11:45 pm, so early and late OPDs can be set
+ * (the old list stopped at 8 am–8 pm). A time the backend returns off this
+ * grid is added to its own picker by the caller.
+ */
+export const TIME_OPTS: readonly string[] = Array.from(
+  { length: MINUTES_PER_DAY / TIME_STEP_MINUTES },
+  (_, i) => minutesToTimeLabel(i * TIME_STEP_MINUTES),
+);
+
+/** The last minute of the day — the end of a range that should reach midnight. */
+export const END_OF_DAY_LABEL = '11:59 pm';

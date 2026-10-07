@@ -8,7 +8,9 @@ import { useDeleteDepartmentMutation } from '@/features/doctors/application/quer
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDeleteDoctorMutation } from '@/features/doctors/application/queries/useDoctorMutations';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+import { useCan } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
@@ -46,7 +48,7 @@ type ConfirmTarget =
 const DEPARTMENT_IN_USE = 'DEPARTMENT_IN_USE';
 
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return describeFailure(error, fallback);
 }
 
 const DOC_COLUMNS = [
@@ -80,6 +82,7 @@ export function DoctorsDepartmentsScreen() {
   const deleteDoctor = useDeleteDoctorMutation();
   const deleteDepartment = useDeleteDepartmentMutation();
   const scheduleConfirm = useScheduleConfirm();
+  const canAddDept = useCan('Doctors & Departments.add');
   const docs = useMemo(() => doctorsQuery.data ?? [], [doctorsQuery.data]);
   const depts = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
   const [tab, setTab] = useState('Doctors');
@@ -130,6 +133,9 @@ export function DoctorsDepartmentsScreen() {
       return true;
     });
   }, [docs, deptName, q, deptF, statusF]);
+
+  const blockedDept =
+    confirm?.kind === 'dept' && docs.some((d) => d.departmentId === confirm.item.id);
 
   const orderedDocs = sorted(shownDocs, {
     name: (d) => d.name,
@@ -317,10 +323,10 @@ export function DoctorsDepartmentsScreen() {
             icon="layers"
             title="No departments yet"
             message="Departments group your doctors in the Medibook app."
-            actionLabel="Add Department"
+            actionLabel={canAddDept ? 'Add Department' : undefined}
             actionIcon="plus"
             actionVariant="button"
-            onAction={() => setDeptModal({ open: true, dept: null })}
+            onAction={canAddDept ? () => setDeptModal({ open: true, dept: null }) : undefined}
           />
         </Card>
       ) : (
@@ -416,18 +422,24 @@ export function DoctorsDepartmentsScreen() {
       />
       <ConfirmModal
         open={Boolean(confirm)}
-        danger
-        confirmLabel="Delete"
+        danger={!blockedDept}
+        confirmLabel={blockedDept ? 'Show its doctors' : 'Delete'}
         title={confirm ? (confirm.kind === 'doc' ? 'Remove Doctor' : 'Delete Department') : ''}
         body={confirm ? confirmBody(confirm, docs) : ''}
         onClose={() => setConfirm(null)}
         onConfirm={() => {
           if (!confirm) return;
           setConfirm(null);
+          if (confirm.kind === 'dept' && blockedDept) {
+            // A department with doctors cannot be deleted (DEPARTMENT_IN_USE):
+            // offer the way forward instead of a request that must fail.
+            setDeptView(confirm.item);
+            return;
+          }
           if (confirm.kind === 'doc') {
             const id = confirm.item.id;
             void scheduleConfirm.run({
-              attempt: (isConfirmed) => deleteDoctor.mutateAsync({ id, confirm: isConfirmed }),
+              attempt: (mode) => deleteDoctor.mutateAsync({ id, mode }),
               onApplied: () => toast('Doctor removed', 'info'),
               onError: (error) =>
                 toast(failureText(error, 'Could not remove the doctor.'), 'error'),
@@ -459,7 +471,7 @@ function confirmBody(target: ConfirmTarget, docs: readonly DoctorProfile[]): str
   const id = target.item.id;
   const assigned = docs.filter((d) => d.departmentId === id).length;
   if (assigned > 0) {
-    return `${target.item.name} still has ${assigned} doctor${assigned === 1 ? '' : 's'}. Move them to another department first — a department with doctors cannot be deleted.`;
+    return `${target.item.name} still has ${assigned} doctor${assigned === 1 ? '' : 's'}. Move them to another department first — a department with doctors cannot be deleted. You can switch it to Inactive instead to hide it from the patient app.`;
   }
   return `Delete the ${target.item.name} department? No doctors are assigned to it. This can't be undone.`;
 }

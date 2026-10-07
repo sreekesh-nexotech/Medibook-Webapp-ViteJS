@@ -7,22 +7,35 @@ import type {
   DoctorFilters,
   DoctorInput,
   DoctorProfile,
+  DoctorReviewPage,
   DoctorScheduleData,
   DoctorScheduleHistory,
   LeaveInput,
   ScheduleChange,
+  ScheduleWriteMode,
   WeeklySession,
 } from '@/features/doctors/domain/entities/doctors.types';
 
+/** A versioned child row (leave, date exception) a write targets. */
+export interface VersionedRef {
+  readonly id: string;
+  readonly version: number;
+}
+
 /**
  * The hospital's doctor & department catalogue. Writes that can cancel
- * bookings take `confirm`: `false` is a dry run that reports the bookings it
- * would cancel, `true` applies it (cancelling those with a full refund).
+ * bookings take a `ScheduleWriteMode`: a dry run reports the bookings it
+ * would cancel; a confirm applies it (cancelling those with a full refund).
  */
 export interface DoctorsRepository {
   listDepartments(): Promise<Result<readonly Department[]>>;
   createDepartment(input: DepartmentInput): Promise<Result<Department>>;
-  updateDepartment(id: string, input: DepartmentInput): Promise<Result<Department>>;
+  /** `version` is the row the user edited (`If-Match`; UAT-06). */
+  updateDepartment(
+    id: string,
+    input: DepartmentInput,
+    version: number,
+  ): Promise<Result<Department>>;
   /** Refused with `DEPARTMENT_IN_USE` while doctors are assigned. */
   deleteDepartment(id: string): Promise<Result<null>>;
 
@@ -34,12 +47,15 @@ export interface DoctorsRepository {
     id: string,
     input: DoctorInput,
     version: number,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange<DoctorProfile>>>;
-  deleteDoctor(id: string, confirm: boolean): Promise<Result<ScheduleChange>>;
+  deleteDoctor(id: string, mode: ScheduleWriteMode): Promise<Result<ScheduleChange>>;
 
   /** A short-lived URL for a doctor's photo file. */
   getPhotoUrl(fileId: string): Promise<Result<string>>;
+
+  /** One page of approved patient reviews (DOC-01). */
+  listReviews(doctorId: string, page: number): Promise<Result<DoctorReviewPage>>;
 
   getSchedule(doctorId: string): Promise<Result<DoctorScheduleData>>;
   /** Every leave entry and date exception, past ones included. */
@@ -48,38 +64,40 @@ export interface DoctorsRepository {
     doctorId: string,
     sessions: readonly WeeklySession[],
     version: number,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
 
   createLeave(
     doctorId: string,
     input: LeaveInput,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
   updateLeave(
     doctorId: string,
-    leaveId: string,
+    leave: VersionedRef,
     input: LeaveInput,
-    version: number,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
-  deleteLeave(doctorId: string, leaveId: string, confirm: boolean): Promise<Result<ScheduleChange>>;
+  deleteLeave(
+    doctorId: string,
+    leave: VersionedRef,
+    mode: ScheduleWriteMode,
+  ): Promise<Result<ScheduleChange>>;
 
   createDateException(
     doctorId: string,
     input: DateExceptionInput,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
   updateDateException(
     doctorId: string,
-    exceptionId: string,
+    exception: VersionedRef,
     input: DateExceptionInput,
-    version: number,
-    confirm: boolean,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
   deleteDateException(
     doctorId: string,
-    exceptionId: string,
-    confirm: boolean,
+    exception: VersionedRef,
+    mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
 }

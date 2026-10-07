@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { hospitalPath, isHospitalRole, type HospitalRole } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
@@ -31,7 +31,8 @@ import {
 import { money } from '@/shared/lib/format';
 import { useFileUploadMutation } from '@/shared/hooks/useFileUploadMutation';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { positiveAmount, required } from '@/shared/lib/validate';
+import { describeFailure } from '@/shared/lib/serverErrors';
+import { required } from '@/shared/lib/validate';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -42,6 +43,7 @@ import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Field } from '@/shared/ui/Field';
 import { Form } from '@/shared/ui/Form';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { SegTabs } from '@/shared/ui/SegTabs';
@@ -53,14 +55,20 @@ import { Toggle } from '@/shared/ui/Toggle';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { DateExceptionsPanel } from '../components/DateExceptionsPanel';
+import { DoctorReviews } from '../components/DoctorReviews';
 import {
   DOCTOR_STATUS_LABEL,
   DOCTOR_STATUS_OPTIONS,
   doctorStatusFromLabel,
+  feeError,
   gridToSessions,
+  paiseToRupeeInput,
   ratingView,
+  rupeeInputToPaise,
   sameSessions,
+  sanitizeRupeeInput,
   sessionsToGrid,
+  weekErrors,
   type DoctorStatusLabel,
   type WeekGrid,
 } from '../components/doctors.view';
@@ -97,6 +105,37 @@ function slotLengthOptions(current: string): readonly string[] {
 /** The backend's answer for an unknown doctor id. */
 const NOT_FOUND_KIND = 'notFound';
 
+/** Editor tabs; `?tab=availability` opens the second one (UAT-73). */
+const TAB_PROFILE = 'Profile';
+const TAB_AVAILABILITY = 'Availability';
+const TAB_REVIEWS = 'Reviews';
+const TAB_PARAM = 'tab';
+const TAB_FROM_PARAM: Readonly<Record<string, string>> = {
+  profile: TAB_PROFILE,
+  availability: TAB_AVAILABILITY,
+  reviews: TAB_REVIEWS,
+};
+
+/**
+ * Router state that keeps the editor mounted when Add Doctor moves from
+ * `/doctors/new` to the created doctor's own address (UAT-20): the editor is
+ * keyed by this instead of the id, so the unsaved weekly hours survive.
+ */
+interface EditorRouteState {
+  readonly editorKey?: string;
+}
+const NEW_EDITOR_KEY = 'new';
+
+function editorKeyOf(state: unknown): string | null {
+  if (typeof state !== 'object' || state === null || !('editorKey' in state)) return null;
+  const key = (state as EditorRouteState).editorKey;
+  return typeof key === 'string' ? key : null;
+}
+
+/** Same rule as department codes: a slug-like key (`{DOC}` in token labels). */
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const SLUG_MAX_LENGTH = 60;
+
 /** A new doctor starts consulting Mon–Fri 9–5 (design default). */
 const NEW_DOCTOR_WEEK: WeekGrid = sessionsToGrid(
   [0, 1, 2, 3, 4].map((weekday) => ({
@@ -108,9 +147,11 @@ const NEW_DOCTOR_WEEK: WeekGrid = sessionsToGrid(
   })),
 );
 
-/** Editable draft — fees and numbers are digits-only text until parsed on save. */
+/** Editable draft — fees are rupee text ("499.50") and numbers are digits until parsed on save. */
 interface DoctorForm {
   name: string;
+  /** Empty on a new doctor = let the server make the slug (UAT-49). */
+  slug: string;
   title: string;
   departmentId: string;
   spec: string;
@@ -133,8 +174,20 @@ interface DoctorForm {
 /** Declared at module level so `useForm`'s error memo stays stable. */
 const DOCTOR_VALIDATORS: FormValidators<DoctorForm> = {
   name: (v) => required(v, 'Doctor name'),
+  slug: (v) => {
+    const slug = v.trim();
+    if (slug === '') return undefined;
+    if (slug.length > SLUG_MAX_LENGTH) return `Use at most ${SLUG_MAX_LENGTH} characters.`;
+    return SLUG_PATTERN.test(slug)
+      ? undefined
+      : 'Use lowercase letters, digits and dashes (e.g. dr-asha-verma).';
+  },
   spec: (v) => required(v, 'Specialization'),
-  fee: (v) => positiveAmount(v, 'Consultation fee'),
+  fee: (v) => feeError(v, 'Consultation fee'),
+  followUpFee: (v) =>
+    v.trim() === '' || rupeeInputToPaise(v) !== null
+      ? undefined
+      : 'Follow-up fee must be an amount in rupees, or empty.',
   departmentId: (v) => (v ? undefined : 'Assign a department.'),
   exp: (v) =>
     v === '' || Number(v) <= MAX_EXPERIENCE_YEARS
@@ -152,12 +205,40 @@ function digits(value: string): string {
 }
 
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return describeFailure(error, fallback);
 }
+
+/** Server field → profile form field (UAT-48). */
+const DOCTOR_SERVER_FIELDS = {
+  name: 'name',
+  slug: 'slug',
+  title: 'title',
+  department_id: 'departmentId',
+  specialisation: 'spec',
+  qualification: 'qual',
+  registration_no: 'reg',
+  experience_years: 'exp',
+  bio: 'about',
+  room: 'room',
+  consultation_fee_paise: 'fee',
+  follow_up_fee_paise: 'followUpFee',
+  expected_consult_minutes: 'consultMinutes',
+  slot_length_min: 'slotLength',
+  is_bookable_online: 'bookableOnline',
+  status: 'status',
+  photo_file_id: 'photoFileId',
+} as const;
+
+/** Server keys that belong to the weekly-hours editor, for the summary. */
+const SESSION_LABELS: Readonly<Record<string, string>> = {
+  sessions: 'Working hours',
+  slug: 'Short code',
+};
 
 function blankDoctorForm(): DoctorForm {
   return {
     name: '',
+    slug: '',
     title: '',
     departmentId: '',
     spec: '',
@@ -179,6 +260,7 @@ function blankDoctorForm(): DoctorForm {
 function toForm(d: DoctorProfile): DoctorForm {
   return {
     name: d.name,
+    slug: d.slug,
     title: d.title,
     departmentId: d.departmentId,
     spec: d.specialisation,
@@ -186,8 +268,8 @@ function toForm(d: DoctorProfile): DoctorForm {
     qual: d.qualification,
     exp: d.experienceYears === null ? '' : String(d.experienceYears),
     reg: d.registrationNo,
-    fee: d.feeRupees ? String(d.feeRupees) : '',
-    followUpFee: d.followUpFeeRupees === null ? '' : String(d.followUpFeeRupees),
+    fee: paiseToRupeeInput(d.feePaise),
+    followUpFee: d.followUpFeePaise === null ? '' : paiseToRupeeInput(d.followUpFeePaise),
     consultMinutes: d.expectedConsultMinutes === null ? '' : String(d.expectedConsultMinutes),
     slotLength: String(d.slotLengthMin),
     bookableOnline: d.isBookableOnline,
@@ -197,7 +279,11 @@ function toForm(d: DoctorProfile): DoctorForm {
   };
 }
 
-function toInput(values: DoctorForm): DoctorInput {
+/** The draft in API units. `stored` = the saved doctor, to send only a slug the user changed. */
+function toInput(values: DoctorForm, stored: DoctorProfile | null): DoctorInput {
+  const slug = values.slug.trim();
+  const typedSlug = slug !== '' && slug !== stored?.slug;
+  const followUp = values.followUpFee.trim();
   return {
     name: values.name.trim(),
     title: values.title.trim(),
@@ -208,13 +294,14 @@ function toInput(values: DoctorForm): DoctorInput {
     experienceYears: values.exp === '' ? null : Number(values.exp),
     bio: values.about.trim(),
     room: values.room.trim(),
-    feeRupees: Number(digits(values.fee)) || 0,
-    followUpFeeRupees: values.followUpFee === '' ? null : Number(values.followUpFee),
+    feePaise: rupeeInputToPaise(values.fee) ?? 0,
+    followUpFeePaise: followUp === '' ? null : rupeeInputToPaise(followUp),
     expectedConsultMinutes: values.consultMinutes === '' ? null : Number(values.consultMinutes),
     slotLengthMin: Number(values.slotLength),
     isBookableOnline: values.bookableOnline,
     status: doctorStatusFromLabel(values.status),
     photoFileId: values.photoFileId,
+    ...(typedSlug && { slug }),
   };
 }
 
@@ -222,9 +309,11 @@ interface DoctorEditorProps {
   role: HospitalRole;
   /** The stored record, or `null` for `/doctors/new`. */
   doctor: DoctorProfile | null;
-  /** The doctor's schedule (`null` for a new doctor). */
+  /** The doctor's schedule (`null` for a new doctor, or while it loads after Add Doctor). */
   schedule: DoctorScheduleData | null;
   departments: readonly Department[];
+  /** The tab to open on (`?tab=availability`). */
+  initialTab: string;
 }
 
 /**
@@ -237,7 +326,7 @@ interface DoctorEditorProps {
  * asked before anything is applied. Leave and date exceptions are saved by
  * their own panels the moment they are edited.
  */
-function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps) {
+function DoctorEditor({ role, doctor, schedule, departments, initialTab }: DoctorEditorProps) {
   const navigate = useNavigate();
   const isNew = doctor === null;
   const createDoctor = useCreateDoctorMutation();
@@ -254,7 +343,10 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
   const followUpWindowDays = rulesQuery.data?.followUpWindowDays ?? null;
   const doctorServicesQuery = useDoctorServicesQuery();
   const servicesQuery = useServicesQuery();
-  const [tab, setTab] = useState('Profile');
+  const [tab, setTab] = useState(initialTab);
+  // Set once Add Doctor has created the record: retries edit it (UAT-20).
+  const [created, setCreated] = useState<DoctorProfile | null>(null);
+  const [showWeekErrors, setShowWeekErrors] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   /** The weekly grid + this doctor's named sessions — the Availability draft. */
@@ -271,21 +363,33 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
     back();
   };
 
-  const onError = (error: unknown): void => {
-    toast(failureText(error, 'Could not save the doctor.'), 'error');
-  };
+  const week = weekErrors(grid.week);
+  const hasWeekErrors = Object.keys(week).length > 0;
 
   /** Replace the weekly sessions when they changed, then finish. */
-  const saveWeek = async (doctorId: string, version: number): Promise<void> => {
+  const saveWeek = async (doctorId: string, version: number, isFresh: boolean): Promise<void> => {
     const sessions = gridToSessions(grid);
     if (schedule && sameSessions(sessions, schedule.weeklySessions)) {
       finish();
       return;
     }
     await scheduleConfirm.run({
-      attempt: (confirm) => replaceSessions.mutateAsync({ doctorId, sessions, version, confirm }),
+      attempt: (mode) => replaceSessions.mutateAsync({ doctorId, sessions, version, mode }),
       onApplied: finish,
-      onError,
+      onError: (error) => {
+        setTab(TAB_AVAILABILITY);
+        const reason = form.applyServerErrors(
+          error,
+          { fields: DOCTOR_SERVER_FIELDS, labels: SESSION_LABELS },
+          'Could not save the working hours.',
+        );
+        toast(
+          isFresh
+            ? `Doctor added, but the working hours were not saved — ${reason} Fix them and press Save Changes.`
+            : reason,
+          'error',
+        );
+      },
     });
   };
 
@@ -293,22 +397,50 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
     initial: doctor ? toForm(doctor) : blankDoctorForm(),
     validate: DOCTOR_VALIDATORS,
     onSubmit: async (values) => {
-      const input = toInput(values);
-      if (!doctor) {
+      // Hours are checked before anything is written, so an invalid day can
+      // never leave a half-created doctor behind (06·Profile F2, F6).
+      if (hasWeekErrors) {
+        setShowWeekErrors(true);
+        setTab(TAB_AVAILABILITY);
+        toast('Fix the working hours before saving.', 'error');
+        return;
+      }
+      const target = doctor ?? created;
+      const input = toInput(values, target);
+      const onError = (error: unknown): void => {
+        toast(
+          form.applyServerErrors(
+            error,
+            { fields: DOCTOR_SERVER_FIELDS, labels: SESSION_LABELS },
+            'Could not save the doctor.',
+          ),
+          'error',
+        );
+      };
+      if (!target) {
+        let fresh: DoctorProfile;
         try {
-          const created = await createDoctor.mutateAsync(input);
-          await saveWeek(created.id, created.version);
+          fresh = await createDoctor.mutateAsync(input);
         } catch (error) {
           onError(error);
+          return;
         }
+        // UAT-20: the doctor exists now. Move to its own address first — the
+        // editor stays mounted (same key), so a failed hours save is retried
+        // as an edit of this doctor, never a second Add.
+        setCreated(fresh);
+        navigate(`${hospitalPath(role, 'doctors')}/${fresh.id}`, {
+          replace: true,
+          state: { editorKey: NEW_EDITOR_KEY } satisfies EditorRouteState,
+        });
+        await saveWeek(fresh.id, fresh.version, true);
         return;
       }
       await scheduleConfirm.run({
-        attempt: (confirm) =>
-          updateDoctor.mutateAsync({ id: doctor.id, input, version: doctor.version, confirm }),
-        onApplied: (change) => {
-          void saveWeek(doctor.id, change.result?.version ?? doctor.version);
-        },
+        attempt: (mode) =>
+          updateDoctor.mutateAsync({ id: target.id, input, version: target.version, mode }),
+        // Awaited, so Save stays busy until the hours are saved too (06·Profile F10).
+        onApplied: (change) => saveWeek(target.id, change.result?.version ?? target.version, false),
         onError,
       });
     },
@@ -336,7 +468,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
     setConfirmDelete(false);
     if (!doctor) return;
     void scheduleConfirm.run({
-      attempt: (confirm) => deleteDoctor.mutateAsync({ id: doctor.id, confirm }),
+      attempt: (mode) => deleteDoctor.mutateAsync({ id: doctor.id, mode }),
       onApplied: () => {
         toast('Doctor profile deleted', 'info');
         back();
@@ -434,13 +566,16 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
       <Card pad={0} className="overflow-hidden">
         <div className="px-5.5 pt-4">
           <Tabs
-            tabs={isNew ? ['Profile', 'Availability'] : ['Profile', 'Availability', 'Reviews']}
+            tabs={
+              isNew ? [TAB_PROFILE, TAB_AVAILABILITY] : [TAB_PROFILE, TAB_AVAILABILITY, TAB_REVIEWS]
+            }
             value={tab}
             onChange={setTab}
           />
         </div>
         <div className="p-5.5">
-          {tab === 'Profile' && (
+          <FormErrorSummary messages={form.serverSummary} className="mb-4" />
+          {tab === TAB_PROFILE && (
             <Form onSubmit={form.handleSubmit} className="flex flex-col gap-4">
               <div className="flex items-center gap-3.5">
                 <Avatar name={values.name || '?'} src={photoSrc} size={56} />
@@ -466,11 +601,32 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     onBlur={() => form.blurField('name')}
                   />
                 </Field>
-                <Field label="Title" hint="Shown under the name in the patient app.">
+                <Field
+                  label="Title"
+                  hint="Shown under the name in the patient app."
+                  error={form.errorFor('title')}
+                >
                   <TextInput
                     value={values.title}
                     placeholder="e.g. Senior Consultant"
                     onChange={(v) => form.setField('title', v)}
+                  />
+                </Field>
+                <Field
+                  label="Short code"
+                  error={form.errorFor('slug')}
+                  hint={
+                    isNew
+                      ? 'Optional. Leave empty and Medibook makes one from the name.'
+                      : 'Used in token labels that use {DOC}. Changing it does not relabel issued tokens.'
+                  }
+                >
+                  <TextInput
+                    value={values.slug}
+                    placeholder="e.g. dr-asha-verma"
+                    maxLength={SLUG_MAX_LENGTH}
+                    onChange={(v) => form.setField('slug', v.toLowerCase())}
+                    onBlur={() => form.blurField('slug')}
                   />
                 </Field>
                 <Field label="Specialization" required error={form.errorFor('spec')}>
@@ -481,14 +637,14 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     onBlur={() => form.blurField('spec')}
                   />
                 </Field>
-                <Field label="Room Number">
+                <Field label="Room Number" error={form.errorFor('room')}>
                   <TextInput
                     value={values.room}
                     placeholder="e.g. 101"
                     onChange={(v) => form.setField('room', v)}
                   />
                 </Field>
-                <Field label="Qualification">
+                <Field label="Qualification" error={form.errorFor('qual')}>
                   <TextInput
                     value={values.qual}
                     placeholder="MBBS, MD"
@@ -504,7 +660,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     onBlur={() => form.blurField('exp')}
                   />
                 </Field>
-                <Field label="Registration No.">
+                <Field label="Registration No." error={form.errorFor('reg')}>
                   <TextInput
                     value={values.reg}
                     placeholder="KMC/…"
@@ -523,14 +679,20 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                 <Field label="Hospital">
                   <TextInput value={hospitalName} readOnly />
                 </Field>
-                <Field label="Consultation Fee" required error={form.errorFor('fee')}>
+                <Field
+                  label="Consultation Fee"
+                  required
+                  error={form.errorFor('fee')}
+                  hint="In rupees; paise allowed (e.g. 499.50). Enter 0 for a free consultation."
+                >
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
                       <TextInput
-                        value={values.fee ? `₹ ${values.fee}` : ''}
-                        placeholder="₹ 0"
-                        inputMode="numeric"
-                        onChange={(v) => form.setField('fee', digits(v))}
+                        value={values.fee}
+                        icon="indian-rupee"
+                        placeholder="0"
+                        inputMode="decimal"
+                        onChange={(v) => form.setField('fee', sanitizeRupeeInput(v))}
                         onBlur={() => form.blurField('fee')}
                       />
                     </div>
@@ -539,17 +701,20 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                 </Field>
                 <Field
                   label="Follow-up Fee"
+                  error={form.errorFor('followUpFee')}
                   hint={`Charged for a follow-up within ${
                     followUpWindowDays === null
                       ? "the hospital's follow-up window"
                       : `${followUpWindowDays} days of the last visit (Hospital Settings)`
-                  }. Leave empty to charge the consultation fee.`}
+                  }. Leave empty to charge the consultation fee; 0 makes follow-ups free.`}
                 >
                   <TextInput
-                    value={values.followUpFee ? `₹ ${values.followUpFee}` : ''}
+                    value={values.followUpFee}
+                    icon="indian-rupee"
                     placeholder="Same as consultation"
-                    inputMode="numeric"
-                    onChange={(v) => form.setField('followUpFee', digits(v))}
+                    inputMode="decimal"
+                    onChange={(v) => form.setField('followUpFee', sanitizeRupeeInput(v))}
+                    onBlur={() => form.blurField('followUpFee')}
                   />
                 </Field>
               </div>
@@ -632,7 +797,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                   )}
                 </div>
               )}
-              <Field label="About">
+              <Field label="About" error={form.errorFor('about')}>
                 {(field) => (
                   <textarea
                     id={field.id}
@@ -646,7 +811,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
             </Form>
           )}
 
-          {tab === 'Availability' && (
+          {tab === TAB_AVAILABILITY && (
             <div className="flex flex-col gap-5">
               <div>
                 <div className="text-body text-text-strong mb-2.5 flex flex-wrap items-center gap-2 font-medium">
@@ -736,6 +901,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                 value={grid.week}
                 onChange={setWeek}
                 patterns={grid.patterns}
+                errors={showWeekErrors ? week : undefined}
                 info="The Medibook app only offers booking slots during these hours. Outside them, patients can't book."
               />
               <div className="text-caption text-text-muted flex items-center gap-1.5">
@@ -765,7 +931,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
             </div>
           )}
 
-          {tab === 'Reviews' && doctor && (
+          {tab === TAB_REVIEWS && doctor && (
             <div>
               <div className="mb-3.5 flex items-center gap-2">
                 <span className="text-caption text-text-muted">
@@ -788,12 +954,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                       : 'No patient ratings yet'}
                 </div>
               </Card>
-              <EmptyState
-                compact
-                icon="message-circle"
-                title="Individual reviews aren't shown here"
-                message="The hospital app receives each doctor's average rating; the written reviews are moderated by Medibook."
-              />
+              <DoctorReviews doctorId={doctor.id} />
             </div>
           )}
         </div>
@@ -844,6 +1005,12 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
 export function DoctorDetailPageScreen() {
   const { id: selId, role: roleParam } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const initialTab = TAB_FROM_PARAM[searchParams.get(TAB_PARAM) ?? ''] ?? TAB_PROFILE;
+  // After Add Doctor the editor keeps its key ('new') at the doctor's own
+  // address, so it is not remounted and its unsaved hours survive (UAT-20).
+  const keptKey = editorKeyOf(location.state);
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
   const isNew = !selId || selId === 'new';
   const doctorId = isNew ? null : selId;
@@ -882,18 +1049,21 @@ export function DoctorDetailPageScreen() {
     );
   }
 
+  // A just-created doctor's schedule loads while its editor stays on screen.
+  const waitForSchedule = keptKey === null && scheduleQuery.isPending;
   const isLoading =
-    departmentsQuery.isPending || (!isNew && (doctorQuery.isPending || scheduleQuery.isPending));
+    departmentsQuery.isPending || (!isNew && (doctorQuery.isPending || waitForSchedule));
   if (isLoading) return <SkeletonCards count={2} lines={6} />;
 
   // Keyed by id: a different doctor is a different editor, with its own draft.
   return (
     <DoctorEditor
-      key={selId ?? 'new'}
+      key={keptKey ?? selId ?? NEW_EDITOR_KEY}
       role={role}
       doctor={doctorQuery.data ?? null}
       schedule={scheduleQuery.data ?? null}
       departments={departmentsQuery.data ?? []}
+      initialTab={initialTab}
     />
   );
 }

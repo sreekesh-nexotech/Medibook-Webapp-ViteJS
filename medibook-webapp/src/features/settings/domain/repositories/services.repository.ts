@@ -4,6 +4,7 @@ import type {
   CouponInput,
   CouponRedemption,
   DoctorServiceLink,
+  DoctorServiceLinkInput,
   HospitalCoupon,
   PricedService,
   ServiceInput,
@@ -17,19 +18,32 @@ export interface ServicesRepository {
   createService(input: ServiceInput): Promise<Result<PricedService>>;
   /** `version` is sent as `If-Match`. */
   updateService(id: string, input: ServiceInput, version: number): Promise<Result<PricedService>>;
+  /** Bookable on/off, nothing else (07·S-F7). */
+  setServiceActive(id: string, isActive: boolean, version: number): Promise<Result<PricedService>>;
   deleteService(id: string): Promise<Result<null>>;
 
   /** The hospital's own rates plus the platform defaults (read-only). */
   listTaxRates(): Promise<Result<readonly ServiceTaxRate[]>>;
   createTaxRate(input: TaxRateInput): Promise<Result<ServiceTaxRate>>;
   updateTaxRate(id: string, input: TaxRateInput, version: number): Promise<Result<ServiceTaxRate>>;
-  deleteTaxRate(id: string): Promise<Result<null>>;
+  setTaxRateActive(id: string, isActive: boolean, version: number): Promise<Result<ServiceTaxRate>>;
+  /** Refused (409 `TAX_RATE_IN_USE`) while services bill with it. */
+  deleteTaxRate(id: string, version: number): Promise<Result<null>>;
 
   listCoupons(): Promise<Result<readonly HospitalCoupon[]>>;
   createCoupon(input: CouponInput): Promise<Result<HospitalCoupon>>;
   updateCoupon(id: string, input: CouponInput, version: number): Promise<Result<HospitalCoupon>>;
-  deleteCoupon(id: string): Promise<Result<null>>;
+  /** Pause / resume only (07·S-F7). */
+  setCouponActive(id: string, isActive: boolean, version: number): Promise<Result<HospitalCoupon>>;
+  deleteCoupon(id: string, version: number): Promise<Result<null>>;
   listCouponRedemptions(couponId: string): Promise<Result<readonly CouponRedemption[]>>;
 
   listDoctorServices(): Promise<Result<readonly DoctorServiceLink[]>>;
+  linkDoctorService(input: DoctorServiceLinkInput): Promise<Result<DoctorServiceLink>>;
+  /** `null` = the service's own price. */
+  updateDoctorServicePrice(
+    id: string,
+    priceOverrideRupees: number | null,
+  ): Promise<Result<DoctorServiceLink>>;
+  unlinkDoctorService(id: string): Promise<Result<null>>;
 }

@@ -1,17 +1,28 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ServiceTaxRate } from '@/features/settings/domain/entities/services.entities';
-import { couponDiscount, priceService } from '@/features/settings/domain/services.pricing';
+import {
+  chargedServiceRate,
+  cheapestConsultationRupees,
+  couponDiscount,
+  priceService,
+} from '@/features/settings/domain/services.pricing';
 
-const rate = (percent: number, isInclusive = false, isActive = true): ServiceTaxRate => ({
+const rate = (
+  percent: number,
+  isInclusive = false,
+  isActive = true,
+  appliesTo: ServiceTaxRate['appliesTo'] = 'service',
+): ServiceTaxRate => ({
   id: 'tax',
   code: 'GST',
   name: 'GST',
   percent,
   isInclusive,
-  appliesTo: 'service',
+  appliesTo,
   isActive,
   isPlatformDefault: false,
+  servicesCount: null,
   version: 1,
 });
 
@@ -28,17 +39,23 @@ describe('priceService (matches the backend fee engine)', () => {
     expect(priceService(333, rate(18)).tax).toBe(60);
   });
 
-  it('breaks inclusive tax out to the paisa, inside the price', () => {
+  it('rounds the tax inside an inclusive price half-up to the rupee (L-22)', () => {
     expect(priceService(1000, rate(18, true))).toEqual({
       base: 1000,
-      tax: 152.54,
+      tax: 153,
       isInclusive: true,
       total: 1000,
     });
+    expect(priceService(1, rate(100, true)).tax).toBe(1);
   });
 
-  it('still charges a service’s rate after the rate is switched off', () => {
-    expect(priceService(300, rate(5, false, false)).total).toBe(315);
+  it('bills a service exempt once its rate is off or no longer for services (BE-10, UAT-09)', () => {
+    expect(chargedServiceRate(rate(5))).not.toBeNull();
+    expect(chargedServiceRate(rate(5, false, true, 'all'))).not.toBeNull();
+    expect(chargedServiceRate(rate(5, false, false))).toBeNull();
+    expect(chargedServiceRate(rate(5, false, true, 'consultation'))).toBeNull();
+    expect(chargedServiceRate(null)).toBeNull();
+    expect(priceService(300, chargedServiceRate(rate(5, false, false))).total).toBe(300);
   });
 
   it('treats no rate as exempt', () => {
@@ -64,5 +81,19 @@ describe('couponDiscount', () => {
     expect(
       couponDiscount({ kind: 'flat', value: 500, minOrderRupees: 0, maxDiscountRupees: null }, 300),
     ).toBe(300);
+  });
+});
+
+describe('cheapestConsultationRupees (decision 7)', () => {
+  const doctors = [
+    { departmentId: 'cardio', feePaise: 80_000 },
+    { departmentId: 'cardio', feePaise: 60_000 },
+    { departmentId: 'ortho', feePaise: 50_000 },
+  ];
+
+  it('is the lowest consultation fee in the coupon’s departments', () => {
+    expect(cheapestConsultationRupees(doctors, ['cardio'])).toBe(600);
+    expect(cheapestConsultationRupees(doctors, [])).toBe(500);
+    expect(cheapestConsultationRupees(doctors, ['derm'])).toBeNull();
   });
 });
