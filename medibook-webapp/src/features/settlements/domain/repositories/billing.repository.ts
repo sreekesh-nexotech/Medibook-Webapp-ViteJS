@@ -6,6 +6,7 @@ import type {
   BillingInvoiceDetail,
   BillingPlan,
   BillingUsage,
+  CreditNote,
   PlanChangeInput,
   PlanChangeRequest,
   Subscription,
@@ -21,4 +22,6 @@ export interface BillingRepository {
   listPlans(): Promise<Result<readonly BillingPlan[]>>;
   listPlanChangeRequests(): Promise<Result<readonly PlanChangeRequest[]>>;
   requestPlanChange(input: PlanChangeInput): Promise<Result<PlanChangeRequest>>;
+  /** The hospital's credit notes, newest first; empty from a server without them. */
+  listCreditNotes(): Promise<Result<readonly CreditNote[]>>;
 }

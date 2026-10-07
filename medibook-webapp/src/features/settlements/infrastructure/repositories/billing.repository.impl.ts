@@ -3,6 +3,7 @@ import { attempt } from '@/core/error/attempt';
 
 import type { BillingRepository } from '@/features/settlements/domain/repositories/billing.repository';
 import {
+  getCreditNotes,
   getInvoice,
   getInvoicePdf,
   getInvoices,
@@ -17,6 +18,7 @@ import {
   toBillingInvoiceDetail,
   toBillingPlan,
   toBillingUsage,
+  toCreditNote,
   toPlanChangeRequest,
   toSubscription,
 } from '@/features/settlements/infrastructure/data-sources/remote/billing.response';
@@ -41,4 +43,7 @@ export const billingRepository: BillingRepository = {
 
   requestPlanChange: (input) =>
     attempt(async () => toPlanChangeRequest(await postPlanChangeRequest(input))),
+
+  listCreditNotes: () =>
+    attempt(async () => (await getCreditNotes())?.results.map(toCreditNote) ?? []),
 };

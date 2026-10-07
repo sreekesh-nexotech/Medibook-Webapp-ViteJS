@@ -308,6 +308,18 @@ const SPEC = [
     path: '/hospital/statements',
     params: LIST,
   },
+  {
+    key: 'settlements.payoutPageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/settlements/payouts',
+    params: LIST,
+  },
+  {
+    key: 'settlements.creditNotePageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/billing/credit-notes',
+    params: LIST,
+  },
   { key: 'reports.reportCatalogResponseSchema', surface: 'hospital', path: '/hospital/reports' },
   {
     key: 'reports.reportResultResponseSchema',

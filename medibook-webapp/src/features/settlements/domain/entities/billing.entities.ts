@@ -35,6 +35,8 @@ export interface Subscription {
   readonly nextInvoiceAt: string | null;
   readonly trialEndsAt: string | null;
   readonly cancelAtPeriodEnd: boolean;
+  /** Days of grace after an invoice falls due, when Medibook set one for this hospital. */
+  readonly graceDaysOverride: number | null;
 }
 
 /** The three metrics plans limit (Q102). */
@@ -73,6 +75,8 @@ export interface BillingInvoice {
   readonly amountPaidPaise: number;
   readonly status: InvoiceStatus | string;
   readonly paidAt: string | null;
+  /** The last day of grace before the hospital turns read-only, when set on the invoice. */
+  readonly graceEndsAt: string | null;
 }
 
 export interface BillingInvoiceLine {
@@ -104,11 +108,35 @@ export type PlanChangeStatus = 'requested' | 'approved' | 'rejected' | 'applied'
 export interface PlanChangeRequest {
   readonly id: string;
   readonly toPlanId: string;
+  /** The requested plan's name, when the row carries it (backend B4). */
+  readonly toPlanName: string | null;
   readonly toBillingPeriod: BillingPeriod | string;
   readonly requestedAt: string;
   readonly status: PlanChangeStatus | string;
   readonly note: string | null;
   readonly reviewNote: string | null;
+  /** What the approval issued: the proration invoice and/or a credit note. */
+  readonly prorationInvoiceId: string | null;
+  readonly creditNoteId: string | null;
+}
+
+/**
+ * A credit note Medibook issued (backend M-25): a downgrade's unused credit,
+ * never a negative invoice. The credit settles unpaid invoices first, oldest
+ * due first; what is left settles later invoices as they are issued.
+ */
+export interface CreditNote {
+  readonly id: string;
+  readonly creditNoteNo: string;
+  readonly issuedAt: string;
+  readonly reason: string | null;
+  readonly subtotalPaise: number;
+  readonly gstPaise: number;
+  readonly totalPaise: number;
+  /** Already used to settle invoices. */
+  readonly appliedPaise: number;
+  /** Still to be used. */
+  readonly remainingPaise: number;
 }
 
 /** What the hospital submits to ask for a plan change. */

@@ -1,9 +1,13 @@
+import { isAxiosError } from 'axios';
+
+import { withJsonErrorBody } from '@/core/api/blobResponses';
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
 
 import type { PlanChangeInput } from '@/features/settlements/domain/entities/billing.entities';
 import {
   billingPlanPageResponseSchema,
+  creditNotePageResponseSchema,
   invoiceDetailResponseSchema,
   invoicePageResponseSchema,
   planChangeRequestPageResponseSchema,
@@ -38,15 +42,21 @@ export async function getInvoice(invoiceId: string) {
   return invoiceDetailResponseSchema.parse(response.data);
 }
 
-/** `GET /hospital/billing/invoices/{id}.pdf` — 501 when this server cannot render PDFs. */
+/**
+ * `GET /hospital/billing/invoices/{id}.pdf` — the bytes; 501 when this server
+ * cannot render PDFs, whose JSON message is decoded from the blob body
+ * (appendix 09 F8).
+ */
 export async function getInvoicePdf(invoiceId: string): Promise<Blob> {
-  const response = await hospitalApi.get<Blob>(
-    `/billing/invoices/${encodeURIComponent(invoiceId)}.pdf`,
-    {
-      responseType: 'blob',
-    },
-  );
-  return response.data;
+  try {
+    const response = await hospitalApi.get<Blob>(
+      `/billing/invoices/${encodeURIComponent(invoiceId)}.pdf`,
+      { responseType: 'blob' },
+    );
+    return response.data;
+  } catch (error) {
+    throw await withJsonErrorBody(error);
+  }
 }
 
 /** `GET /hospital/billing/plans` — the public, active catalogue (one page holds it all). */
@@ -57,7 +67,10 @@ export async function getPlans() {
   return billingPlanPageResponseSchema.parse(response.data);
 }
 
-/** `GET /hospital/billing/plan-change-requests` — newest first; needs `billing_settlements.edit`. */
+/**
+ * `GET /hospital/billing/plan-change-requests` — newest first; needs
+ * `billing_settlements.edit` on the hospital side.
+ */
 export async function getPlanChangeRequests() {
   const response = await hospitalApi.get('/billing/plan-change-requests');
   return planChangeRequestPageResponseSchema.parse(response.data);
@@ -71,4 +84,23 @@ export async function postPlanChangeRequest(input: PlanChangeInput) {
     note: input.note,
   });
   return planChangeRequestResponseSchema.parse(response.data);
+}
+
+const HTTP_NOT_FOUND = 404;
+
+/**
+ * `GET /hospital/billing/credit-notes` — the newest 100, newest first
+ * (backend B4, M-25). A server without the route answers 404: no credit
+ * notes, not an error.
+ */
+export async function getCreditNotes() {
+  try {
+    const response = await hospitalApi.get('/billing/credit-notes', {
+      params: { page_size: MAX_PAGE_SIZE, sort: '-issued_at' },
+    });
+    return creditNotePageResponseSchema.parse(response.data);
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === HTTP_NOT_FOUND) return null;
+    throw error;
+  }
 }

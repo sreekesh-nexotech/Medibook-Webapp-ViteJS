@@ -1,13 +1,18 @@
+import { toPage } from '@/core/api/pagination';
 import { attempt } from '@/core/error/attempt';
 
+import type { StatementPdf } from '@/features/settlements/domain/entities/settlements.entities';
 import type { SettlementsRepository } from '@/features/settlements/domain/repositories/settlements.repository';
 import {
+  getPayouts,
   getSettlementPeriod,
   getSettlementPeriods,
   getStatementPdf,
-  getStatementsStartingOn,
+  getStatements,
+  getStatementsForDate,
 } from '@/features/settlements/infrastructure/data-sources/remote/settlements.api';
 import {
+  toPayout,
   toSettlementPeriod,
   toSettlementPeriodDetail,
   toStatement,
@@ -27,12 +32,22 @@ export const settlementsRepository: SettlementsRepository = {
   getPeriod: (periodId) =>
     attempt(async () => toSettlementPeriodDetail(await getSettlementPeriod(periodId))),
 
-  findStatement: (periodStart) =>
+  findStatementForDate: (date) =>
     attempt(async () => {
-      const page = await getStatementsStartingOn(periodStart);
-      const first = page.results[0];
-      return first ? toStatement(first) : null;
+      const page = await getStatementsForDate(date);
+      const match = page.results.find((s) => s.period_start <= date && date <= s.period_end);
+      return match ? toStatement(match) : null;
     }),
 
-  getStatementPdf: (statementId) => attempt(() => getStatementPdf(statementId)),
+  listStatements: (query) => attempt(async () => toPage(await getStatements(query), toStatement)),
+
+  getStatementPdf: (statementId) =>
+    attempt(async (): Promise<StatementPdf> => {
+      const answer = await getStatementPdf(statementId);
+      return answer.kind === 'url'
+        ? { kind: 'link', url: answer.url }
+        : { kind: 'file', blob: answer.blob };
+    }),
+
+  listPayouts: (query) => attempt(async () => toPage(await getPayouts(query), toPayout)),
 };

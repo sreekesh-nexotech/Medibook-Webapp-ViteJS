@@ -10,7 +10,9 @@ import type {
 } from '@/features/settlements/domain/entities/billing.entities';
 import type {
   PayoutStatus,
+  SettlementPeriodDetail,
   SettlementPeriodStatus,
+  StatementRef,
 } from '@/features/settlements/domain/entities/settlements.entities';
 
 const PAISE_PER_RUPEE = 100;
@@ -61,6 +63,60 @@ export function fmtDateTime(iso: string | null): string {
   return Number.isNaN(at.getTime()) ? '—' : fmtDate(toLocalISO(at));
 }
 
+/** "2026-09-01" → "September 2026". */
+export function monthLabel(iso: string): string {
+  const at = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+/** Whether `start`–`end` is exactly one calendar month (`yyyy-mm-dd`). */
+function isWholeMonth(start: string, end: string): boolean {
+  const from = new Date(`${start}T00:00:00`);
+  const to = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return false;
+  const lastDay = new Date(from.getFullYear(), from.getMonth() + 1, 0);
+  return from.getDate() === 1 && to.getTime() === lastDay.getTime();
+}
+
+/** A statement's span: its month when it covers one ("September 2026"), else the dates. */
+export function statementSpan(statement: Pick<StatementRef, 'periodStart' | 'periodEnd'>): string {
+  return isWholeMonth(statement.periodStart, statement.periodEnd)
+    ? monthLabel(statement.periodStart)
+    : periodLabel(statement.periodStart, statement.periodEnd);
+}
+
+/** The file name a statement PDF is saved under. */
+export function statementFilename(statementNo: string): string {
+  return `${statementNo}.pdf`;
+}
+
+/** Whether a period's frozen net agrees with its ledger, and by how much it does not. */
+export interface PeriodCheck {
+  /** `ledger net + adjustments − TDS`. */
+  readonly expectedNetPaise: number;
+  /** `net payable − expected`; 0 for every healthy period. */
+  readonly differencePaise: number;
+  readonly reconciled: boolean;
+}
+
+/**
+ * The server states the check itself (backend B4: `expected_net_paise`,
+ * `difference_paise`, `reconciled`); an older server leaves it to this
+ * function, with the same formula (SET-01).
+ */
+export function periodCheck(detail: SettlementPeriodDetail): PeriodCheck {
+  const b = detail.breakdown;
+  const expectedNetPaise =
+    b.expectedNetPaise ?? b.ledgerNetPaise + detail.adjustmentsPaise - detail.tdsPaise;
+  const differencePaise = b.differencePaise ?? detail.netPayablePaise - expectedNetPaise;
+  return {
+    expectedNetPaise,
+    differencePaise,
+    reconciled: b.reconciled ?? differencePaise === 0,
+  };
+}
+
 /** Label + badge palette key for a status the screen shows. */
 export interface StatusView {
   readonly label: string;
@@ -68,8 +124,12 @@ export interface StatusView {
   readonly badge: string;
 }
 
+/**
+ * Periods are created closed (decision 11); `open` keeps a plain label in
+ * case an old row still carries it — never an "accruing" figure.
+ */
 export const PERIOD_STATUS: Readonly<Record<SettlementPeriodStatus, StatusView>> = {
-  open: { label: 'Accruing', badge: 'Open' },
+  open: { label: 'Open', badge: 'Open' },
   closed: { label: 'Awaiting payout', badge: 'Pending' },
   paid: { label: 'Paid', badge: 'Paid' },
   on_hold: { label: 'On Hold', badge: 'On Hold' },

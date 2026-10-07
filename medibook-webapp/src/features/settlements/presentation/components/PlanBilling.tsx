@@ -27,6 +27,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { useBillingPlansQuery } from '@/features/settlements/application/queries/useBillingPlansQuery';
 import { useBillingUsageQuery } from '@/features/settlements/application/queries/useBillingUsageQuery';
+import { useCreditNotesQuery } from '@/features/settlements/application/queries/useCreditNotesQuery';
 import { useInvoicesQuery } from '@/features/settlements/application/queries/useInvoicesQuery';
 import { usePlanChangeRequestsQuery } from '@/features/settlements/application/queries/usePlanChangeRequestsQuery';
 import { useRequestPlanChangeMutation } from '@/features/settlements/application/queries/useRequestPlanChangeMutation';
@@ -37,6 +38,12 @@ import type {
   BillingPlan,
 } from '@/features/settlements/domain/entities/billing.entities';
 import { InvoiceModal } from '@/features/settlements/presentation/components/InvoiceModal';
+import {
+  CYCLE_LABEL,
+  graceNotice,
+  planChoices,
+  UNPAID_INVOICE_STATUSES,
+} from '@/features/settlements/presentation/components/planBillingView';
 import {
   billingPeriodLabel,
   bpToPct,
@@ -52,8 +59,7 @@ import {
 
 const INVOICE_COLUMNS = ['Invoice', 'Period', 'Issued', 'Due', 'Amount', 'Status', ''] as const;
 
-/** Invoice statuses that still need paying (backend `UNPAID_INVOICE`). */
-const UNPAID_INVOICE_STATUSES: ReadonlySet<string> = new Set(['issued', 'overdue']);
+const CREDIT_NOTE_COLUMNS = ['Credit Note', 'Issued', 'Reason', 'Total', 'Used', 'Left'] as const;
 
 /** Decided plan-change outcomes, and how the hospital is told about each. */
 const DECIDED_COPY: Readonly<Record<string, string>> = {
@@ -70,11 +76,10 @@ const QUOTA_ALERT_PCT = 85;
 /** Backend 404 code when the hospital has no current subscription. */
 const NOT_FOUND_KIND = 'notFound';
 
-const PERIOD_MONTHLY = 'Monthly';
-const PERIOD_YEARLY = 'Yearly';
+/** Billing-cycle label → value, for the cycle select. */
 const PERIOD_VALUE: Readonly<Record<string, BillingPeriod>> = {
-  [PERIOD_MONTHLY]: 'monthly',
-  [PERIOD_YEARLY]: 'yearly',
+  [CYCLE_LABEL.monthly]: 'monthly',
+  [CYCLE_LABEL.yearly]: 'yearly',
 };
 
 const NOTE_MAX_LENGTH = 2000;
@@ -102,8 +107,11 @@ function priceFor(plan: BillingPlan, period: string): { paise: number; suffix: s
 /**
  * Plan & Billing tab — the hospital's Medibook subscription
  * (`/hospital/billing/*`): current plan, usage against plan limits, the
- * subscription invoices and the request-plan-change flow. Medibook operations
- * review plan changes; the pending request shows here until they do.
+ * subscription invoices, credit notes and the request-plan-change flow.
+ * Medibook operations review plan changes; the pending request shows here
+ * until they do. An approved change applies at once with proration (Q106).
+ * A past-due subscription says how long full access lasts, and a lapsed one
+ * what read-only means (D-30, appendix 09 F5/F6).
  */
 export function PlanBilling() {
   const { can } = usePermission();
@@ -116,8 +124,10 @@ export function PlanBilling() {
   // The newest invoices, whatever page the table is on — the source of the
   // "payment due" banner.
   const latestInvoicesQuery = useInvoicesQuery(1, INVOICE_PAGE_SIZE);
+  // The hospital route stays on `billing_settlements.edit` (only the ops list moved to view).
   const requestsQuery = usePlanChangeRequestsQuery(canEdit);
   const requestMutation = useRequestPlanChangeMutation();
+  const creditNotesQuery = useCreditNotesQuery();
 
   const [reqOpen, setReqOpen] = useState(false);
   const [invoice, setInvoice] = useState<BillingInvoice | null>(null);
@@ -136,25 +146,30 @@ export function PlanBilling() {
   const plans = plansQuery.data ?? [];
 
   const sub = subscriptionQuery.data;
-  const planOptions = plans.filter((p) => p.id !== sub?.plan.id);
+  const choices = planChoices(plans, sub ?? null);
+  const planNameOf = (planId: string, fromRow: string | null): string | undefined =>
+    fromRow ?? plans.find((p) => p.id === planId)?.name;
   const pendingPlanName =
-    pendingRequest && plans.find((p) => p.id === pendingRequest.toPlanId)?.name;
-  const decidedPlanName = latestDecided && plans.find((p) => p.id === latestDecided.toPlanId)?.name;
+    pendingRequest && planNameOf(pendingRequest.toPlanId, pendingRequest.toPlanName);
+  const decidedPlanName =
+    latestDecided && planNameOf(latestDecided.toPlanId, latestDecided.toPlanName);
   const today = todayISO();
-  const dueInvoices = (latestInvoicesQuery.data?.items ?? []).filter(
+  const latestInvoices = latestInvoicesQuery.data?.items ?? [];
+  const dueInvoices = latestInvoices.filter(
     (i) => UNPAID_INVOICE_STATUSES.has(i.status) && i.dueAt <= today,
   );
+  const grace = sub ? graceNotice(sub, latestInvoices, today) : null;
 
   const form = useForm<PlanChangeForm>({
-    initial: { plan: '', period: PERIOD_MONTHLY, note: '' },
+    initial: { plan: '', period: '', note: '' },
     validate: PLAN_CHANGE_VALIDATORS,
     onSubmit: async ({ plan, period, note }) => {
-      const target = planOptions.find((p) => p.name === plan);
+      const target = choices.find((c) => c.label === plan);
       const toBillingPeriod = PERIOD_VALUE[period];
-      if (!target || !toBillingPeriod) return;
+      if (!target || !toBillingPeriod || !target.cycles.includes(toBillingPeriod)) return;
       try {
         await requestMutation.mutateAsync({
-          toPlanId: target.id,
+          toPlanId: target.plan.id,
           toBillingPeriod,
           note: note.trim() || null,
         });
@@ -169,14 +184,12 @@ export function PlanBilling() {
     },
   });
 
-  const selectedPlan = planOptions.find((p) => p.name === form.values.plan);
-  const periodOptions =
-    selectedPlan && selectedPlan.priceYearlyPaise === null
-      ? [PERIOD_MONTHLY]
-      : [PERIOD_MONTHLY, PERIOD_YEARLY];
+  const selectedChoice = choices.find((c) => c.label === form.values.plan);
+  const selectedPlan = selectedChoice?.plan;
+  const periodOptions = (selectedChoice?.cycles ?? []).map((c) => CYCLE_LABEL[c]);
 
   const openRequest = (): void => {
-    form.reset({ plan: '', period: PERIOD_MONTHLY, note: '' });
+    form.reset({ plan: '', period: '', note: '' });
     setReqOpen(true);
   };
 
@@ -252,9 +265,28 @@ export function PlanBilling() {
               </div>
             )}
             {sub.readOnly && (
-              <div className="text-body text-d-700 bg-d-100 flex items-center gap-2 rounded-md px-3.5 py-2.5">
-                <Icon name="triangle-alert" size={16} /> Your subscription has lapsed. The app is
-                read-only until the outstanding invoice is paid.
+              <div className="text-body text-d-700 bg-d-100 flex items-start gap-2 rounded-md px-3.5 py-2.5">
+                <Icon name="triangle-alert" size={16} className="mt-0.5 flex-none" />
+                <span>
+                  <b className="font-semibold">
+                    Your subscription has lapsed, so the hospital is read-only.
+                  </b>{' '}
+                  Staff can still sign in and see everything, but nothing can be added or changed —
+                  bookings, payments, patients and settings are all refused — and patients cannot
+                  book this hospital in the Medibook app. Full access returns as soon as Medibook
+                  records the payment of the outstanding invoice.
+                </span>
+              </div>
+            )}
+            {!sub.readOnly && grace && (
+              <div className="text-body text-y-700 bg-y-100 flex items-start gap-2 rounded-md px-3.5 py-2.5">
+                <Icon name="clock" size={16} className="mt-0.5 flex-none" />
+                <span>
+                  Invoice {grace.invoice.invoiceNo} is overdue. Pay it by{' '}
+                  <b className="font-semibold">{fmtDate(grace.endsOn)}</b> to keep full access;
+                  after that the hospital becomes read-only until it is paid. Signing in is never
+                  blocked.
+                </span>
               </div>
             )}
             <div className="flex justify-between">
@@ -375,6 +407,7 @@ export function PlanBilling() {
   );
 
   const invoices = invoicesQuery.data?.items ?? [];
+  const creditNotes = creditNotesQuery.data ?? [];
   const invoiceState: TableStateSpec | undefined = invoicesQuery.isPending
     ? { kind: 'loading', rows: 3 }
     : invoicesQuery.isError
@@ -455,6 +488,41 @@ export function PlanBilling() {
         />
       </Card>
 
+      {creditNotes.length > 0 && (
+        <Card pad={24}>
+          <SectionTitle size={16} className="mb-1">
+            Credit Notes
+          </SectionTitle>
+          <div className="text-caption text-text-muted mb-4">
+            Issued when a plan change leaves unused credit. The credit settles unpaid invoices
+            first, oldest due first; anything left settles your next invoices.
+          </div>
+          <TableShell
+            columns={CREDIT_NOTE_COLUMNS}
+            rightCols={['Total', 'Used', 'Left']}
+            scrollLabel="Credit notes"
+          >
+            {creditNotes.map((n) => (
+              <tr key={n.id}>
+                <td className={cn(tdClass, 'text-text-strong font-medium')}>{n.creditNoteNo}</td>
+                <td className={tdClass}>{fmtDateTime(n.issuedAt)}</td>
+                <td className={tdClass}>{n.reason ?? '—'}</td>
+                <td className={cn(tdClass, 'text-right tabular-nums')}>
+                  {rupees(n.totalPaise)}
+                  <div className="text-caption text-text-muted">incl. {rupees(n.gstPaise)} GST</div>
+                </td>
+                <td className={cn(tdClass, 'text-right tabular-nums')}>{rupees(n.appliedPaise)}</td>
+                <td
+                  className={cn(tdClass, 'text-text-strong text-right font-semibold tabular-nums')}
+                >
+                  {rupees(n.remainingPaise)}
+                </td>
+              </tr>
+            ))}
+          </TableShell>
+        </Card>
+      )}
+
       <FormModal
         open={reqOpen}
         onClose={() => setReqOpen(false)}
@@ -466,7 +534,8 @@ export function PlanBilling() {
         onSubmit={form.handleSubmit}
       >
         <p className="text-body-lg text-text-body m-0 mb-3.5">
-          Current plan: <b>{sub?.plan.name ?? '—'}</b>.{' '}
+          Current plan: <b>{sub?.plan.name ?? '—'}</b>
+          {sub ? ` (${billingPeriodLabel(sub.billingPeriod).toLowerCase()})` : ''}.{' '}
           {"Medibook operations reviews and applies plan changes — you'll see the result here."}
         </p>
         {plansQuery.isError ? (
@@ -482,8 +551,11 @@ export function PlanBilling() {
               <Select
                 value={form.values.plan}
                 placeholder={plansQuery.isPending ? 'Loading plans…' : 'Select a plan'}
-                options={planOptions.map((p) => p.name)}
-                onChange={(v) => form.setValues({ plan: v, period: PERIOD_MONTHLY })}
+                options={choices.map((c) => c.label)}
+                onChange={(v) => {
+                  const first = choices.find((c) => c.label === v)?.cycles[0];
+                  form.setValues({ plan: v, period: first ? CYCLE_LABEL[first] : '' });
+                }}
                 onBlur={() => form.blurField('plan')}
                 disabled={plansQuery.isPending}
               />
@@ -499,11 +571,27 @@ export function PlanBilling() {
             <Field label="Billing Cycle" required error={form.errorFor('period')}>
               <Select
                 value={form.values.period}
+                placeholder="Select a plan first"
                 options={periodOptions}
                 onChange={(v) => form.setField('period', v)}
                 onBlur={() => form.blurField('period')}
+                disabled={!selectedChoice}
               />
             </Field>
+            {selectedChoice?.isCurrent && (
+              <div className="text-caption text-text-muted">
+                Same plan, new billing cycle — only the cycle changes.
+              </div>
+            )}
+            <div className="text-caption text-text-body bg-bg-subtle border-border-soft flex items-start gap-2 rounded-md border px-3 py-2.5">
+              <Icon name="info" size={14} className="text-blue mt-0.5 flex-none" />
+              <span>
+                Once Medibook approves, the change applies straight away with proration: you are
+                credited for the unused part of the current period and charged for the new plan from
+                that day. An upgrade is billed on one invoice; a downgrade issues a credit note,
+                which first settles any unpaid invoices.
+              </span>
+            </div>
             <Field label="Note for Medibook (optional)">
               {(field) => (
                 <textarea
@@ -511,7 +599,7 @@ export function PlanBilling() {
                   value={form.values.note}
                   maxLength={NOTE_MAX_LENGTH}
                   onChange={(e) => form.setField('note', e.target.value)}
-                  placeholder="e.g. We are adding a second branch next month"
+                  placeholder="e.g. We are adding three doctors next month"
                   className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
                 />
               )}
