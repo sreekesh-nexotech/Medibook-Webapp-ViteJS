@@ -36,6 +36,15 @@ export interface PlatformUserSummary {
   readonly deletionRequestedAt: string | null;
   readonly lastLoginAt: string | null;
   readonly createdAt: string;
+  /** Bookings the account has made (B2, BE-31); `null` until the backend sends it. */
+  readonly bookingCount: number | null;
+}
+
+/** Demographics from the patient profile — never medical data (D-04). */
+export interface PlatformUserProfile {
+  readonly dateOfBirth: string | null;
+  readonly gender: string | null;
+  readonly marketingOptIn: boolean;
 }
 
 /** A person the account books for (the account holder is `isSelf`). */
@@ -81,4 +90,8 @@ export interface PlatformUserDetail extends PlatformUserSummary {
   readonly bookings: readonly PlatformUserBooking[];
   readonly devices: readonly PlatformUserDevice[];
   readonly activeSessions: number;
+  /** `null` when the account has no patient profile yet. */
+  readonly profile: PlatformUserProfile | null;
+  /** When a pending deletion completes (B2), if the backend sends it. */
+  readonly deletionDueAt: string | null;
 }
