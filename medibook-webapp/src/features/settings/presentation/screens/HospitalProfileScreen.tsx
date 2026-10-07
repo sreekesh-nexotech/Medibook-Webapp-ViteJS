@@ -126,15 +126,12 @@ function holidayOpSuccessCopy(op: HolidayOp, cancelled: number): string {
 }
 
 /**
- * Hospital Profile (module H4) — audit HA-03 (§2.4): "Branches and holiday
- * calendar have no screen. Hospital-published banners for the patient app
- * have no screen."
+ * Hospital Profile (module H4) — the holiday calendar and the banners the
+ * hospital publishes to the patient app, both on the hospital API.
  *
- * The holiday calendar and the patient-app banners run on the hospital API.
  * Every closure write is checked with a dry run first: if it would cancel
  * booked appointments, nothing is applied until the user confirms the list.
- * Branches have no backend yet, so that tab says so instead of showing
- * rows that are not real.
+ * There is no Branches tab: one hospital is one location (D-02, UAT-52).
  */
 export function HospitalProfileScreen() {
   const { can } = usePermission();

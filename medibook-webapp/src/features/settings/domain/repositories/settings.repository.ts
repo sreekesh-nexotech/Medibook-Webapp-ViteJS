@@ -10,7 +10,7 @@ import type {
   HospitalRuleChanges,
   HospitalRuleSettings,
   TokenPolicy,
-  TokenScope,
+  TokenPolicyChanges,
 } from '@/features/settings/domain/entities/settings.entities';
 
 /** Hospital Settings (H2): profile, rules, hours, token policy and payout account. */
@@ -30,8 +30,8 @@ export interface SettingsRepository {
   replaceHours(days: readonly HospitalHoursDay[]): Promise<Result<readonly HospitalHoursDay[]>>;
 
   getTokenPolicy(): Promise<Result<TokenPolicy>>;
-  /** Scope changes apply from tomorrow (hospital-local). */
-  updateTokenScope(scope: TokenScope, version: number): Promise<Result<TokenPolicy>>;
+  /** `scope`/`reset` changes apply from tomorrow (hospital-local); the rest now. */
+  updateTokenPolicy(changes: TokenPolicyChanges, version: number): Promise<Result<TokenPolicy>>;
 
   listBankAccounts(): Promise<Result<readonly BankAccount[]>>;
   createBankAccount(input: BankAccountInput): Promise<Result<BankAccount>>;
@@ -40,6 +40,9 @@ export interface SettingsRepository {
     input: BankAccountInput,
     version: number,
   ): Promise<Result<BankAccount>>;
+  deleteBankAccount(id: string, version: number): Promise<Result<null>>;
+  /** Make this the payout account (admin role only, decision 4). */
+  makeBankAccountPrimary(id: string): Promise<Result<BankAccount>>;
 
   /** Upload a hospital image; resolves to the stored file id to attach to the profile. */
   uploadImage(file: File, purpose: HospitalImagePurpose): Promise<Result<string>>;

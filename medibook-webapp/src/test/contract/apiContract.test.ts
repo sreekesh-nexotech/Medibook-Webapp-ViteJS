@@ -121,6 +121,7 @@ import {
   servicePageSchema,
   taxRatePageSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/services.api';
+import { settingsCounterPageSchema } from '@/features/settings/infrastructure/data-sources/remote/counters.response';
 import {
   bankAccountPageResponseSchema,
   hospitalProfileResponseSchema,
@@ -243,6 +244,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'settings.hospitalSettingsResponseSchema': hospitalSettingsResponseSchema,
   'settings.scheduleHoursListResponseSchema': scheduleHoursListResponseSchema,
   'settings.servicePageSchema': servicePageSchema,
+  'settings.settingsCounterPageSchema': settingsCounterPageSchema,
   'settings.taxRatePageSchema': taxRatePageSchema,
   'settings.tokenPolicyResponseSchema': tokenPolicyResponseSchema,
   'settlements.billingPlanPageResponseSchema': billingPlanPageResponseSchema,
@@ -274,6 +276,17 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
   doctorReviewPageSchema:
     'DOC-01: GET /hospital/doctors/{id}/reviews is not served by the recorded backend yet; record it once B9 lands.',
+  // New to the web app in fe/f2 (Hospital Settings); the recorder's SPEC lists them — record
+  // against the seeded backend at integration. Shapes follow the backend serializers named
+  // on each schema.
+  numberingListResponseSchema:
+    'Not yet recorded: GET /hospital/numbering (NumberingSeriesSerializer).',
+  numberingPreviewResponseSchema:
+    'Not yet recorded: GET /hospital/numbering/{kind}/preview (NumberingPreviewSerializer).',
+  printTemplatePageSchema:
+    'Not yet recorded: GET /hospital/print-templates (PrintTemplateSerializer).',
+  displayDevicePageSchema:
+    'Not yet recorded: GET /hospital/display-devices (DisplayDeviceSerializer).',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

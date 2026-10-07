@@ -114,7 +114,7 @@ export type HospitalView =
   // ---- added this round (screens owned by the feature agents) ----
   /** Doctor slot templates + exceptions. Admin-only. */
   | 'slots'
-  /** Hospital profile: branches, holidays, banners. Admin-only. */
+  /** Hospital profile: holidays and banners (one hospital = one location, D-02). Admin-only. */
   | 'profile'
   /** Services & pricing, taxes, coupons. Admin-only. */
   | 'services'

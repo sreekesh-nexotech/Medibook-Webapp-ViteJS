@@ -7,6 +7,7 @@ import type {
   HospitalProfilePatchRequest,
   HospitalSettingsPutRequest,
   ScheduleHoursPutRequest,
+  TokenPolicyPutRequest,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.request';
 import type {
   BankAccountResponse,
@@ -74,8 +75,9 @@ export async function getTokenPolicy(): Promise<TokenPolicyResponse> {
   return tokenPolicyResponseSchema.parse(response.data);
 }
 
+/** `scope`/`reset` apply from tomorrow (sent equal to the value in force, they cancel a pending change). */
 export async function putTokenPolicy(
-  body: { readonly scope: string },
+  body: TokenPolicyPutRequest,
   version: number,
 ): Promise<TokenPolicyResponse> {
   const response = await hospitalApi.put(TOKEN_POLICY_PATH, body, { headers: ifMatch(version) });
@@ -91,6 +93,21 @@ export async function listBankAccounts(): Promise<readonly BankAccountResponse[]
 
 export async function postBankAccount(body: BankAccountWriteRequest): Promise<BankAccountResponse> {
   const response = await hospitalApi.post(BANK_ACCOUNTS_PATH, body);
+  return bankAccountResponseSchema.parse(response.data);
+}
+
+/** Soft delete; `If-Match` honoured when sent. */
+export async function deleteBankAccount(id: string, version: number): Promise<void> {
+  await hospitalApi.delete(`${BANK_ACCOUNTS_PATH}/${encodeURIComponent(id)}`, {
+    headers: ifMatch(version),
+  });
+}
+
+/** One primary per hospital; payouts go to it (admin role only, decision 4). */
+export async function postBankAccountPrimary(id: string): Promise<BankAccountResponse> {
+  const response = await hospitalApi.post(
+    `${BANK_ACCOUNTS_PATH}/${encodeURIComponent(id)}/primary`,
+  );
   return bankAccountResponseSchema.parse(response.data);
 }
 

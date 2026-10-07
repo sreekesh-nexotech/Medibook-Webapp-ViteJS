@@ -1,7 +1,7 @@
 /**
  * Hospital Profile entities (module H4) — the holiday calendar and the banners
  * the hospital publishes to the patient app. Plain readonly types: no Zod, no
- * Axios, no React. (Branches have no backend yet — see the H4 gap list.)
+ * Axios, no React. There are no branches: one hospital = one location (D-02).
  */
 
 /** A closure. `departmentId === null` closes the whole hospital. */

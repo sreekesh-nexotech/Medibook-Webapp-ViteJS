@@ -5,6 +5,7 @@ import { ok } from '@/core/error/failure';
 
 import type { SettingsRepository } from '@/features/settings/domain/repositories/settings.repository';
 import {
+  deleteBankAccount,
   getHours,
   getProfile,
   getSettings,
@@ -13,6 +14,7 @@ import {
   patchBankAccount,
   patchProfile,
   postBankAccount,
+  postBankAccountPrimary,
   putHours,
   putSettings,
   putTokenPolicy,
@@ -22,6 +24,7 @@ import {
   toHoursPutRequest,
   toProfilePatchRequest,
   toSettingsPutRequest,
+  toTokenPolicyPutRequest,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.request';
 import {
   toBankAccount,
@@ -53,8 +56,10 @@ export const settingsRepository: SettingsRepository = {
 
   getTokenPolicy: () => attempt(async () => toTokenPolicy(await getTokenPolicy())),
 
-  updateTokenScope: (scope, version) =>
-    attempt(async () => toTokenPolicy(await putTokenPolicy({ scope }, version))),
+  updateTokenPolicy: (changes, version) =>
+    attempt(async () =>
+      toTokenPolicy(await putTokenPolicy(toTokenPolicyPutRequest(changes), version)),
+    ),
 
   listBankAccounts: () => attempt(async () => (await listBankAccounts()).map(toBankAccount)),
 
@@ -65,6 +70,15 @@ export const settingsRepository: SettingsRepository = {
     attempt(async () =>
       toBankAccount(await patchBankAccount(id, toBankAccountWriteRequest(input), version)),
     ),
+
+  deleteBankAccount: (id, version) =>
+    attempt(async () => {
+      await deleteBankAccount(id, version);
+      return null;
+    }),
+
+  makeBankAccountPrimary: (id) =>
+    attempt(async () => toBankAccount(await postBankAccountPrimary(id))),
 
   uploadImage: async (file, purpose): Promise<Result<string>> => {
     const uploaded = await uploadFile({ file, purpose });

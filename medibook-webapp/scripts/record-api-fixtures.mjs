@@ -252,6 +252,34 @@ const SPEC = [
     path: '/hospital/billing/bank-accounts',
     params: LIST,
   },
+  {
+    key: 'settings.settingsCounterPageSchema',
+    surface: 'hospital',
+    path: '/hospital/counters',
+    params: { page_size: 100 },
+  },
+  {
+    key: 'settings.numberingListResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/numbering',
+  },
+  {
+    key: 'settings.numberingPreviewResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/numbering/receipt/preview',
+  },
+  {
+    key: 'settings.printTemplatePageSchema',
+    surface: 'hospital',
+    path: '/hospital/print-templates',
+    params: LIST,
+  },
+  {
+    key: 'settings.displayDevicePageSchema',
+    surface: 'hospital',
+    path: '/hospital/display-devices',
+    params: LIST,
+  },
 
   // hospital: billing, settlements, reports, messaging, audit, users
   {
