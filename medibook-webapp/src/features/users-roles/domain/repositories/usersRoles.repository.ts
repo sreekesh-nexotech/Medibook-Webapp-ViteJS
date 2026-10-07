@@ -16,7 +16,7 @@ import type {
 export interface UsersRolesRepository {
   /** Every staff member of the hospital (all pages). */
   listStaff(): Promise<Result<readonly StaffMember[]>>;
-  /** Every invitation still waiting to be accepted (all pages). */
+  /** Every invitation not yet accepted — links that still work and lapsed ones (all pages). */
   listPendingInvitations(): Promise<Result<readonly StaffInvitation[]>>;
   /** `idempotencyKey` is one per user intent, so a retried submit is not sent twice. */
   inviteStaff(draft: StaffInviteDraft, idempotencyKey: string): Promise<Result<StaffInvitation>>;
@@ -39,10 +39,17 @@ export interface UsersRolesRepository {
   /** The permission catalogue — every module a role can be granted. */
   listPermissionModules(): Promise<Result<readonly PermissionModule[]>>;
   listRoles(): Promise<Result<readonly StaffRole[]>>;
-  /** Replaces the role's whole permission set with `permissions`. */
+  /** Replaces the role's whole permission set with `permissions` (`version` → `If-Match`). */
   updateRolePermissions(
     roleCode: StaffRoleCode,
     permissions: readonly string[],
+    version: number | null,
+  ): Promise<Result<StaffRole>>;
+  /** The role's one-line description (USR-02); `version` guards a concurrent edit. */
+  updateRoleDescription(
+    roleCode: StaffRoleCode,
+    description: string | null,
+    version: number,
   ): Promise<Result<StaffRole>>;
   previewRole(roleCode: StaffRoleCode): Promise<Result<RolePreview>>;
 }

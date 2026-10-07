@@ -7,26 +7,27 @@ import {
   PAYMENTS_STALE_TIME_MS,
   paymentsKeys,
 } from '@/features/payments/application/queries/payments.keys';
-import { fetchPaymentRefunds } from '@/features/payments/application/usecases/fetchPaymentRefunds';
+import { fetchPayment } from '@/features/payments/application/usecases/fetchPayment';
 
 /**
- * The refunds of each refunded line on the visible page, keyed by payment id.
- * A line whose refunds have not loaded (or failed to) is simply absent.
+ * The refunds of each listed line, keyed by payment id — for lines whose
+ * refund state the backend does not send on the row (an older backend). A
+ * line whose detail has not loaded (or failed to) is simply absent.
  */
-export function usePaymentRefundsQuery(
+export function useLineRefundsQuery(
   paymentIds: readonly string[],
 ): Readonly<Record<string, readonly PaymentRefund[]>> {
   return useQueries({
     queries: paymentIds.map((id) => ({
-      queryKey: paymentsKeys.refunds(id),
-      queryFn: async () => unwrap(await fetchPaymentRefunds(id)),
+      queryKey: paymentsKeys.detail(id),
+      queryFn: async () => unwrap(await fetchPayment(id)),
       staleTime: PAYMENTS_STALE_TIME_MS,
     })),
     combine: (results) => {
       const out: Record<string, readonly PaymentRefund[]> = {};
       results.forEach((r, i) => {
         const id = paymentIds[i];
-        if (id !== undefined && r.data !== undefined) out[id] = r.data;
+        if (id !== undefined && r.data !== undefined) out[id] = r.data.refunds;
       });
       return out;
     },

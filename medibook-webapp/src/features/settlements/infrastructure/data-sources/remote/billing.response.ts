@@ -7,6 +7,7 @@ import type {
   BillingInvoiceDetail,
   BillingPlan,
   BillingUsage,
+  CreditNote,
   InvoiceParty,
   PlanChangeRequest,
   Subscription,
@@ -42,6 +43,7 @@ export const subscriptionResponseSchema = z.object({
   next_invoice_at: z.string().nullable(),
   trial_ends_at: z.string().nullable(),
   cancel_at_period_end: z.boolean(),
+  grace_days_override: z.number().int().nullable().optional(),
   plan: billingPlanResponseSchema,
 });
 
@@ -74,6 +76,7 @@ export const invoiceResponseSchema = z.object({
   amount_paid_paise: z.number().int(),
   status: z.string(),
   paid_at: z.string().nullable(),
+  grace_ends_at: z.string().nullable().optional(),
 });
 
 export const invoicePageResponseSchema = paginatedSchema(invoiceResponseSchema);
@@ -111,14 +114,32 @@ export const invoiceDetailResponseSchema = invoiceResponseSchema.extend({
 export const planChangeRequestResponseSchema = z.object({
   id: z.string(),
   to_plan_id: z.string(),
+  to_plan_name: z.string().nullable().optional(),
   to_billing_period: z.string(),
   requested_at: z.string(),
   status: z.string(),
   note: z.string().nullable(),
   review_note: z.string().nullable(),
+  proration_invoice_id: z.string().nullable().optional(),
+  credit_note_id: z.string().nullable().optional(),
 });
 
 export const planChangeRequestPageResponseSchema = paginatedSchema(planChangeRequestResponseSchema);
+
+/** `GET /hospital/billing/credit-notes` rows (backend B4, M-25). */
+export const creditNoteResponseSchema = z.object({
+  id: z.string(),
+  credit_note_no: z.string(),
+  issued_at: z.string(),
+  reason: z.string().nullable().optional(),
+  subtotal_paise: z.number().int(),
+  gst_paise: z.number().int(),
+  total_paise: z.number().int(),
+  applied_paise: z.number().int(),
+  remaining_paise: z.number().int().optional(),
+});
+
+export const creditNotePageResponseSchema = paginatedSchema(creditNoteResponseSchema);
 
 type BillingPlanResponse = z.infer<typeof billingPlanResponseSchema>;
 type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>;
@@ -127,6 +148,7 @@ type InvoiceResponse = z.infer<typeof invoiceResponseSchema>;
 type InvoiceDetailResponse = z.infer<typeof invoiceDetailResponseSchema>;
 type PartySnapshot = z.infer<typeof partySnapshotSchema>;
 type PlanChangeRequestResponse = z.infer<typeof planChangeRequestResponseSchema>;
+type CreditNoteResponse = z.infer<typeof creditNoteResponseSchema>;
 
 /** Name used when the issuer snapshot carries no name. */
 const DEFAULT_ISSUER_NAME = 'Medibook';
@@ -157,6 +179,7 @@ export function toSubscription(dto: SubscriptionResponse): Subscription {
     nextInvoiceAt: dto.next_invoice_at,
     trialEndsAt: dto.trial_ends_at,
     cancelAtPeriodEnd: dto.cancel_at_period_end,
+    graceDaysOverride: dto.grace_days_override ?? null,
   };
 }
 
@@ -184,6 +207,7 @@ export function toBillingInvoice(dto: InvoiceResponse): BillingInvoice {
     amountPaidPaise: dto.amount_paid_paise,
     status: dto.status,
     paidAt: dto.paid_at,
+    graceEndsAt: dto.grace_ends_at ?? null,
   };
 }
 
@@ -220,10 +244,27 @@ export function toPlanChangeRequest(dto: PlanChangeRequestResponse): PlanChangeR
   return {
     id: dto.id,
     toPlanId: dto.to_plan_id,
+    toPlanName: dto.to_plan_name ?? null,
     toBillingPeriod: dto.to_billing_period,
     requestedAt: dto.requested_at,
     status: dto.status,
     note: dto.note,
     reviewNote: dto.review_note,
+    prorationInvoiceId: dto.proration_invoice_id ?? null,
+    creditNoteId: dto.credit_note_id ?? null,
+  };
+}
+
+export function toCreditNote(dto: CreditNoteResponse): CreditNote {
+  return {
+    id: dto.id,
+    creditNoteNo: dto.credit_note_no,
+    issuedAt: dto.issued_at,
+    reason: dto.reason || null,
+    subtotalPaise: dto.subtotal_paise,
+    gstPaise: dto.gst_paise,
+    totalPaise: dto.total_paise,
+    appliedPaise: dto.applied_paise,
+    remainingPaise: dto.remaining_paise ?? dto.total_paise - dto.applied_paise,
   };
 }

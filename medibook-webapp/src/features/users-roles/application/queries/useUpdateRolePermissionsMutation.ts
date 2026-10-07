@@ -10,14 +10,16 @@ interface UpdateRolePermissionsInput {
   readonly roleCode: StaffRoleCode;
   /** The complete set the role should hold afterwards — it replaces the current one. */
   readonly permissions: readonly string[];
+  /** The role version edited, sent as `If-Match` when known. */
+  readonly version: number | null;
 }
 
 /** Replace one role's permission grid (`admin` is not editable). */
 export function useUpdateRolePermissionsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ roleCode, permissions }: UpdateRolePermissionsInput) =>
-      unwrap(await updateRolePermissions(roleCode, permissions)),
+    mutationFn: async ({ roleCode, permissions, version }: UpdateRolePermissionsInput) =>
+      unwrap(await updateRolePermissions(roleCode, permissions, version)),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: usersRolesKeys.roles() });
       void queryClient.invalidateQueries({ queryKey: usersRolesKeys.previews() });

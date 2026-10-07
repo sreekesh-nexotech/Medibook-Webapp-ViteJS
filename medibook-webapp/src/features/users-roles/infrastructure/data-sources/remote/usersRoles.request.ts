@@ -44,3 +44,8 @@ export function toInvitationCreateRequest(draft: StaffInviteDraft): InvitationCr
     role_code: draft.roleCode,
   };
 }
+
+/** `PATCH /roles/{code}` (USR-02) — only the description is editable. */
+export interface RolePatchRequest {
+  readonly description: string | null;
+}

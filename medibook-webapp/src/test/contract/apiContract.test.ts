@@ -279,8 +279,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
 const NOT_RECORDED: Readonly<Record<string, string>> = {
   receiptPdfResponseSchema: 'Reading it generates and stores the receipt PDF.',
   auditLogExportResponseSchema: 'Reading it starts an export file.',
-  reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
-  reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
+  reportExportDeferredResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
+  reportExportQueuedResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
   faqFeedSchema: 'New hospital FAQ feed (BE-34); record once the backend serves it.',
   doctorReviewPageSchema:
@@ -296,12 +296,18 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
     'Not yet recorded: GET /hospital/print-templates (PrintTemplateSerializer).',
   displayDevicePageSchema:
     'Not yet recorded: GET /hospital/display-devices (DisplayDeviceSerializer).',
+  // New reads of fix wave 1 (fe/f3). Their recorder entries are in place;
+  // record them against the merged backend and move them to CONTRACTS.
+  approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
+  payoutPageResponseSchema: 'New in wave 1 — record against the merged backend.',
+  creditNotePageResponseSchema: 'New in wave 1 — record against the merged backend.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */
 const COVERED_BY_PAGE: Readonly<Record<string, string>> = {
   loginEventResponseSchema: 'loginEventPageSchema',
   configChangeResponseSchema: 'configChangePageSchema',
+  deliveryResponseSchema: 'deliveryPageResponseSchema',
 };
 
 const fixtures = import.meta.glob<unknown>('./fixtures/*.json', { eager: true, import: 'default' });

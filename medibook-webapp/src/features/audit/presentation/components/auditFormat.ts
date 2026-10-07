@@ -82,3 +82,60 @@ export function localStamp(iso: string): { date: string; time: string } | null {
   if (Number.isNaN(at.getTime())) return null;
   return { date: localDateIso(at), time: localTimeHm(at) };
 }
+
+/**
+ * The entities the Entity filter offers: the hospital-side resource types the
+ * backend's domain audit rows use (`audit/services/record.py` callers, B6's
+ * patient master rows included). Generic `http.*` rows name a view class
+ * instead; those are found through the exact search.
+ */
+export const AUDIT_ENTITY_OPTIONS = [
+  { code: 'hospital_patient', label: 'Patient record' },
+  { code: 'patient_change_request', label: 'Patient change request' },
+  { code: 'hospital_staff', label: 'Staff member' },
+  { code: 'hospital_role', label: 'Role' },
+  { code: 'doctor', label: 'Doctor' },
+  { code: 'department', label: 'Department' },
+  { code: 'doctor_leave', label: 'Doctor leave' },
+  { code: 'doctor_date_exception', label: 'Doctor date exception' },
+  { code: 'service', label: 'Service' },
+  { code: 'doctor_service', label: 'Doctor service' },
+  { code: 'tax_rate', label: 'Tax rate' },
+  { code: 'coupon', label: 'Coupon' },
+  { code: 'holiday', label: 'Holiday' },
+  { code: 'slot', label: 'Slot' },
+  { code: 'hospital_counter', label: 'Counter' },
+  { code: 'hospital_banner', label: 'Banner' },
+  { code: 'hospital_bank_account', label: 'Bank account' },
+  { code: 'display_device', label: 'Display device' },
+  { code: 'print_template', label: 'Print template' },
+  { code: 'plan_change_request', label: 'Plan change request' },
+] as const;
+
+/** Entity filter label → resource type. */
+export function entityCodeFor(label: string): string | undefined {
+  return AUDIT_ENTITY_OPTIONS.find((o) => o.label === label)?.code;
+}
+
+const VIEW_CLASS_SUFFIX = /View$/;
+const HOSPITAL_PREFIX = /^Hospital(?=[A-Z])/;
+const CAMEL_BOUNDARY = /([a-z0-9])([A-Z])/g;
+
+/**
+ * A readable entity name (appendix 05 F19): a known resource type gets its
+ * label; a generic row's DRF view class (`HospitalAppointmentRefundsView`)
+ * reads as words ("Appointment refunds"); anything else as written.
+ */
+export function entityLabel(resourceType: string): string {
+  const known = AUDIT_ENTITY_OPTIONS.find((o) => o.code === resourceType);
+  if (known) return known.label;
+  if (VIEW_CLASS_SUFFIX.test(resourceType)) {
+    const words = resourceType
+      .replace(VIEW_CLASS_SUFFIX, '')
+      .replace(HOSPITAL_PREFIX, '')
+      .replace(CAMEL_BOUNDARY, '$1 $2')
+      .toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  return resourceType.replace(/_/g, ' ');
+}

@@ -1,8 +1,9 @@
 import type { Result } from '@/core/error/failure';
 
-import type { CashSummaryRow } from '@/features/payments/domain/entities/payments.entities';
+import type { CashSummary } from '@/features/payments/domain/entities/payments.entities';
 import { paymentsRepository } from '@/features/payments/infrastructure/repositories/payments.repository.impl';
 
-export function fetchCashSummary(date: string): Promise<Result<readonly CashSummaryRow[]>> {
+/** `date` `null` = the hospital's own today. */
+export function fetchCashSummary(date: string | null): Promise<Result<CashSummary>> {
   return paymentsRepository.getCashSummary(date);
 }

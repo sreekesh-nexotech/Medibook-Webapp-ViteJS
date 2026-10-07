@@ -1,3 +1,4 @@
+import { exportTruncation } from '@/core/api/blobResponses';
 import { hospitalApi } from '@/core/api/http';
 
 import type {
@@ -16,6 +17,7 @@ function filterParams(filters: AuditLogFilters): Record<string, string> {
   if (filters.dateTo) params.date_to = filters.dateTo;
   if (filters.actorUserId) params.actor_user_id = filters.actorUserId;
   if (filters.action) params.action = filters.action;
+  if (filters.resourceType) params.resource_type = filters.resourceType;
   if (filters.q) params.q = filters.q;
   return params;
 }
@@ -28,11 +30,17 @@ export async function getAuditLog(query: AuditLogPageQuery) {
   return auditLogPageResponseSchema.parse(response.data);
 }
 
-/** `GET /hospital/audit/log/export.csv` — same filters as the list, CSV body as text. */
-export async function getAuditLogCsv(filters: AuditLogFilters): Promise<string> {
+/**
+ * `GET /hospital/audit/log/export.csv` — same filters as the list, CSV body as
+ * text, plus what the headers say about rows left out at the cap (UAT-40).
+ */
+export async function getAuditLogCsv(filters: AuditLogFilters) {
   const response = await hospitalApi.get('/audit/log/export.csv', {
     params: filterParams(filters),
     responseType: 'text',
   });
-  return auditLogExportResponseSchema.parse(response.data);
+  return {
+    csv: auditLogExportResponseSchema.parse(response.data),
+    truncation: exportTruncation(response.headers),
+  };
 }

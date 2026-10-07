@@ -19,6 +19,13 @@ export interface AuditFieldChange {
   readonly after: string | null;
 }
 
+/** One top-level field of a row's `before`, `after` or `meta` snapshot, as display text. */
+export interface AuditSnapshotField {
+  readonly field: string;
+  /** `null` when the value was empty. */
+  readonly value: string | null;
+}
+
 /** One row of the hospital audit log. */
 export interface AuditLogEntry {
   readonly id: string;
@@ -39,6 +46,12 @@ export interface AuditLogEntry {
   readonly resourceType: string;
   readonly resourceId: string | null;
   readonly changes: readonly AuditFieldChange[];
+  /** The masked snapshot before the change (domain rows only). */
+  readonly before: readonly AuditSnapshotField[];
+  /** The masked snapshot after the change (domain rows only). */
+  readonly after: readonly AuditSnapshotField[];
+  /** Context the backend attached (e.g. the record's MRN). */
+  readonly meta: readonly AuditSnapshotField[];
   readonly statusCode: number;
 }
 
@@ -53,6 +66,8 @@ export interface AuditLogFilters {
   readonly actorUserId?: string;
   /** Exact action code, e.g. `http.delete`. */
   readonly action?: string;
+  /** Exact entity, e.g. `hospital_patient`. */
+  readonly resourceType?: string;
   /** Exact match on a request id, action, resource type, or a record / actor UUID. */
   readonly q?: string;
   readonly sort: AuditLogSort;
@@ -68,4 +83,7 @@ export interface AuditLogPageQuery extends AuditLogFilters {
 export interface AuditLogExport {
   readonly filename: string;
   readonly csv: string;
+  /** The backend stopped at its row cap (`X-Export-Truncated`, UAT-40). */
+  readonly isTruncated: boolean;
+  readonly rowLimit: number | null;
 }

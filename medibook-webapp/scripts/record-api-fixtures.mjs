@@ -148,6 +148,12 @@ const SPEC = [
     needs: (fx) => ({ id: first(fx, 'patients.hospitalPatientPageResponseSchema')?.id }),
   },
   {
+    key: 'patients.approvalRequestPageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/patient-approvals',
+    params: LIST,
+  },
+  {
     key: 'token-queue.sessionPageSchema',
     surface: 'hospital',
     path: '/hospital/sessions',
@@ -366,6 +372,18 @@ const SPEC = [
     key: 'settlements.statementPageResponseSchema',
     surface: 'hospital',
     path: '/hospital/statements',
+    params: LIST,
+  },
+  {
+    key: 'settlements.payoutPageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/settlements/payouts',
+    params: LIST,
+  },
+  {
+    key: 'settlements.creditNotePageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/billing/credit-notes',
     params: LIST,
   },
   { key: 'reports.reportCatalogResponseSchema', surface: 'hospital', path: '/hospital/reports' },

@@ -2,13 +2,18 @@ import { z } from 'zod';
 
 import { paginatedSchema } from '@/core/api/pagination';
 
-import type { AuditFieldChange, AuditLogEntry } from '@/features/audit/domain/entities/audit.log';
+import type {
+  AuditFieldChange,
+  AuditLogEntry,
+  AuditSnapshotField,
+} from '@/features/audit/domain/entities/audit.log';
 
 /**
  * `AuditLog` (`schema.yml`). `schema.yml` declares the list as a plain array,
  * but the view returns the standard page envelope (`core/pagination.py`), so
- * the page schema is what is validated. `before` / `after` / `diff` are
- * masked JSON; only `diff` (`{field: [old, new]}`) is shown.
+ * the page schema is what is validated. `before` / `after` / `diff` / `meta`
+ * are masked JSON: `diff` (`{field: [old, new]}`) fills the table, the
+ * snapshots and `meta` the detail drawer.
  */
 export const auditLogResponseSchema = z.object({
   id: z.string(),
@@ -44,6 +49,21 @@ function toDisplayValue(value: unknown): string | null {
   return JSON.stringify(value);
 }
 
+/**
+ * A snapshot's top-level fields as display text. An object lists its keys; a
+ * bare value is one unnamed field; nothing (or an empty object) is no field.
+ */
+export function toSnapshotFields(value: unknown): readonly AuditSnapshotField[] {
+  if (value === null || value === undefined) return [];
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return Object.entries(value as Record<string, unknown>).map(([field, v]) => ({
+      field,
+      value: toDisplayValue(v),
+    }));
+  }
+  return [{ field: 'value', value: toDisplayValue(value) }];
+}
+
 /** `diff` holds `[before, after]` pairs; anything else is ignored rather than guessed at. */
 function toChanges(diff: AuditLogResponse['diff']): readonly AuditFieldChange[] {
   if (!diff) return [];
@@ -70,6 +90,9 @@ export function toAuditLogEntry(dto: AuditLogResponse): AuditLogEntry {
     resourceType: dto.resource_type,
     resourceId: dto.resource_id,
     changes: toChanges(dto.diff),
+    before: toSnapshotFields(dto.before),
+    after: toSnapshotFields(dto.after),
+    meta: toSnapshotFields(dto.meta),
     statusCode: dto.status_code,
   };
 }

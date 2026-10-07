@@ -14,8 +14,11 @@ import { Spinner } from '@/shared/ui/Spinner';
 import { useReportExportFileQuery } from '@/features/reports/application/queries/useReportExportFileQuery';
 import { fileSizeCopy } from '@/features/reports/presentation/components/reportsFormat';
 
-/** The files API answers 404 for a file that is gone, expired or not this account's. */
+/** The files API answers 404 for a file that is gone or not this account's… */
 const NOT_FOUND_STATUS = 404;
+
+/** …and 410 for an export past its expiry (B7). */
+const GONE_STATUS = 410;
 
 const DOWNLOAD_FAILED = 'The download could not be started. Please try again.';
 
@@ -34,8 +37,10 @@ interface ReportDownloadScreenProps {
  * large export or a scheduled report is built in the background and emailed;
  * the email links here rather than to the file, because signed file links
  * live only 10 minutes. After the guard has checked the session, this reads
- * the file (`GET /shared/files/{id}`), starts the download with a freshly
- * signed link, and offers to download it again.
+ * the file (`GET /shared/files/{id}`), waits while it is still being built,
+ * starts the download with a freshly signed link once it is ready, and offers
+ * to download it again. A failed or expired export says so instead of
+ * claiming it is ready (UAT-67, 08 F17).
  */
 export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
   const { fileId = '' } = useParams();
@@ -45,9 +50,9 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
   const { mutate: startDownload } = download;
   const startedFor = useRef<string | null>(null);
 
-  // Download once per file as soon as it is confirmed (StrictMode runs effects twice).
+  // Download once per file as soon as it is ready (StrictMode runs effects twice).
   useEffect(() => {
-    if (!file.data || startedFor.current === file.data.id) return;
+    if (!file.data || file.data.status !== 'ready' || startedFor.current === file.data.id) return;
     startedFor.current = file.data.id;
     startDownload({ fileId: file.data.id, filename: file.data.name });
   }, [file.data, startDownload]);
@@ -62,20 +67,61 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
   if (file.isPending) {
     content = <Spinner size={32} label="Finding your report" />;
   } else if (file.isError) {
-    const gone = isFailure(file.error) && file.error.status === NOT_FOUND_STATUS;
-    content = gone ? (
+    const status = isFailure(file.error) ? file.error.status : null;
+    const gone = status === NOT_FOUND_STATUS;
+    content =
+      status === GONE_STATUS ? (
+        <ErrorState
+          icon="file-text"
+          title="This report has expired"
+          message="Exports are kept for 7 days. Export it again from Reports."
+        >
+          {home}
+        </ErrorState>
+      ) : gone ? (
+        <ErrorState
+          icon="file-text"
+          title="This download link is no longer valid"
+          message="The report may have expired or been removed, or it was prepared for a different account. Export it again from Reports."
+        >
+          {home}
+        </ErrorState>
+      ) : (
+        <ErrorState
+          title="Your report didn’t load"
+          message={isFailure(file.error) ? file.error.message : undefined}
+          onRetry={() => void file.refetch()}
+        >
+          {home}
+        </ErrorState>
+      );
+  } else if (file.data.status === 'pending') {
+    content = (
+      <Card pad={32} className="w-115 max-w-full text-center">
+        <div className="mb-4 flex justify-center">
+          <Spinner size={28} label="Preparing your report" />
+        </div>
+        <div className="text-h2 text-text-strong mb-2">Your report is being prepared</div>
+        <p className="text-body text-text-muted mb-5.5">
+          It downloads here as soon as it is ready. You can leave this page open.
+        </p>
+        <div className="flex justify-center">{home}</div>
+      </Card>
+    );
+  } else if (file.data.status === 'failed' || file.data.status === 'expired') {
+    content = (
       <ErrorState
         icon="file-text"
-        title="This download link is no longer valid"
-        message="The report may have expired or been removed, or it was prepared for a different account. Export it again from Reports."
-      >
-        {home}
-      </ErrorState>
-    ) : (
-      <ErrorState
-        title="Your report didn’t load"
-        message={isFailure(file.error) ? file.error.message : undefined}
-        onRetry={() => void file.refetch()}
+        title={
+          file.data.status === 'failed'
+            ? 'This report could not be prepared'
+            : 'This report has expired'
+        }
+        message={
+          file.data.status === 'failed'
+            ? 'Building the export failed. Export it again from Reports.'
+            : 'Exports are kept for 7 days. Export it again from Reports.'
+        }
       >
         {home}
       </ErrorState>

@@ -25,8 +25,7 @@ import { tdClass, TableShell } from '@/shared/ui/TableShell';
 import { toast } from '@/shared/ui/toast/toast.store';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import type { HospitalRole } from '@/app/router/paths';
-
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import { useDeactivateStaffMutation } from '@/features/users-roles/application/queries/useDeactivateStaffMutation';
 import { usePendingInvitationsQuery } from '@/features/users-roles/application/queries/usePendingInvitationsQuery';
 import { usePermissionModulesQuery } from '@/features/users-roles/application/queries/usePermissionModulesQuery';
@@ -34,7 +33,6 @@ import { useRolePreviewQuery } from '@/features/users-roles/application/queries/
 import { useStaffMembersQuery } from '@/features/users-roles/application/queries/useStaffMembersQuery';
 import { useStaffRolesQuery } from '@/features/users-roles/application/queries/useStaffRolesQuery';
 import { RBAC_MODULES, type PermsGrid } from '@/features/users-roles/application/store/rbac.types';
-import { defaultSignInAs } from '@/features/users-roles/presentation/components/access-preview';
 import { AddUserModal } from '@/features/users-roles/presentation/components/AddUserModal';
 import { ResetModal } from '@/features/users-roles/presentation/components/ResetModal';
 import { RoleAccessPreview } from '@/features/users-roles/presentation/components/RoleAccessPreview';
@@ -44,9 +42,11 @@ import { UsersRolesChangeRoleModal } from '@/features/users-roles/presentation/c
 import {
   failureText,
   invitationToRow,
+  isOwnRow,
   lastActiveLabel,
   modulesHeld,
   NO_VALUE,
+  previewExtraModules,
   previewToPermsGrid,
   staffToRow,
   toRoleView,
@@ -96,14 +96,18 @@ function roleHolders(users: readonly UserRow[], roleId: string): readonly UserRo
  * `GET /hospital/roles/{code}/preview` for the third tab.
  *
  * The third tab is the demonstrable half of audit 2.4 / X-01 / Q-03: pick any
- * role — including `Accountant` and `Department Front Desk`, which the topbar
- * role switcher cannot reach — and see the sidebar it gets, the actions it
- * holds and the screens it is refused, computed from the server's effective
- * access for the role and the same nav model the live sidebar uses.
+ * role and see the sidebar it gets, the actions it holds (the modules outside
+ * the grid included) and the screens it is refused, computed from the
+ * server's effective access for the role with the same permission-only gate
+ * the live sidebar and routes use (UAT-23).
+ *
+ * The signed-in user's own row offers no deactivate and no role change: the
+ * backend refuses both (BE-15, UAT-24).
  */
 export function UsersRolesScreen() {
   const canAddUser = useCan('Users & Roles.add');
   const now = useNow();
+  const myUserId = useSessionQuery('hospital').data?.user.id ?? null;
 
   const staffQuery = useStaffMembersQuery();
   const invitationsQuery = usePendingInvitationsQuery(canAddUser);
@@ -116,7 +120,9 @@ export function UsersRolesScreen() {
   const [tab, setTab] = useState<string>(TABS[0]);
   const [add, setAdd] = useState(false);
   const [roleEdit, setRoleEdit] = useState<RoleView | null>(null);
-  const [userView, setUserView] = useState<UserRow | null>(null);
+  // The open drawer follows the refreshed list by key, so it never shows a
+  // stale row after Resend, Unlock or an edit (08 F5).
+  const [userViewKey, setUserViewKey] = useState<string | null>(null);
   const [reset, setReset] = useState<UserRow | null>(null);
   const [deactivate, setDeactivate] = useState<UserRow | null>(null);
   const [roleChange, setRoleChange] = useState<UserRow | null>(null);
@@ -124,7 +130,6 @@ export function UsersRolesScreen() {
   const [roleFilter, setRoleFilter] = useState(ALL_ROLES);
   const [statusFilter, setStatusFilter] = useState(ALL_STATUS);
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null);
-  const [signInAs, setSignInAs] = useState<HospitalRole | null>(null);
 
   const roles: readonly RoleView[] = (rolesQuery.data ?? []).map(toRoleView);
   // Pending invitations first: they are the rows an administrator acts on next.
@@ -134,6 +139,7 @@ export function UsersRolesScreen() {
   ];
 
   const loading = staffQuery.isLoading || rolesQuery.isLoading || invitationsQuery.isLoading;
+  const userView = users.find((u) => u.key === userViewKey) ?? null;
 
   const refresh = async (): Promise<void> => {
     await Promise.all([
@@ -224,6 +230,7 @@ export function UsersRolesScreen() {
   const previewPerms: PermsGrid | null = previewQuery.data
     ? previewToPermsGrid(previewQuery.data.modules)
     : null;
+  const previewExtras = previewQuery.data ? previewExtraModules(previewQuery.data.modules) : [];
 
   const rolesError = rolesQuery.isError ? (
     <ErrorState
@@ -344,7 +351,7 @@ export function UsersRolesScreen() {
                 return (
                   <tr
                     key={u.key}
-                    onClick={() => setUserView(u)}
+                    onClick={() => setUserViewKey(u.key)}
                     className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
                   >
                     <td className={tdClass}>
@@ -389,9 +396,10 @@ export function UsersRolesScreen() {
                           box={34}
                           size={15}
                           title={`View ${u.name}`}
-                          onClick={() => setUserView(u)}
+                          onClick={() => setUserViewKey(u.key)}
                         />
-                        {u.kind === 'staff' && (
+                        {/* The backend sends reset links to active members only (08 F4). */}
+                        {u.kind === 'staff' && u.status === 'Active' && (
                           <Can perm="Users & Roles.edit" disableInstead>
                             <IconBtn
                               name="key-round"
@@ -419,7 +427,7 @@ export function UsersRolesScreen() {
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {roles.map((r) => {
-              const held = modulesHeld(r.permissionCodes);
+              const held = modulesHeld(r.permissionCodes, catalogue.length === 0);
               const count = roleHolders(users, r.id).length;
               return (
                 <Card key={r.id} pad={18} hover onClick={() => setRoleEdit(r)}>
@@ -456,9 +464,8 @@ export function UsersRolesScreen() {
             <div>
               <SectionTitle size={16}>View as role</SectionTitle>
               <div className="text-caption text-text-muted mt-1">
-                Pick any role in the grid — including ones the topbar switcher cannot sign in as —
-                and see exactly what it reaches. Driven by the same nav model and permission grid as
-                the live sidebar and route guards.
+                Pick any role and see exactly what it reaches. A screen opens when the role can view
+                its module — the same check the live sidebar and route guards make.
               </div>
             </div>
             <FilterSelect
@@ -467,7 +474,6 @@ export function UsersRolesScreen() {
               onChange={(name) => {
                 const next = roles.find((r) => r.name === name);
                 setPreviewRoleId(next?.id ?? '');
-                setSignInAs(null);
               }}
               aria-label="Preview access for this role"
             />
@@ -495,8 +501,7 @@ export function UsersRolesScreen() {
               roleName={previewRole.name}
               roleColor={previewRole.color}
               perms={previewPerms}
-              signInAs={signInAs ?? defaultSignInAs({ ...previewRole, perms: previewPerms })}
-              onSignInAsChange={setSignInAs}
+              extraModules={previewExtras}
             />
           )}
           <div className="border-border-soft mt-4 border-t pt-3">
@@ -521,17 +526,18 @@ export function UsersRolesScreen() {
         <UserDrawer
           user={userView}
           roles={roles}
-          onClose={() => setUserView(null)}
+          isSelf={isOwnRow(userView, myUserId)}
+          onClose={() => setUserViewKey(null)}
           onReset={(u) => {
-            setUserView(null);
+            setUserViewKey(null);
             setReset(u);
           }}
           onDeactivate={(u) => {
-            setUserView(null);
+            setUserViewKey(null);
             setDeactivate(u);
           }}
           onEditRole={(u) => {
-            setUserView(null);
+            setUserViewKey(null);
             setRoleChange(u);
           }}
         />
@@ -541,6 +547,7 @@ export function UsersRolesScreen() {
         <UsersRolesChangeRoleModal
           user={roleChange}
           roles={roles}
+          isSelf={isOwnRow(roleChange, myUserId)}
           onClose={() => setRoleChange(null)}
         />
       )}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import {
   hospitalAppointmentsPath,
+  hospitalPatientApprovalsPath,
   hospitalPath,
   isHospitalRole,
   type HospitalStaticView,
@@ -266,8 +267,8 @@ export function AdminDashboardScreen() {
       icon: 'users',
       iconClass: 'bg-p-100 text-p-500',
       t: `${plural(alerts.pendingPatientChanges, 'patient change')} to review`,
-      s: 'Patient record edits waiting for approval',
-      to: pathTo('patients'),
+      s: 'Desk edits and deletions waiting for an administrator',
+      to: hospitalPatientApprovalsPath(activeRole),
       perm: 'Patients.view',
     });
   }

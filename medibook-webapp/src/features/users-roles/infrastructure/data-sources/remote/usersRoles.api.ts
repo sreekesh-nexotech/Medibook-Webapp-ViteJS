@@ -7,6 +7,7 @@ import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
 import type { StaffRoleCode } from '@/features/users-roles/domain/entities/usersRoles.types';
 import type {
   InvitationCreateRequest,
+  RolePatchRequest,
   RolePermissionsPatchRequest,
   StaffRolePatchRequest,
 } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.request';
@@ -35,8 +36,12 @@ import {
  */
 const MAX_PAGES = 50;
 
-/** Invitations still waiting to be accepted (`InvitationStatusEnum`). */
-const PENDING_INVITATION_STATUS = 'invited';
+/**
+ * Invitations not yet accepted: links that still work (`invited`) and lapsed
+ * ones (`expired`, USR-01) — an administrator resends those (`status` takes
+ * several values, comma-separated).
+ */
+const PENDING_INVITATION_STATUSES = 'invited,expired';
 
 /** Staff actions mounted at `/staff/{id}/<action>` (`rbac/views/hospital_staff_action.py`). */
 type StaffAction = 'deactivate' | 'reactivate' | 'reset-password' | 'unlock';
@@ -69,7 +74,7 @@ export function getStaff(): Promise<StaffResponse[]> {
 
 export function getPendingInvitations(): Promise<InvitationResponse[]> {
   return getAllPages('/staff/invitations', invitationPageResponseSchema, {
-    status: PENDING_INVITATION_STATUS,
+    status: PENDING_INVITATION_STATUSES,
   });
 }
 
@@ -123,14 +128,29 @@ export function getRoles(): Promise<RoleResponse[]> {
   return getAllPages('/roles', rolePageResponseSchema);
 }
 
+/** `If-Match` is optional here (B2 honours it when sent). */
 export async function patchRolePermissions(
   roleCode: StaffRoleCode,
   body: RolePermissionsPatchRequest,
+  version: number | null,
 ): Promise<RoleResponse> {
   const response = await hospitalApi.patch(
     `/roles/${encodeURIComponent(roleCode)}/permissions`,
     body,
+    { headers: version === null ? undefined : ifMatch(version) },
   );
+  return roleResponseSchema.parse(response.data);
+}
+
+/** `PATCH /roles/{code}` `{description}` with a required `If-Match` (USR-02, admin only). */
+export async function patchRole(
+  roleCode: StaffRoleCode,
+  body: RolePatchRequest,
+  version: number,
+): Promise<RoleResponse> {
+  const response = await hospitalApi.patch(`/roles/${encodeURIComponent(roleCode)}`, body, {
+    headers: ifMatch(version),
+  });
   return roleResponseSchema.parse(response.data);
 }
 

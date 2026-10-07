@@ -15,6 +15,7 @@ import type {
   ManualEventCode,
   MessagingChannel,
   PatientChannel,
+  RecipientSource,
 } from '@/features/messaging/domain/entities/messaging.entities';
 
 /** Patient-facing events, in the order the template library lists them. */
@@ -76,6 +77,7 @@ export function patientChannelFromLabel(label: string): PatientChannel | null {
 
 const STATUS_LABELS: Readonly<Record<DeliveryStatus, string>> = {
   queued: 'Queued',
+  sending: 'Sending',
   sent: 'Sent',
   delivered: 'Delivered',
   failed: 'Failed',
@@ -86,6 +88,54 @@ const STATUS_LABELS: Readonly<Record<DeliveryStatus, string>> = {
 
 export function deliveryStatusLabel(status: DeliveryStatus): string {
   return STATUS_LABELS[status];
+}
+
+/**
+ * The badge palette per delivery status (UAT-65, 05 F26): waiting states
+ * blue/amber, delivered green, every way of not arriving red or grey — so a
+ * bounced or failed message never looks queued.
+ */
+const STATUS_BADGES: Readonly<Record<DeliveryStatus, string>> = {
+  queued: 'Queued',
+  sending: 'Pending',
+  sent: 'Sent',
+  delivered: 'Completed',
+  failed: 'Failed',
+  bounced: 'Failed',
+  suppressed: 'Inactive',
+  cancelled: 'Cancelled',
+};
+
+export function deliveryStatusBadge(status: DeliveryStatus): {
+  readonly status: string;
+  readonly label: string;
+} {
+  return { status: STATUS_BADGES[status], label: STATUS_LABELS[status] };
+}
+
+/** What a delivery's error code means to the desk (backend B7). */
+const ERROR_CODE_TEXT: Readonly<Record<string, string>> = {
+  OUTCOME_UNKNOWN: 'The provider did not confirm it; it is not sent again automatically.',
+  PROVIDER_UNAVAILABLE: 'The provider was unavailable; it will be retried.',
+  NO_RECIPIENT: 'The patient has no address on this channel.',
+  EMAIL_STAFF_ONLY: 'Patients are never emailed.',
+  UNKNOWN_CHANNEL: 'This channel is not available.',
+};
+
+/** A readable reason for an error code, or `null` when there is none to give. */
+export function deliveryErrorText(code: string | null): string | null {
+  return code ? (ERROR_CODE_TEXT[code] ?? null) : null;
+}
+
+const RECIPIENT_SOURCE_TEXT: Readonly<Record<RecipientSource, string>> = {
+  account: 'The phone on the booking’s Medibook account',
+  hospital_record: 'The phone on the hospital’s patient record',
+  devices: 'The patient’s Medibook app',
+  staff: 'A staff email address',
+};
+
+export function recipientSourceText(source: RecipientSource | null): string | null {
+  return source ? RECIPIENT_SOURCE_TEXT[source] : null;
 }
 
 /** Tokens the platform templates use beyond the desk's six. */
@@ -113,6 +163,18 @@ export function messagingSampleValues(): Readonly<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const p of MESSAGING_PLACEHOLDERS) out[p.token] = p.sample;
   return out;
+}
+
+/**
+ * An appointment time as the server writes it into a message
+ * (`strftime("%I:%M %p")`, e.g. "10:30 AM"), so the preview matches the SMS.
+ */
+export function templateTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 /** Local wall-clock time of an ISO date-time, e.g. "10:30 am". */

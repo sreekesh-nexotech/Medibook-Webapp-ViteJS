@@ -1,11 +1,11 @@
 import type { Result } from '@/core/error/failure';
 
-import type { PaymentRefund } from '@/features/payments/domain/entities/payments.entities';
+import type {
+  RefundListQuery,
+  RefundPage,
+} from '@/features/payments/domain/entities/payments.entities';
 import { paymentsRepository } from '@/features/payments/infrastructure/repositories/payments.repository.impl';
 
-export function fetchRefunds(
-  dateFrom: string,
-  dateTo: string,
-): Promise<Result<readonly PaymentRefund[]>> {
-  return paymentsRepository.listRefunds(dateFrom, dateTo);
+export function fetchRefunds(query: RefundListQuery): Promise<Result<RefundPage>> {
+  return paymentsRepository.listRefunds(query);
 }

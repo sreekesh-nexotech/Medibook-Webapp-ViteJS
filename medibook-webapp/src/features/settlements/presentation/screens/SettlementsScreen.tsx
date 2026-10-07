@@ -30,7 +30,12 @@ import type {
   SettlementPeriodFilters,
 } from '@/features/settlements/domain/entities/settlements.entities';
 import { PlanBilling } from '@/features/settlements/presentation/components/PlanBilling';
-import { SettlementPeriodDrawer } from '@/features/settlements/presentation/components/SettlementPeriodDrawer';
+import { SettlementPayoutsPanel } from '@/features/settlements/presentation/components/SettlementPayoutsPanel';
+import {
+  SettlementPeriodDrawer,
+  type PeriodRef,
+} from '@/features/settlements/presentation/components/SettlementPeriodDrawer';
+import { SettlementStatementsPanel } from '@/features/settlements/presentation/components/SettlementStatementsPanel';
 import {
   effectiveRate,
   fmtDateTime,
@@ -46,7 +51,10 @@ const PERCENT = 100;
 const PAISE_PER_RUPEE = 100;
 
 const TAB_SETTLEMENTS = 'Settlements';
+const TAB_STATEMENTS = 'Statements';
+const TAB_PAYOUTS = 'Payouts';
 const TAB_PLAN = 'Plan & Billing';
+const TABS = [TAB_SETTLEMENTS, TAB_STATEMENTS, TAB_PAYOUTS, TAB_PLAN] as const;
 
 /** Sort accessors for the settlement records table. */
 const ACC: SortAccessors<SettlementPeriod> = {
@@ -79,18 +87,20 @@ function sumNet(list: readonly SettlementPeriod[]): number {
 }
 
 /**
- * Billing & Settlements (admin) — the settlement ledger from
- * `GET /hospital/settlements/periods` plus the Plan & Billing tab.
+ * Billing & Settlements — the settlement ledger from
+ * `GET /hospital/settlements/periods`, the monthly statements, the payouts
+ * and the Plan & Billing tab.
  *
  * The hospital side of the ledger is read-only: Medibook closes periods and
  * releases payouts, and the hospital sees each period's breakdown, payout and
- * statement in the detail drawer. The date range is filtered on the server;
- * KPIs, search, sort, paging and the CSV work on the fetched window (the
- * latest 100 periods, about two years of weekly settlements).
+ * statements in the detail drawer. Periods only exist once closed (decision
+ * 11), so there is no "accruing" figure (UAT-63). The date range is filtered
+ * on the server; KPIs, search, sort, paging and the CSV work on the fetched
+ * window (the latest 100 periods, about two years of weekly settlements).
  */
 export function SettlementsScreen() {
   const [tab, setTab] = useState(TAB_SETTLEMENTS);
-  const [opened, setOpened] = useState<SettlementPeriod | null>(null);
+  const [opened, setOpened] = useState<PeriodRef | null>(null);
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -123,7 +133,7 @@ export function SettlementsScreen() {
   const total = sumNet(periods);
   const paid = sumNet(periods.filter((r) => r.status === 'paid'));
   const onHold = periods.filter((r) => r.status === 'on_hold');
-  const accruing = sumNet(periods.filter((r) => r.status === 'open'));
+  const awaiting = periods.filter((r) => r.status === 'closed');
   const windowNote = hasMore ? `latest ${periods.length} periods` : `${periods.length} periods`;
 
   const KPIS: readonly StatCardData[] = [
@@ -144,20 +154,20 @@ export function SettlementsScreen() {
       valueClass: 'text-g-600',
     },
     {
+      icon: 'clock',
+      label: 'Awaiting Payout',
+      value: rupees(sumNet(awaiting)),
+      sub: `${awaiting.length} closed period${awaiting.length === 1 ? '' : 's'}`,
+      iconClass: 'bg-y-100 text-y-600',
+      valueClass: 'text-y-600',
+    },
+    {
       icon: 'triangle-alert',
       label: 'On Hold',
       value: rupees(sumNet(onHold)),
       sub: `${onHold.length} period${onHold.length === 1 ? '' : 's'}`,
       iconClass: 'bg-d-100 text-d-500',
       valueClass: 'text-d-500',
-    },
-    {
-      icon: 'clock',
-      label: 'Current Period (Accruing)',
-      value: rupees(accruing),
-      sub: 'net so far, paid out after the period closes',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
     },
   ];
 
@@ -236,7 +246,7 @@ export function SettlementsScreen() {
   return (
     <div className="flex flex-col gap-5">
       <Card pad={16} className="flex flex-wrap items-center justify-between gap-3">
-        <SegTabs tabs={[TAB_SETTLEMENTS, TAB_PLAN]} value={tab} onChange={setTab} />
+        <SegTabs tabs={TABS} value={tab} onChange={setTab} />
         {tab === TAB_SETTLEMENTS && (
           <div className="flex items-center gap-2.5">
             <RefreshBtn onRefresh={refresh} title="Refresh settlements" />
@@ -254,6 +264,10 @@ export function SettlementsScreen() {
 
       {tab === TAB_PLAN ? (
         <PlanBilling />
+      ) : tab === TAB_STATEMENTS ? (
+        <SettlementStatementsPanel />
+      ) : tab === TAB_PAYOUTS ? (
+        <SettlementPayoutsPanel onOpenPeriod={setOpened} />
       ) : (
         <>
           {periodsQuery.isPending ? (
@@ -297,7 +311,7 @@ export function SettlementsScreen() {
             )}
             <span className="flex-1" />
             <div className="text-caption text-text-muted flex items-center gap-1.75">
-              <InfoDot text="Medibook collects online booking fees upfront, deducts refunds, gateway fees and its platform commission, and transfers the net to your bank account after each period closes. Open a period to see the full breakdown, the payout and its transfer reference." />{' '}
+              <InfoDot text="Medibook collects online booking fees upfront, deducts refunds, gateway fees and its platform commission, and transfers the net to your bank account once a period is closed. Open a period to see the full breakdown, the payout, its transfer reference and the monthly statements it appears in." />{' '}
               Commission shown as charged on each period
             </div>
           </Card>

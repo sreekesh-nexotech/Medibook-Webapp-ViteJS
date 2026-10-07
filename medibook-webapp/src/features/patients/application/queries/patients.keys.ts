@@ -1,4 +1,7 @@
-import type { PatientListParams } from '@/features/patients/domain/entities/patients.entities';
+import type {
+  PatientApprovalListParams,
+  PatientListParams,
+} from '@/features/patients/domain/entities/patients.entities';
 
 /** Query keys for the patients feature (standards §4 — no inline key arrays). */
 export const patientsKeys = {
@@ -9,4 +12,7 @@ export const patientsKeys = {
   visitCount: (id: string) => [...patientsKeys.all, 'visit-count', id] as const,
   appointments: (id: string, limit: number) =>
     [...patientsKeys.all, 'appointments', id, limit] as const,
+  approvals: () => [...patientsKeys.all, 'approvals'] as const,
+  approvalPage: (params: PatientApprovalListParams) =>
+    [...patientsKeys.approvals(), params] as const,
 };

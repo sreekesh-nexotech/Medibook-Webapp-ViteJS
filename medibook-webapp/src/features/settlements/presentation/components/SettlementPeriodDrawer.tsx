@@ -1,39 +1,42 @@
 import type { ReactNode } from 'react';
 
 import { isFailure } from '@/core/error/failure';
-import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
-import { Button } from '@/shared/ui/Button';
 import { Drawer } from '@/shared/ui/Drawer';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonLine } from '@/shared/ui/Skeleton';
-import { toast } from '@/shared/ui/toast/toast.store';
 
-import { usePeriodStatementQuery } from '@/features/settlements/application/queries/usePeriodStatementQuery';
 import { useSettlementPeriodQuery } from '@/features/settlements/application/queries/useSettlementPeriodQuery';
-import { useStatementPdfMutation } from '@/features/settlements/application/queries/useStatementPdfMutation';
+import { useStatementForDateQuery } from '@/features/settlements/application/queries/useStatementForDateQuery';
 import type {
   SettlementPeriod,
-  SettlementStatement,
+  SettlementPeriodDetail,
+  StatementRef,
 } from '@/features/settlements/domain/entities/settlements.entities';
+import { StatementDownloadButton } from '@/features/settlements/presentation/components/StatementDownloadButton';
 import {
-  downloadBlob,
   effectiveRate,
   fmtDateTime,
   PAYOUT_STATUS,
   PERIOD_STATUS,
+  periodCheck,
   periodLabel,
   rupees,
+  statementSpan,
 } from '@/features/settlements/presentation/components/settlementsFormat';
 
 const DRAWER_WIDTH = 480;
 const SKELETON_LINES = 8;
 
+/** What opening a period needs: the row from the periods list, or a payout's period. */
+export type PeriodRef = Pick<SettlementPeriod, 'id' | 'periodStart' | 'periodEnd'> &
+  Partial<Pick<SettlementPeriod, 'status'>>;
+
 interface SettlementPeriodDrawerProps {
-  /** The row that was opened; `null` closes the drawer. */
-  period: SettlementPeriod | null;
+  /** The period that was opened; `null` closes the drawer. */
+  period: PeriodRef | null;
   onClose: () => void;
 }
 
@@ -58,35 +61,57 @@ function minus(paise: number): string {
   return paise === 0 ? rupees(0) : `− ${rupees(Math.abs(paise))}`;
 }
 
-/** Stored statement PDF via the shared files API, else rendered on demand. */
-function StatementButton({ statement }: { statement: SettlementStatement }) {
-  const storedDownload = useFileDownloadMutation();
-  const rendered = useStatementPdfMutation();
-  const filename = `${statement.statementNo}.pdf`;
+/** A signed amount: "+ ₹100" / "− ₹100". */
+function signed(paise: number): string {
+  return paise < 0 ? minus(paise) : `+ ${rupees(paise)}`;
+}
 
-  const onError = (failure: unknown): void =>
-    toast(isFailure(failure) ? failure.message : 'Could not download the statement.', 'error');
+/**
+ * The statements a period appears in (UAT-29). Statements are monthly and
+ * periods are custom windows, so the server links every month the period
+ * overlaps (backend B4); an older server is asked for the month containing
+ * the period's start instead.
+ */
+function PeriodStatements({ detail }: { detail: SettlementPeriodDetail | undefined }) {
+  const needsLookup = detail !== undefined && detail.statements === null;
+  const lookup = useStatementForDateQuery(needsLookup ? detail.periodStart : null);
 
-  const handleDownload = (): void => {
-    if (statement.pdfFileId) {
-      storedDownload.mutate({ fileId: statement.pdfFileId, filename }, { onError });
-      return;
-    }
-    rendered.mutate(statement.id, {
-      onSuccess: (blob) => downloadBlob(blob, filename),
-      onError,
-    });
-  };
+  let statements: readonly StatementRef[] = [];
+  let pdfFileId: string | null = null;
+  if (detail?.statements) statements = detail.statements;
+  else if (lookup.data) {
+    statements = [lookup.data];
+    pdfFileId = lookup.data.pdfFileId;
+  }
+
+  if (statements.length === 0) {
+    let copy = 'No statement has been issued for this period’s month yet.';
+    if (detail === undefined || (needsLookup && lookup.isPending))
+      copy = 'Looking for the statement…';
+    else if (needsLookup && lookup.isError) copy = 'The statement could not be looked up.';
+    return <span className="text-caption text-text-muted">{copy}</span>;
+  }
 
   return (
-    <Button
-      variant="secondary"
-      icon="file-down"
-      onClick={handleDownload}
-      busy={storedDownload.isPending || rendered.isPending}
-    >
-      Statement {statement.statementNo} · {periodLabel(statement.periodStart, statement.periodEnd)}
-    </Button>
+    <div className="flex flex-col gap-2">
+      {statements.length > 1 && (
+        <span className="text-caption text-text-muted">
+          Statements are monthly — this period falls in {statements.length} of them.
+        </span>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {statements.map((st) => (
+          <StatementDownloadButton
+            key={st.id}
+            statementId={st.id}
+            statementNo={st.statementNo}
+            pdfFileId={pdfFileId}
+          >
+            Statement {st.statementNo} · {statementSpan(st)}
+          </StatementDownloadButton>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -96,9 +121,14 @@ function StatementButton({ statement }: { statement: SettlementStatement }) {
  */
 export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDrawerProps) {
   const detailQuery = useSettlementPeriodQuery(period?.id ?? null);
-  const statementQuery = usePeriodStatementQuery(period?.periodStart ?? null);
   const detail = detailQuery.data;
-  const statement = statementQuery.data ?? null;
+  const status = detail?.status ?? period?.status ?? null;
+  // A payout row may not carry its period's dates; the detail always does.
+  const span = detail ?? period;
+  const drawerTitle =
+    span && span.periodStart && span.periodEnd
+      ? periodLabel(span.periodStart, span.periodEnd)
+      : 'Settlement period';
 
   let body: ReactNode;
   if (detailQuery.isPending) {
@@ -121,9 +151,9 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
   } else {
     const payout = detail.payout;
     const b = detail.breakdown;
-    // The ledger's own total plus any adjustments should equal the net
-    // payable; when it does not, say so (BACKEND_BLOCKERS SET-01).
-    const ledgerGap = detail.netPayablePaise - (b.ledgerNetPaise + detail.adjustmentsPaise);
+    // The ledger's own total plus adjustments less TDS should equal the net
+    // payable; when it does not, say so (SET-01).
+    const check = periodCheck(detail);
     body = (
       <div className="flex flex-col gap-5">
         <section>
@@ -150,21 +180,31 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
           {b.convenienceFeeGstPaise !== 0 && (
             <Line label="GST on convenience fees" value={minus(b.convenienceFeeGstPaise)} />
           )}
-          {detail.tdsPaise !== 0 && <Line label="TDS" value={minus(detail.tdsPaise)} />}
-          {detail.adjustmentsPaise !== 0 && (
-            <Line label="Adjustments" value={rupees(detail.adjustmentsPaise)} />
+          {b.carriedAdjustmentsPaise !== 0 && (
+            <Line
+              label="Adjustments carried from a paid period"
+              value={signed(b.carriedAdjustmentsPaise)}
+            />
           )}
+          {detail.adjustmentsPaise !== 0 && (
+            <Line label="Adjustments" value={signed(detail.adjustmentsPaise)} />
+          )}
+          {detail.tdsPaise !== 0 && <Line label="TDS" value={minus(detail.tdsPaise)} />}
           <div className="border-border-soft mt-1.5 border-t pt-1.5">
             <Line label="Net payable" value={rupees(detail.netPayablePaise)} strong />
           </div>
-          {ledgerGap !== 0 && (
+          {!check.reconciled && (
             <p className="text-caption text-d-700 m-0 mt-1.5">
-              Medibook&apos;s ledger for this period adds up to {rupees(b.ledgerNetPaise)}
-              {detail.adjustmentsPaise !== 0
-                ? ` plus ${rupees(detail.adjustmentsPaise)} of adjustments`
-                : ''}
-              , {rupees(Math.abs(ledgerGap))} {ledgerGap > 0 ? 'less' : 'more'} than the net
-              payable. Ask Medibook to explain the difference before the payout.
+              Medibook&apos;s ledger for this period, with adjustments and TDS, adds up to{' '}
+              {rupees(check.expectedNetPaise)} — {rupees(Math.abs(check.differencePaise))}{' '}
+              {check.differencePaise > 0 ? 'less' : 'more'} than the net payable. Ask Medibook to
+              explain the difference before the payout.
+            </p>
+          )}
+          {b.lateEntries > 0 && (
+            <p className="text-caption text-text-muted m-0 mt-1.5">
+              Includes {b.lateEntries} ledger entr{b.lateEntries === 1 ? 'y' : 'ies'} recorded after
+              an earlier period closed; they settle here instead.
             </p>
           )}
         </section>
@@ -175,11 +215,18 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
               Adjustments by Medibook
             </SectionTitle>
             {detail.adjustments.map((a) => (
-              <Line
-                key={a.id}
-                label={`${a.reason} · ${fmtDateTime(a.createdAt)}`}
-                value={rupees(a.amountPaise)}
-              />
+              <div key={a.id}>
+                <Line
+                  label={`${a.reason} · ${fmtDateTime(a.createdAt)}`}
+                  value={signed(a.amountPaise)}
+                />
+                {a.carriedForward && (
+                  <p className="text-caption text-text-muted m-0 mb-1">
+                    Made after this period was paid — it settles in your next period, not in this
+                    one&apos;s net.
+                  </p>
+                )}
+              </div>
             ))}
           </section>
         )}
@@ -216,9 +263,8 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
             </>
           ) : (
             <p className="text-body text-text-muted m-0">
-              {detail.status === 'open'
-                ? 'This period is still accruing. Medibook creates the payout once it closes.'
-                : 'No payout has been created for this period yet.'}
+              No payout has been created for this period yet. Medibook adds it to its next payout
+              run.
             </p>
           )}
         </section>
@@ -231,27 +277,13 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
       open={period !== null}
       onClose={onClose}
       width={DRAWER_WIDTH}
-      title={period ? periodLabel(period.periodStart, period.periodEnd) : ''}
+      title={drawerTitle}
       subtitle={
-        period ? (
-          <Badge status={PERIOD_STATUS[period.status].badge}>
-            {PERIOD_STATUS[period.status].label}
-          </Badge>
+        status ? (
+          <Badge status={PERIOD_STATUS[status].badge}>{PERIOD_STATUS[status].label}</Badge>
         ) : undefined
       }
-      footer={
-        statement ? (
-          <StatementButton statement={statement} />
-        ) : (
-          <span className="text-caption text-text-muted">
-            {statementQuery.isPending
-              ? 'Looking for the statement…'
-              : statementQuery.isError
-                ? 'The statement could not be looked up.'
-                : 'No statement has been issued for this period yet.'}
-          </span>
-        )
-      }
+      footer={detailQuery.isError ? undefined : <PeriodStatements detail={detail} />}
     >
       {body}
     </Drawer>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { dateRange } from '@/shared/lib/validate';
@@ -16,8 +15,6 @@ import { StatCard } from '@/shared/ui/StatCard';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
-import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
   ReportExportFormat,
   ReportParams,
@@ -30,8 +27,9 @@ import { CAT_ICON_CLASS, REPORT_PAGE_SIZE } from '../reports.data';
 import type { ReportCatalogItem } from '../reports.design';
 
 import { ReportDataTable } from './ReportDataTable';
-import { ReportFilterBar } from './ReportFilterBar';
-import { kpiTile } from './reportsFormat';
+import { ReportFilterControls } from './ReportFilterControls';
+import { ReportQueuedExport } from './ReportQueuedExport';
+import { kpiTile, reportFailureText } from './reportsFormat';
 import { saveBlob } from './reportsDownload';
 
 const EXPORT_FAILED = 'Could not export the report. Please try again.';
@@ -43,6 +41,24 @@ const FORMAT_LABEL: Readonly<Record<ReportExportFormat, string>> = {
   xlsx: 'Excel',
   pdf: 'PDF',
 };
+
+/** The exports offered, in order; each also needs the report's own `formats` to list it. */
+const EXPORT_BUTTONS: readonly {
+  readonly format: ReportExportFormat;
+  readonly label: string;
+  readonly icon: 'download' | 'printer';
+}[] = [
+  { format: 'csv', label: 'Export CSV', icon: 'download' },
+  { format: 'xlsx', label: 'Export Excel', icon: 'download' },
+  { format: 'pdf', label: 'Save as PDF', icon: 'printer' },
+];
+
+/** An export the server is building in the background. */
+interface QueuedExport {
+  readonly exportId: string;
+  readonly format: ReportExportFormat;
+  readonly rows: number | null;
+}
 
 interface ReportViewProps {
   report: ReportCatalogItem;
@@ -63,9 +79,7 @@ export function ReportView({ report }: ReportViewProps) {
   const [page, setPage] = useState(0);
   const { sort, onSort } = useSort<never>();
   const exporter = useReportExportMutation();
-
-  const departments = useDepartmentsQuery();
-  const doctors = useDoctorsQuery();
+  const [queued, setQueued] = useState<readonly QueuedExport[]>([]);
 
   // An open-ended range is fine (the server treats it as "since" / "until");
   // only a reversed one is refused, here rather than as a 400.
@@ -112,13 +126,18 @@ export function ReportView({ report }: ReportViewProps) {
             saveBlob(out.file, out.filename);
             toast(`Exported the ${report.title.toLowerCase()} as ${FORMAT_LABEL[format]}`);
           } else {
+            // Kept on screen and followed to completion; the email is a backup.
+            setQueued((list) => [
+              { exportId: out.exportId, format, rows: out.rows },
+              ...list.filter((q) => q.exportId !== out.exportId),
+            ]);
             toast(
-              `This export has ${out.rows.toLocaleString('en-IN')} rows — it is being prepared and the link will be emailed to you.`,
+              'This export is large — it is being prepared below, and the link will also be emailed to you.',
               'info',
             );
           }
         },
-        onError: (failure) => toast(isFailure(failure) ? failure.message : EXPORT_FAILED, 'error'),
+        onError: (failure) => toast(reportFailureText(failure, EXPORT_FAILED), 'error'),
       },
     );
   };
@@ -137,7 +156,7 @@ export function ReportView({ report }: ReportViewProps) {
     : result.isError && !data
       ? {
           kind: 'error',
-          message: isFailure(result.error) ? result.error.message : REPORT_FAILED,
+          message: reportFailureText(result.error, REPORT_FAILED),
           onRetry: () => void result.refetch(),
         }
       : !data || result.isPlaceholderData
@@ -175,32 +194,41 @@ export function ReportView({ report }: ReportViewProps) {
           <SectionTitle size={18}>{report.title}</SectionTitle>
           <div className="text-caption text-text-muted mt-0.5">{report.brief}</div>
         </div>
-        <span
-          title={
-            canExport
-              ? `Export all ${total} ${report.noun} that match the filters`
-              : 'There are no rows to export — widen the filters first'
-          }
-        >
-          <Button
-            variant="secondary"
-            icon="download"
-            onClick={() => runExport('csv')}
-            busy={exporting === 'csv'}
-            disabled={!canExport || exporter.isPending}
+        {EXPORT_BUTTONS.filter((b) => definition.formats.includes(b.format)).map((b) => (
+          <span
+            key={b.format}
+            title={
+              canExport
+                ? `Export all ${total} ${report.noun} that match the filters`
+                : 'There are no rows to export — widen the filters first'
+            }
           >
-            Export CSV
-          </Button>
-        </span>
-        <Button
-          icon="printer"
-          onClick={() => runExport('pdf')}
-          busy={exporting === 'pdf'}
-          disabled={!canExport || exporter.isPending}
-        >
-          Save as PDF
-        </Button>
+            <Button
+              variant={b.format === 'pdf' ? 'primary' : 'secondary'}
+              icon={b.icon}
+              onClick={() => runExport(b.format)}
+              busy={exporting === b.format}
+              disabled={!canExport || exporter.isPending}
+            >
+              {b.label}
+            </Button>
+          </span>
+        ))}
       </Card>
+
+      {queued.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {queued.map((q) => (
+            <ReportQueuedExport
+              key={q.exportId}
+              exportId={q.exportId}
+              format={q.format}
+              rows={q.rows}
+              onDismiss={() => setQueued((list) => list.filter((x) => x.exportId !== q.exportId))}
+            />
+          ))}
+        </div>
+      )}
 
       {/* filters — exactly the controls this report's definition lists */}
       <Card pad={16} className="flex flex-col gap-2">
@@ -211,13 +239,7 @@ export function ReportView({ report }: ReportViewProps) {
             }}
             title={`Refresh the ${report.title.toLowerCase()}`}
           />
-          <ReportFilterBar
-            filters={definition.filters}
-            params={params}
-            onChange={patch}
-            departments={departments.data ?? []}
-            doctors={doctors.data ?? []}
-          />
+          <ReportFilterControls filters={definition.filters} params={params} onChange={patch} />
           {isFiltered && (
             <button
               type="button"
@@ -259,7 +281,7 @@ export function ReportView({ report }: ReportViewProps) {
         {result.isError && data ? (
           <ErrorState
             inline
-            message={isFailure(result.error) ? result.error.message : REPORT_FAILED}
+            message={reportFailureText(result.error, REPORT_FAILED)}
             onRetry={() => void result.refetch()}
           />
         ) : (

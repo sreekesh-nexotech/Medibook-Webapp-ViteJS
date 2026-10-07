@@ -5,8 +5,9 @@ import { unwrap } from '@/core/error/failure';
 import { fetchStatementPdf } from '@/features/settlements/application/usecases/fetchStatementPdf';
 
 /**
- * Render a statement PDF on demand (statements with no stored file). A read,
- * so nothing to invalidate; a mutation because the user triggers a one-off file.
+ * A statement's PDF — a signed link, or the file from an older server. A
+ * read, so nothing to invalidate; a mutation because each link is short-lived
+ * and must never be served from cache.
  */
 export function useStatementPdfMutation() {
   return useMutation({

@@ -26,11 +26,15 @@ import { useSessionQuery } from '@/features/auth/application/queries/useSessionQ
 import { useAuditExportMutation } from '@/features/audit/application/queries/useAuditExportMutation';
 import { useAuditLogQuery } from '@/features/audit/application/queries/useAuditLogQuery';
 import type { AuditLogEntry, AuditLogFilters } from '@/features/audit/domain/entities/audit.log';
+import { AuditDetailDrawer } from '@/features/audit/presentation/components/AuditDetailDrawer';
 import {
   AUDIT_ACTION_OPTIONS,
+  AUDIT_ENTITY_OPTIONS,
   actionCodeFor,
   actionLabel,
   actorLabel,
+  entityCodeFor,
+  entityLabel,
   localStamp,
   methodTint,
   shortId,
@@ -50,9 +54,15 @@ const MAX_CHANGES_SHOWN = 3;
 const CSV_MIME = 'text/csv;charset=utf-8';
 
 /** Filter sentinels — one per dropdown, so "all" is never a real value. */
-const ANY_ACTOR = 'Actor: All';
+const ANY_ACTOR = 'Actor: All staff';
 const ONLY_ME = 'Actor: Only me';
 const ANY_ACTION = 'Action: All';
+const ENTITY_PREFIX = 'Entity: ';
+const ANY_ENTITY = `${ENTITY_PREFIX}All`;
+const ENTITY_FILTER_OPTIONS: readonly string[] = [
+  ANY_ENTITY,
+  ...AUDIT_ENTITY_OPTIONS.map((o) => `${ENTITY_PREFIX}${o.label}`),
+];
 
 const DATE_INPUT_CLASS =
   'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
@@ -103,8 +113,10 @@ export function AuditTrailScreen() {
   const mayView = can('Hospital Settings.view');
   const { data: session } = useSessionQuery('hospital');
   const myUserId = session?.user.id ?? null;
-  // Staff directory (H12) to name actors; rows fall back to a short id without it.
-  const staff = useStaffMembersQuery();
+  // Staff directory (H12) to name actors and fill the actor picker. It needs
+  // Users & Roles.view; without it rows fall back to a short id (05 F18).
+  const mayReadStaff = can('Users & Roles.view');
+  const staff = useStaffMembersQuery(mayView && mayReadStaff);
   const staffNames = useMemo(
     () =>
       new Map(
@@ -115,11 +127,25 @@ export function AuditTrailScreen() {
       ),
     [staff.data],
   );
+  // Actor picker label → user id: every staff member, by name (UAT-66).
+  const actorOptions = useMemo(() => {
+    const byLabel = new Map<string, string>();
+    for (const m of staff.data ?? []) {
+      const name = [m.firstName, m.lastName].filter(Boolean).join(' ');
+      const label = byLabel.has(`Actor: ${name}`)
+        ? `Actor: ${name} (${m.email ?? shortId(m.userId)})`
+        : `Actor: ${name}`;
+      byLabel.set(label, m.userId);
+    }
+    return byLabel;
+  }, [staff.data]);
 
   const [qDraft, setQDraft] = useState('');
   const [q, setQ] = useState('');
   const [actor, setActor] = useState(ANY_ACTOR);
   const [action, setAction] = useState(ANY_ACTION);
+  const [entity, setEntity] = useState(ANY_ENTITY);
+  const [opened, setOpened] = useState<AuditLogEntry | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
@@ -129,8 +155,9 @@ export function AuditTrailScreen() {
   const filters: AuditLogFilters = {
     dateFrom: from || undefined,
     dateTo: to || undefined,
-    actorUserId: actor === ONLY_ME && myUserId ? myUserId : undefined,
+    actorUserId: actor === ONLY_ME && myUserId ? myUserId : actorOptions.get(actor),
     action: actionCodeFor(action),
+    resourceType: entityCodeFor(entity.slice(ENTITY_PREFIX.length)),
     q: q || undefined,
     sort: sort.dir === 'desc' ? '-occurred_at' : 'occurred_at',
   };
@@ -142,7 +169,12 @@ export function AuditTrailScreen() {
   const exportMutation = useAuditExportMutation();
 
   const hasFilters =
-    q !== '' || actor !== ANY_ACTOR || action !== ANY_ACTION || from !== '' || to !== '';
+    q !== '' ||
+    actor !== ANY_ACTOR ||
+    action !== ANY_ACTION ||
+    entity !== ANY_ENTITY ||
+    from !== '' ||
+    to !== '';
 
   const onFilterChange = (apply: () => void): void => {
     apply();
@@ -167,6 +199,7 @@ export function AuditTrailScreen() {
     setQ('');
     setActor(ANY_ACTOR);
     setAction(ANY_ACTION);
+    setEntity(ANY_ENTITY);
     setFrom('');
     setTo('');
     setPage(0);
@@ -180,6 +213,15 @@ export function AuditTrailScreen() {
     exportMutation.mutate(filters, {
       onSuccess: (file) => {
         downloadTextFile(file.filename, file.csv, CSV_MIME);
+        if (file.isTruncated) {
+          toast(
+            `Exported, but the server stopped at ${
+              file.rowLimit ? file.rowLimit.toLocaleString('en-IN') : 'its row limit'
+            } rows. Narrow the dates or filters to export the rest.`,
+            'info',
+          );
+          return;
+        }
         toast('Audit log exported as CSV', 'success');
       },
       onError: (failure) =>
@@ -254,9 +296,15 @@ export function AuditTrailScreen() {
           <RefreshBtn onRefresh={refresh} title="Refresh the audit trail" />
           <FilterSelect
             value={actor}
-            options={[ANY_ACTOR, ONLY_ME]}
+            options={[ANY_ACTOR, ONLY_ME, ...actorOptions.keys()]}
             onChange={(v) => onFilterChange(() => setActor(v))}
             aria-label="Filter by actor"
+          />
+          <FilterSelect
+            value={entity}
+            options={ENTITY_FILTER_OPTIONS}
+            onChange={(v) => onFilterChange(() => setEntity(v))}
+            aria-label="Filter by entity"
           />
           <FilterSelect
             value={action}
@@ -307,7 +355,11 @@ export function AuditTrailScreen() {
             const who = actorLabel(e, myUserId, staffNames);
             const stamp = localStamp(e.occurredAt);
             return (
-              <tr key={e.id}>
+              <tr
+                key={e.id}
+                onClick={() => setOpened(e)}
+                className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+              >
                 <td className={cn(tdClass, 'max-w-85')}>
                   <OpsEntity
                     icon="scroll-text"
@@ -322,7 +374,12 @@ export function AuditTrailScreen() {
                     <span className="text-caption text-text-muted">{who.sub}</span>
                   </div>
                 </td>
-                <td className={cn(tdClass, 'break-all')}>{e.resourceType}</td>
+                <td className={cn(tdClass, 'break-all')}>
+                  {entityLabel(e.resourceType)}
+                  {e.resourceId && (
+                    <div className="text-caption text-text-muted">{shortId(e.resourceId)}</div>
+                  )}
+                </td>
                 <td className={cn(tdClass, 'max-w-75')}>
                   <ChangesCell entry={e} />
                 </td>
@@ -350,6 +407,11 @@ export function AuditTrailScreen() {
           noun="log entries"
         />
       </Card>
+      <AuditDetailDrawer
+        entry={opened}
+        actor={opened ? actorLabel(opened, myUserId, staffNames) : null}
+        onClose={() => setOpened(null)}
+      />
     </div>
   );
 }
