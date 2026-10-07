@@ -10,6 +10,9 @@ import { isFailure } from '@/core/error/failure';
 import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
 import { useRemarkMutation } from '@/features/appointments/application/queries/appointments.mutations';
 
+/** The backend's limit on a desk remark (`HospitalAppointmentPatchSerializer`). */
+const REMARK_MAX = 2000;
+
 interface AppointmentRemarkModalProps {
   /** `null` = closed. */
   appt: DeskAppointment | null;
@@ -69,6 +72,7 @@ function RemarkForm({ appt, onClose }: { appt: DeskAppointment; onClose: () => v
           <textarea
             id={field.id}
             value={remark}
+            maxLength={REMARK_MAX}
             onChange={(e) => setRemark(e.target.value)}
             className="rounded-input border-border text-body text-text-strong box-border h-24 w-full resize-none border p-3"
           />

@@ -8,7 +8,9 @@ import type {
   DeskAppointment,
   DeskReceipt,
   DeskRefund,
+  FeeQuote,
   PaymentLineInput,
+  QuoteInput,
   RefundOutcome,
   TokenSlipData,
   WalkInInput,
@@ -29,6 +31,11 @@ export interface AppointmentsRepository {
   count(params: AppointmentListParams): Promise<Result<number>>;
   get(id: string): Promise<Result<DeskAppointment>>;
   events(id: string): Promise<Result<readonly AppointmentEvent[]>>;
+  /**
+   * The real fee of a walk-in before booking (APPT-05) — follow-up pricing,
+   * service, tax. `null` when the backend has no quote endpoint yet.
+   */
+  quote(input: QuoteInput): Promise<Result<FeeQuote | null>>;
   /** Book one or more walk-in consultations (each on an open slot). */
   createWalkIn(input: WalkInInput, idempotencyKey: string): Promise<Result<WalkInResult>>;
   updateRemark(id: string, remark: string, version: number): Promise<Result<DeskAppointment>>;

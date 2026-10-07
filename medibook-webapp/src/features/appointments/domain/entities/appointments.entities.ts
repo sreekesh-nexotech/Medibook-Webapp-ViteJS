@@ -15,11 +15,12 @@ export type ApptStatus =
   | 'no_show';
 
 /**
- * `not_required` is new (BE-07, UAT-12): a ₹0 walk-in has nothing to collect.
- * An older backend leaves such a booking `unpaid` — read `isNothingDue`.
+ * `not_required` (BE-07, UAT-12): a ₹0 walk-in has nothing to collect — an
+ * older backend leaves it `unpaid`, so read `isNothingDue`. `cancelled`
+ * (APPT-02): cancelled or expired before any money was taken.
  */
 export type ApptPaymentStatus =
-  'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed' | 'not_required';
+  'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed' | 'not_required' | 'cancelled';
 
 export type ApptSource = 'online' | 'walk_in';
 
@@ -126,8 +127,12 @@ export interface DeskReceipt {
   readonly hasPdf: boolean;
 }
 
-/** Refund lifecycle (`Refund.Status`): a gateway refund stays `requested` until confirmed. */
-export type RefundStatus = 'requested' | 'processing' | 'processed' | 'failed';
+/**
+ * Refund lifecycle (`Refund.Status`): a gateway refund is `requested` /
+ * `processing` until confirmed; `superseded` is a failed row replaced by a
+ * later refund of the same line.
+ */
+export type RefundStatus = 'requested' | 'processing' | 'processed' | 'failed' | 'superseded';
 
 /** One refund row — one per payment line, always in full (Q94, Q95). */
 export interface DeskRefund {
@@ -233,4 +238,36 @@ export interface AppointmentPage {
   readonly page: number;
   readonly pageSize: number;
   readonly total: number;
+}
+
+/** One consultation to price before booking (`POST /hospital/appointments/quote`, APPT-05). */
+export interface QuoteConsultationInput {
+  readonly doctorId: string;
+  /** The chosen slot (its date prices follow-ups), when picked. */
+  readonly slotId: string | null;
+  readonly serviceId: string | null;
+  /** Hospital-local day of the visit, used until a slot is picked. */
+  readonly date: string;
+}
+
+export interface QuoteInput {
+  /** An existing patient (follow-up pricing); a new patient is never a follow-up. */
+  readonly hospitalPatientId: string | null;
+  readonly consultations: readonly QuoteConsultationInput[];
+}
+
+/** What one consultation would cost, exactly as the booking would snapshot it. */
+export interface QuotedConsultation {
+  readonly index: number;
+  readonly isFollowUp: boolean;
+  readonly consultationRupees: number;
+  readonly serviceRupees: number;
+  readonly discountRupees: number;
+  readonly taxRupees: number;
+  readonly totalRupees: number;
+}
+
+export interface FeeQuote {
+  readonly consultations: readonly QuotedConsultation[];
+  readonly totalRupees: number;
 }

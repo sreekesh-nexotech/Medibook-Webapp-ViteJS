@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useActionKeys } from '@/shared/hooks/useActionKeys';
 import { money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
@@ -18,6 +19,7 @@ import type {
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { useCollectPaymentMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import {
+  deskErrorText,
   DESK_METHODS,
   methodLabel,
 } from '@/features/appointments/presentation/components/appointments.view';
@@ -25,8 +27,11 @@ import {
 /** Rupee amounts are compared at paise precision. */
 const PAISE_PER_RUPEE = 100;
 
-/** The backend's answer when a cash line has no open cash session (D-28). */
-const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
+/** The backend's limit on a payment reference (`PaymentLineSerializer`). */
+const REFERENCE_MAX = 200;
+
+/** This modal's one action: one key for every retry of it (UAT-16). */
+const COLLECT_ACTION = 'collect';
 
 interface Line {
   readonly key: number;
@@ -46,7 +51,9 @@ interface AppointmentPaymentModalProps {
  * Collect a walk-in's fee at the desk (D-27): one or more lines across cash,
  * UPI and card that must add up to the amount due. Cash lines are taken into
  * the receptionist's open cash session; without one the backend refuses and
- * this says so. Online bookings are prepaid and never come here (Q89).
+ * this says so. Online bookings are prepaid and ₹0 walk-ins owe nothing, so
+ * neither comes here (Q89, UAT-12). Every retry of one collection carries the
+ * same `Idempotency-Key`, so a lost answer never charges twice (UAT-16).
  */
 export function AppointmentPaymentModal({ appt, onClose, onPaid }: AppointmentPaymentModalProps) {
   if (!appt) return null;
@@ -63,6 +70,7 @@ function PaymentForm({
   onPaid: (receipt: DeskReceipt) => void;
 }) {
   const collect = useCollectPaymentMutation();
+  const actionKeys = useActionKeys();
   const due = appt.totalRupees;
   const [lines, setLines] = useState<readonly Line[]>([
     { key: 1, method: 'cash', amount: String(due), reference: '' },
@@ -101,6 +109,7 @@ function PaymentForm({
     collect.mutate(
       {
         id: appt.id,
+        idempotencyKey: actionKeys.keyFor(COLLECT_ACTION),
         lines: lines.map((l) => ({
           method: l.method,
           amountRupees: Number(l.amount),
@@ -109,17 +118,16 @@ function PaymentForm({
       },
       {
         onSuccess: (receipt) => {
+          actionKeys.settle(COLLECT_ACTION);
           toast(`Payment of ${money(due)} recorded`, 'success');
           onPaid(receipt);
         },
         onError: (failure) => {
-          const message =
-            isFailure(failure) && failure.code === CASH_SESSION_REQUIRED
-              ? 'Open your cash drawer on the Payments screen before taking cash, or collect by UPI or card.'
-              : isFailure(failure)
-                ? failure.message
-                : 'Could not record the payment.';
-          setError(message);
+          setError(
+            isFailure(failure)
+              ? deskErrorText(failure, 'Could not record the payment.')
+              : 'Could not record the payment.',
+          );
         },
       },
     );
@@ -169,6 +177,7 @@ function PaymentForm({
             <Field label="Reference" className="flex-1">
               <TextInput
                 value={l.reference}
+                maxLength={REFERENCE_MAX}
                 placeholder={l.method === 'cash' ? 'Optional' : 'UPI / card ref.'}
                 onChange={(v) => update(l.key, { reference: v })}
               />

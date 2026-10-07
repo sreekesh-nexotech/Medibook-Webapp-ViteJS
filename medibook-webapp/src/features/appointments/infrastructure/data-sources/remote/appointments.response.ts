@@ -5,6 +5,7 @@ import type {
   DeskAppointment,
   DeskReceipt,
   DeskRefund,
+  FeeQuote,
   RefundOutcome,
   TokenSlipData,
 } from '@/features/appointments/domain/entities/appointments.entities';
@@ -64,8 +65,17 @@ export const appointmentResponseSchema = z.object({
   is_follow_up: z.boolean(),
   patient_notes: z.string().nullable(),
   remark: z.string().nullable(),
-  // `not_required` (BE-07): a ₹0 walk-in; older backends leave it `unpaid`.
-  payment_status: z.enum(['unpaid', 'pending', 'paid', 'refunded', 'failed', 'not_required']),
+  // `not_required` (BE-07): a ₹0 walk-in, older backends leave it `unpaid`;
+  // `cancelled` (APPT-02): cancelled before any money was taken.
+  payment_status: z.enum([
+    'unpaid',
+    'pending',
+    'paid',
+    'refunded',
+    'failed',
+    'not_required',
+    'cancelled',
+  ]),
   consultation_fee_paise: z.number().int(),
   service_fee_paise: z.number().int(),
   discount_paise: z.number().int(),
@@ -139,7 +149,7 @@ export const tokenSlipResponseSchema = z.object({
 const refundBriefSchema = z.object({
   id: z.string(),
   amount_paise: z.number().int(),
-  status: z.enum(['requested', 'processing', 'processed', 'failed']),
+  status: z.enum(['requested', 'processing', 'processed', 'failed', 'superseded']),
   method: z.string().nullable().optional(),
 });
 
@@ -287,5 +297,36 @@ export function toRefundOutcome(dto: z.infer<typeof cancellationResponseSchema>)
   return {
     appointment: toAppointment(dto.appointment),
     refunds: (dto.refunds ?? []).map(toRefund),
+  };
+}
+
+/** `POST /hospital/appointments/quote` (APPT-05): `fees.quote(channel="desk")` per consultation. */
+export const quoteResponseSchema = z.object({
+  consultations: z.array(
+    z.object({
+      index: z.number().int(),
+      is_follow_up: z.boolean(),
+      consultation_fee_paise: z.number().int(),
+      service_fee_paise: z.number().int(),
+      discount_paise: z.number().int(),
+      tax_paise: z.number().int(),
+      total_paise: z.number().int(),
+    }),
+  ),
+  total_paise: z.number().int(),
+});
+
+export function toFeeQuote(dto: z.infer<typeof quoteResponseSchema>): FeeQuote {
+  return {
+    consultations: dto.consultations.map((c) => ({
+      index: c.index,
+      isFollowUp: c.is_follow_up,
+      consultationRupees: rupees(c.consultation_fee_paise),
+      serviceRupees: rupees(c.service_fee_paise),
+      discountRupees: rupees(c.discount_paise),
+      taxRupees: rupees(c.tax_paise),
+      totalRupees: rupees(c.total_paise),
+    })),
+    totalRupees: rupees(dto.total_paise),
   };
 }

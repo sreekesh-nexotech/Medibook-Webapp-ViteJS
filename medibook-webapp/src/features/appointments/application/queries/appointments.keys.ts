@@ -1,6 +1,7 @@
 import type {
   AppointmentListParams,
   AppointmentRange,
+  QuoteInput,
 } from '@/features/appointments/domain/entities/appointments.entities';
 
 /** Query keys for desk appointments (standards §4). */
@@ -16,4 +17,5 @@ export const appointmentsKeys = {
   events: (id: string) => [...appointmentsKeys.all, 'events', id] as const,
   receipt: (id: string) => [...appointmentsKeys.all, 'receipt', id] as const,
   tokenSlip: (id: string) => [...appointmentsKeys.all, 'token-slip', id] as const,
+  quote: (input: QuoteInput) => [...appointmentsKeys.all, 'quote', input] as const,
 };

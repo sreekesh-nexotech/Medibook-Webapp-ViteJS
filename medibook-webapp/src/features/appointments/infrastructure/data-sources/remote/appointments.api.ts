@@ -5,7 +5,10 @@ import { fetchAllPages, paginatedSchema } from '@/core/api/pagination';
 import type {
   AppointmentListParams,
   AppointmentRange,
+  AppointmentSort,
+  AppointmentSortField,
   PaymentLineInput,
+  QuoteInput,
   WalkInInput,
 } from '@/features/appointments/domain/entities/appointments.entities';
 import {
@@ -14,6 +17,7 @@ import {
   cancellationResponseSchema,
   PAISE_PER_RUPEE,
   paymentResponseSchema,
+  quoteResponseSchema,
   receiptPdfResponseSchema,
   receiptResponseSchema,
   refundListResponseSchema,
@@ -39,6 +43,23 @@ const base = (id: string) => `/appointments/${encodeURIComponent(id)}`;
 const COUNT_PAGE_SIZE = 1;
 
 /**
+ * Tie-breakers after the chosen sort, so rows that share a start time keep
+ * one order and never hop between pages (`booking_ref` is unique).
+ */
+const SORT_TIEBREAKERS: Readonly<Record<AppointmentSortField, readonly AppointmentSortField[]>> = {
+  scheduled_start_at: ['token_no', 'booking_ref'],
+  token_no: ['booking_ref'],
+  created_at: ['booking_ref'],
+  booking_ref: [],
+};
+
+/** `sort=` for the list: the field, then its tie-breakers, all in one direction. */
+export function sortParam(sort: AppointmentSort): string {
+  const sign = sort.direction === 'desc' ? '-' : '';
+  return [sort.field, ...SORT_TIEBREAKERS[sort.field]].map((f) => `${sign}${f}`).join(',');
+}
+
+/**
  * The backend's query string for a list page: only allowlisted params, and
  * only the ones that filter (empty values are left out, a 400 otherwise).
  */
@@ -46,7 +67,7 @@ export function toListQuery(params: AppointmentListParams): Record<string, strin
   const query: Record<string, string | number> = {
     date_from: params.dateFrom,
     date_to: params.dateTo,
-    sort: `${params.sort.direction === 'desc' ? '-' : ''}${params.sort.field}`,
+    sort: sortParam(params.sort),
     page: params.page,
     page_size: params.pageSize,
   };
@@ -94,6 +115,22 @@ export function getEvents(id: string) {
     const response = await hospitalApi.get(`${base(id)}/events`, { params: { page, page_size } });
     return eventPageSchema.parse(response.data);
   });
+}
+
+/**
+ * `POST /hospital/appointments/quote` (APPT-05) — read-only, so no
+ * `Idempotency-Key`. A backend without the route answers 404.
+ */
+export async function postQuote(input: QuoteInput) {
+  const response = await hospitalApi.post('/appointments/quote', {
+    ...(input.hospitalPatientId ? { hospital_patient_id: input.hospitalPatientId } : {}),
+    consultations: input.consultations.map((c) => ({
+      doctor_id: c.doctorId,
+      ...(c.slotId ? { slot_id: c.slotId } : { date: c.date }),
+      ...(c.serviceId ? { service_id: c.serviceId } : {}),
+    })),
+  });
+  return quoteResponseSchema.parse(response.data);
 }
 
 export async function postWalkIn(input: WalkInInput, key: string) {
