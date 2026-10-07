@@ -30,6 +30,7 @@ import {
   type LogSeverity,
 } from '@/features/ops-logs/application/store/logs.types';
 import { useExportLogsMutation } from '@/features/ops-logs/application/queries/useExportLogsMutation';
+import { useLogRetentionQuery } from '@/features/ops-logs/application/queries/useLogRetentionQuery';
 import { useLogsQuery } from '@/features/ops-logs/application/queries/useLogsQuery';
 import { useRefreshLogs } from '@/features/ops-logs/application/queries/useRefreshLogs';
 import type {
@@ -43,9 +44,10 @@ import {
   formatLogTime,
   isUuid,
   LOG_MODULE_LABEL,
-  LOG_RETENTION_TEXT,
   LOG_SEARCH_HINT,
+  logRetentionText,
   logsExportFileName,
+  logsExportMessage,
   moduleLabel,
   narrowingPrincipals,
   PRINCIPAL_LABEL,
@@ -113,6 +115,7 @@ export function OpsLogsScreen() {
   const refreshLogs = useRefreshLogs();
   const exportLogs = useExportLogsMutation();
   const hospitals = useHospitalOptionsQuery();
+  const retention = useLogRetentionQuery();
 
   const debouncedQ = useLogsDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
   const debouncedActor = useLogsDebouncedValue(actor.trim(), SEARCH_DEBOUNCE_MS);
@@ -187,9 +190,9 @@ export function OpsLogsScreen() {
 
   const handleExport = (): void => {
     exportLogs.mutate(filters, {
-      onSuccess: (csv) => {
+      onSuccess: ({ csv, truncated, rowLimit }) => {
         downloadTextFile(logsExportFileName(todayISO()), csv, 'text/csv;charset=utf-8');
-        toast('Compliance log exported with the current filters.', 'success');
+        toast(logsExportMessage(truncated, rowLimit), truncated ? 'info' : 'success');
       },
       onError: (failure) =>
         toast(
@@ -335,7 +338,7 @@ export function OpsLogsScreen() {
           )}
           <div className="flex-1"></div>
           <span className="text-caption text-text-muted mt-3">
-            {LOG_RETENTION_TEXT} · updated {refreshedAt(logsQuery.dataUpdatedAt)}
+            {logRetentionText(retention.data)} · updated {refreshedAt(logsQuery.dataUpdatedAt)}
           </span>
         </div>
         <TableShell

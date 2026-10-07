@@ -32,6 +32,7 @@ const BASE: DataRequest = {
   subjectContact: null,
   hospitalName: null,
   requestedByName: null,
+  allowedActions: null,
 };
 
 describe('dataRequestActions (UAT-54)', () => {
@@ -54,6 +55,19 @@ describe('dataRequestActions (UAT-54)', () => {
       canPrepare: false,
       canRectify: true,
       canReject: true,
+    });
+  });
+
+  it('follows the actions the server allows when it lists them (B6)', () => {
+    expect(dataRequestActions({ ...BASE, allowedActions: [] }, true)).toEqual({
+      canPrepare: false,
+      canRectify: false,
+      canReject: false,
+    });
+    expect(dataRequestActions({ ...BASE, allowedActions: ['process'] }, true)).toEqual({
+      canPrepare: true,
+      canRectify: false,
+      canReject: false,
     });
   });
 
@@ -132,6 +146,27 @@ describe('request params', () => {
       status: 'requested,verifying',
       kind: 'rectification',
       subject_kind: 'patient',
+    });
+  });
+
+  it('sends the B6 request number and dates only when used', () => {
+    const base = { page: 1, pageSize: 10, statuses: [], kind: null, subjectKind: null };
+    expect(toDataRequestParams({ ...base, requestNo: ' ', dateFrom: '' })).toEqual({
+      page: 1,
+      page_size: 10,
+      sort: '-requested_at',
+    });
+    expect(
+      toDataRequestParams({
+        ...base,
+        requestNo: 'dsr-2026-000004',
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-07',
+      }),
+    ).toMatchObject({
+      request_no: 'DSR-2026-000004',
+      date_from: '2026-10-01',
+      date_to: '2026-10-07',
     });
   });
 

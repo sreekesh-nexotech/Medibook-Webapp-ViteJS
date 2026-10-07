@@ -2,6 +2,7 @@ import type {
   AuditLogEntry,
   AuditPrincipal,
   LogSeverity,
+  RetentionWindow,
 } from '@/features/ops-logs/domain/entities/logs.types';
 
 /** Leading characters of a UUID shown when no name is available. */
@@ -18,6 +19,24 @@ const JSON_INDENT = 2;
  * audit_log 3 years, archived to cold storage after, nothing deleted — Q122).
  */
 export const LOG_RETENTION_TEXT = 'Kept 3 years, then archived — never deleted';
+
+/** The audit trail's window as the server reports it (B6), else {@link LOG_RETENTION_TEXT}. */
+export function logRetentionText(windows: readonly RetentionWindow[] | undefined): string {
+  const trail = windows?.find((w) => w.table === 'audit_log');
+  if (!trail) return LOG_RETENTION_TEXT;
+  const years = trail.retentionYears;
+  const span = Number.isInteger(years)
+    ? `${years} ${years === 1 ? 'year' : 'years'}`
+    : `${trail.retentionDays.toLocaleString('en-IN')} days`;
+  return `Kept ${span}, then archived — never deleted`;
+}
+
+/** The toast after an export; says so when the server's row cap cut the file (B6). */
+export function logsExportMessage(truncated: boolean, rowLimit: number | null): string {
+  if (!truncated) return 'Compliance log exported with the current filters.';
+  const cap = rowLimit ? `the first ${rowLimit.toLocaleString('en-IN')} rows` : 'the first rows';
+  return `The export holds ${cap} only. Narrow the dates or filters to export the rest.`;
+}
 
 /**
  * What the search box really matches (`audit_log_filters._q`): the backend has

@@ -64,10 +64,13 @@ export interface DataRequestActions {
 
 export function dataRequestActions(r: DataRequest, canEdit: boolean): DataRequestActions {
   const open = canEdit && OPEN_DATA_REQUEST_STATUSES.has(r.status);
+  // B6 says what it accepts; without it, deletions are never reviewed (v2 §5.11).
+  const process = r.allowedActions ? r.allowedActions.includes('process') : true;
+  const reject = r.allowedActions ? r.allowedActions.includes('reject') : r.kind !== 'deletion';
   return {
-    canPrepare: open && r.kind === 'export',
-    canRectify: open && r.kind === 'rectification',
-    canReject: open && r.kind !== 'deletion',
+    canPrepare: open && process && r.kind === 'export',
+    canRectify: open && process && r.kind === 'rectification',
+    canReject: open && reject,
   };
 }
 

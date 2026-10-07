@@ -10,6 +10,9 @@ import {
   actorLabel,
   isUuid,
   jsonText,
+  LOG_RETENTION_TEXT,
+  logRetentionText,
+  logsExportMessage,
   moduleLabel,
   narrowingPrincipals,
 } from '@/features/ops-logs/presentation/components/logs.format';
@@ -130,5 +133,27 @@ describe('display helpers', () => {
   it('accepts only full UUIDs as an actor id', () => {
     expect(isUuid(ROW.actor_user_id)).toBe(true);
     expect(isUuid('01929b2e')).toBe(false);
+  });
+});
+
+describe('retention and export copy (B6)', () => {
+  it('reads the audit trail window from the server, else the documented 3 years', () => {
+    expect(logRetentionText(undefined)).toBe(LOG_RETENTION_TEXT);
+    expect(
+      logRetentionText([
+        { table: 'login_events', label: 'Sign-in history', retentionDays: 30, retentionYears: 0.1 },
+        { table: 'audit_log', label: 'Audit trail', retentionDays: 1825, retentionYears: 5 },
+      ]),
+    ).toBe('Kept 5 years, then archived — never deleted');
+    expect(
+      logRetentionText([
+        { table: 'audit_log', label: 'Audit trail', retentionDays: 1200, retentionYears: 3.3 },
+      ]),
+    ).toBe('Kept 1,200 days, then archived — never deleted');
+  });
+
+  it('says when the row cap cut the export', () => {
+    expect(logsExportMessage(false, 10000)).toMatch(/exported/);
+    expect(logsExportMessage(true, 10000)).toMatch(/first 10,000 rows/);
   });
 });

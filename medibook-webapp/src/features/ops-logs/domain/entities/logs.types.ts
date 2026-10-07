@@ -88,3 +88,20 @@ export interface AuditLogQuery extends AuditLogFilters {
   /** Omitted → newest first (the backend default). */
   readonly sortDir?: AuditLogSortDir;
 }
+
+/** The server CSV export, with whether the row cap cut it (B6: 10,000 rows). */
+export interface LogsExport {
+  readonly csv: string;
+  readonly truncated: boolean;
+  /** The cap the server applied, when it says. */
+  readonly rowLimit: number | null;
+}
+
+/** One retention window the backend applies (`GET /platform/compliance/retention`, B6). */
+export interface RetentionWindow {
+  /** Table name, e.g. `audit_log`. */
+  readonly table: string;
+  readonly label: string;
+  readonly retentionDays: number;
+  readonly retentionYears: number;
+}

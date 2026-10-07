@@ -3,15 +3,25 @@ import { apiFor } from '@/core/api/http';
 import type {
   AuditLogFilters,
   AuditLogQuery,
+  LogsExport,
 } from '@/features/ops-logs/domain/entities/logs.types';
-import type { LogsPageResponse } from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
+import type {
+  LogsPageResponse,
+  RetentionResponse,
+} from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
 import {
   logsExportResponseSchema,
   logsPageResponseSchema,
+  retentionResponseSchema,
 } from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
 
 const LOGS_PATH = '/logs';
 const LOGS_EXPORT_PATH = '/logs/export.csv';
+const RETENTION_PATH = '/compliance/retention';
+
+/** B6 export headers: whether the row cap cut the file, and the cap. */
+const TRUNCATED_HEADER = 'x-export-truncated';
+const ROW_LIMIT_HEADER = 'x-export-row-limit';
 
 /** The one column `/platform/logs` sorts by (`audit_log_spec` allowlist). */
 const SORT_COLUMN = 'occurred_at';
@@ -57,10 +67,21 @@ export async function getLogs(query: AuditLogQuery): Promise<LogsPageResponse> {
 }
 
 /** `GET /api/v1/platform/logs/export.csv` (B6) — the filtered trail as CSV text. */
-export async function getLogsCsv(filters: AuditLogFilters): Promise<string> {
+export async function getLogsCsv(filters: AuditLogFilters): Promise<LogsExport> {
   const response = await apiFor('platform').get(LOGS_EXPORT_PATH, {
     params: { ...filterParams(filters), sort: `-${SORT_COLUMN}` },
     responseType: 'text',
   });
-  return logsExportResponseSchema.parse(response.data);
+  const limit = Number(response.headers[ROW_LIMIT_HEADER]);
+  return {
+    csv: logsExportResponseSchema.parse(response.data),
+    truncated: String(response.headers[TRUNCATED_HEADER]).toLowerCase() === 'true',
+    rowLimit: Number.isInteger(limit) && limit > 0 ? limit : null,
+  };
+}
+
+/** `GET /platform/compliance/retention` (B6) — the retention windows the backend applies. */
+export async function getRetention(): Promise<RetentionResponse> {
+  const response = await apiFor('platform').get(RETENTION_PATH);
+  return retentionResponseSchema.parse(response.data);
 }

@@ -8,6 +8,7 @@ import {
   LOGIN_RESULTS,
   type ConfigChangeRecord,
   type DataRequest,
+  type DataRequestAction,
   type LoginEvent,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
@@ -62,6 +63,8 @@ export const dataRequestResponseSchema = z.object({
   subject_contact: maskedContactSchema,
   hospital_name: z.string().nullable().optional(),
   requested_by_name: z.string().nullable().optional(),
+  // B6 (UAT-54): what may be done now; absent on older backends.
+  allowed_actions: z.array(z.string()).optional(),
 });
 
 /**
@@ -135,5 +138,11 @@ export function toDataRequest(dto: DataRequestResponse): DataRequest {
     subjectContact: toContactLine(dto.subject_contact),
     hospitalName: dto.hospital_name ?? null,
     requestedByName: dto.requested_by_name ?? null,
+    allowedActions: dto.allowed_actions ? toActions(dto.allowed_actions) : null,
   };
+}
+
+/** Keep the actions this console knows; an unknown one is ignored, not a parse failure. */
+function toActions(values: readonly string[]): DataRequestAction[] {
+  return values.filter((v): v is DataRequestAction => v === 'process' || v === 'reject');
 }

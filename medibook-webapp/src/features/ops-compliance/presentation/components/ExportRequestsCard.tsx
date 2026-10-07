@@ -9,6 +9,7 @@ import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { Pager } from '@/shared/ui/Pager';
+import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
@@ -28,6 +29,7 @@ import {
   type DataRequestStatus,
   type DataSubjectKind,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
+import { ComplianceDateInput } from '@/features/ops-compliance/presentation/components/ComplianceDateInput';
 import { DataRequestDrawer } from '@/features/ops-compliance/presentation/components/DataRequestDrawer';
 import { RectifyDataRequestModal } from '@/features/ops-compliance/presentation/components/RectifyDataRequestModal';
 import { RejectDataRequestModal } from '@/features/ops-compliance/presentation/components/RejectDataRequestModal';
@@ -40,6 +42,7 @@ import {
   fmtComplianceDate,
   fmtComplianceWhen,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
+import { useComplianceDebouncedValue } from '@/features/ops-compliance/presentation/hooks/useComplianceDebouncedValue';
 
 const PAGE_SIZE = 10;
 
@@ -59,6 +62,9 @@ const ID_PREVIEW_CHARS = 8;
 const ALL_STATUSES = 'Status: All';
 const ALL_KINDS = 'Type: All';
 const ALL_SUBJECTS = 'Subject: All';
+
+/** Typing pause before the request number is sent. */
+const SEARCH_DEBOUNCE_MS = 350;
 
 interface ExportRequestsCardProps {
   /** The request being prepared right now, so its row shows busy. */
@@ -83,6 +89,10 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
   const [status, setStatus] = useState<DataRequestStatus | null>(null);
   const [kind, setKind] = useState<DataRequestKind | null>(null);
   const [subjectKind, setSubjectKind] = useState<DataSubjectKind | null>(null);
+  const [requestNo, setRequestNo] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const debouncedRequestNo = useComplianceDebouncedValue(requestNo.trim(), SEARCH_DEBOUNCE_MS);
   const [openId, setOpenId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<DataRequest | null>(null);
   const [rectifying, setRectifying] = useState<DataRequest | null>(null);
@@ -94,17 +104,29 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
     statuses: status ? [status] : [],
     kind,
     subjectKind,
+    requestNo: debouncedRequestNo,
+    dateFrom,
+    dateTo,
   });
   const rejectMutation = useRejectComplianceDataRequestMutation();
   const processMutation = useProcessComplianceDataRequestMutation();
   const download = useFileDownloadMutation();
 
   const requests = requestsQuery.data?.items ?? [];
-  const filtersActive = status !== null || kind !== null || subjectKind !== null;
+  const filtersActive =
+    status !== null ||
+    kind !== null ||
+    subjectKind !== null ||
+    requestNo.trim() !== '' ||
+    dateFrom !== '' ||
+    dateTo !== '';
   const clearFilters = (): void => {
     setStatus(null);
     setKind(null);
     setSubjectKind(null);
+    setRequestNo('');
+    setDateFrom('');
+    setDateTo('');
     setPage(0);
   };
 
@@ -208,6 +230,35 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
             setSubjectKind(DATA_SUBJECT_KINDS.find((k) => DATA_SUBJECT_LABEL[k] === v) ?? null);
             setPage(0);
           }}
+        />
+      </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="w-64">
+          <SearchField
+            value={requestNo}
+            onChange={(v) => {
+              setRequestNo(v);
+              setPage(0);
+            }}
+            placeholder="Request no., e.g. DSR-2026-000004"
+            aria-label="Find a request by its exact number"
+          />
+        </div>
+        <ComplianceDateInput
+          value={dateFrom}
+          onChange={(v) => {
+            setDateFrom(v);
+            setPage(0);
+          }}
+          title="Requested on or after (IST)"
+        />
+        <ComplianceDateInput
+          value={dateTo}
+          onChange={(v) => {
+            setDateTo(v);
+            setPage(0);
+          }}
+          title="Requested on or before (IST)"
         />
         {filtersActive && (
           <button

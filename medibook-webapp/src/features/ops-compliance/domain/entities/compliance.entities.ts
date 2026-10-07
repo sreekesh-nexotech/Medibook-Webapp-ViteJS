@@ -156,7 +156,15 @@ export interface DataRequest {
   readonly subjectContact: string | null;
   readonly hospitalName: string | null;
   readonly requestedByName: string | null;
+  /**
+   * What compliance may do with it now (B6, UAT-54): `process` (prepare the
+   * export / mark the rectification done) and `reject`; `null` when the
+   * server does not say, and the console falls back to its own rules.
+   */
+  readonly allowedActions: readonly DataRequestAction[] | null;
 }
+
+export type DataRequestAction = 'process' | 'reject';
 
 /** Server-side filters on the DSR register. */
 export interface DataRequestFilters {
@@ -164,6 +172,11 @@ export interface DataRequestFilters {
   readonly statuses: readonly DataRequestStatus[];
   readonly kind: DataRequestKind | null;
   readonly subjectKind: DataSubjectKind | null;
+  /** Exact request number, e.g. `DSR-2026-000004` (B6). */
+  readonly requestNo?: string;
+  /** Requested on or after / before, `yyyy-mm-dd` IST (B6). */
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
 }
 
 /** One page of the DSR register. */

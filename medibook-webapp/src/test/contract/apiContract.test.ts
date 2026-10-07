@@ -304,6 +304,8 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
   logsExportResponseSchema: 'Reading it renders the whole filtered audit trail as a CSV file.',
+  retentionResponseSchema:
+    'B6 endpoint (GET /platform/compliance/retention), not on the recording backend yet.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

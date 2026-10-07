@@ -66,6 +66,10 @@ export function toDataRequestParams(params: DataRequestParams): ComplianceQueryP
     ...(params.statuses.length > 0 ? { status: params.statuses.join(',') } : {}),
     ...(params.kind ? { kind: params.kind } : {}),
     ...(params.subjectKind ? { subject_kind: params.subjectKind } : {}),
+    // B6 filters: sent only when used, so an older backend still answers the rest.
+    ...(params.requestNo?.trim() ? { request_no: params.requestNo.trim().toUpperCase() } : {}),
+    ...(params.dateFrom ? { date_from: params.dateFrom } : {}),
+    ...(params.dateTo ? { date_to: params.dateTo } : {}),
   };
 }
 

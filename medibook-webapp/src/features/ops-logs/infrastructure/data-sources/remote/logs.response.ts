@@ -8,6 +8,7 @@ import type {
   AuditFieldChange,
   AuditLogEntry,
   LogSeverity,
+  RetentionWindow,
 } from '@/features/ops-logs/domain/entities/logs.types';
 
 const SEVERITIES: readonly LogSeverity[] = ['info', 'warning', 'critical'];
@@ -53,6 +54,30 @@ export const logsPageResponseSchema = paginatedSchema(auditLogResponseSchema);
 
 /** `GET /platform/logs/export.csv` (B6) — the CSV body as text. */
 export const logsExportResponseSchema = z.string();
+
+/** `GET /platform/compliance/retention` (B6, `logs.view`). */
+export const retentionResponseSchema = z.object({
+  policies: z.array(
+    z.object({
+      table: z.string(),
+      label: z.string(),
+      retention_days: z.number(),
+      retention_years: z.number(),
+    }),
+  ),
+  basis: z.string().optional(),
+});
+
+export type RetentionResponse = z.infer<typeof retentionResponseSchema>;
+
+export function toRetentionWindows(dto: RetentionResponse): RetentionWindow[] {
+  return dto.policies.map((p) => ({
+    table: p.table,
+    label: p.label,
+    retentionDays: p.retention_days,
+    retentionYears: p.retention_years,
+  }));
+}
 
 export type AuditLogResponse = z.infer<typeof auditLogResponseSchema>;
 export type LogsPageResponse = z.infer<typeof logsPageResponseSchema>;
