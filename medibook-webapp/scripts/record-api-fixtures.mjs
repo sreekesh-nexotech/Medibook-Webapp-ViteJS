@@ -583,6 +583,18 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-support.ticketPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets',
+    params: LIST,
+  },
+  {
+    key: 'ops-support.ticketDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-support.ticketPageResponseSchema')?.id }),
+  },
+  {
     key: 'ops-reviews.reviewPageResponseSchema',
     surface: 'platform',
     path: '/platform/reviews',

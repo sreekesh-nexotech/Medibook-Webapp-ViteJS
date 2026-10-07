@@ -85,6 +85,10 @@ import {
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.response';
 import { reviewPageResponseSchema } from '@/features/ops-reviews/infrastructure/data-sources/remote/reviews.response';
 import {
+  ticketDetailResponseSchema,
+  ticketPageResponseSchema,
+} from '@/features/ops-support/infrastructure/data-sources/remote/support.response';
+import {
   reportListResponseSchema,
   reportResultResponseSchema as opsReportResultResponseSchema,
   reportSchedulePageResponseSchema,
@@ -230,6 +234,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-platform-users.platformUsersPageResponseSchema': platformUsersPageResponseSchema,
   'ops-reports.reportListResponseSchema': reportListResponseSchema,
   'ops-reviews.reviewPageResponseSchema': reviewPageResponseSchema,
+  'ops-support.ticketPageResponseSchema': ticketPageResponseSchema,
+  'ops-support.ticketDetailResponseSchema': ticketDetailResponseSchema,
   'ops-reports.reportResultResponseSchema': opsReportResultResponseSchema,
   'ops-reports.reportSchedulePageResponseSchema': reportSchedulePageResponseSchema,
   'ops-settings.featureFlagPageResponseSchema': featureFlagPageResponseSchema,

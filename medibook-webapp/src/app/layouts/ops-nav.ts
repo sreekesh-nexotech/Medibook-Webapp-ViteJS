@@ -50,6 +50,7 @@ export const OPS_NAV: readonly OpsNavSection[] = [
       { id: 'platform-users', label: 'Platform Users', icon: 'users' },
       { id: 'notifications', label: 'Notifications', icon: 'megaphone' },
       { id: 'reviews', label: 'Review Moderation', icon: 'star' },
+      { id: 'support', label: 'Support Desk', icon: 'headset' },
     ],
   },
   {
@@ -106,6 +107,7 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Legal documents, FAQs, locations and ambulance providers in the patient app',
   ],
   reviews: ['Review Moderation', 'Patient reviews of doctors, approved before they are published'],
+  support: ['Support Desk', 'Tickets from hospitals and patients: reply, assign and resolve'],
   account: ['My Account', 'Your name, password and signed-in devices'],
 };
 

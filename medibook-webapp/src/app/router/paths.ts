@@ -295,6 +295,8 @@ export type OpsView =
   | 'content'
   /** Review Moderation (UAT report §8). */
   | 'reviews'
+  /** Support Desk (UAT report §8). */
+  | 'support'
   /** The signed-in user's own account: name, password, sessions. */
   | 'account';
 
@@ -327,6 +329,7 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   compliance: 'compliance',
   content: 'content',
   reviews: 'reviews',
+  support: 'support',
   account: 'account',
 };
 
@@ -393,6 +396,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'compliance',
   'content',
   'reviews',
+  'support',
   'account',
 ];
 

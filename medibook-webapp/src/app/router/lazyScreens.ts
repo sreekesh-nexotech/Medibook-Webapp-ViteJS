@@ -205,3 +205,8 @@ export const OpsReviewsScreen = lazy(() =>
     default: m.OpsReviewsScreen,
   })),
 );
+export const OpsSupportScreen = lazy(() =>
+  import('@/features/ops-support/presentation/screens/OpsSupportScreen').then((m) => ({
+    default: m.OpsSupportScreen,
+  })),
+);
