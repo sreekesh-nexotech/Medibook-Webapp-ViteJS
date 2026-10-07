@@ -65,17 +65,20 @@ export function OpsComplianceScreen() {
 
   const prepare = (request: DataRequest): void => {
     setProcessingId(request.id);
-    processRequest.mutate(request.id, {
-      onSuccess: (outcome) => announceOutcome(request.requestNo, outcome),
-      onError: (error) =>
-        toast(
-          `${request.requestNo} could not be prepared now: ${
-            isFailure(error) ? error.message : 'please try again.'
-          }`,
-          'error',
-        ),
-      onSettled: () => setProcessingId(null),
-    });
+    processRequest.mutate(
+      { id: request.id },
+      {
+        onSuccess: (outcome) => announceOutcome(request.requestNo, outcome),
+        onError: (error) =>
+          toast(
+            `${request.requestNo} could not be prepared now: ${
+              isFailure(error) ? error.message : 'please try again.'
+            }`,
+            'error',
+          ),
+        onSettled: () => setProcessingId(null),
+      },
+    );
   };
 
   /**

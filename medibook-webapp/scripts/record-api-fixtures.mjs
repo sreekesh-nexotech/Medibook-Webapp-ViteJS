@@ -19,6 +19,10 @@
  *   node scripts/record-api-fixtures.mjs
  *
  * Use a hospital admin (every hospital endpoint) and a platform owner.
+ *
+ * `FIXTURE_ONLY=key1,key2` still reads every endpoint (later entries take
+ * their ids from earlier ones) but writes only the listed fixtures, so a new
+ * schema can be recorded without re-recording — and churning — the others.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +37,12 @@ const accounts = {
   hospital: required('FIXTURE_HOSPITAL_EMAIL'),
   platform: required('FIXTURE_PLATFORM_EMAIL'),
 };
+const only = new Set(
+  (process.env.FIXTURE_ONLY ?? '')
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean),
+);
 
 function required(name) {
   const value = process.env[name];
@@ -531,6 +541,12 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-compliance.dataRequestResponseSchema',
+    surface: 'platform',
+    path: '/platform/compliance/data-requests/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-compliance.dataRequestPageSchema')?.id }),
+  },
+  {
     key: 'ops-logs.logsPageResponseSchema',
     surface: 'platform',
     path: '/platform/logs',
@@ -690,6 +706,10 @@ for (const entry of SPEC) {
   }
   const body = await response.json();
   fixtures[entry.key] = body;
+  if (only.size > 0 && !only.has(entry.key)) {
+    report.push([entry.key, 'read, not written (FIXTURE_ONLY)']);
+    continue;
+  }
   writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(body), null, 2)}\n`);
   report.push([entry.key, 'recorded']);
 }
@@ -699,5 +719,6 @@ process.stdout.write(
   `Recorded ${recorded} of ${SPEC.length} responses into src/test/contract/fixtures/\n`,
 );
 for (const [key, status] of report) {
-  if (status !== 'recorded') process.stdout.write(`  ${key}: ${status}\n`);
+  if (status !== 'recorded' && !status.startsWith('read,'))
+    process.stdout.write(`  ${key}: ${status}\n`);
 }

@@ -1,0 +1,145 @@
+import { describe, expect, it } from 'vitest';
+
+import type { DataRequest } from '@/features/ops-compliance/domain/entities/compliance.entities';
+import {
+  toDataRequestParams,
+  toLoginFilterParams,
+} from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.request';
+import {
+  dataRequestActions,
+  dataRequestNote,
+  loginInstanceLabel,
+} from '@/features/ops-compliance/presentation/components/compliance.labels';
+
+const BASE: DataRequest = {
+  id: 'd1',
+  requestNo: 'DSR-2026-000001',
+  subjectKind: 'patient',
+  subjectUserId: 'u1',
+  hospitalId: null,
+  kind: 'export',
+  status: 'requested',
+  requestedByKind: 'platform_staff',
+  requestedById: null,
+  requestedAt: '2026-10-01T04:00:00Z',
+  coolingOffEndsAt: null,
+  dueAt: '2026-10-31T04:00:00Z',
+  completedAt: null,
+  exportFileId: null,
+  notes: null,
+  retentionCarveOut: null,
+  subjectName: null,
+  subjectContact: null,
+  hospitalName: null,
+  requestedByName: null,
+};
+
+describe('dataRequestActions (UAT-54)', () => {
+  it('never offers Reject on a deletion, even an open one', () => {
+    expect(dataRequestActions({ ...BASE, kind: 'deletion' }, true).canReject).toBe(false);
+  });
+
+  it('offers nothing on cooling-off rows — they complete on their own', () => {
+    const a = dataRequestActions({ ...BASE, kind: 'deletion', status: 'cooling_off' }, true);
+    expect(a).toEqual({ canPrepare: false, canRectify: false, canReject: false });
+  });
+
+  it('offers Prepare on open exports and Mark rectified on open rectifications', () => {
+    expect(dataRequestActions(BASE, true)).toEqual({
+      canPrepare: true,
+      canRectify: false,
+      canReject: true,
+    });
+    expect(dataRequestActions({ ...BASE, kind: 'rectification' }, true)).toEqual({
+      canPrepare: false,
+      canRectify: true,
+      canReject: true,
+    });
+  });
+
+  it('offers nothing on closed requests or without compliance.edit', () => {
+    expect(dataRequestActions({ ...BASE, status: 'completed' }, true).canReject).toBe(false);
+    expect(dataRequestActions(BASE, false)).toEqual({
+      canPrepare: false,
+      canRectify: false,
+      canReject: false,
+    });
+  });
+});
+
+describe('dataRequestNote', () => {
+  it('says a cooling-off deletion completes on its own', () => {
+    expect(
+      dataRequestNote({
+        ...BASE,
+        kind: 'deletion',
+        status: 'cooling_off',
+        coolingOffEndsAt: '2026-11-01T00:00:00Z',
+      }),
+    ).toMatch(/^Deletes automatically on/);
+  });
+
+  it('only promises the nightly run for exports', () => {
+    expect(dataRequestNote(BASE)).toBe('The nightly run prepares it if not now');
+    expect(dataRequestNote({ ...BASE, kind: 'rectification' })).toBe(
+      'Correct the record, then mark it rectified',
+    );
+  });
+});
+
+describe('loginInstanceLabel (12·F16)', () => {
+  const nameOf = (id: string) => (id === 'h1' ? 'Lakeshore' : null);
+
+  it('labels by principal when no hospital is recorded', () => {
+    expect(
+      loginInstanceLabel({ principal: 'platform', hospitalId: null, hospitalName: null }, nameOf),
+    ).toBe('Ops console');
+    expect(
+      loginInstanceLabel({ principal: 'patient', hospitalId: null, hospitalName: null }, nameOf),
+    ).toBe('Patient app');
+    expect(
+      loginInstanceLabel({ principal: 'hospital', hospitalId: null, hospitalName: null }, nameOf),
+    ).toBe('Hospital (not recorded)');
+  });
+
+  it('prefers the name on the row, then the registry', () => {
+    expect(
+      loginInstanceLabel(
+        { principal: 'hospital', hospitalId: 'h1', hospitalName: 'From row' },
+        nameOf,
+      ),
+    ).toBe('From row');
+    expect(
+      loginInstanceLabel({ principal: 'hospital', hospitalId: 'h1', hospitalName: null }, nameOf),
+    ).toBe('Lakeshore');
+  });
+});
+
+describe('request params', () => {
+  it('sends register filters with the backend names', () => {
+    expect(
+      toDataRequestParams({
+        page: 2,
+        pageSize: 10,
+        statuses: ['requested', 'verifying'],
+        kind: 'rectification',
+        subjectKind: 'patient',
+      }),
+    ).toEqual({
+      page: 2,
+      page_size: 10,
+      sort: '-requested_at',
+      status: 'requested,verifying',
+      kind: 'rectification',
+      subject_kind: 'patient',
+    });
+  });
+
+  it('joins several sign-in principals and sends one plainly', () => {
+    const base = { dateFrom: '', dateTo: '', result: null, hospitalId: null };
+    expect(toLoginFilterParams({ ...base, principals: ['hospital', 'platform'] })).toEqual({
+      principal: 'hospital,platform',
+    });
+    expect(toLoginFilterParams({ ...base, principals: [] })).toEqual({});
+  });
+});

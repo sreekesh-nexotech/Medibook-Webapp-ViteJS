@@ -3,6 +3,7 @@ import type {
   ConfigChangeFilters,
   ConfigChangeParams,
   DataExportDraft,
+  DataRequestParams,
   LoginHistoryFilters,
   LoginHistoryParams,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
@@ -33,7 +34,8 @@ export function toLoginFilterParams(filters: LoginHistoryFilters): ComplianceQue
     ...dateParams(filters),
     ...(filters.result ? { result: filters.result } : {}),
     ...(filters.hospitalId ? { hospital_id: filters.hospitalId } : {}),
-    ...(filters.principal ? { principal: filters.principal } : {}),
+    // One surface is valid on every backend; several need B6's multi-value `principal`.
+    ...(filters.principals.length > 0 ? { principal: filters.principals.join(',') } : {}),
   };
 }
 
@@ -51,6 +53,19 @@ export function toConfigFilterParams(filters: ConfigChangeFilters): ComplianceQu
     ...dateParams(filters),
     ...(filters.scope ? { scope: filters.scope } : {}),
     ...(filters.settingKeyPrefix ? { setting_key_prefix: filters.settingKeyPrefix } : {}),
+    ...(filters.hospitalId ? { hospital_id: filters.hospitalId } : {}),
+  };
+}
+
+/** `GET /platform/compliance/data-requests` params (`status` is multi-value on the backend). */
+export function toDataRequestParams(params: DataRequestParams): ComplianceQueryParams {
+  return {
+    page: params.page,
+    page_size: params.pageSize,
+    sort: '-requested_at',
+    ...(params.statuses.length > 0 ? { status: params.statuses.join(',') } : {}),
+    ...(params.kind ? { kind: params.kind } : {}),
+    ...(params.subjectKind ? { subject_kind: params.subjectKind } : {}),
   };
 }
 

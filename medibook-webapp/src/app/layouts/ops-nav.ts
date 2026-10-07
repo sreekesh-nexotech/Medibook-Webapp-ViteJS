@@ -96,7 +96,7 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Hospital Onboarding',
     'Applications, KYC verification and go-live across the onboarding pipeline',
   ],
-  compliance: ['Compliance', 'Registration, licence and document compliance per hospital instance'],
+  compliance: ['Compliance', 'Sign-in history, configuration changes and data-subject requests'],
   account: ['My Account', 'Your name, password and signed-in devices'],
 };
 

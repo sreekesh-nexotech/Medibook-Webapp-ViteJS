@@ -12,5 +12,7 @@ export const complianceKeys = {
   changes: () => [...complianceKeys.all, 'config-changes'] as const,
   changePage: (params: ConfigChangeParams) => [...complianceKeys.changes(), params] as const,
   requests: () => [...complianceKeys.all, 'data-requests'] as const,
-  requestPage: (params: DataRequestParams) => [...complianceKeys.requests(), params] as const,
+  requestPage: (params: DataRequestParams) =>
+    [...complianceKeys.requests(), 'page', params] as const,
+  requestDetail: (id: string) => [...complianceKeys.requests(), 'detail', id] as const,
 };

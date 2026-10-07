@@ -17,6 +17,7 @@ export const loginEventResponseSchema = z.object({
   identifier: z.string(),
   principal: z.string(),
   hospital_id: z.string().nullable(),
+  hospital_name: z.string().nullable().optional(),
   result: z.enum(LOGIN_RESULTS),
   ip: z.string(),
   user_agent: z.string().nullable().optional(),
@@ -32,6 +33,8 @@ export const configChangeResponseSchema = z.object({
   before_value: z.unknown().optional(),
   after_value: z.unknown().optional(),
   actor_user_id: z.string(),
+  actor_name: z.string().nullable().optional(),
+  hospital_name: z.string().nullable().optional(),
   occurred_at: z.string(),
 });
 
@@ -42,14 +45,22 @@ export const dataRequestResponseSchema = z.object({
   subject_kind: z.enum(['patient', 'hospital_staff', 'hospital']),
   subject_user_id: z.string().nullable(),
   hospital_id: z.string().nullable(),
-  kind: z.enum(['export', 'deletion', 'rectification', 'percent']),
+  kind: z.enum(['export', 'deletion', 'rectification']),
   status: z.enum(DATA_REQUEST_STATUSES),
   requested_by_kind: z.string(),
+  requested_by_id: z.string().nullable().optional(),
   requested_at: z.string(),
+  cooling_off_ends_at: z.string().nullable().optional(),
   due_at: z.string(),
   completed_at: z.string().nullable().optional(),
   export_file_id: z.string().nullable(),
   notes: z.string().nullable().optional(),
+  retention_carve_out: z.unknown().optional(),
+  // B6 (BE-30): names on compliance rows; absent on older backends.
+  subject_name: z.string().nullable().optional(),
+  subject_contact: z.string().nullable().optional(),
+  hospital_name: z.string().nullable().optional(),
+  requested_by_name: z.string().nullable().optional(),
 });
 
 /**
@@ -71,6 +82,7 @@ export function toLoginEvent(dto: LoginEventResponse): LoginEvent {
     identifier: dto.identifier,
     principal: dto.principal,
     hospitalId: dto.hospital_id,
+    hospitalName: dto.hospital_name ?? null,
     result: dto.result,
     ip: dto.ip,
     userAgent: dto.user_agent ?? null,
@@ -87,8 +99,17 @@ export function toConfigChange(dto: ConfigChangeResponse): ConfigChangeRecord {
     beforeValue: dto.before_value ?? null,
     afterValue: dto.after_value ?? null,
     actorUserId: dto.actor_user_id,
+    actorName: dto.actor_name ?? null,
+    hospitalName: dto.hospital_name ?? null,
     occurredAt: dto.occurred_at,
   };
+}
+
+/** The carve-out is `{}` until an export is written; treat that as nothing recorded. */
+function toCarveOut(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object' && Object.keys(value).length === 0) return null;
+  return value;
 }
 
 export function toDataRequest(dto: DataRequestResponse): DataRequest {
@@ -101,10 +122,17 @@ export function toDataRequest(dto: DataRequestResponse): DataRequest {
     kind: dto.kind,
     status: dto.status,
     requestedByKind: dto.requested_by_kind,
+    requestedById: dto.requested_by_id ?? null,
     requestedAt: dto.requested_at,
+    coolingOffEndsAt: dto.cooling_off_ends_at ?? null,
     dueAt: dto.due_at,
     completedAt: dto.completed_at ?? null,
     exportFileId: dto.export_file_id,
     notes: dto.notes ?? null,
+    retentionCarveOut: toCarveOut(dto.retention_carve_out),
+    subjectName: dto.subject_name ?? null,
+    subjectContact: dto.subject_contact ?? null,
+    hospitalName: dto.hospital_name ?? null,
+    requestedByName: dto.requested_by_name ?? null,
   };
 }

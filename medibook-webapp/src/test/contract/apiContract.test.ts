@@ -54,6 +54,7 @@ import {
 import {
   configChangePageSchema,
   dataRequestPageSchema,
+  dataRequestResponseSchema,
   loginEventPageSchema,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 import { opsDashboardResponseSchema } from '@/features/ops-dashboard/infrastructure/data-sources/remote/opsDashboard.response';
@@ -198,6 +199,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-billing.subscriptionSchema': subscriptionSchema,
   'ops-compliance.configChangePageSchema': configChangePageSchema,
   'ops-compliance.dataRequestPageSchema': dataRequestPageSchema,
+  'ops-compliance.dataRequestResponseSchema': dataRequestResponseSchema,
   'ops-compliance.loginEventPageSchema': loginEventPageSchema,
   'ops-dashboard.opsDashboardResponseSchema': opsDashboardResponseSchema,
   'ops-hospitals.caseDetailResponseSchema': caseDetailResponseSchema,

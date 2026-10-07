@@ -76,11 +76,15 @@ export function getAllConfigChanges(
   return walkPages(CONFIG_CHANGES_PATH, params, configChangeResponseSchema);
 }
 
-export async function getDataRequests(page: number, pageSize: number) {
-  const response = await platformApi.get(DATA_REQUESTS_PATH, {
-    params: { page, page_size: pageSize, sort: '-requested_at' },
-  });
+export async function getDataRequests(params: ComplianceQueryParams) {
+  const response = await platformApi.get(DATA_REQUESTS_PATH, { params });
   return dataRequestPageSchema.parse(response.data);
+}
+
+/** `GET /platform/compliance/data-requests/{id}` — one request with notes and carve-out. */
+export async function getDataRequest(id: string): Promise<DataRequestResponse> {
+  const response = await platformApi.get(`${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}`);
+  return dataRequestResponseSchema.parse(response.data);
 }
 
 /** `POST /platform/compliance/data-requests` — idempotent on the caller's key. */
@@ -94,10 +98,17 @@ export async function postDataRequest(
   return dataRequestResponseSchema.parse(response.data);
 }
 
-export async function postProcessDataRequest(id: string): Promise<DataRequestResponse> {
+/**
+ * `POST …/{id}/process {notes?}` — prepares an export, or completes a
+ * rectification with the notes saying what was corrected.
+ */
+export async function postProcessDataRequest(
+  id: string,
+  notes?: string,
+): Promise<DataRequestResponse> {
   const response = await platformApi.post(
     `${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}/process`,
-    {},
+    notes ? { notes } : {},
   );
   return dataRequestResponseSchema.parse(response.data);
 }

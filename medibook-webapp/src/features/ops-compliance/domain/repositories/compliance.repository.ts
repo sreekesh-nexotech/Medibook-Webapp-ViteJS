@@ -28,9 +28,14 @@ export interface ComplianceRepository {
     filters: ConfigChangeFilters,
   ): Promise<Result<ComplianceExportRows<ConfigChangeRecord>>>;
   listDataRequests(params: DataRequestParams): Promise<Result<Page<DataRequest>>>;
+  /** One request in full (notes, carve-out, cooling-off end). */
+  getDataRequest(id: string): Promise<Result<DataRequest>>;
   /** File an export request for one account. */
   createDataExport(draft: DataExportDraft): Promise<Result<DataRequest>>;
-  /** Prepare a filed request's export now, or report that the nightly run will. */
-  processDataRequest(id: string): Promise<Result<DataRequestProcessOutcome>>;
+  /**
+   * Prepare a filed request's export now (or report that the nightly run
+   * will), or complete a rectification with `notes` on what was corrected.
+   */
+  processDataRequest(id: string, notes?: string): Promise<Result<DataRequestProcessOutcome>>;
   rejectDataRequest(id: string, reason: string): Promise<Result<DataRequest>>;
 }

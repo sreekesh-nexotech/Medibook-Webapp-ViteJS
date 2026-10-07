@@ -45,7 +45,7 @@ const STAFF_SOURCE: LoginHistoryParams = {
   dateTo: '',
   result: 'success',
   hospitalId: null,
-  principal: 'hospital',
+  principals: ['hospital'],
   page: 1,
   pageSize: MAX_PAGE_SIZE,
   sortDirection: 'desc',
