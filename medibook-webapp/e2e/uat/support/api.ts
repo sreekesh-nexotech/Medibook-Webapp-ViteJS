@@ -32,7 +32,11 @@ export class ApiError extends Error {
   readonly body: ApiErrorBody;
 
   constructor(method: string, url: string, status: number, body: ApiErrorBody) {
-    super(`${method} ${url} → ${status} ${body.code ?? ''} ${body.message ?? ''}`.trim());
+    const detail = [body.errors, body.meta]
+      .filter((part) => part && Object.keys(part).length > 0)
+      .map((part) => JSON.stringify(part))
+      .join(' ');
+    super(`${method} ${url} → ${status} ${body.code ?? ''} ${body.message ?? ''} ${detail}`.trim());
     this.status = status;
     this.code = body.code ?? '';
     this.body = body;

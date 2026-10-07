@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { stepTitle } from './stepList.ts';
@@ -52,6 +54,38 @@ export function stepPassed(id: string): boolean {
   return passed.has(id);
 }
 
+/** `UAT_STOP_ON_FAIL=1`: after the first failed step, the rest of the section is not run. */
+const STOP_ON_FAIL = process.env.UAT_STOP_ON_FAIL === '1';
+/** `UAT_UNTIL=<ID>`: run the section up to and including that step only. */
+const UNTIL = process.env.UAT_UNTIL ?? null;
+
+let stopped = false;
+
+/** Keep what the pages showed when a step failed: a full-page screenshot and the accessibility tree. */
+async function keepEvidence(id: string, pages: readonly Page[]): Promise<void> {
+  for (const [i, page] of pages.entries()) {
+    if (page.isClosed()) continue;
+    const name = `${id}-page-${i + 1}`;
+    const shot = test.info().outputPath(`${name}.png`);
+    if (
+      await page.screenshot({ fullPage: true, path: shot }).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      await test.info().attach(`${name}.png`, { path: shot, contentType: 'image/png' });
+    }
+    const tree = await page
+      .locator('body')
+      .ariaSnapshot()
+      .catch(() => null);
+    if (tree) {
+      const file = test.info().outputPath(`${name}.aria.yml`);
+      writeFileSync(file, `# ${page.url()}\n${tree}\n`);
+    }
+  }
+}
+
 /**
  * Run UAT step `id`. Failures are soft: the step is marked failed with the
  * reason and the section continues. Returns whether it passed.
@@ -61,6 +95,7 @@ export async function uatStep(
   options: StepOptions,
   body: () => Promise<void>,
 ): Promise<boolean> {
+  if (stopped) return false;
   let ok = true;
   await test.step(stepTitle(id), async () => {
     for (const w of options.watch ?? []) w.begin(options.allow);
@@ -72,20 +107,19 @@ export async function uatStep(
       }
     } catch (error) {
       ok = false;
-      const shots = typeof options.pages === 'function' ? options.pages() : (options.pages ?? []);
-      for (const [i, page] of shots.entries()) {
-        if (page.isClosed()) continue;
-        const shot = await page.screenshot({ fullPage: true }).catch(() => null);
-        if (shot) {
-          await test.info().attach(`${id}-page-${i + 1}.png`, {
-            body: shot,
-            contentType: 'image/png',
-          });
-        }
-      }
-      uatExpect.soft(error).toCompleteStep();
+      const pages = typeof options.pages === 'function' ? options.pages() : (options.pages ?? []);
+      await keepEvidence(id, pages);
+      // What the app's API said while the step ran is usually the reason.
+      const seen = (options.watch ?? []).flatMap((w) => w.problems());
+      const message = describeError(error);
+      const full =
+        seen.length > 0 && !message.startsWith('Unexpected errors')
+          ? `${message}\nWhile this step ran:\n${seen.join('\n')}`
+          : message;
+      uatExpect.soft(full).toCompleteStep();
     }
   });
   if (ok) passed.add(id);
+  if ((!ok && STOP_ON_FAIL) || id === UNTIL) stopped = true;
   return ok;
 }

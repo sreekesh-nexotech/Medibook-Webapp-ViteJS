@@ -70,7 +70,17 @@ export class ApiWatch {
         (a.status === undefined || a.status === response.status()) &&
         (!a.path || a.path.test(line)),
     );
-    if (!isAllowed) this.failures.push(`${response.status()} ${line}`);
+    if (isAllowed) return;
+    const entry = `${response.status()} ${line}`;
+    const index = this.failures.push(entry) - 1;
+    // The error code and message say why (the envelope's `code` / `message`).
+    void response
+      .json()
+      .then((body: { code?: string; message?: string }) => {
+        const why = [body.code, body.message].filter(Boolean).join(': ');
+        if (why && this.failures[index] === entry) this.failures[index] = `${entry} — ${why}`;
+      })
+      .catch(() => undefined);
   }
 
   /** Start a step: forget what came before and expect exactly `allowed` failures. */

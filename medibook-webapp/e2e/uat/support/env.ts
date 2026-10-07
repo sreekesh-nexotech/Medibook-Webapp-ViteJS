@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,3 +39,29 @@ export const API_PREFIX = '/api/v1';
 
 /** Every seeded hospital works on India Standard Time. */
 export const HOSPITAL_TIME_ZONE = 'Asia/Kolkata';
+
+/** `KEY=VALUE` lines of the live stack's env file. */
+export function liveEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const line of readFileSync(UAT_ENV.liveEnvFile, 'utf-8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq > 0) env[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+  }
+  return env;
+}
+
+/** The backend's default ceiling for a PDF built while you wait (M-26). */
+const PDF_SYNC_MAX_ROWS_DEFAULT = 2_000;
+
+/**
+ * Report PDFs with more rows than this are built in the background and
+ * emailed; the live stack lowers it with `REPORT_PDF_SYNC_MAX_ROWS`.
+ */
+export function pdfSyncMaxRows(): number {
+  const configured = Number(liveEnv().REPORT_PDF_SYNC_MAX_ROWS);
+  return Number.isFinite(configured) && configured > 0
+    ? Math.min(configured, PDF_SYNC_MAX_ROWS_DEFAULT)
+    : PDF_SYNC_MAX_ROWS_DEFAULT;
+}

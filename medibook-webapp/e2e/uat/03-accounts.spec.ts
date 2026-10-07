@@ -10,6 +10,7 @@ import {
   runTag,
 } from './support/booking.ts';
 import { paymentSearch } from './support/desk.ts';
+import { pdfSyncMaxRows } from './support/env.ts';
 import { needs, uatStep } from './support/steps.ts';
 import { addDays, fmtDate, isoDateIn, previousMonth, rupees, todayIso } from './support/time.ts';
 import {
@@ -39,7 +40,6 @@ test.describe.configure({ mode: 'serial' });
 const DESK = '/receptionist';
 const PAYMENT_LOOKBACK_DAYS = 60;
 const REPORT_SPAN_DAYS = 1_825;
-const PDF_SYNC_MAX_ROWS = 2_000;
 const EXPORT_WAIT_MS = 120_000;
 
 interface PaymentLineDto {
@@ -362,7 +362,8 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
   /* C-8 ------------------------------------------------------------------ */
   // A large export is built in the background and emailed as
   // `<app>/reports/downloads/<file id>`; the export id the screen is given is
-  // that file id. PDFs above 2,000 rows go to the background (M-26).
+  // that file id. PDFs above the sync ceiling (2,000 rows; the live stack sets
+  // REPORT_PDF_SYNC_MAX_ROWS lower) go to the background (M-26).
   await uatStep('C-8', { watch: watch(), pages }, async () => {
     const { page } = needs(desk, 'C-1');
     const reports = (await adminApi.get<ApiPage<CatalogDto>>('/reports')).results;
@@ -376,9 +377,10 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
       if (data && (!biggest || data.total > biggest.total)) biggest = { ...r, total: data.total };
     }
     const target = needs(biggest, 'a report');
-    if (target.total <= PDF_SYNC_MAX_ROWS) {
+    const syncMax = pdfSyncMaxRows();
+    if (target.total <= syncMax) {
       throw new Error(
-        `No report has more than ${PDF_SYNC_MAX_ROWS} rows (largest: ${target.title}, ${target.total}), so no export is large enough to be built in the background and emailed with the seeded data.`,
+        `No report has more than ${syncMax} rows (largest: ${target.title}, ${target.total}), so no export is large enough to be built in the background and emailed with the seeded data.`,
       );
     }
     await openNav(page, 'Reports');

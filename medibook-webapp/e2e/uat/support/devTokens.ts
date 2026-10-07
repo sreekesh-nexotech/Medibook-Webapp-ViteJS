@@ -1,9 +1,8 @@
 import { execFile } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
-import { UAT_ENV } from './env.ts';
+import { liveEnv, UAT_ENV } from './env.ts';
 
 /**
  * The emailed-link bridge (BE-02): the live stack runs with fake email, so the
@@ -35,18 +34,6 @@ export interface DevToken {
 interface DevTokensOutput {
   readonly identifier: string;
   readonly tokens: readonly DevToken[];
-}
-
-/** `KEY=VALUE` lines of the live stack's env file. */
-function liveEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const line of readFileSync(UAT_ENV.liveEnvFile, 'utf-8').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq > 0) env[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-  }
-  return env;
 }
 
 /** Every live emailed token for `email`, newest first. */

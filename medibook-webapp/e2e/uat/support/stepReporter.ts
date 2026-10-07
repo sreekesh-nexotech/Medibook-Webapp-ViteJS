@@ -56,12 +56,15 @@ export default class StepReporter implements Reporter {
     const match = STEP_ID.exec(step.title);
     if (!match?.[1]) return;
     const id = match[1];
+    const status: StepStatus = step.error ? 'failed' : 'passed';
     this.results.set(id, {
       id,
       title: step.title.slice(id.length).trim(),
-      status: step.error ? 'failed' : 'passed',
+      status,
       error: clean(step.error?.message),
     });
+    // Progress for a long run (one line per step).
+    process.stdout.write(`[uat] ${id} ${status} (${Math.round(step.duration / 1000)}s)\n`);
   }
 
   onEnd(): void {

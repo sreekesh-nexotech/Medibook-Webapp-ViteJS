@@ -230,7 +230,12 @@ test('4.2 Department front desk — Lakeshore', async ({ browser }) => {
     const deskMarker = needs(policy.offline_marker, 'the desk marker');
     expect(onlineMarker, 'online and desk tokens are told apart').not.toBe(deskMarker);
 
-    online = await bookOnline({ doctorId: session.doctor.id, date: todayIso(), pay: 'checkout' });
+    online = await bookOnline({
+      doctorId: session.doctor.id,
+      date: todayIso(),
+      pay: 'checkout',
+      sessionId: session.sessionId,
+    });
     const onlineLabel = needs(online.appointment.token_label, 'an online token');
     const slot = needs(
       (await openSlotsOf(adminApi, session.doctor.id, session.sessionId))[0],

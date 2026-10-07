@@ -251,7 +251,7 @@ interface ScheduleChange {
 async function addUatSessionToday(
   admin: ApiClient,
   doctor: HospitalDoctor,
-): Promise<string | null> {
+): Promise<{ readonly id: string; readonly label: string } | null> {
   const today = todayIso();
   const rows = await admin.get<HoursRow[]>('/hours');
   const todayHours = rows.find((h) => h.weekday === weekdayOf(today));
@@ -260,8 +260,9 @@ async function addUatSessionToday(
   const closes = todayHours?.closes_at ? minutesOf(todayHours.closes_at) : minutesOf('23:55');
 
   const day = await slotDay(admin, doctor.id, today);
-  const existing = (day?.sessions ?? []).map((s) => ({
-    session_code: s.session_code ?? s.label.toLowerCase().replace(/\W+/g, '-'),
+  // Session codes are `morning|afternoon|evening|custom-<n>` (SESSION_CODE_RE).
+  const existing = (day?.sessions ?? []).map((s, i) => ({
+    session_code: s.session_code ?? `custom-${i + 1}`,
     label: s.label,
     starts_at: clockIn(new Date(s.starts_at)),
     ends_at: clockIn(new Date(s.ends_at)),
@@ -274,11 +275,13 @@ async function addUatSessionToday(
   }
   const end = Math.min(start + UAT_SESSION_MINUTES, closes);
   if (end - start < UAT_SESSION_MIN_MINUTES) return null;
+  // A label of its own: earlier runs' UAT sessions stay on the day.
+  const label = `${UAT_SESSION_LABEL} ${hhmm(start)}`;
   const sessions = [
     ...existing,
     {
-      session_code: `uat-${hhmm(start).replace(':', '')}`,
-      label: UAT_SESSION_LABEL,
+      session_code: `custom-${hhmm(start).replace(':', '')}`,
+      label,
       starts_at: hhmm(start),
       ends_at: hhmm(end),
     },
@@ -309,8 +312,8 @@ async function addUatSessionToday(
   const deadline = Date.now() + MATERIALISE_WAIT_MS;
   while (Date.now() < deadline) {
     const fresh = await slotDay(admin, doctor.id, today);
-    const added = fresh?.sessions.find((s) => s.label === UAT_SESSION_LABEL);
-    if (added && added.slots.length > 0) return added.id;
+    const added = fresh?.sessions.find((s) => s.label === label);
+    if (added && added.slots.length > 0) return { id: added.id, label };
     await sleep(POLL_MS);
   }
   return null;
@@ -340,9 +343,12 @@ export async function cleanSessionToday(
     .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const doctor of candidates) {
-    const clean = sessions.filter(
+    const mine = sessions.filter((s) => s.doctor_id === doctor.id);
+    // The desk tells sessions apart by "doctor · label", so the label must be unique that day.
+    const unique = (label: string) => mine.filter((s) => s.label === label).length === 1;
+    const clean = mine.filter(
       (s) =>
-        s.doctor_id === doctor.id &&
+        unique(s.label) &&
         s.status === 'scheduled' &&
         s.waiting_count === 0 &&
         (s.in_consultation_count ?? 0) === 0 &&
@@ -366,17 +372,17 @@ export async function cleanSessionToday(
   }
 
   for (const doctor of candidates) {
-    const sessionId = await addUatSessionToday(admin, doctor);
-    if (!sessionId) continue;
+    const added = await addUatSessionToday(admin, doctor);
+    if (!added) continue;
     const day = await slotDay(admin, doctor.id, today);
-    const grid = day?.sessions.find((g) => g.id === sessionId);
+    const grid = day?.sessions.find((g) => g.id === added.id);
     const open = grid ? futureOpenSlots(grid, lead) : [];
     if (open.length >= options.minOpenSlots) {
       return {
         doctor,
         departmentName: deptName(doctor.department_id),
-        sessionId,
-        label: UAT_SESSION_LABEL,
+        sessionId: added.id,
+        label: added.label,
         openSlots: open,
       };
     }
@@ -598,6 +604,8 @@ export interface OnlineBookingOptions {
   readonly leadMinutes?: number;
   /** Which of the free slots to try (default: any, earliest first). */
   readonly slotFilter?: (slot: { readonly id: string; readonly starts_at: string }) => boolean;
+  /** Only slots of this session (a step that watches one queue). */
+  readonly sessionId?: string;
 }
 
 /** Codes that mean "this person or account cannot take another booking now". */
@@ -658,6 +666,7 @@ export async function bookOnline(options: OnlineBookingOptions): Promise<OnlineB
   await anonymous.dispose();
   const slots = grid.sessions
     .filter((s) => s.status !== 'closed' && s.status !== 'cancelled')
+    .filter((s) => !options.sessionId || s.session_id === options.sessionId)
     .flatMap((s) => s.slots)
     .filter((s) => s.state === 'available' && minutesUntil(s.starts_at) >= lead)
     .filter((s) => (options.slotFilter ? options.slotFilter(s) : true))

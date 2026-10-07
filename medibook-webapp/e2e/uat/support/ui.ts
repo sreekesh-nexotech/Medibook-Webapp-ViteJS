@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { inflateSync } from 'node:zlib';
 
 import {
   expect,
@@ -126,11 +127,19 @@ export function topbarTitle(page: Page): Locator {
   return page.getByRole('heading', { level: 1 });
 }
 
-/** A toast (confirmations are a polite status, errors an assertive alert). */
+/**
+ * A toast (confirmations are a polite status, errors an assertive alert). A
+ * toast's text starts after its icon with a space, and Playwright tests a
+ * RegExp against the untrimmed text, so a leading `^` allows that space.
+ */
 export function toast(page: Page, text: string | RegExp): Locator {
+  const matcher =
+    text instanceof RegExp && text.source.startsWith('^')
+      ? new RegExp(`^\\s*${text.source.slice(1)}`, text.flags)
+      : text;
   return page
     .locator('[role="status"][aria-live="polite"], [role="alert"][aria-live="assertive"]')
-    .getByText(text);
+    .getByText(matcher);
 }
 
 /** A dialog, modal or drawer by its title. */
@@ -256,10 +265,28 @@ async function saved(file: Download): Promise<SavedDownload> {
   };
 }
 
-/** Pages in a PDF (each page object carries `/Type /Page`). */
+const PDF_PAGE_OBJECT = /\/Type\s*\/Page(?![a-zA-Z])/g;
+const PDF_STREAM = /stream\r?\n/g;
+
+/**
+ * Pages in a PDF: page objects carry `/Type /Page`, in the file or inside a
+ * compressed object stream (WeasyPrint writes PDF 1.5+ object streams).
+ */
 export function pdfPageCount(bytes: Buffer): number {
-  const text = bytes.toString('latin1');
-  return (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
+  const raw = bytes.toString('latin1');
+  let count = (raw.match(PDF_PAGE_OBJECT) ?? []).length;
+  for (const match of raw.matchAll(PDF_STREAM)) {
+    const start = match.index + match[0].length;
+    const end = raw.indexOf('endstream', start);
+    if (end < 0) continue;
+    try {
+      const inflated = inflateSync(bytes.subarray(start, end)).toString('latin1');
+      count += (inflated.match(PDF_PAGE_OBJECT) ?? []).length;
+    } catch {
+      // Not a Flate stream (an image, a font): no page objects in it.
+    }
+  }
+  return count;
 }
 
 export function isPdf(bytes: Buffer): boolean {

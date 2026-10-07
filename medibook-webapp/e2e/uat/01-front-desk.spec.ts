@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 
-import { hospitalStaff, platformStaff, rememberPassword } from './support/accounts.ts';
+import { hospitalStaff, passwordOf, platformStaff, rememberPassword } from './support/accounts.ts';
 import { ApiClient } from './support/api.ts';
 import {
   bookOnline,
@@ -96,7 +96,7 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
     await expect(form.hospitalTab).toHaveAttribute('aria-pressed', 'true');
     await expect(form.remember).not.toBeChecked();
     await form.email.fill(receptionist.email);
-    await form.password.fill(UAT_ENV.seedPassword);
+    await form.password.fill(passwordOf(receptionist.email));
     await spendSignIn(receptionist.email);
     // UAT-70: Enter submits the form.
     await form.password.press('Enter');
@@ -105,7 +105,7 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
     await expect(page.getByText(`Welcome back, ${firstName}`)).toBeVisible();
     await expect(page.getByText('Appointments Today')).toBeVisible();
     await expect(page.getByText('Quick Actions')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New Appointment' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New Appointment' }).first()).toBeVisible();
     // "Keep me signed in" off: the session lives in this tab only.
     const stored = await page.evaluate(() => ({
       local: window.localStorage.getItem('medibook.auth.hospital.refresh'),
@@ -158,7 +158,7 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
     await modal.getByRole('button', { name: 'Add Patient' }).click();
     const added = toast(page, /^Patient added as /);
     await expect(added).toBeVisible();
-    const mrn = (await added.innerText()).replace(/^Patient added as /, '').split(' ')[0] ?? '';
+    const mrn = /Patient added as (\S+)/.exec(await added.innerText())?.[1] ?? '';
     expect(mrn, 'an MR number').toMatch(/\w/);
     await expect(topbarTitle(page)).toHaveText('Patient Profile');
     await expect(page.getByText(`MR: ${mrn}`)).toBeVisible();
@@ -296,7 +296,12 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
   await uatStep('R-9', { watch: watch(), pages }, async () => {
     const { page } = needs(desk, 'R-1');
     const session = needs(rSession, 'R-4');
-    online = await bookOnline({ doctorId: session.doctor.id, date: todayIso(), pay: 'checkout' });
+    online = await bookOnline({
+      doctorId: session.doctor.id,
+      date: todayIso(),
+      pay: 'checkout',
+      sessionId: session.sessionId,
+    });
     const ref = online.appointment.booking_ref;
     await openNav(page, 'Appointments');
     // The list has no booking-ref column; the search narrows it to this booking.
@@ -366,7 +371,8 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
       await search.fill(booking.appointment.booking_ref);
       const line = row(page, booking.patientName);
       await expect(line).toHaveCount(1);
-      await expect(line.getByText(mode, { exact: true })).toBeVisible();
+      // The method cell reads "<method> <collected by> · <counter>".
+      await expect(line.getByRole('cell', { name: new RegExp(`^${mode}\\b`) })).toBeVisible();
       await expect(line.getByText(rupees(booking.appointment.total_paise / 100))).toBeVisible();
     }
     await search.fill('');
@@ -404,7 +410,7 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
     await modal.getByRole('button', { name: 'Send to Medibook' }).click();
     const sent = toast(page, /^Ticket \S+ sent to Medibook$/);
     await expect(sent).toBeVisible();
-    const ticketNo = (await sent.innerText()).split(' ')[1] ?? '';
+    const ticketNo = /Ticket (\S+) sent/.exec(await sent.innerText())?.[1] ?? '';
     await closeDialogs(page);
 
     // Medibook support answers from the operations console.
@@ -436,14 +442,17 @@ test('4.1 Front desk — receptionist, Lakeshore', async ({ browser }) => {
     const other = await ApiClient.staff('hospital', receptionist.email);
     await goTo(page, `${DESK}/account`);
     await expect(topbarTitle(page)).toHaveText('My Account');
-    await page.getByLabel('Current Password').fill(UAT_ENV.seedPassword);
-    await page.getByLabel('New Password', { exact: true }).fill(NEW_PASSWORD);
-    await page.getByLabel('Confirm New Password').fill(NEW_PASSWORD);
+    // A run that stopped before R-16 leaves the rotated password in place.
+    const current = passwordOf(receptionist.email);
+    const next = current === NEW_PASSWORD ? `${NEW_PASSWORD}-b` : NEW_PASSWORD;
+    await page.getByLabel(/^Current Password/).fill(current);
+    await page.getByLabel(/^New Password/).fill(next);
+    await page.getByLabel(/^Confirm New Password/).fill(next);
     await page.getByRole('button', { name: 'Change Password' }).click();
     await expect(
       toast(page, 'Password changed. Your other devices were signed out.'),
     ).toBeVisible();
-    rememberPassword(receptionist.email, NEW_PASSWORD);
+    rememberPassword(receptionist.email, next);
     expect(await refreshWorks(other), 'the other device is signed out').toBe(false);
     await other.dispose();
 
