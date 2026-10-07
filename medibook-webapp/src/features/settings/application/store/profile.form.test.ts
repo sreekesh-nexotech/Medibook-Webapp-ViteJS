@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Holiday } from '@/features/settings/domain/entities/profile.entities';
+import type { Holiday, HospitalBanner } from '@/features/settings/domain/entities/profile.entities';
 import {
+  appLinkError,
+  bannerCtaCopy,
+  bannerCtaOf,
+  bannerCtaTarget,
   closedDaysWithin,
   upcomingClosures,
 } from '@/features/settings/application/store/profile.form';
@@ -81,5 +85,54 @@ describe('upcoming closures follow the hospital’s today (UAT-47)', () => {
     expect(edge.upcoming).toHaveLength(1);
     const beyond = upcomingClosures([holiday('2027-01-07', '2027-01-07')], today, 90);
     expect(beyond.upcoming).toHaveLength(0);
+  });
+});
+const HOSPITAL = 'h-1';
+
+describe('banner button links', () => {
+  it('builds the deep links the patient app opens', () => {
+    expect(bannerCtaTarget({ action: 'booking', doctorId: '', link: '' }, HOSPITAL)).toBe(
+      'medibook://booking',
+    );
+    expect(bannerCtaTarget({ action: 'hospital', doctorId: '', link: '' }, HOSPITAL)).toBe(
+      'medibook://hospital/h-1',
+    );
+    expect(bannerCtaTarget({ action: 'doctor', doctorId: 'd-7', link: '' }, HOSPITAL)).toBe(
+      'medibook://doctor/d-7',
+    );
+    expect(bannerCtaTarget({ action: 'none', doctorId: '', link: '' }, HOSPITAL)).toBeNull();
+  });
+
+  it('reads a stored link back as the choice that made it', () => {
+    expect(bannerCtaOf('medibook://doctor/d-7')).toEqual({
+      action: 'doctor',
+      doctorId: 'd-7',
+      link: '',
+    });
+    expect(bannerCtaOf('medibook://hospital/h-1').action).toBe('hospital');
+    expect(bannerCtaOf('medibook://faq')).toEqual({
+      action: 'other',
+      doctorId: '',
+      link: 'medibook://faq',
+    });
+    expect(bannerCtaOf(null).action).toBe('none');
+  });
+
+  it('accepts only links the patient app can open', () => {
+    expect(appLinkError('medibook://faq')).toBeUndefined();
+    expect(appLinkError('https://medibook.app/hospital/h-1')).toBeUndefined();
+    expect(appLinkError('https://example.com')).toBeDefined();
+    expect(appLinkError('')).toBeDefined();
+  });
+
+  it('describes the button for the banner list', () => {
+    const banner = {
+      ctaLabel: 'Book now',
+      ctaTarget: 'medibook://doctor/d-7',
+    } as HospitalBanner;
+    expect(bannerCtaCopy(banner, new Map([['d-7', 'Dr. Meera Varghese']]))).toBe(
+      'Button “Book now” → Dr. Meera Varghese',
+    );
+    expect(bannerCtaCopy({ ...banner, ctaLabel: null }, new Map())).toBeNull();
   });
 });

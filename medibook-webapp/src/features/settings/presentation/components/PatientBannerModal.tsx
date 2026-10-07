@@ -13,16 +13,21 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
   BannerInput,
   HospitalBanner,
 } from '@/features/settings/domain/entities/profile.entities';
 import { useUploadBannerImageMutation } from '@/features/settings/application/queries/useUploadBannerImageMutation';
 import {
-  BANNER_AUDIENCE_LABEL,
-  BANNER_AUDIENCE_OPTIONS,
-  audienceForLabel,
+  BANNER_CTA_ACTION_LABEL,
+  BANNER_CTA_ACTION_OPTIONS,
+  appLinkError,
+  bannerCtaOf,
+  bannerCtaTarget,
   bannerWindow,
+  ctaActionForLabel,
   dayEndIso,
   dayStartIso,
 } from '@/features/settings/application/store/profile.form';
@@ -30,6 +35,8 @@ import {
 /** Banner copy the patient app can render without clipping. */
 const MAX_BODY_CHARS = 220;
 const MIN_TITLE_CHARS = 6;
+/** Backend `HospitalBannerSerializer.cta_label` max length. */
+const MAX_CTA_LABEL_CHARS = 40;
 
 const DATE_INPUT_CLASS =
   'rounded-input border-border-control text-body text-text-body h-12 w-full border bg-white px-3';
@@ -40,14 +47,29 @@ interface BannerForm {
   imageFileId: string | null;
   from: string;
   to: string;
-  audience: string;
+  /** The button choice, as its label (`BANNER_CTA_ACTION_LABEL`). */
+  ctaAction: string;
+  ctaLabel: string;
+  ctaDoctorId: string;
+  ctaLink: string;
 }
+
+const hasButton = (values: BannerForm): boolean => ctaActionForLabel(values.ctaAction) !== 'none';
 
 const VALIDATORS: FormValidators<BannerForm> = {
   title: (v) => minLen(v, MIN_TITLE_CHARS, 'Banner title'),
   body: (v) => required(v, 'Banner message'),
-  from: (v) => required(v, 'Live-from date'),
-  to: (v, values) => dateRange(values.from, v),
+  // Either end may stay open: no start = live now, no end = until paused.
+  to: (v, values) => (values.from && v ? dateRange(values.from, v) : undefined),
+  ctaLabel: (v, values) =>
+    // The input stops at the backend's 40 characters.
+    hasButton(values) ? required(v, 'Button text') : undefined,
+  ctaDoctorId: (v, values) =>
+    ctaActionForLabel(values.ctaAction) === 'doctor' && v === ''
+      ? 'Pick the doctor the button opens.'
+      : undefined,
+  ctaLink: (v, values) =>
+    ctaActionForLabel(values.ctaAction) === 'other' ? appLinkError(v) : undefined,
 };
 
 /** Server field → form field (UAT-48). */
@@ -57,7 +79,8 @@ const BANNER_SERVER_FIELDS = {
   image_file_id: 'imageFileId',
   starts_at: 'from',
   ends_at: 'to',
-  audience: 'audience',
+  cta_label: 'ctaLabel',
+  cta_target: 'ctaLink',
 } as const;
 
 interface PatientBannerModalProps {
@@ -89,6 +112,10 @@ export function PatientBannerModal({
   const upload = useUploadBannerImageMutation();
   const [preview, setPreview] = useState<string | null>(imageUrl);
   const span = banner ? bannerWindow(banner) : { from: '', to: '' };
+  const cta = bannerCtaOf(banner?.ctaTarget ?? null);
+  const session = useSessionQuery('hospital').data;
+  const hospitalId = session?.surface === 'hospital' ? session.hospital.id : '';
+  const doctors = useDoctorsQuery().data ?? [];
 
   const form = useForm<BannerForm>({
     initial: {
@@ -97,17 +124,28 @@ export function PatientBannerModal({
       imageFileId: banner?.imageFileId ?? null,
       from: span.from,
       to: span.to,
-      audience: BANNER_AUDIENCE_LABEL[banner?.audience ?? 'hospital_patients'],
+      ctaAction: BANNER_CTA_ACTION_LABEL[banner?.ctaLabel ? cta.action : 'none'],
+      ctaLabel: banner?.ctaLabel ?? '',
+      ctaDoctorId: cta.doctorId,
+      ctaLink: cta.link,
     },
     validate: VALIDATORS,
     onSubmit: async (v) => {
       try {
+        const action = ctaActionForLabel(v.ctaAction);
+        const target =
+          action === 'none'
+            ? null
+            : bannerCtaTarget({ action, doctorId: v.ctaDoctorId, link: v.ctaLink }, hospitalId);
         await onSave({
           title: v.title.trim(),
           body: v.body.trim(),
           imageFileId: v.imageFileId,
-          audience: audienceForLabel(v.audience),
-          startsAt: dayStartIso(v.from),
+          ctaLabel: target ? v.ctaLabel.trim() : null,
+          ctaTarget: target,
+          // The backend stores an audience but never uses it (PROF-01): keep what is there.
+          audience: banner?.audience ?? 'hospital_patients',
+          startsAt: v.from ? dayStartIso(v.from) : null,
           endsAt: v.to ? dayEndIso(v.to) : null,
         });
         onClose();
@@ -259,7 +297,7 @@ export function PatientBannerModal({
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Live From" required error={form.errorFor('from')}>
+          <Field label="Live From" error={form.errorFor('from')} hint="Empty = live right away.">
             <input
               type="date"
               value={form.values.from}
@@ -269,7 +307,7 @@ export function PatientBannerModal({
               className={DATE_INPUT_CLASS}
             />
           </Field>
-          <Field label="Live Until" required error={form.errorFor('to')}>
+          <Field label="Live Until" error={form.errorFor('to')} hint="Empty = no end date.">
             <input
               type="date"
               value={form.values.to}
@@ -281,17 +319,57 @@ export function PatientBannerModal({
           </Field>
         </div>
 
-        <Field
-          label="Audience"
-          hint="Patients of this hospital, or every patient browsing hospitals in your city."
-        >
-          <Select
-            value={form.values.audience}
-            options={BANNER_AUDIENCE_OPTIONS}
-            onChange={(v) => form.setField('audience', v)}
-            height={48}
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Button in the App" hint="A button under the banner, e.g. “Book now”.">
+            <Select
+              value={form.values.ctaAction}
+              options={BANNER_CTA_ACTION_OPTIONS}
+              onChange={(v) => form.setField('ctaAction', v)}
+              height={48}
+            />
+          </Field>
+          {hasButton(form.values) && (
+            <Field
+              label="Button Text"
+              required
+              error={form.errorFor('ctaLabel')}
+              hint={`${form.values.ctaLabel.length}/${MAX_CTA_LABEL_CHARS} characters.`}
+            >
+              <TextInput
+                value={form.values.ctaLabel}
+                onChange={(v) => form.setField('ctaLabel', v.slice(0, MAX_CTA_LABEL_CHARS))}
+                onBlur={() => form.blurField('ctaLabel')}
+                placeholder="e.g. Book now"
+                height={48}
+              />
+            </Field>
+          )}
+        </div>
+        {ctaActionForLabel(form.values.ctaAction) === 'doctor' && (
+          <Field label="Doctor" required error={form.errorFor('ctaDoctorId')}>
+            <Select
+              value={doctors.find((d) => d.id === form.values.ctaDoctorId)?.name ?? ''}
+              options={doctors.map((d) => d.name)}
+              onChange={(name) =>
+                form.setField('ctaDoctorId', doctors.find((d) => d.name === name)?.id ?? '')
+              }
+              onBlur={() => form.blurField('ctaDoctorId')}
+              placeholder="Select a doctor"
+              height={48}
+            />
+          </Field>
+        )}
+        {ctaActionForLabel(form.values.ctaAction) === 'other' && (
+          <Field label="App Link" required error={form.errorFor('ctaLink')}>
+            <TextInput
+              value={form.values.ctaLink}
+              onChange={(v) => form.setField('ctaLink', v)}
+              onBlur={() => form.blurField('ctaLink')}
+              placeholder="medibook://…"
+              height={48}
+            />
+          </Field>
+        )}
       </div>
     </FormModal>
   );

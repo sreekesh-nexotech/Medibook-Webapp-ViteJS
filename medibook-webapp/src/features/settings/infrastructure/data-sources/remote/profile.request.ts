@@ -31,6 +31,8 @@ export interface BannerWriteRequest {
   readonly title?: string;
   readonly body?: string | null;
   readonly image_file_id?: string | null;
+  readonly cta_label?: string | null;
+  readonly cta_target?: string | null;
   readonly audience?: string;
   readonly starts_at?: string | null;
   readonly ends_at?: string | null;
@@ -43,6 +45,8 @@ export function toBannerWriteRequest(c: BannerChanges): BannerWriteRequest {
     ...(c.title !== undefined && { title: c.title }),
     ...(c.body !== undefined && { body: c.body }),
     ...(c.imageFileId !== undefined && { image_file_id: c.imageFileId }),
+    ...(c.ctaLabel !== undefined && { cta_label: c.ctaLabel }),
+    ...(c.ctaTarget !== undefined && { cta_target: c.ctaTarget }),
     ...(c.audience !== undefined && { audience: c.audience }),
     ...(c.startsAt !== undefined && { starts_at: c.startsAt }),
     ...(c.endsAt !== undefined && { ends_at: c.endsAt }),

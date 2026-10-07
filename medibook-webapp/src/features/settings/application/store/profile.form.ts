@@ -1,6 +1,6 @@
 /**
  * Pure rules for the Hospital Profile screen (module H4) over the API
- * entities: closure scope and span, banner audience labels, the date ↔
+ * entities: closure scope and span, the banner button's app link, the date ↔
  * date-time mapping the banner window needs, and a banner's publication
  * state. No React, no store, no I/O.
  */
@@ -10,7 +10,6 @@ import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
   AffectedBooking,
-  BannerAudience,
   Holiday,
   HospitalBanner,
 } from '@/features/settings/domain/entities/profile.entities';
@@ -130,18 +129,94 @@ export function affectedBookingsCopy(bookings: readonly AffectedBooking[]): stri
 
 /* ------------------------------------------------------------------- banners */
 
-/** The two audiences the backend supports, as the modal labels them. */
-export const BANNER_AUDIENCE_LABEL: Readonly<Record<BannerAudience, string>> = {
-  hospital_patients: 'Patients of this hospital',
-  all_patients_in_city: 'All patients in the city',
+/**
+ * Where a banner's button leads in the patient app: one of the app's own deep
+ * links (`app_routes.dart` `inAppPathFor` accepts `medibook://…` and
+ * `https://medibook.app/…`). The backend stores the link as text.
+ */
+export type BannerCtaAction = 'none' | 'booking' | 'hospital' | 'doctor' | 'other';
+
+export const BANNER_CTA_ACTION_LABEL: Readonly<Record<BannerCtaAction, string>> = {
+  none: 'No button',
+  booking: 'Book an appointment',
+  hospital: "Open the hospital's page",
+  doctor: "Open a doctor's profile",
+  other: 'Another app link',
 };
 
-export const BANNER_AUDIENCE_OPTIONS: readonly string[] = Object.values(BANNER_AUDIENCE_LABEL);
+export const BANNER_CTA_ACTION_OPTIONS: readonly string[] = Object.values(BANNER_CTA_ACTION_LABEL);
 
-export function audienceForLabel(label: string): BannerAudience {
-  return label === BANNER_AUDIENCE_LABEL.all_patients_in_city
-    ? 'all_patients_in_city'
-    : 'hospital_patients';
+export function ctaActionForLabel(label: string): BannerCtaAction {
+  const found = (Object.keys(BANNER_CTA_ACTION_LABEL) as BannerCtaAction[]).find(
+    (k) => BANNER_CTA_ACTION_LABEL[k] === label,
+  );
+  return found ?? 'none';
+}
+
+const DEEP_LINK = 'medibook://';
+const BOOKING_LINK = `${DEEP_LINK}booking`;
+const HOSPITAL_LINK = `${DEEP_LINK}hospital/`;
+const DOCTOR_LINK = `${DEEP_LINK}doctor/`;
+/** The links the patient app opens; anything else shows its not-found screen. */
+const APP_LINK = /^(medibook:\/\/|https:\/\/(www\.)?medibook\.app\/)\S*$/;
+
+/** A stored button link read back as the choice that made it. */
+export interface BannerCta {
+  readonly action: BannerCtaAction;
+  /** The doctor a `doctor` link opens. */
+  readonly doctorId: string;
+  /** The link itself, for `other`. */
+  readonly link: string;
+}
+
+export function bannerCtaOf(target: string | null): BannerCta {
+  if (!target) return { action: 'none', doctorId: '', link: '' };
+  if (target === BOOKING_LINK) return { action: 'booking', doctorId: '', link: '' };
+  if (target.startsWith(HOSPITAL_LINK)) return { action: 'hospital', doctorId: '', link: '' };
+  if (target.startsWith(DOCTOR_LINK)) {
+    return { action: 'doctor', doctorId: target.slice(DOCTOR_LINK.length), link: '' };
+  }
+  return { action: 'other', doctorId: '', link: target };
+}
+
+/** The link to store for a choice; `null` when there is no button. */
+export function bannerCtaTarget(cta: BannerCta, hospitalId: string): string | null {
+  switch (cta.action) {
+    case 'none':
+      return null;
+    case 'booking':
+      return BOOKING_LINK;
+    case 'hospital':
+      return `${HOSPITAL_LINK}${hospitalId}`;
+    case 'doctor':
+      return `${DOCTOR_LINK}${cta.doctorId}`;
+    case 'other':
+      return cta.link.trim();
+  }
+}
+
+/** `undefined` when `link` is one the patient app can open. */
+export function appLinkError(link: string): string | undefined {
+  if (link.trim() === '') return 'Enter the app link the button opens.';
+  return APP_LINK.test(link.trim())
+    ? undefined
+    : 'Use a Medibook app link, e.g. medibook://booking or https://medibook.app/…';
+}
+
+/** "Book now → Book an appointment" for the banner list. */
+export function bannerCtaCopy(
+  banner: HospitalBanner,
+  doctorNames: ReadonlyMap<string, string>,
+): string | null {
+  if (!banner.ctaLabel || !banner.ctaTarget) return null;
+  const cta = bannerCtaOf(banner.ctaTarget);
+  const where =
+    cta.action === 'doctor'
+      ? (doctorNames.get(cta.doctorId) ?? "a doctor's profile")
+      : cta.action === 'other'
+        ? cta.link
+        : BANNER_CTA_ACTION_LABEL[cta.action];
+  return `Button “${banner.ctaLabel}” → ${where}`;
 }
 
 /** The last second of a day, for inclusive end dates. */

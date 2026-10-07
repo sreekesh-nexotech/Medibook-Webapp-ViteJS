@@ -80,6 +80,9 @@ Paths under `backend:` are in the Django repository.
 | REP-01    | User Activity's Last Active is sent and exported in UTC                    | Medium   | Screen shows the UTC time too                 |
 | REP-02    | Sorting a report high-to-low puts empty values first                       | Low      | Screen shows what the server returns          |
 | REP-03    | System reasons are exported as codes (`patient_cancellation`)              | Low      | Screen shows the codes too                    |
+| PROF-01   | A banner's audience is stored but never used                               | Low      | Audience choice removed from the form         |
+| PROF-02   | Banner order ties sort differently for staff and patients                  | Low      | Reordering always saves distinct positions    |
+| PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links         |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1124,3 +1127,52 @@ CSV, Excel and PDF exports print them as they are.
 separate `reason_code`), so the exports read like the screen.
 
 **What the web app does meanwhile.** Shows the codes as sent, like the exports.
+
+## PROF-01 — A banner's audience is stored but never used
+
+**New finding (live check of System → Hospital Profile, 7 Oct 2026).**
+
+**What fails.** `hospital_banners.audience` accepts `hospital_patients` or
+`all_patients_in_city` (backend: `hospitals/models/hospital_banner.py`), but nothing
+reads it. The patient app gets a hospital's banners only from
+`GET /patient/hospitals/{id}/banners`, which filters by hospital, window and
+`is_enabled` alone (`hospitals/services/patient_discovery.py` `active_banners`), and
+there is no city-wide banner list (`docs/FLUTTER_API_INTEGRATION.md` §7.4, §18). A
+hospital that picked "All patients in the city" reached nobody new.
+
+**What the backend needs.** Either serve `all_patients_in_city` banners to patients
+browsing hospitals in that city, or drop the field from the hospital API.
+
+**What the web app does meanwhile.** The banner form no longer offers an audience. New
+banners are `hospital_patients`, and an edit keeps whatever a banner already has.
+
+## PROF-02 — Banner order ties sort differently for staff and patients
+
+**New finding (live check of System → Hospital Profile, 7 Oct 2026).**
+
+**What fails.** Staff see banners ordered by `sort_order, created_at`
+(`hospitals/views/settings_banner_list.py`), but patients get `sort_order, -created_at`
+(`patient_discovery.active_banners`). Two banners with the same `sort_order` therefore
+rotate in the opposite order to the one the Hospital Profile screen shows.
+
+**What the backend needs.** One tie-break for both lists, or unique `sort_order` values
+per hospital.
+
+**What the web app does meanwhile.** New banners take the next free position and the
+arrows save distinct positions, so ties only come from older data.
+
+## PROF-03 — A banner's button link is not checked
+
+**New finding (live check of System → Hospital Profile, 7 Oct 2026).**
+
+**What fails.** `cta_target` accepts any text up to 500 characters, and `cta_label` can
+be saved without a target (`hospitals/serializers/settings_banner_serializer.py`). The
+patient app opens only its own links (`medibook://…` or `https://medibook.app/…`) and
+shows its not-found screen for anything else, so a typo gives patients a dead button.
+
+**What the backend needs.** Validate `cta_target` against the app's link forms, and
+require the label and the target together.
+
+**What the web app does meanwhile.** The banner form builds the link from a choice (book
+an appointment, the hospital's page, a doctor's profile) or accepts only a Medibook app
+link, and sends the label and the link together.

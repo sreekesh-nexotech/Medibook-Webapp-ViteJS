@@ -32,6 +32,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { ScheduleChangeModal } from '@/features/doctors/presentation/components/ScheduleChangeModal';
 import { useScheduleConfirm } from '@/features/doctors/presentation/components/useScheduleConfirm';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
   BannerInput,
   Holiday,
@@ -49,8 +50,8 @@ import { useReorderBannersMutation } from '@/features/settings/application/queri
 import { useSaveHolidayMutation } from '@/features/settings/application/queries/useSaveHolidayMutation';
 import { useUpdateBannerMutation } from '@/features/settings/application/queries/useUpdateBannerMutation';
 import {
-  BANNER_AUDIENCE_LABEL,
   HOLIDAY_SCOPE_OPTIONS,
+  bannerCtaCopy,
   bannerStatusAt,
   bannerWindow,
   holidayAppliesTo,
@@ -142,6 +143,7 @@ export function HospitalProfileScreen() {
   const holidaysQuery = useHolidaysQuery(canView);
   const bannersQuery = useBannersQuery(canView);
   const departmentsQuery = useDepartmentsQuery();
+  const doctorsQuery = useDoctorsQuery();
 
   const saveHoliday = useSaveHolidayMutation();
   const removeHoliday = useRemoveHolidayMutation();
@@ -166,6 +168,7 @@ export function HospitalProfileScreen() {
   const banners = bannersQuery.data ?? [];
   const departments = (departmentsQuery.data ?? []).map((d) => ({ id: d.id, name: d.name }));
   const departmentNames = new Map(departments.map((d) => [d.id, d.name]));
+  const doctorNames = new Map((doctorsQuery.data ?? []).map((d) => [d.id, d.name]));
   const imageUrls = useBannerImageUrlsQuery(
     banners.flatMap((b) => (b.imageFileId ? [b.imageFileId] : [])),
   );
@@ -216,8 +219,8 @@ export function HospitalProfileScreen() {
         h.from,
         h.to,
         holidayDayCount(h.from, h.to),
-        holidayScopeOf(h),
         holidayAppliesTo(h, departmentNames),
+        holidayScopeOf(h),
         h.note ?? '',
       ]),
     ]);
@@ -518,7 +521,9 @@ export function HospitalProfileScreen() {
                   <td className={tdClass}>
                     <div className="flex flex-col">
                       <span className="text-text-strong font-medium">{appliesTo}</span>
-                      <span className="text-caption text-text-muted">{holidayScopeOf(h)}</span>
+                      {h.departmentId !== null && (
+                        <span className="text-caption text-text-muted">Department</span>
+                      )}
                     </div>
                   </td>
                   <td className={cn(tdClass, 'max-w-80')}>
@@ -678,9 +683,13 @@ export function HospitalProfileScreen() {
                         </div>
                         <div className="text-caption text-text-muted mt-0.5 tabular-nums">
                           {span.from ? fmtDate(span.from) : 'Now'} –{' '}
-                          {span.to ? fmtDate(span.to) : 'No end date'} ·{' '}
-                          {BANNER_AUDIENCE_LABEL[b.audience]}
+                          {span.to ? fmtDate(span.to) : 'No end date'}
                         </div>
+                        {bannerCtaCopy(b, doctorNames) && (
+                          <div className="text-caption text-text-muted mt-0.5">
+                            {bannerCtaCopy(b, doctorNames)}
+                          </div>
+                        )}
                       </div>
                       <Badge status={state} />
                       {state !== 'Expired' && (

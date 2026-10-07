@@ -77,6 +77,10 @@ export interface HospitalBanner {
   readonly title: string;
   readonly body: string | null;
   readonly imageFileId: string | null;
+  /** The button under the banner, e.g. "Book now"; `null` = no button. */
+  readonly ctaLabel: string | null;
+  /** Where the button leads: a patient-app deep link such as `medibook://booking`. */
+  readonly ctaTarget: string | null;
   readonly audience: BannerAudience;
   /** ISO date-times; `null` = open-ended. */
   readonly startsAt: string | null;
@@ -94,6 +98,8 @@ export interface BannerInput {
   readonly title: string;
   readonly body: string | null;
   readonly imageFileId: string | null;
+  readonly ctaLabel: string | null;
+  readonly ctaTarget: string | null;
   readonly audience: BannerAudience;
   readonly startsAt: string | null;
   readonly endsAt: string | null;
