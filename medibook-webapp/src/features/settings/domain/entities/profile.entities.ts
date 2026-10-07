@@ -13,6 +13,14 @@ export interface Holiday {
   readonly to: string;
   readonly departmentId: string | null;
   readonly note: string | null;
+  /** Row version: `If-Match` on edit (required) and delete (decision 10, UAT-05). */
+  readonly version: number;
+}
+
+/** The closure a write targets, at the version the user saw. */
+export interface HolidayRef {
+  readonly id: string;
+  readonly version: number;
 }
 
 export interface HolidayInput {
@@ -27,6 +35,7 @@ export interface HolidayInput {
 export interface AffectedBooking {
   readonly appointmentId: string;
   readonly bookingRef: string;
+  readonly tokenLabel: string | null;
   readonly patientName: string;
   /** ISO date-time. */
   readonly scheduledStartAt: string;
@@ -35,10 +44,26 @@ export interface AffectedBooking {
 /**
  * The outcome of a holiday write. A dry run applies nothing and lists what
  * confirming would cancel (with a 100% refund); a confirmed write applied it.
+ * Same envelope as every schedule-affecting write (`ScheduleChangeSerializer`).
  */
 export interface ScheduleChange {
   readonly dryRun: boolean;
   readonly affectedBookings: readonly AffectedBooking[];
+  readonly result: null;
+  /** The dry run's fingerprint, echoed on confirm (BE-33); `null` when not issued. */
+  readonly previewToken: string | null;
+  /** The applied change queued a slot re-generation. */
+  readonly rematerialisationQueued: boolean;
+}
+
+/**
+ * How one holiday write is sent: a dry run with a fresh `Idempotency-Key`,
+ * or the confirm with the action's key (reused on retry) and the preview token.
+ */
+export interface HolidayWriteMode {
+  readonly confirm: boolean;
+  readonly idempotencyKey: string;
+  readonly previewToken?: string | null;
 }
 
 /** Who a hospital banner reaches in the patient app. */

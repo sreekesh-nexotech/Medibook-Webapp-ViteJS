@@ -24,6 +24,7 @@ export const holidayResponseSchema = z.object({
   date_to: z.string(),
   department_id: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
+  version: z.number().int(),
 });
 
 /** `GET /holidays` answers with the page envelope, not the bare array `schema.yml` shows. */
@@ -39,12 +40,14 @@ export function toHoliday(dto: HolidayResponse): Holiday {
     to: dto.date_to,
     departmentId: dto.department_id ?? null,
     note: dto.note ?? null,
+    version: dto.version,
   };
 }
 
 const affectedBookingSchema = z.object({
   appointment_id: z.string(),
   booking_ref: z.string(),
+  token_label: z.string().nullable().optional(),
   patient_name: z.string(),
   scheduled_start_at: z.string(),
 });
@@ -52,6 +55,9 @@ const affectedBookingSchema = z.object({
 export const scheduleChangeResponseSchema = z.object({
   dry_run: z.boolean(),
   affected_bookings: z.array(affectedBookingSchema),
+  // Confirm-bound-to-preview (BE-33); optional until the backend issues it.
+  preview_token: z.string().nullable().optional(),
+  rematerialisation_queued: z.boolean().optional(),
 });
 
 export type ScheduleChangeResponse = z.infer<typeof scheduleChangeResponseSchema>;
@@ -62,9 +68,13 @@ export function toScheduleChange(dto: ScheduleChangeResponse): ScheduleChange {
     affectedBookings: dto.affected_bookings.map((b): AffectedBooking => ({
       appointmentId: b.appointment_id,
       bookingRef: b.booking_ref,
+      tokenLabel: b.token_label ?? null,
       patientName: b.patient_name,
       scheduledStartAt: b.scheduled_start_at,
     })),
+    result: null,
+    previewToken: dto.preview_token ?? null,
+    rematerialisationQueued: dto.rematerialisation_queued ?? false,
   };
 }
 

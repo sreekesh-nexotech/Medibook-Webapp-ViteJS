@@ -1,7 +1,9 @@
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { dateRange, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
+import { toast } from '@/shared/ui/toast/toast.store';
 import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
@@ -42,6 +44,19 @@ export interface HolidayDepartmentOption {
   readonly name: string;
 }
 
+/** What saving did: done (applied, or handed to the impact confirmation), or failed with why. */
+export type HolidaySaveOutcome =
+  { readonly status: 'done' } | { readonly status: 'failed'; readonly error: unknown };
+
+/** Server field → form field (UAT-48). */
+const HOLIDAY_SERVER_FIELDS = {
+  name: 'name',
+  date_from: 'from',
+  date_to: 'to',
+  department_id: 'departmentId',
+  note: 'note',
+} as const;
+
 interface HolidayModalProps {
   open: boolean;
   /** The closure being edited, or null to add one. */
@@ -49,10 +64,11 @@ interface HolidayModalProps {
   departments: readonly HolidayDepartmentOption[];
   onClose: () => void;
   /**
-   * Save the closure. Resolves `true` when the modal's job is done (applied,
-   * or handed to the screen's impact confirmation); `false` keeps it open.
+   * Save the closure. `done` closes the modal (applied, or handed to the
+   * screen's impact confirmation); `failed` keeps it open with the server's
+   * reasons on the fields.
    */
-  onSave: (input: HolidayInput) => Promise<boolean>;
+  onSave: (input: HolidayInput) => Promise<HolidaySaveOutcome>;
 }
 
 /**
@@ -74,14 +90,25 @@ export function HolidayModal({ open, holiday, departments, onClose, onSave }: Ho
     validate: VALIDATORS,
     onSubmit: async (v) => {
       const note = v.note.trim();
-      const done = await onSave({
+      const outcome = await onSave({
         name: v.name.trim(),
         from: v.from,
         to: v.to || v.from,
         departmentId: v.scope === 'Whole hospital' ? null : v.departmentId,
         note: note === '' ? null : note,
       });
-      if (done) onClose();
+      if (outcome.status === 'done') {
+        onClose();
+        return;
+      }
+      toast(
+        form.applyServerErrors(
+          outcome.error,
+          { fields: HOLIDAY_SERVER_FIELDS },
+          'The closure could not be saved.',
+        ),
+        'error',
+      );
     },
   });
 
@@ -99,6 +126,7 @@ export function HolidayModal({ open, holiday, departments, onClose, onSave }: Ho
       busy={form.submitting}
     >
       <div className="flex flex-col gap-4">
+        <FormErrorSummary messages={form.serverSummary} />
         <Field label="Closure Name" required error={form.errorFor('name')}>
           <TextInput
             value={form.values.name}
@@ -170,7 +198,11 @@ export function HolidayModal({ open, holiday, departments, onClose, onSave }: Ho
             </Field>
           )}
         </div>
-        <Field label="Note" hint="Shown to staff on the slot grid and in the patient app.">
+        <Field
+          label="Note"
+          error={form.errorFor('note')}
+          hint="Shown to staff on the holiday calendar and the slot grid."
+        >
           <TextInput
             value={form.values.note}
             onChange={(v) => form.setField('note', v)}

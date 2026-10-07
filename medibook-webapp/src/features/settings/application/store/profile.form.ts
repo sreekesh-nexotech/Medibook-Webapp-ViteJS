@@ -55,6 +55,30 @@ export function holidayDaysWithin(holiday: Holiday, windowFrom: string, windowTo
   return holidayDayCount(from, to);
 }
 
+/**
+ * Distinct calendar days inside `[windowFrom, windowTo]` that at least one of
+ * `holidays` closes — overlapping closures count each day once (07·P-F3).
+ */
+export function closedDaysWithin(
+  holidays: readonly Holiday[],
+  windowFrom: string,
+  windowTo: string,
+): number {
+  const days = new Set<string>();
+  for (const h of holidays) {
+    const from = h.from > windowFrom ? h.from : windowFrom;
+    const to = h.to < windowTo ? h.to : windowTo;
+    const count = holidayDayCount(from, to);
+    const start = localNoon(from);
+    for (let i = 0; i < count; i += 1) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.add(toLocalISO(d));
+    }
+  }
+  return days.size;
+}
+
 /** How many bookings to name in the confirm dialog before summarising the rest. */
 const AFFECTED_PREVIEW_COUNT = 3;
 

@@ -272,6 +272,8 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
   reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
+  doctorReviewPageSchema:
+    'DOC-01: GET /hospital/doctors/{id}/reviews is not served by the recorded backend yet; record it once B9 lands.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */
