@@ -7,6 +7,7 @@ import type {
   PatientAppointment,
   PatientChangeDecision,
   PatientFieldChange,
+  PatientMatchCandidate,
   PatientRecord,
   PendingPatientChange,
 } from '@/features/patients/domain/entities/patients.entities';
@@ -73,6 +74,42 @@ export const hospitalPatientResponseSchema = z.object({
   created_at: z.string(),
   version: z.number().int(),
 });
+
+/**
+ * `409 PATIENT_MATCH_REVIEW` → `meta.candidates` (backend B6, M-14): this
+ * hospital's records that share the phone and first name but cannot be
+ * confirmed as the same person (a date of birth is missing).
+ */
+export const patientMatchReviewMetaSchema = z.object({
+  candidates: z.array(
+    z.object({
+      id: z.string(),
+      mrn: z.string(),
+      first_name: z.string().nullable().optional(),
+      last_name: z.string().nullable().optional(),
+      full_name: z.string().nullable().optional(),
+      date_of_birth: z.string().nullable().optional(),
+      gender: genderSchema.nullable().optional(),
+      created_at: z.string().nullable().optional(),
+    }),
+  ),
+});
+
+type PatientMatchReviewMeta = z.infer<typeof patientMatchReviewMetaSchema>;
+
+export function toPatientMatchCandidate(
+  dto: PatientMatchReviewMeta['candidates'][number],
+): PatientMatchCandidate {
+  const name = [dto.first_name, dto.last_name].filter(Boolean).join(' ');
+  return {
+    id: dto.id,
+    mrn: dto.mrn,
+    fullName: dto.full_name || name || dto.mrn,
+    dateOfBirth: dto.date_of_birth ?? null,
+    gender: dto.gender ?? null,
+    createdAt: dto.created_at ?? null,
+  };
+}
 
 export type HospitalPatientResponse = z.infer<typeof hospitalPatientResponseSchema>;
 

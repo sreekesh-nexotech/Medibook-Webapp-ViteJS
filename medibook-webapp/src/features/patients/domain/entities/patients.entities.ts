@@ -110,10 +110,35 @@ export interface PatientListParams {
   readonly sortDirection: SortDirection;
 }
 
-export interface PatientCreateOutcome {
-  readonly patient: PatientRecord;
-  /** The same person already had an MRN here; this is that record (no new MRN). */
-  readonly isExisting: boolean;
+/**
+ * A record at this hospital that may be the person being registered: same
+ * phone and first name, but a date of birth is missing on one side, so the
+ * server cannot confirm it (backend B6, M-14).
+ */
+export interface PatientMatchCandidate {
+  readonly id: string;
+  readonly mrn: string;
+  readonly fullName: string;
+  readonly dateOfBirth: string | null;
+  readonly gender: PatientGender | null;
+  readonly createdAt: string | null;
+}
+
+/**
+ * - `created`: a new MRN was minted.
+ * - `existing`: the same person already had an MRN here; this is that record.
+ * - `matchReview`: possible duplicates the desk must rule on — use one, or
+ *   register again with `confirmNewRecord`.
+ */
+export type PatientCreateOutcome =
+  | { readonly status: 'created' | 'existing'; readonly patient: PatientRecord }
+  | { readonly status: 'matchReview'; readonly candidates: readonly PatientMatchCandidate[] };
+
+/** What registering a patient sends. */
+export interface PatientCreateInput {
+  readonly demographics: PatientDemographics;
+  /** The desk reviewed the possible matches and wants a new record anyway. */
+  readonly confirmNewRecord: boolean;
 }
 
 export type PatientEditOutcome =

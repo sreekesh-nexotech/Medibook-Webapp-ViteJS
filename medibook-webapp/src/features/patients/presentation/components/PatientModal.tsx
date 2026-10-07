@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { todayISO } from '@/shared/lib/format';
 import { email as emailRule, notFutureDate, required } from '@/shared/lib/validate';
@@ -11,10 +13,11 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useCreatePatientMutation } from '@/features/patients/application/queries/useCreatePatientMutation';
 import { useUpdatePatientMutation } from '@/features/patients/application/queries/useUpdatePatientMutation';
 import type {
-  PatientCreateOutcome,
   PatientDemographics,
+  PatientMatchCandidate,
   PatientRecord,
 } from '@/features/patients/domain/entities/patients.entities';
+import { PatientMatchReview } from '@/features/patients/presentation/components/PatientMatchReview';
 import {
   GENDER_NOT_SPECIFIED,
   GENDER_OPTIONS,
@@ -143,12 +146,27 @@ function formToDemographics(v: PatientForm): PatientDemographics {
   };
 }
 
-/** What the desk is told after registering: a new MRN, an existing record, a linked account. */
-function createdMessage({ patient, isExisting }: PatientCreateOutcome): string {
+/**
+ * What the desk is told after registering: a new MRN, an existing record, a
+ * linked account. The server reports a link only for the same person, never
+ * for a dependant the registration created (M-15), so this never over-promises.
+ */
+function createdMessage(patient: PatientRecord, isExisting: boolean): string {
   if (isExisting) return `Already registered as ${patient.mrn} — opened that record`;
   return patient.isLinked
     ? `Patient added as ${patient.mrn} and linked to their Medibook account`
     : `Patient added as ${patient.mrn}`;
+}
+
+/** The fields the server matches people on; a change after a review means a fresh check. */
+function matchKey(d: PatientDemographics): string {
+  return [d.phone, d.firstName.toLowerCase(), d.lastName?.toLowerCase(), d.dateOfBirth].join('|');
+}
+
+/** Possible duplicates the server returned, for the details they were checked against. */
+interface MatchReviewState {
+  readonly candidates: readonly PatientMatchCandidate[];
+  readonly key: string;
 }
 
 /**
@@ -164,13 +182,25 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
   const isPhoneRequired = !patient || patient.phone !== null;
   const createMutation = useCreatePatientMutation();
   const updateMutation = useUpdatePatientMutation();
+  const [review, setReview] = useState<MatchReviewState | null>(null);
 
   const save = async (v: PatientForm): Promise<void> => {
     const demographics = formToDemographics(v);
     try {
       if (!patient) {
-        const outcome = await createMutation.mutateAsync(demographics);
-        toast(createdMessage(outcome), outcome.isExisting ? 'info' : 'success');
+        const key = matchKey(demographics);
+        // A second submit after the review registers a new record anyway —
+        // unless the matching details changed, which needs a fresh check.
+        const outcome = await createMutation.mutateAsync({
+          demographics,
+          confirmNewRecord: review?.key === key,
+        });
+        if (outcome.status === 'matchReview') {
+          setReview({ candidates: outcome.candidates, key });
+          return;
+        }
+        const isExisting = outcome.status === 'existing';
+        toast(createdMessage(outcome.patient, isExisting), isExisting ? 'info' : 'success');
         onSaved?.(outcome.patient.mrn);
         onClose();
         return;
@@ -203,6 +233,13 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
     validate: isPhoneRequired ? PHONE_REQUIRED_VALIDATORS : PHONE_OPTIONAL_VALIDATORS,
     onSubmit: save,
   });
+  const reviewing = review !== null && review.key === matchKey(formToDemographics(form.values));
+
+  const openCandidate = (candidate: PatientMatchCandidate): void => {
+    toast(`Opened ${candidate.fullName} (${candidate.mrn})`, 'info');
+    onSaved?.(candidate.mrn);
+    onClose();
+  };
 
   const text = (
     key: keyof PatientForm,
@@ -245,9 +282,10 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
       title={isNew ? 'Add Patient' : 'Edit Patient'}
       width={640}
       onSubmit={form.handleSubmit}
-      submitLabel={isNew ? 'Add Patient' : 'Save Changes'}
+      submitLabel={reviewing ? 'Register as New Patient' : isNew ? 'Add Patient' : 'Save Changes'}
       busy={form.submitting}
     >
+      {reviewing && <PatientMatchReview candidates={review.candidates} onUse={openCandidate} />}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4.5">
         {text('firstName', 'First Name', {
           required: true,

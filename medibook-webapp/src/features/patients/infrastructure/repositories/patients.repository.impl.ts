@@ -2,6 +2,7 @@ import { toPage } from '@/core/api/pagination';
 import { attempt } from '@/core/error/attempt';
 import { clientFailure } from '@/core/error/toFailure';
 
+import type { PatientCreateOutcome } from '@/features/patients/domain/entities/patients.entities';
 import type { PatientsRepository } from '@/features/patients/domain/repositories/patients.repository';
 import {
   deletePatient,
@@ -19,6 +20,7 @@ import {
   toPatientApproval,
   toPatientAppointment,
   toPatientChangeDecision,
+  toPatientMatchCandidate,
   toPatientRecord,
 } from '@/features/patients/infrastructure/data-sources/remote/patients.response';
 
@@ -46,10 +48,12 @@ export const patientsRepository: PatientsRepository = {
       return toPatientRecord(await getPatient(hit.id));
     }),
 
-  createPatient: (demographics) =>
-    attempt(async () => {
-      const { isCreated, patient } = await postPatient(toPatientRequestBody(demographics));
-      return { patient: toPatientRecord(patient), isExisting: !isCreated };
+  createPatient: ({ demographics, confirmNewRecord }) =>
+    attempt(async (): Promise<PatientCreateOutcome> => {
+      const answer = await postPatient(toPatientRequestBody(demographics), confirmNewRecord);
+      return answer.kind === 'matchReview'
+        ? { status: 'matchReview', candidates: answer.candidates.map(toPatientMatchCandidate) }
+        : { status: answer.kind, patient: toPatientRecord(answer.patient) };
     }),
 
   updatePatient: (id, changes, version) =>

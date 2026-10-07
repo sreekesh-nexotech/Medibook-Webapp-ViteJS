@@ -6,6 +6,7 @@ import type {
   PatientApprovalListParams,
   PatientAppointmentHistory,
   PatientChangeDecision,
+  PatientCreateInput,
   PatientCreateOutcome,
   PatientDeleteOutcome,
   PatientDemographics,
@@ -20,7 +21,7 @@ export interface PatientsRepository {
   /** The record with exactly this MRN; a `notFound` failure when there is none. */
   getPatientByMrn(mrn: string): Promise<Result<PatientRecord>>;
   /** Mints an MRN, or returns the existing record when the person is already registered. */
-  createPatient(demographics: PatientDemographics): Promise<Result<PatientCreateOutcome>>;
+  createPatient(input: PatientCreateInput): Promise<Result<PatientCreateOutcome>>;
   /** Applies at once, or becomes a change request when the hospital requires approval. */
   updatePatient(
     id: string,

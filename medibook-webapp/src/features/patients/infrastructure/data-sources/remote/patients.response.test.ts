@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { toPatientRequestBody } from '@/features/patients/infrastructure/data-sources/remote/patients.request';
 import {
+  patientMatchReviewMetaSchema,
+  toPatientMatchCandidate,
   approvalRequestPageResponseSchema,
   hospitalPatientResponseSchema,
   toFieldChanges,
@@ -124,5 +126,36 @@ describe('toPatientRequestBody', () => {
     expect(
       toPatientRequestBody({ city: null, legacyMrn: 'OLD-77', addressLine3: 'Near X' }),
     ).toEqual({ city: null, legacy_mrn: 'OLD-77', address_line3: 'Near X' });
+  });
+});
+
+describe('possible duplicates (409 PATIENT_MATCH_REVIEW, B6 M-14)', () => {
+  it('reads the candidates, naming each one even without a full name', () => {
+    const meta = patientMatchReviewMetaSchema.parse({
+      candidates: [
+        {
+          id: 'hp-1',
+          mrn: 'LKSM000006',
+          first_name: 'Priya',
+          last_name: 'Nair',
+          full_name: 'Priya Nair',
+          date_of_birth: null,
+          gender: 'female',
+          created_at: '2026-09-01T10:00:00Z',
+        },
+        { id: 'hp-2', mrn: 'LKSM000009', first_name: 'Priya', last_name: null },
+      ],
+    });
+    const [first, second] = meta.candidates.map(toPatientMatchCandidate);
+    expect(first).toEqual({
+      id: 'hp-1',
+      mrn: 'LKSM000006',
+      fullName: 'Priya Nair',
+      dateOfBirth: null,
+      gender: 'female',
+      createdAt: '2026-09-01T10:00:00Z',
+    });
+    expect(second?.fullName).toBe('Priya');
+    expect(second?.createdAt).toBeNull();
   });
 });

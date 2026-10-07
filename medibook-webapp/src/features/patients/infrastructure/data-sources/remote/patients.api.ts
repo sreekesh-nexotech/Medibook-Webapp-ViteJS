@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios';
+
 import { ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
@@ -15,6 +17,7 @@ import {
   hospitalPatientPageResponseSchema,
   hospitalPatientResponseSchema,
   patientAppointmentPageResponseSchema,
+  patientMatchReviewMetaSchema,
 } from '@/features/patients/infrastructure/data-sources/remote/patients.response';
 
 /** `/hospital/patients…` and `/hospital/patient-approvals…` (`schema.yml`). */
@@ -74,13 +77,39 @@ export async function getPatient(id: string) {
   return hospitalPatientResponseSchema.parse(response.data);
 }
 
-/** `201` = new MRN minted; `200` = the same person was already registered here. */
-export async function postPatient(body: PatientRequestBody) {
-  const response = await hospitalApi.post(PATIENTS_PATH, body);
-  return {
-    isCreated: response.status === HTTP_CREATED,
-    patient: hospitalPatientResponseSchema.parse(response.data),
-  };
+const HTTP_CONFLICT = 409;
+const MATCH_REVIEW_CODE = 'PATIENT_MATCH_REVIEW';
+
+/** The candidates of a `409 PATIENT_MATCH_REVIEW`, or `null` for any other error. */
+function matchReviewOf(error: unknown) {
+  if (!isAxiosError(error) || error.response?.status !== HTTP_CONFLICT) return null;
+  const body: unknown = error.response.data;
+  if (typeof body !== 'object' || body === null) return null;
+  const { code, meta } = body as { code?: unknown; meta?: unknown };
+  if (code !== MATCH_REVIEW_CODE) return null;
+  return patientMatchReviewMetaSchema.parse(meta).candidates;
+}
+
+/**
+ * `201` = new MRN minted; `200` = the same person was already registered
+ * here; `409 PATIENT_MATCH_REVIEW` = possible duplicates the desk must rule
+ * on (B6, M-14) — re-sent with `confirm_new_record: true` to register anyway.
+ */
+export async function postPatient(body: PatientRequestBody, confirmNewRecord: boolean) {
+  try {
+    const response = await hospitalApi.post(
+      PATIENTS_PATH,
+      confirmNewRecord ? { ...body, confirm_new_record: true } : body,
+    );
+    return {
+      kind: response.status === HTTP_CREATED ? ('created' as const) : ('existing' as const),
+      patient: hospitalPatientResponseSchema.parse(response.data),
+    };
+  } catch (error) {
+    const candidates = matchReviewOf(error);
+    if (candidates) return { kind: 'matchReview' as const, candidates };
+    throw error;
+  }
 }
 
 /** `200` = applied (the record); `202` = sent to an admin for approval. */
