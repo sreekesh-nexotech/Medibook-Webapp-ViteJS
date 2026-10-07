@@ -83,6 +83,8 @@ Paths under `backend:` are in the Django repository.
 | PROF-01   | A banner's audience is stored but never used                               | Low      | Audience choice removed from the form         |
 | PROF-02   | Banner order ties sort differently for staff and patients                  | Low      | Reordering always saves distinct positions    |
 | PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links         |
+| HSET-01   | A payout account can never become verified                                 | Medium   | Not shown on the screen                       |
+| HSET-02   | Removing a counter does not check who still uses it                        | Low      | Counters can be marked inactive instead       |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1176,3 +1178,38 @@ require the label and the target together.
 **What the web app does meanwhile.** The banner form builds the link from a choice (book
 an appointment, the hospital's page, a doctor's profile) or accepts only a Medibook app
 link, and sends the label and the link together.
+
+## HSET-01 — A payout account can never become verified
+
+**New finding (live check of System → Hospital Settings, 8 Oct 2026).**
+
+**What fails.** `hospital_bank_accounts.verified_at` is returned on every account
+(`hospitals/serializers/bank_account_serializer.py`), and changing the account number
+clears it (`hospitals/services/bank_accounts.py:88`), but no endpoint, task or admin
+action ever sets it. The test hospital's only payout account has `verified_at: null`,
+and every account will stay unverified for good.
+
+**What the backend needs.** A verification step that sets `verified_at` (a penny-drop
+check, or an operations "mark verified" action), and a rule for whether settlements
+wait on it.
+
+**What the web app does meanwhile.** Bank & Payouts does not show a verification state yet;
+`verified_at` is read but stays empty.
+
+## HSET-02 — Removing a counter does not check who still uses it
+
+**New finding (live check of System → Hospital Settings, 8 Oct 2026).**
+
+**What fails.** `DELETE /hospital/counters/{id}` soft-deletes the counter
+(`hospitals/services/settings.py` `delete_counter`) without checking staff whose
+default counter it is (`rbac.HospitalStaff`) or a cash drawer still open at it
+(`cashdesk.CashSession.counter`). Those rows keep pointing at a counter that no longer
+appears in any list. Assigning a default counter checks only that the counter exists
+(`rbac/services/staff.py:80`), not that it is active.
+
+**What the backend needs.** Refuse the delete (or clear the references) while staff
+default to the counter or a drawer is open at it, and refuse inactive counters as a
+default.
+
+**What the web app does meanwhile.** A counter can be marked inactive in its edit form,
+which keeps it for history; removing one is not checked.
