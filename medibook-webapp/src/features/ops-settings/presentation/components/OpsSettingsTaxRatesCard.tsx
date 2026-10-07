@@ -21,6 +21,7 @@ import type { TaxRate } from '@/features/ops-settings/domain/entities/opsSetting
 import {
   APPLIES_TO_LABEL,
   formatRateBp,
+  taxRateInUseMessage,
 } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 import { OpsSettingsTaxRateModal } from '@/features/ops-settings/presentation/components/OpsSettingsTaxRateModal';
 
@@ -54,7 +55,12 @@ export function OpsSettingsTaxRatesCard() {
       {
         onSuccess: () => toast(`${target.code} deleted.`, 'success'),
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not delete that rate.', 'error'),
+          toast(
+            isFailure(failure)
+              ? (taxRateInUseMessage(failure.code, failure.meta) ?? failure.message)
+              : 'Could not delete that rate.',
+            'error',
+          ),
       },
     );
   };

@@ -21,6 +21,7 @@ import {
   appliesToOptionsFor,
   bpToPercentInput,
   percentInputToBp,
+  taxRateInUseMessage,
 } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 
 /** The modal's text-and-toggle form. */
@@ -101,7 +102,7 @@ export function OpsSettingsTaxRateModal({ rate, onClose }: OpsSettingsTaxRateMod
       if (formKey) fromServer[formKey] = messages[0] ?? null;
     }
     setErr((p) => ({ ...p, ...fromServer }));
-    toast(failure.message, 'error');
+    toast(taxRateInUseMessage(failure.code, failure.meta) ?? failure.message, 'error');
   };
 
   const handleSubmit = () => {

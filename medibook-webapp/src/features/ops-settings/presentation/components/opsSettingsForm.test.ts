@@ -12,6 +12,7 @@ import {
   toSettingsValues,
   validateSettingsForm,
 } from '@/features/ops-settings/presentation/components/opsSettingsForm';
+import { taxRateInUseMessage } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 
 const DTO = {
   id: 1,
@@ -173,5 +174,23 @@ describe('feature flag changes', () => {
       is_public: true,
     });
     expect(toFeatureFlagPatchBody({})).toEqual({});
+  });
+});
+
+describe('taxRateInUseMessage (B4)', () => {
+  it('names a few services still using the rate', () => {
+    const services = ['Dressing', 'ECG', 'X-ray', 'Lab'].map((name, i) => ({
+      id: String(i),
+      code: name.toUpperCase(),
+      name,
+      hospital_id: 'h1',
+    }));
+    expect(taxRateInUseMessage('TAX_RATE_IN_USE', { service_count: 4, services })).toBe(
+      '4 hospital services still use this rate (Dressing, ECG, X-ray and 1 more). Hospitals must move them to another rate first.',
+    );
+    expect(taxRateInUseMessage('TAX_RATE_IN_USE', { service_count: 1, services: [] })).toBe(
+      '1 hospital service still uses this rate. Hospitals must move it to another rate first.',
+    );
+    expect(taxRateInUseMessage('CONFLICT_VERSION', {})).toBeNull();
   });
 });
