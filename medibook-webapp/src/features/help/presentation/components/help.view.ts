@@ -1,6 +1,7 @@
 import type { IconName } from '@/shared/ui/icon-registry';
 
 import type {
+  HelpFaq,
   SupportTicketCategory,
   SupportTicketStatus,
   TicketAuthorKind,
@@ -57,60 +58,88 @@ export function authorLabel(kind: TicketAuthorKind, name: string | null): string
 
 /* ------------------------------------------------------------------ FAQs */
 
-/** The four help topics — both a category tile and the FAQ grouping. */
-export const HELP_TOPICS = ['Getting Started', 'Appointments', 'Billing', 'Settlements'] as const;
-
-export type HelpTopic = (typeof HELP_TOPICS)[number];
-
 export interface Faq {
+  readonly key: string;
   readonly q: string;
   readonly a: string;
-  readonly topic: HelpTopic;
+  readonly topic: string;
 }
 
 /**
  * In-app answers, each checked against what the product does today (UAT-51):
  * email-link invitations only, walk-ins on an open slot, tokens per doctor
  * session called with Call Next, per-hospital receipt series and commission,
- * and no "mark received" step on settlements.
+ * and no "mark received" step on settlements. Shown when the platform's
+ * hospital FAQ feed (BE-34) is empty or unavailable.
  */
-export const FAQS: readonly Faq[] = [
+export const STATIC_FAQS: readonly Faq[] = [
   {
+    key: 'staff-access',
     topic: 'Getting Started',
     q: 'How do I give my staff access?',
     a: 'An admin opens Users & Roles → Add User and sends an email invitation; the staff member sets their own password from the link. Everyone gets one of the four roles — Admin, Front Desk, Accounts or Department Front Desk — and the admin can change what each role may do, except the admin role itself.',
   },
   {
+    key: 'walk-in',
     topic: 'Appointments',
     q: 'How do I book a walk-in?',
     a: 'Go to Appointments → New Appointment, find the patient (or add them), then pick the department, the doctor and one of the doctor’s open slots for each consultation and book. The queue token is issued at booking. Staff who take payments collect the fee straight away; anyone else books and the patient pays at reception.',
   },
   {
+    key: 'token-queue',
     topic: 'Appointments',
     q: 'How does the token queue work?',
     a: 'Each doctor session is its own queue. On Token Management the desk opens the session and presses Call Next, which calls tokens in number order; Start, Done and Skip move the called patient along. Done does not call anyone else — press Call Next for the next patient. After the hospital’s number of skips the desk is offered a no-show; it is never marked automatically.',
   },
   {
+    key: 'receipt',
     topic: 'Billing',
     q: 'Where do I find a payment receipt?',
     a: 'Open the appointment and choose Receipt, or find the payment on the Payments screen. Receipts are numbered in your hospital’s own receipt series and list every payment line, with tax shown on the lines it applies to.',
   },
   {
+    key: 'settlements',
     topic: 'Settlements',
     q: 'How do settlements work?',
     a: 'Medibook collects the payment for online bookings and pays your hospital the amount due after its commission, at the rate agreed for your hospital, once each settlement period closes. Billing & Settlements shows every period with its payout and statement. Fees collected at the desk are your hospital’s and are not part of settlements.',
   },
   {
+    key: 'export',
     topic: 'Billing',
     q: 'Can I export data?',
     a: 'Yes. Payments, Reports and Billing & Settlements export what you are looking at, in the formats each screen offers. Very large report exports are prepared in the background and sent to you by email when they are ready.',
   },
 ];
 
-/** FAQs in a topic (or all) that mention the search text in the question or the answer. */
+/** The platform's answers when it publishes any (BE-34), else the app's own. */
+export function faqsToShow(feed: readonly HelpFaq[] | undefined): readonly Faq[] {
+  if (!feed || feed.length === 0) return STATIC_FAQS;
+  return feed.map((f) => ({ key: f.id, q: f.question, a: f.answer, topic: f.category }));
+}
+
+/** The topics the answers fall into, in first-seen order. */
+export function topicsOf(faqs: readonly Faq[]): readonly string[] {
+  return Array.from(new Set(faqs.map((f) => f.topic)));
+}
+
+const TOPIC_TILES: Readonly<
+  Record<string, { readonly icon: IconName; readonly subtitle: string } | undefined>
+> = {
+  'Getting Started': { icon: 'rocket', subtitle: 'Setup & first steps' },
+  Appointments: { icon: 'calendar-days', subtitle: 'Booking & queue' },
+  Billing: { icon: 'wallet', subtitle: 'Payments & receipts' },
+  Settlements: { icon: 'scale', subtitle: 'Medibook transfers' },
+};
+
+/** A topic tile's glyph and caption; topics the app does not know get a plain tile. */
+export function topicTile(topic: string): { readonly icon: IconName; readonly subtitle: string } {
+  return TOPIC_TILES[topic] ?? { icon: 'circle-help', subtitle: 'Answers from Medibook' };
+}
+
+/** Answers in a topic (or all) that mention the search text in the question or the answer. */
 export function filterFaqs(
   faqs: readonly Faq[],
-  topic: HelpTopic | null,
+  topic: string | null,
   search: string,
 ): readonly Faq[] {
   const needle = search.trim().toLowerCase();

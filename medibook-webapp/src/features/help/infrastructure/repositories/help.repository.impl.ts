@@ -1,7 +1,10 @@
 import { attempt } from '@/core/error/attempt';
+import { isFailure } from '@/core/error/failure';
+import { toFailure } from '@/core/error/toFailure';
 
 import type { HelpRepository } from '@/features/help/domain/repositories/help.repository';
 import {
+  getHospitalFaqs,
   getSupportTicket,
   getSupportTickets,
   postSupportTicket,
@@ -13,6 +16,7 @@ import {
   toTicketMessageRequest,
 } from '@/features/help/infrastructure/data-sources/remote/help.request';
 import {
+  toHelpFaqs,
   toSupportTicket,
   toSupportTicketDetail,
   toTicketMessage,
@@ -32,6 +36,17 @@ export const helpRepository: HelpRepository = {
       };
     }),
   getTicket: (id) => attempt(async () => toSupportTicketDetail(await getSupportTicket(id))),
+  listFaqs: () =>
+    attempt(async () => {
+      try {
+        return toHelpFaqs(await getHospitalFaqs());
+      } catch (error) {
+        // A backend without the feed answers 404: the screen keeps its own answers.
+        const failure = isFailure(error) ? error : toFailure(error);
+        if (failure.kind === 'notFound') return [];
+        throw failure;
+      }
+    }),
   addMessage: (id, input) =>
     attempt(async () =>
       toTicketMessage(await postTicketMessage(id, toTicketMessageRequest(input))),

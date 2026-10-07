@@ -38,6 +38,8 @@ export interface SupportTicket {
   readonly updatedAt: string;
   readonly resolvedAt: string | null;
   readonly closedAt: string | null;
+  /** Who raised it, when the backend names them (BE-35). */
+  readonly raisedByName: string | null;
   readonly version: number;
 }
 
@@ -93,4 +95,13 @@ export interface NewSupportTicket {
   readonly category: SupportTicketCategory;
   readonly subject: string;
   readonly description: string;
+}
+
+/** One help answer from the platform's hospital FAQ feed (`GET /hospital/content/faqs`, BE-34). */
+export interface HelpFaq {
+  readonly id: string;
+  readonly category: string;
+  readonly question: string;
+  /** Markdown source, shown as plain text. */
+  readonly answer: string;
 }

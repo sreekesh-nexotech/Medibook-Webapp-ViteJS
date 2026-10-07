@@ -8,32 +8,19 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
-import type { IconName } from '@/shared/ui/icon-registry';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
+import { useHelpFaqsQuery } from '@/features/help/application/queries/useHelpFaqsQuery';
 import {
-  FAQS,
+  faqsToShow,
   filterFaqs,
   supportContacts,
-  type HelpTopic,
+  topicsOf,
+  topicTile,
 } from '@/features/help/presentation/components/help.view';
 import { RaiseTicketModal } from '@/features/help/presentation/components/RaiseTicketModal';
 import { SupportTicketDrawer } from '@/features/help/presentation/components/SupportTicketDrawer';
 import { SupportTicketsCard } from '@/features/help/presentation/components/SupportTicketsCard';
-
-interface HelpCategory {
-  readonly key: HelpTopic;
-  readonly icon: IconName;
-  readonly subtitle: string;
-}
-
-/** The four help category tiles (design `HelpSupport` `cats`). */
-const CATEGORIES: readonly HelpCategory[] = [
-  { key: 'Getting Started', icon: 'rocket', subtitle: 'Setup & first steps' },
-  { key: 'Appointments', icon: 'calendar-days', subtitle: 'Booking & queue' },
-  { key: 'Billing', icon: 'wallet', subtitle: 'Payments & receipts' },
-  { key: 'Settlements', icon: 'scale', subtitle: 'Medibook transfers' },
-];
 
 /**
  * Help & Support screen (design `Admin.jsx` `HelpSupport`): the navy hero with
@@ -41,8 +28,10 @@ const CATEGORIES: readonly HelpCategory[] = [
  * "Raise a Ticket", and the hospital's own tickets with Medibook's replies
  * (UAT-30).
  *
- * The FAQs are in-app copy checked against what the product does (UAT-51);
- * the hospital API has no FAQ endpoint. The support email and phone are the
+ * The FAQs come from the platform's hospital FAQ feed (`GET
+ * /hospital/content/faqs`, BE-34); while it is empty or unavailable the app
+ * shows its own answers, checked against what the product does (UAT-51).
+ * The topic tiles follow the answers' categories. The support email and phone are the
  * platform's `support_contacts` from app-config: the phone card only shows
  * when one is set, and the email falls back to the address the rest of the
  * app names. There is no live chat.
@@ -52,7 +41,7 @@ export function HelpSupportScreen() {
   const [raising, setRaising] = useState(false);
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [topic, setTopic] = useState<HelpTopic | null>(null);
+  const [topic, setTopic] = useState<string | null>(null);
   const timeZone = useHospitalTimeZone();
   const appConfig = useAppConfigQuery();
   const contacts = supportContacts(
@@ -61,7 +50,10 @@ export function HelpSupportScreen() {
     SUPPORT_EMAIL_FALLBACK,
   );
 
-  const shown = filterFaqs(FAQS, topic, q);
+  const faqsQuery = useHelpFaqsQuery();
+  const faqs = faqsToShow(faqsQuery.data);
+  const topics = topicsOf(faqs);
+  const shown = filterFaqs(faqs, topic, q);
   const filtered = q.trim() !== '' || topic !== null;
   const clear = (): void => {
     setQ('');
@@ -102,8 +94,9 @@ export function HelpSupportScreen() {
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        {CATEGORIES.map((c) => {
-          const on = topic === c.key;
+        {topics.map((key) => {
+          const on = topic === key;
+          const c = { key, ...topicTile(key) };
           return (
             <Card
               key={c.key}
@@ -135,7 +128,7 @@ export function HelpSupportScreen() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <SectionTitle size={16}>Frequently Asked Questions</SectionTitle>
             <span className="text-caption text-text-muted">
-              {filtered ? `${shown.length} of ${FAQS.length} answers` : `${FAQS.length} answers`}
+              {filtered ? `${shown.length} of ${faqs.length} answers` : `${faqs.length} answers`}
             </span>
           </div>
           {shown.length === 0 ? (
@@ -153,7 +146,7 @@ export function HelpSupportScreen() {
           ) : (
             <div className="flex flex-col gap-2.5">
               {shown.map((f, i) => (
-                <div key={f.q} className="border-border-soft overflow-hidden rounded-md border">
+                <div key={f.key} className="border-border-soft overflow-hidden rounded-md border">
                   <button
                     type="button"
                     aria-expanded={open === i}
@@ -171,7 +164,7 @@ export function HelpSupportScreen() {
                     />
                   </button>
                   {open === i && (
-                    <div className="text-body text-text-body px-4.5 pb-4.5 leading-relaxed">
+                    <div className="text-body text-text-body px-4.5 pb-4.5 leading-relaxed whitespace-pre-wrap">
                       {f.a}
                     </div>
                   )}

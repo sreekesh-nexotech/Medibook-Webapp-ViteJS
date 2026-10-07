@@ -6,6 +6,7 @@ import type {
 } from '@/features/help/infrastructure/data-sources/remote/help.request';
 import type { SupportTicketResponse } from '@/features/help/infrastructure/data-sources/remote/help.response';
 import {
+  faqFeedSchema,
   supportTicketDetailSchema,
   supportTicketPageSchema,
   supportTicketResponseSchema,
@@ -38,4 +39,10 @@ export async function getSupportTicket(id: string) {
 export async function postTicketMessage(id: string, body: TicketMessageRequest) {
   const response = await hospitalApi.post(`${ticketPath(id)}/messages`, body);
   return ticketMessageResponseSchema.parse(response.data);
+}
+
+/** `GET /hospital/content/faqs` — the platform's help entries for hospital staff (BE-34). */
+export async function getHospitalFaqs() {
+  const response = await hospitalApi.get('/content/faqs');
+  return faqFeedSchema.parse(response.data);
 }

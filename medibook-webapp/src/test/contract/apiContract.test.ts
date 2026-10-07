@@ -280,6 +280,7 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   reportExportDeferredResponseSchema: 'Only sent for exports over 50,000 rows.',
   reportExportQueuedResponseSchema: 'Only sent for exports over 50,000 rows.',
   invitationPreviewResponseSchema: 'Needs a live invitation token.',
+  faqFeedSchema: 'New hospital FAQ feed (BE-34); record once the backend serves it.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

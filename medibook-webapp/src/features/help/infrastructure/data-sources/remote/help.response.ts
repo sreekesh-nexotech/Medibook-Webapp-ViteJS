@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  HelpFaq,
   SupportTicket,
   SupportTicketDetail,
   SupportTicketMessage,
@@ -26,6 +27,7 @@ export const supportTicketResponseSchema = z.object({
   status: z.enum(['open', 'in_progress', 'waiting_on_requester', 'resolved', 'closed']),
   resolved_at: z.string().nullable(),
   closed_at: z.string().nullable(),
+  raised_by_name: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   version: z.number().int(),
@@ -46,6 +48,7 @@ export function toSupportTicket(dto: SupportTicketResponse): SupportTicket {
     updatedAt: dto.updated_at,
     resolvedAt: dto.resolved_at,
     closedAt: dto.closed_at,
+    raisedByName: dto.raised_by_name ?? null,
     version: dto.version,
   };
 }
@@ -84,4 +87,34 @@ export function toSupportTicketDetail(
   dto: z.infer<typeof supportTicketDetailSchema>,
 ): SupportTicketDetail {
   return { ...toSupportTicket(dto), messages: dto.messages.map(toTicketMessage) };
+}
+
+/** `GET /hospital/content/faqs` — published entries grouped by category (BE-34). */
+export const faqFeedSchema = z.object({
+  categories: z.array(
+    z.object({
+      category: z.string(),
+      entries: z.array(
+        z.object({
+          id: z.string(),
+          question: z.string(),
+          answer_md: z.string(),
+          sort_order: z.number().int(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export function toHelpFaqs(dto: z.infer<typeof faqFeedSchema>): HelpFaq[] {
+  return dto.categories.flatMap((group) =>
+    [...group.entries]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((e) => ({
+        id: e.id,
+        category: group.category,
+        question: e.question,
+        answer: e.answer_md,
+      })),
+  );
 }

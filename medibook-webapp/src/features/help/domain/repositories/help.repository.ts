@@ -1,6 +1,7 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
+  HelpFaq,
   NewSupportTicket,
   NewTicketMessage,
   SupportTicket,
@@ -18,6 +19,11 @@ export interface HelpRepository {
   listTickets(query: TicketListQuery): Promise<Result<SupportTicketPage>>;
   /** One ticket with its thread. */
   getTicket(id: string): Promise<Result<SupportTicketDetail>>;
+  /**
+   * The platform's FAQ feed for hospital staff, in display order; empty when
+   * the backend has none (or predates the feed).
+   */
+  listFaqs(): Promise<Result<readonly HelpFaq[]>>;
   /** Reply on a ticket's thread. */
   addMessage(id: string, input: NewTicketMessage): Promise<Result<SupportTicketMessage>>;
 }

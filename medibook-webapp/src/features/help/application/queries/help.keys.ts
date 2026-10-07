@@ -7,4 +7,6 @@ export const helpKeys = {
   tickets: () => [...helpKeys.all, 'tickets'] as const,
   ticketList: (query: TicketListQuery) => [...helpKeys.tickets(), 'list', query] as const,
   ticket: (id: string) => [...helpKeys.tickets(), 'detail', id] as const,
+  /** The platform's FAQ feed for hospital staff (`GET /hospital/content/faqs`). */
+  faqs: () => [...helpKeys.all, 'faqs'] as const,
 };
