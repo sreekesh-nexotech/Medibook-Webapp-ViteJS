@@ -108,13 +108,33 @@ export interface BulkSlotResult {
   readonly skippedBooked: number;
   readonly skippedPast: number;
   readonly affectedBookings: readonly AffectedBooking[];
+  /** The dry run's fingerprint, sent back on confirm (BE-33); `null` when not issued. */
+  readonly previewToken: string | null;
 }
 
+/**
+ * A manual regeneration. Run in the request, it reports its counts and the
+ * bookings left on slots the rules no longer produce (kept, never
+ * cancelled). Run as a background task (BE-33), it is `queued` with the
+ * generation run to watch, and the counts arrive on that run.
+ */
 export interface SlotRegenerateResult {
+  readonly runId: string | null;
+  readonly queued: boolean;
   readonly createdCount: number;
   readonly updatedCount: number;
   readonly closedCount: number;
+  /** Booked or held slots kept although the rules no longer produce them. */
   readonly preservedCount: number;
+  /** The bookings on those kept slots — the desk must move or cancel them. */
+  readonly affectedBookings: readonly AffectedBooking[];
+}
+
+/** A page of generation runs, newest first. */
+export interface SlotGenerationRunPage {
+  readonly items: readonly SlotGenerationRun[];
+  readonly total: number;
+  readonly hasNext: boolean;
 }
 
 export interface SlotGenerationRun {

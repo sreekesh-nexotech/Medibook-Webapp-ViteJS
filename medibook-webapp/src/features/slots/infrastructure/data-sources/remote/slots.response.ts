@@ -89,14 +89,24 @@ export const bulkSlotResponseSchema = z.object({
   skipped_booked: z.number().int(),
   skipped_past: z.number().int(),
   affected_bookings: z.array(affectedBookingResponseSchema),
+  // Confirm-bound-to-preview (BE-33); optional until the backend issues it.
+  preview_token: z.string().nullable().optional(),
 });
 
-/** `POST /slots/regenerate` — `{run_id, …Result.as_dict()}`. */
+/**
+ * `POST /slots/regenerate` — `{run_id, …Result.as_dict()}` when run in the
+ * request; `{run_id, queued: true}` (counts absent) once it runs as a task
+ * (BE-33). Every count is optional so both shapes parse.
+ */
 export const regenerateResponseSchema = z.object({
-  created_count: z.number().int(),
-  updated_count: z.number().int(),
-  closed_count: z.number().int(),
-  preserved_count: z.number().int(),
+  run_id: z.string().nullable().optional(),
+  queued: z.boolean().optional(),
+  status: z.string().optional(),
+  created_count: z.number().int().optional(),
+  updated_count: z.number().int().optional(),
+  closed_count: z.number().int().optional(),
+  preserved_count: z.number().int().optional(),
+  affected_bookings: z.array(affectedBookingResponseSchema).optional(),
 });
 
 /** `GenerationRun` (`schema.yml`). */
@@ -172,17 +182,28 @@ export function toBulkSlotResult(dto: z.infer<typeof bulkSlotResponseSchema>): B
     skippedBooked: dto.skipped_booked,
     skippedPast: dto.skipped_past,
     affectedBookings: dto.affected_bookings.map(toAffectedBooking),
+    previewToken: dto.preview_token ?? null,
   };
 }
+
+/** Statuses a task-run regeneration may report while it has not finished. */
+const QUEUED_STATUSES: ReadonlySet<string> = new Set(['queued', 'pending', 'running', 'started']);
 
 export function toRegenerateResult(
   dto: z.infer<typeof regenerateResponseSchema>,
 ): SlotRegenerateResult {
+  const hasCounts = dto.created_count !== undefined;
   return {
-    createdCount: dto.created_count,
-    updatedCount: dto.updated_count,
-    closedCount: dto.closed_count,
-    preservedCount: dto.preserved_count,
+    runId: dto.run_id ?? null,
+    queued:
+      dto.queued === true ||
+      (dto.status !== undefined && QUEUED_STATUSES.has(dto.status)) ||
+      !hasCounts,
+    createdCount: dto.created_count ?? 0,
+    updatedCount: dto.updated_count ?? 0,
+    closedCount: dto.closed_count ?? 0,
+    preservedCount: dto.preserved_count ?? 0,
+    affectedBookings: (dto.affected_bookings ?? []).map(toAffectedBooking),
   };
 }
 

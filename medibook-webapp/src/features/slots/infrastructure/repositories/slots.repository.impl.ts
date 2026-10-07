@@ -3,6 +3,7 @@ import { clientFailure } from '@/core/error/toFailure';
 
 import type { SlotsRepository } from '@/features/slots/domain/repositories/slots.repository';
 import {
+  getGenerationRuns,
   getLatestGenerationRun,
   getSlotGrid,
   postSlotBlock,
@@ -47,9 +48,9 @@ export const slotsRepository: SlotsRepository = {
       ),
     ),
 
-  applyBulk: (request, key) =>
+  applyBulk: (request, key, previewToken) =>
     attempt(async () =>
-      toBulkSlotResult(await postSlotBulk(toSlotBulkRequestBody(request), key, true)),
+      toBulkSlotResult(await postSlotBulk(toSlotBulkRequestBody(request), key, true, previewToken)),
     ),
 
   regenerate: (doctorId) =>
@@ -59,5 +60,11 @@ export const slotsRepository: SlotsRepository = {
     attempt(async () => {
       const [latest] = (await getLatestGenerationRun()).results;
       return latest ? toGenerationRun(latest) : null;
+    }),
+
+  listGenerationRuns: (doctorId, page) =>
+    attempt(async () => {
+      const dto = await getGenerationRuns(doctorId, page);
+      return { items: dto.results.map(toGenerationRun), total: dto.total, hasNext: dto.has_next };
     }),
 };

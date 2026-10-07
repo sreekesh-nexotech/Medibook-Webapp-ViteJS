@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { WeekDay } from '@/features/doctors/application/store/catalog.types';
-import { END_OF_DAY_LABEL, TIME_OPTS } from '@/features/doctors/domain/calendar';
+import {
+  END_OF_DAY_LABEL,
+  TIME_OPTS,
+  toIsoDate,
+  todayIsoIn,
+} from '@/features/doctors/domain/calendar';
 import {
   feeError,
   paiseToRupeeInput,
@@ -78,5 +83,20 @@ describe('time pickers cover the whole day (UAT-50)', () => {
   it('adds a stored off-grid time in order', () => {
     const options = timeOptionsWith('9:10 am');
     expect(options.indexOf('9:10 am')).toBe(options.indexOf('9:00 am') + 1);
+  });
+});
+
+describe('todayIsoIn (D-09)', () => {
+  it('uses the hospital’s calendar day, not the browser’s', () => {
+    // 20:00 UTC on 7 Oct is already 8 Oct in Kolkata and still 7 Oct in New York.
+    const now = new Date('2026-10-07T20:00:00Z');
+    expect(todayIsoIn('Asia/Kolkata', now)).toBe('2026-10-08');
+    expect(todayIsoIn('America/New_York', now)).toBe('2026-10-07');
+  });
+
+  it('falls back to the local date for an unknown zone', () => {
+    const now = new Date('2026-10-07T06:00:00Z');
+    expect(todayIsoIn('Not/AZone', now)).toBe(toIsoDate(now));
+    expect(todayIsoIn(null, now)).toBe(toIsoDate(now));
   });
 });
