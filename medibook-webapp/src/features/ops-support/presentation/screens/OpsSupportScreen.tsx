@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
-import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
@@ -43,7 +42,7 @@ import {
   STATUS_LOOK,
 } from '@/features/ops-support/presentation/components/support.view';
 import { useSupportDebouncedValue } from '@/features/ops-support/presentation/hooks/useSupportDebouncedValue';
-import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
+import { useAssignableStaffQuery } from '@/features/ops-users/application/queries/useAssignableStaffQuery';
 
 const PAGE_SIZE = 15;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -70,7 +69,6 @@ const toggle = <T,>(list: readonly T[], value: T, on: boolean): readonly T[] =>
  * conversation, controls and reply box. `support.view`.
  */
 export function OpsSupportScreen() {
-  const { can } = useOpsPermission();
   const [statuses, setStatuses] = useState<readonly TicketStatus[]>(ACTIVE_STATUSES);
   const [priorities, setPriorities] = useState<readonly TicketPriority[]>([]);
   const [category, setCategory] = useState<TicketCategory | null>(null);
@@ -84,18 +82,16 @@ export function OpsSupportScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const { sort, onSort } = useSort<SupportTicket>({ key: 'updated', dir: 'desc' });
   const hospitals = useHospitalOptionsQuery();
-  const staff = useOpsStaffQuery();
+  // Support assigns without the full staff list (`GET /platform/staff/assignable`).
+  const staff = useAssignableStaffQuery();
   const debouncedTicketNo = useSupportDebouncedValue(
     normaliseTicketNo(ticketNo),
     SEARCH_DEBOUNCE_MS,
   );
 
-  const assignees: readonly AssigneeOption[] | null =
-    can('staff.view') && staff.data
-      ? staff.data.items
-          .filter((s) => s.status === 'active')
-          .map((s) => ({ id: s.id, name: s.name }))
-      : null;
+  const assignees: readonly AssigneeOption[] | null = staff.data
+    ? staff.data.items.map((s) => ({ id: s.id, name: s.name }))
+    : null;
   const hospitalName = (id: string): string | null =>
     hospitals.options.find((h) => h.id === id)?.name ?? null;
   const staffName = (id: string): string | null =>

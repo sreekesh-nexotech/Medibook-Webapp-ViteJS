@@ -31,6 +31,17 @@ export interface OpsStaffMember {
   readonly version: number;
 }
 
+/**
+ * An active staff member a ticket or onboarding case can be assigned to
+ * (`GET /platform/staff/assignable`) — name and role only, never contact details.
+ */
+export interface OpsAssignableStaff {
+  /** The `platform_staff` id that `assigned_to_id` takes. */
+  readonly id: string;
+  readonly name: string;
+  readonly role: OpsStaffRoleRef;
+}
+
 /** A platform role and the permission codes (`hospitals.view`, …) it grants. */
 export interface OpsStaffRole {
   readonly id: string;

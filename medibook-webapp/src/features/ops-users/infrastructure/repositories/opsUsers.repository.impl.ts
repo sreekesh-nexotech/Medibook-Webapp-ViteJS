@@ -4,6 +4,7 @@ import { attempt } from '@/core/error/attempt';
 import type { OpsUsersRepository } from '@/features/ops-users/domain/repositories/opsUsers.repository';
 import {
   deleteRole,
+  getAssignableStaff,
   getPermissions,
   getRoles,
   getStaff,
@@ -14,6 +15,7 @@ import {
   postStaffAction,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.api';
 import {
+  toAssignableStaff,
   toPermissions,
   toStaffMember,
   toStaffRole,
@@ -21,6 +23,9 @@ import {
 
 export const opsUsersRepository: OpsUsersRepository = {
   listStaff: () => attempt(async () => toPage(await getStaff(), toStaffMember)),
+
+  listAssignableStaff: () =>
+    attempt(async () => toPage(await getAssignableStaff(), toAssignableStaff)),
 
   inviteStaff: (invite) => attempt(async () => toStaffMember(await postStaff(invite))),
 

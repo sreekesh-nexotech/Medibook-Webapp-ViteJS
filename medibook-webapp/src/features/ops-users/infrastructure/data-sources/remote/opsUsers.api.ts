@@ -8,6 +8,7 @@ import type {
   OpsStaffInvite,
 } from '@/features/ops-users/domain/entities/opsUsers.types';
 import type {
+  AssignableStaffPageResponse,
   PermissionsResponse,
   RolePageResponse,
   RoleResponse,
@@ -15,6 +16,7 @@ import type {
   StaffResponse,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.response';
 import {
+  assignableStaffPageResponseSchema,
   permissionsResponseSchema,
   rolePageResponseSchema,
   roleResponseSchema,
@@ -33,6 +35,14 @@ export type StaffAction = 'deactivate' | 'reactivate' | 'unlock' | 'resend-invit
 export async function getStaff(): Promise<StaffPageResponse> {
   const response = await platformApi.get('/staff', { params: { page_size: MAX_PAGE_SIZE } });
   return staffPageResponseSchema.parse(response.data);
+}
+
+/** `GET /staff/assignable` — the assignee picker, readable by roles without `staff.view`. */
+export async function getAssignableStaff(): Promise<AssignableStaffPageResponse> {
+  const response = await platformApi.get('/staff/assignable', {
+    params: { page_size: MAX_PAGE_SIZE },
+  });
+  return assignableStaffPageResponseSchema.parse(response.data);
 }
 
 export async function postStaff(invite: OpsStaffInvite): Promise<StaffResponse> {

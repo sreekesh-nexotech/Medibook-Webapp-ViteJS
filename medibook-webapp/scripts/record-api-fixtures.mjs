@@ -640,6 +640,12 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-users.assignableStaffPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/staff/assignable',
+    params: LIST,
+  },
+  {
     key: 'ops-users.rolePageResponseSchema',
     surface: 'platform',
     path: '/platform/roles',
