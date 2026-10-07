@@ -77,6 +77,13 @@ export interface AlertView {
   readonly hospitals: readonly OpsAlertHospital[];
   /** A single screen to open instead. */
   readonly action?: { readonly label: string; readonly to: string };
+  /** Hospitals the alert names beyond the linked ones ("+N more"), shown as a link to the list. */
+  readonly moreHospitals: number;
+}
+
+/** Hospitals an alert names beyond the ones it links to directly. */
+export function moreHospitalsOf(hospitals: readonly OpsAlertHospital[]): number {
+  return Math.max(0, hospitals.length - MAX_ALERT_HOSPITAL_LINKS);
 }
 
 function namesOf(hospitals: readonly OpsAlertHospital[]): string {
@@ -96,6 +103,7 @@ export function toAlertView(alert: OpsDashboardAlert): AlertView {
         title: `${plural(alert.count, 'hospital')} past due or in grace`,
         sub: namesOf(alert.hospitals),
         hospitals: alert.hospitals,
+        moreHospitals: moreHospitalsOf(alert.hospitals),
       };
     case 'hospitals_read_only':
       return {
@@ -104,14 +112,17 @@ export function toAlertView(alert: OpsDashboardAlert): AlertView {
         title: `${plural(alert.count, 'hospital')} in read-only mode`,
         sub: `Unpaid subscription · ${namesOf(alert.hospitals)}`,
         hospitals: alert.hospitals,
+        moreHospitals: moreHospitalsOf(alert.hospitals),
       };
     case 'unreconciled_cash_sessions':
       return {
         key: alert.code,
         sev: 'warning',
         title: `${plural(alert.count, 'cash session')} unreconciled for over a day`,
-        sub: `Across ${plural(alert.hospitals.length, 'hospital')}`,
+        // B9 names the hospital on each row; older backends send only the id.
+        sub: `Across ${plural(alert.hospitals.length, 'hospital')} · ${namesOf(alert.hospitals)}`,
         hospitals: alert.hospitals,
+        moreHospitals: moreHospitalsOf(alert.hospitals),
       };
     case 'dead_outbox_rows':
       return {
@@ -120,6 +131,7 @@ export function toAlertView(alert: OpsDashboardAlert): AlertView {
         title: `${plural(alert.count, 'notification')} failed permanently`,
         sub: 'Messages the outbox stopped retrying. Check the messaging provider configuration.',
         hospitals: [],
+        moreHospitals: 0,
       };
     case 'pending_onboarding':
       return {
@@ -132,6 +144,7 @@ export function toAlertView(alert: OpsDashboardAlert): AlertView {
             : 'All opened within the last 7 days',
         hospitals: [],
         action: { label: 'Open onboarding', to: opsOnboardingPath() },
+        moreHospitals: 0,
       };
     case 'unknown':
       return {
@@ -140,6 +153,7 @@ export function toAlertView(alert: OpsDashboardAlert): AlertView {
         title: `${alert.rawCode.replaceAll('_', ' ')} (${alert.count})`,
         sub: 'Reported by the platform',
         hospitals: [],
+        moreHospitals: 0,
       };
   }
 }
