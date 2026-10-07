@@ -9,7 +9,9 @@ import { opsPath } from '@/app/router/paths';
 
 import { useLogsQuery } from '@/features/ops-logs/application/queries/useLogsQuery';
 import type { AuditLogQuery } from '@/features/ops-logs/domain/entities/logs.types';
-import { actorLabel, formatLogTime } from '@/features/ops-logs/presentation/components/logs.format';
+import { LogActor } from '@/features/ops-logs/presentation/components/LogActor';
+import { resourceName } from '@/features/ops-logs/presentation/components/logResources';
+import { formatLogTime } from '@/features/ops-logs/presentation/components/logs.format';
 
 /** Entries shown; Compliance Logs has the full, searchable trail. */
 const RECENT_ROWS = 10;
@@ -32,7 +34,8 @@ export function LogsHospitalActivityCard({ hospitalId }: LogsHospitalActivityCar
 
   let state: TableStateSpec | undefined;
   if (logs.isPending) state = { kind: 'loading', rows: 4 };
-  else if (logs.isLoadingError) state = { kind: 'error', onRetry: () => void logs.refetch() };
+  else if (logs.isLoadingError)
+    state = { kind: 'error', error: logs.error, onRetry: () => void logs.refetch() };
   else if (rows.length === 0)
     state = {
       kind: 'empty',
@@ -56,8 +59,10 @@ export function LogsHospitalActivityCard({ hospitalId }: LogsHospitalActivityCar
         {rows.map((l) => (
           <tr key={l.id}>
             <td className={tdClass}>{l.action}</td>
-            <td className={tdClass}>{actorLabel(l)}</td>
-            <td className={tdClass}>{l.resourceType}</td>
+            <td className={tdClass}>
+              <LogActor entry={l} />
+            </td>
+            <td className={tdClass}>{resourceName(l.resourceType)}</td>
             <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
           </tr>
         ))}

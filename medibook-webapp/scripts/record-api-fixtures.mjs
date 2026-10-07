@@ -25,6 +25,11 @@
  * without contacting the backend:
  *
  *   node scripts/record-api-fixtures.mjs --rescrub
+ *
+ * To record only some fixtures (a new endpoint), pass key prefixes; the
+ * others are left as they are:
+ *
+ *   node scripts/record-api-fixtures.mjs --only ops-support.
  */
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -54,6 +59,28 @@ function first(fx, key, test = () => true) {
  * (`{id}`) come from `needs`, which reads earlier fixtures; an entry whose
  * needs cannot be met (an empty list) is skipped and reported.
  */
+/** Free text people type into tickets: replaced outright, since any of it could name someone. */
+const TICKET_TEXT = {
+  subject: 'Sample subject',
+  description: 'Sample description.',
+  body: 'Sample message.',
+  author_name: 'Sample Person',
+};
+
+/** Replaces the values of `fields` at any depth (`redact` on a SPEC entry). */
+function redact(node, fields) {
+  if (Array.isArray(node)) return node.map((item) => redact(item, fields));
+  if (node && typeof node === 'object') {
+    return Object.fromEntries(
+      Object.entries(node).map(([k, v]) => [
+        k,
+        k in fields && typeof v === 'string' ? fields[k] : redact(v, fields),
+      ]),
+    );
+  }
+  return node;
+}
+
 const SPEC = [
   // shared and auth
   { key: 'core.appConfigResponseSchema', surface: 'public', path: '/shared/app-config' },
@@ -233,6 +260,7 @@ const SPEC = [
     surface: 'hospital',
     path: '/hospital/token-policy',
   },
+  { key: 'settings.numberingListResponseSchema', surface: 'hospital', path: '/hospital/numbering' },
   {
     key: 'settings.holidayPageResponseSchema',
     surface: 'hospital',
@@ -483,6 +511,21 @@ const SPEC = [
     path: '/platform/staff',
     params: LIST,
   },
+  // Resolved tickets carry a thread: replies, internal notes and attachments.
+  {
+    key: 'ops-support.ticketPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets',
+    params: { ...LIST, status: 'resolved' },
+    redact: TICKET_TEXT,
+  },
+  {
+    key: 'ops-support.ticketDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-support.ticketPageResponseSchema')?.id }),
+    redact: TICKET_TEXT,
+  },
   {
     key: 'ops-users.rolePageResponseSchema',
     surface: 'platform',
@@ -620,6 +663,17 @@ const COORDINATE_KEY = /^(lat|lng|lon|latitude|longitude)$/i;
  */
 const SEEDED_NAMES = { lakeshore: 'example', sahyadri: 'sample', nilgiri: 'model', deccan: 'demo' };
 const SEEDED_NAME = new RegExp(`\\b(${Object.keys(SEEDED_NAMES).join('|')})`, 'gi');
+/**
+ * …and gives each a short code that starts its booking, MRN and receipt
+ * numbers (`LKSB-2610-00211`, `LKSR/26-27/00002`) and registration number.
+ * Only a code followed by a series letter, a separator, a digit or the end is
+ * replaced, so words like `SCHEDULED` are left alone.
+ */
+const SEEDED_CODES = { LKS: 'EXM', SCH: 'SMP', NFC: 'MDL', DHI: 'DMO' };
+const SEEDED_CODE = new RegExp(
+  `(?<![A-Za-z])(${Object.keys(SEEDED_CODES).join('|')})(?=[BMR]?(?:[-/0-9]|$))`,
+  'g',
+);
 
 /** Keep the shape (length, digit/letter positions, case) and drop the content. */
 function maskFormat(value) {
@@ -632,6 +686,10 @@ function sampleNames(value) {
     if (word === word.toUpperCase()) return sample.toUpperCase();
     return word[0] === word[0].toUpperCase() ? sample[0].toUpperCase() + sample.slice(1) : sample;
   });
+}
+
+function sampleCodes(value) {
+  return value.replace(SEEDED_CODE, (code) => SEEDED_CODES[code]);
 }
 
 function scrubString(key, value) {
@@ -656,7 +714,7 @@ function scrubString(key, value) {
       return 'https://files.example.test/';
     }
   }
-  return sampleNames(value.replace(IPV4, '203.0.113.10'));
+  return sampleCodes(sampleNames(value.replace(IPV4, '203.0.113.10')));
 }
 
 function scrub(node, key = '') {
@@ -705,9 +763,14 @@ async function login(surface) {
 const tokens = { hospital: await login('hospital'), platform: await login('platform') };
 mkdirSync(OUT_DIR, { recursive: true });
 
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt === -1 ? [] : process.argv.slice(onlyAt + 1).filter((a) => !a.startsWith('--'));
+const selected =
+  only.length === 0 ? SPEC : SPEC.filter((e) => only.some((p) => e.key.startsWith(p)));
+
 const fixtures = {};
 const report = [];
-for (const entry of SPEC) {
+for (const entry of selected) {
   const ids = entry.needs ? entry.needs(fixtures) : {};
   const missing = Object.entries(ids)
     .filter(([, v]) => !v)
@@ -730,13 +793,14 @@ for (const entry of SPEC) {
   }
   const body = await response.json();
   fixtures[entry.key] = body;
-  writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(body), null, 2)}\n`);
+  const safe = entry.redact ? redact(body, entry.redact) : body;
+  writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(safe), null, 2)}\n`);
   report.push([entry.key, 'recorded']);
 }
 
 const recorded = report.filter(([, s]) => s === 'recorded').length;
 process.stdout.write(
-  `Recorded ${recorded} of ${SPEC.length} responses into src/test/contract/fixtures/\n`,
+  `Recorded ${recorded} of ${selected.length} responses into src/test/contract/fixtures/\n`,
 );
 for (const [key, status] of report) {
   if (status !== 'recorded') process.stdout.write(`  ${key}: ${status}\n`);

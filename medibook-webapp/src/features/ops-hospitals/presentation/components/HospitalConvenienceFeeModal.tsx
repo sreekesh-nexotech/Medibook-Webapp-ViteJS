@@ -74,7 +74,7 @@ export function HospitalConvenienceFeeModal({ h, onClose }: HospitalConvenienceF
         );
         onClose();
       } catch (error) {
-        toast(isFailure(error) ? error.message : SAVE_FAILED, 'error');
+        toast(isFailure(error) ? error.message : SAVE_FAILED, 'error', error);
       }
     },
   });
@@ -83,6 +83,7 @@ export function HospitalConvenienceFeeModal({ h, onClose }: HospitalConvenienceF
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Convenience fee for ${h.name}`}

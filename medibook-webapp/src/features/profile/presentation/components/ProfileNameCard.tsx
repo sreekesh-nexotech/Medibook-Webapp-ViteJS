@@ -46,7 +46,7 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
         onError: (failure) => {
           const message = isFailure(failure) ? failure.message : 'Could not save your name.';
           setError(message);
-          toast(message, 'error');
+          toast(message, 'error', failure);
         },
       },
     );
@@ -65,11 +65,11 @@ export function ProfileNameCard({ session }: ProfileNameCardProps) {
       </div>
       <dl className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <dt className="text-caption text-text-faint">Email</dt>
+          <dt className="text-caption text-text-muted">Email</dt>
           <dd className="text-body text-text-strong font-medium">{user.email || '—'}</dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="text-caption text-text-faint">Role</dt>
+          <dt className="text-caption text-text-muted">Role</dt>
           <dd className="text-body text-text-strong font-medium">{session.role.name}</dd>
         </div>
       </dl>

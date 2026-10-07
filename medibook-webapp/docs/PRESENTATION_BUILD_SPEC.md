@@ -1,5 +1,11 @@
 # Presentation Layer Build Spec — Medibook mbAdmin + Operations Console
 
+> **Historical — no longer binding.** This spec drove the first presentation build, on
+> static seed data, before the app was wired to the backend. It refers to files that no
+> longer exist (for example `src/core/config/demo.ts`) and is kept only as a record. The
+> current rules are [`REACT_VITEJS_ARCHITECTURE.md`](REACT_VITEJS_ARCHITECTURE.md) and
+> [`REACT_VITEJS_CODING_STANDARDS.md`](REACT_VITEJS_CODING_STANDARDS.md).
+
 **Binding for every agent working on the presentation build.** Read this file, then
 `docs/CLAUDE.md`, `docs/REACT_VITEJS_ARCHITECTURE.md`, and
 `docs/REACT_VITEJS_CODING_STANDARDS.md` (all binding), then your assigned design source

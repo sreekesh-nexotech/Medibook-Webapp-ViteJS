@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useAppConfigQuery } from '@/shared/hooks/useAppConfigQuery';
+import { useSupportContacts } from '@/shared/hooks/useSupportContacts';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -8,6 +8,7 @@ import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
+import { SkeletonBlock } from '@/shared/ui/Skeleton';
 
 import { RaiseTicketModal } from '@/features/help/presentation/components/RaiseTicketModal';
 
@@ -36,57 +37,46 @@ interface Faq {
   readonly cat: HelpCategoryKey;
 }
 
-/** Frequently asked questions, tagged with the category tile that shows them. */
+/**
+ * Frequently asked questions, tagged with the category tile that shows them.
+ * Each answer describes the product as it works today (OBS-07); change it in
+ * the same pull request as the behaviour it describes.
+ */
 const FAQS: readonly Faq[] = [
   {
     cat: 'Getting Started',
     q: 'How do I give my staff access?',
-    a: 'Go to Users & Roles → Add User, pick the role that matches what they do, and choose how they get access (email invite, mobile OTP, or a password you set). The Access Preview tab shows exactly which screens and actions each role reaches before you assign it.',
+    a: 'Go to Users & Roles → Add User, enter their name, email and role, and send the invitation. They get an email link, set their own password and can then sign in. The link expires after 7 days; you can resend it from their row. The Access Preview tab shows which screens and actions each role can reach.',
   },
   {
     cat: 'Appointments',
-    q: 'How do I add a walk-in appointment?',
-    a: 'Go to Appointments → New Appointment, set Appointment type to Walk-in, choose the department, doctor and time, then record the payment — the receipt and queue token are generated automatically.',
+    q: 'How do I book a walk-in?',
+    a: 'Go to Appointments → New Appointment. Find the patient or add a new one, pick the date, then for each consultation choose the department, doctor and an open slot, and book. The next window shows each token and fee: collect the payment there by cash, UPI or card (cash needs your cash drawer open on the Payments screen), then print the receipt and token slip. If the patient pays later, the booking stays Pending Payment in the list.',
   },
   {
     cat: 'Appointments',
-    q: 'How is the token queue updated?',
-    a: 'Tokens advance automatically when a doctor marks a patient Done, or manually via Call Next on the Token Management screen. Token numbers are issued as a hospital-wide running sequence (T-001, T-002 …).',
+    q: 'How does the token queue move?',
+    a: "On Token Management, each doctor's session has its own queue. Call Next calls the next token, Start begins the consultation and Done finishes it. Skip calls a token again later; after the attempts your hospital allows, it can be marked a no-show. Tokens are numbered in booking order, following the token rules in Hospital Settings.",
   },
   {
     cat: 'Billing',
     q: 'Where do I find a payment receipt?',
-    a: 'Open the appointment or the Payments screen and use the receipt action — receipts carry the financial-year series (MB/R/2026-27/000123) and show the 18% GST as its own line. Use Save as PDF to print or keep a copy.',
+    a: 'Open the appointment and choose Receipt, or use the receipt action on the Payments screen. The receipt shows its number, each service with its own tax, how it was paid and your GSTIN. You can download it as a PDF or print it from the same window.',
   },
   {
     cat: 'Settlements',
     q: 'How do settlements work?',
-    a: 'For online bookings, Medibook collects the fee, keeps a 10% commission, and transfers the net to the hospital by the expected date. Track and reconcile each transfer in Billing & Settlements — mark it Received once it reaches your account. Walk-in payments are collected at the desk and kept 100% by the hospital.',
+    a: "For online bookings, Medibook collects the fee from the patient, keeps its commission at the rate in your agreement, and pays the rest into your hospital's bank account for each settlement period. Billing & Settlements lists every period with its gross amount, commission, net payable and status; open one for its breakdown, payout and statement. Payments you collect at the desk stay with the hospital and are not part of settlements.",
   },
   {
     cat: 'Billing',
     q: 'Can I export reports?',
-    a: 'Yes — the Payments, Settlements and Reports screens export the rows you are looking at as a CSV file. Anything labelled Save as PDF opens your browser print dialog with just that document on the page.',
+    a: 'Yes. Payments, Billing & Settlements, Reports and the Audit Trail download the rows you are looking at as a CSV file that opens in Excel. A very large report is prepared in the background and its download link is emailed to you. Reports can also be printed or saved as a PDF.',
   },
 ];
 
-/** A contact channel as an `[icon, title, subtitle, href]` tuple. */
-type Contact = readonly [IconName, string, string, string | null];
-
-/**
- * The design's support line — shown until (or unless) the platform configures
- * its own in app-config's `support_contacts`.
- */
-const DEFAULT_PHONE: Contact = ['phone', 'Call Us', '1800 200 4567', 'tel:+918002004567'];
-
-/** Contact channels; the phone comes from the platform when it has one configured. */
-function contactsFor(phoneE164: string | null): readonly Contact[] {
-  return [
-    ['mail', 'Email Support', 'support@medibook.app', 'mailto:support@medibook.app'],
-    phoneE164 ? ['phone', 'Call Us', phoneE164, `tel:${phoneE164}`] : DEFAULT_PHONE,
-    ['message-circle', 'Live Chat', 'Mon–Sat, 9am–7pm', null],
-  ];
-}
+/** A contact channel as an `[icon, title, shown value, link]` tuple. */
+type Contact = readonly [IconName, string, string, string];
 
 /**
  * Help & Support screen (design `Admin.jsx` `HelpSupport`): the navy hero with
@@ -99,17 +89,24 @@ function contactsFor(phoneE164: string | null): readonly Contact[] {
  * empty state offering a way out.
  *
  * The FAQs are in-app copy: the hospital API has no FAQ endpoint (FAQs exist
- * only on the patient and platform surfaces). The support phone is the
- * platform's `support_contacts` from app-config; while that loads, fails, or
- * is unset, the design's number stands in, so the card never blanks out.
+ * only on the patient and platform surfaces). The contacts are the platform's
+ * own, from app config (OBS-06); a channel the platform has not set is not
+ * shown, so nobody calls a number or writes to an address that goes nowhere.
  */
 export function HelpSupportScreen() {
   const [open, setOpen] = useState(0);
   const [ticket, setTicket] = useState(false);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState<HelpCategoryKey | null>(null);
-  const appConfig = useAppConfigQuery();
-  const contacts = contactsFor(appConfig.data?.supportPhoneE164 ?? null);
+  const support = useSupportContacts();
+  const contacts: readonly Contact[] = [
+    ...(support.email
+      ? [['mail', 'Email Support', support.email.label, support.email.href] as const]
+      : []),
+    ...(support.phone
+      ? [['phone', 'Call Us', support.phone.label, support.phone.href] as const]
+      : []),
+  ];
 
   const needle = q.trim().toLowerCase();
   const shown = FAQS.filter((f) => {
@@ -241,35 +238,25 @@ export function HelpSupportScreen() {
             Still need help?
           </SectionTitle>
           <div className="flex flex-col gap-3.5">
-            {contacts.map(([ic, t, s, href]) => {
-              const body = (
-                <>
-                  <div className="bg-blue-soft-bg text-blue flex size-10 flex-none items-center justify-center rounded-md">
-                    <Icon name={ic} size={19} />
-                  </div>
-                  <div>
-                    <div className="text-body text-text-strong font-medium">{t}</div>
-                    <div className="text-caption text-text-muted">{s}</div>
-                  </div>
-                </>
-              );
-              return href ? (
-                <a
-                  key={t}
-                  href={href}
-                  className="border-border-soft hover:bg-grey-200 flex items-center gap-3.5 rounded-md border p-3.5 no-underline transition-colors duration-150"
-                >
-                  {body}
-                </a>
-              ) : (
-                <div
-                  key={t}
-                  className="border-border-soft flex items-center gap-3.5 rounded-md border p-3.5"
-                >
-                  {body}
+            {support.isPending && <SkeletonBlock w="100%" h={64} />}
+            {contacts.map(([ic, t, s, href]) => (
+              <a
+                key={t}
+                href={href}
+                className="border-border-soft hover:bg-grey-200 flex items-center gap-3.5 rounded-md border p-3.5 no-underline transition-colors duration-150"
+              >
+                <div className="bg-blue-soft-bg text-blue flex size-10 flex-none items-center justify-center rounded-md">
+                  <Icon name={ic} size={19} />
                 </div>
-              );
-            })}
+                <div>
+                  <div className="text-body text-text-strong font-medium">{t}</div>
+                  <div className="text-caption text-text-muted">{s}</div>
+                </div>
+              </a>
+            ))}
+            <p className="text-caption text-text-muted">
+              Raise a ticket and the Medibook team replies by email.
+            </p>
             <Button icon="ticket" className="mt-1 w-full" onClick={() => setTicket(true)}>
               Raise a Ticket
             </Button>

@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { opsOnboardingPath, opsPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
-import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { CanOps } from '@/shared/ui/CanOps';
@@ -51,15 +50,12 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** Shown in a cell or KPI the backend has no value for. */
 const NO_VALUE = '—';
 
-const COLUMNS = [
-  'Hospital',
-  'Plan',
-  'Location',
-  'Bookings / Mo',
-  'Onboarded',
-  'Status',
-  'Action',
-] as const;
+/**
+ * The registry rows carry no plan or monthly bookings (PRD-05-B), so those
+ * columns are left out rather than shown as dashes; each hospital's page has
+ * its plan.
+ */
+const COLUMNS = ['Hospital', 'Location', 'Onboarded', 'Status', 'Action'] as const;
 
 /** Sortable column keys → backend `sort` fields (`PlatformHospitalListView.spec.sorts`). */
 const SORT_FIELD: Readonly<Record<string, string>> = {
@@ -74,8 +70,8 @@ const SORT_FIELD: Readonly<Record<string, string>> = {
  * all served by `GET /platform/hospitals` (search, filters, sort and paging
  * run on the server).
  *
- * The registry rows carry no plan or booking volume, so those two columns
- * show a dash; the plan *filter* still works (`plan_id`).
+ * The registry rows carry no plan or booking volume, so the table has no
+ * such columns; the plan *filter* still works (`plan_id`).
  */
 export function OpsHospitalsScreen() {
   const navigate = useNavigate();
@@ -138,24 +134,24 @@ export function OpsHospitalsScreen() {
       label: 'Active Instances',
       value: kpi(counts.data?.active),
       sub: 'Live and serving bookings',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'clock',
       label: 'Pending Verification',
       value: kpi(pendingCt),
       sub: 'Awaiting document review',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'ban',
       label: 'Suspended',
       value: kpi(counts.data?.suspended),
       sub: 'Access paused by platform',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
     },
   ];
@@ -180,6 +176,7 @@ export function OpsHospitalsScreen() {
     (isPlanResolved && hospitals.isLoadingError) || (!isPlanResolved && plansQuery.isLoadingError)
       ? {
           kind: 'error',
+          error: listError,
           title: "The hospital registry didn't load",
           message: isFailure(listError) ? listError.message : undefined,
           onRetry: () => void (isPlanResolved ? hospitals.refetch() : plansQuery.refetch()),
@@ -218,7 +215,7 @@ export function OpsHospitalsScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {KPIS.map((k) => (
           <StatCard key={k.label} k={k} />
         ))}
@@ -275,7 +272,6 @@ export function OpsHospitalsScreen() {
         </div>
         <TableShell
           columns={COLUMNS}
-          rightCols={['Bookings / Mo']}
           scrollLabel="Hospital registry"
           sortKeys={{
             Hospital: 'name',
@@ -300,12 +296,10 @@ export function OpsHospitalsScreen() {
                 <td className={tdClass}>
                   <OpsEntity icon="building-2" tint={opsTintOf(i)} title={h.name} sub={h.email} />
                 </td>
-                <td className={tdClass}>{NO_VALUE}</td>
                 <td className={tdClass}>
                   {h.city}
                   {h.state ? `, ${h.state}` : ''}
                 </td>
-                <td className={cn(tdClass, 'text-right tabular-nums')}>{NO_VALUE}</td>
                 <td className={tdClass}>{longDateFromTimestamp(h.createdAt)}</td>
                 <td className={tdClass}>
                   <Badge status={badge}>{label}</Badge>

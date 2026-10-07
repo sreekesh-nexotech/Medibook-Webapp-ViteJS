@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 
+import { useDialog } from '@/shared/hooks/useDialog';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Icon } from '@/shared/ui/Icon';
@@ -14,10 +15,10 @@ import type { IconName } from '@/shared/ui/icon-registry';
 export const OPS_TINTS = {
   primary: ['bg-blue-soft-bg', 'text-text-navy'],
   info: ['bg-blue-soft-bg', 'text-blue'],
-  success: ['bg-g-100', 'text-g-600'],
-  warning: ['bg-y-100', 'text-y-600'],
-  danger: ['bg-d-100', 'text-d-500'],
-  orange: ['bg-badge-noshow-bg', 'text-orange'],
+  success: ['bg-g-100', 'text-g-800'],
+  warning: ['bg-y-100', 'text-y-800'],
+  danger: ['bg-d-100', 'text-d-600'],
+  orange: ['bg-badge-noshow-bg', 'text-orange-strong'],
   neutral: ['bg-grey-300', 'text-text-muted'],
 } as const satisfies Record<string, readonly [string, string]>;
 
@@ -51,6 +52,11 @@ interface OpsConfirmProps {
  * Centered ops confirm dialog (approve / reject / suspend / release / delete /
  * block). The prototype positioned this absolutely inside its windowed stage —
  * ported as a fixed full-viewport overlay (same visual at 100% zoom).
+ *
+ * It is a real dialog (A11Y-02): announced as an alert dialog with its title
+ * and message, focus moves into it and stays there, Escape cancels, and focus
+ * returns to the button that opened it. While the action runs, it cannot be
+ * dismissed.
  */
 export function OpsConfirm({
   open,
@@ -67,21 +73,34 @@ export function OpsConfirm({
   disabled,
   children,
 }: OpsConfirmProps) {
+  const { panelRef, titleId, descriptionId } = useDialog({
+    open,
+    onClose,
+    closeOnEscape: !busy,
+  });
   if (!open) return null;
   const t = OPS_TINTS[tone];
   return (
     <div
-      onClick={onClose}
+      onClick={busy ? undefined : onClose}
       className="animate-fade-in bg-text-strong/45 fixed inset-0 z-50 flex items-center justify-center p-6"
     >
       <div
+        ref={panelRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={body ? descriptionId : undefined}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="animate-pop-in shadow-pop flex w-112 max-w-full flex-col items-center gap-4 rounded-xl bg-white p-6 text-center"
       >
         <div className={cn('flex size-13 items-center justify-center rounded-full', t[0], t[1])}>
           <Icon name={icon} size={24} />
         </div>
-        <SectionTitle size={20}>{title}</SectionTitle>
+        <SectionTitle id={titleId} size={20}>
+          {title}
+        </SectionTitle>
         {summary && (
           <div className="bg-bg-subtle border-border flex w-full flex-col gap-2 rounded-md border px-4 py-3 text-left">
             {summary.map((s) => (
@@ -97,16 +116,14 @@ export function OpsConfirm({
           </div>
         )}
         {children}
-        <p className="text-body text-text-muted m-0">{body}</p>
+        <p id={descriptionId} className="text-body text-text-muted m-0">
+          {body}
+        </p>
         <div className="flex justify-center gap-3">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button
-            variant={confirmVariant}
-            onClick={disabled || busy ? undefined : onConfirm}
-            className={cn((disabled || busy) && 'cursor-not-allowed opacity-50')}
-          >
+          <Button variant={confirmVariant} onClick={onConfirm} busy={busy} disabled={disabled}>
             {confirmLabel}
           </Button>
         </div>

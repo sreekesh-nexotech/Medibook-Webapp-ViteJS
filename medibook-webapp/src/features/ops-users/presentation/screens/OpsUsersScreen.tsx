@@ -39,7 +39,8 @@ import {
 } from '../components/opsUsers.display';
 import { OpsRoleAnnotation } from '../components/OpsRoleAnnotation';
 
-const USER_COLUMNS = ['User', 'Role', '2FA', 'Last Active', 'Status', 'Action'] as const;
+/** No 2FA column: two-factor sign-in is off by design in this phase (Q64, PRD-05). */
+const USER_COLUMNS = ['User', 'Role', 'Last Active', 'Status', 'Action'] as const;
 
 /** Which editor the modal is open on: a new invite, or an existing user. */
 type EditorState = { readonly kind: 'new' } | { readonly kind: 'edit'; readonly id: string } | null;
@@ -50,7 +51,7 @@ type PendingAction = { readonly kind: 'deactivate' | 'reactivate'; readonly id: 
 /** Check glyph (full access), em-dash (no access) or the actions held, for one matrix cell. */
 function mark(access: ModuleAccess) {
   if (access.kind === 'full') {
-    return <Icon name="circle-check" size={17} className="text-g-600" />;
+    return <Icon name="circle-check" size={17} className="text-g-800" />;
   }
   if (access.kind === 'none') {
     return (
@@ -64,7 +65,7 @@ function mark(access: ModuleAccess) {
 
 /** Toast a failed mutation with the backend's own message. */
 function failToast(failure: unknown, fallback: string) {
-  toast(isFailure(failure) ? failure.message : fallback, 'error');
+  toast(isFailure(failure) ? failure.message : fallback, 'error', failure);
 }
 
 /** Internal Medibook users & roles (design `OpsUsers`). */
@@ -119,6 +120,7 @@ export function OpsUsersScreen() {
     : staffQuery.isLoadingError
       ? {
           kind: 'error',
+          error: staffQuery.error,
           title: "Internal users didn't load",
           message: isFailure(staffQuery.error) ? staffQuery.error.message : undefined,
           onRetry: () => void staffQuery.refetch(),
@@ -148,6 +150,7 @@ export function OpsUsersScreen() {
       : rolesError
         ? {
             kind: 'error',
+            error: rolesQuery.error ?? permissionsQuery.error,
             title: "Role permissions didn't load",
             onRetry: () => {
               void rolesQuery.refetch();
@@ -181,7 +184,7 @@ export function OpsUsersScreen() {
   return (
     <div className="flex flex-col gap-5">
       {KPIS.length > 0 && (
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           {KPIS.map((k) => (
             <StatCard key={k.label} k={k} />
           ))}
@@ -217,11 +220,6 @@ export function OpsUsersScreen() {
                   <OpsPerson row={u} />
                 </td>
                 <td className={tdClass}>{u.role.name}</td>
-                <td className={tdClass}>
-                  <span className="text-text-muted" title="Not reported by the server">
-                    —
-                  </span>
-                </td>
                 <td className={tdClass}>{lastActiveLabel(u.lastLoginAt)}</td>
                 <td className={tdClass}>
                   <div className="flex flex-wrap gap-1.5">
@@ -268,7 +266,7 @@ export function OpsUsersScreen() {
                             name="user-x"
                             box={36}
                             size={15}
-                            color="var(--color-d-500)"
+                            color="var(--color-d-600)"
                             label="Deactivate user"
                             title={`Deactivate ${u.name}`}
                             onClick={() => setPending({ kind: 'deactivate', id: u.id })}
@@ -298,7 +296,7 @@ export function OpsUsersScreen() {
           Every detail view is written to Compliance Logs.
         </div>
         {!rolesState && (
-          <div className="mb-4.5 grid grid-cols-2 gap-3">
+          <div className="mb-4.5 grid gap-3 lg:grid-cols-2">
             {roles.map((r) => (
               <OpsRoleAnnotation key={r.id} role={r} modules={modules} />
             ))}

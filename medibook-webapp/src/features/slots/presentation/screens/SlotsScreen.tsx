@@ -141,7 +141,7 @@ export function SlotsScreen() {
             `${row.doctorName} · ${slot.label} ${action === 'open' ? 'opened' : 'blocked'}`,
             action === 'open' ? 'success' : 'info',
           ),
-        onError: (error) => toast(errorText(error, TOGGLE_FAILED), 'error'),
+        onError: (error) => toast(errorText(error, TOGGLE_FAILED), 'error', error),
       },
     );
   };
@@ -153,7 +153,7 @@ export function SlotsScreen() {
           `Slots regenerated — ${res.createdCount} created, ${res.updatedCount} updated`,
           'success',
         ),
-      onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error'),
+      onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error', error),
     });
   };
 
@@ -308,6 +308,7 @@ export function SlotsScreen() {
         </Card>
       ) : catalogError ? (
         <ErrorState
+          error={catalogError}
           title="Doctors and departments could not be loaded"
           message={errorText(catalogError, 'Please try again.')}
           onRetry={() => {
@@ -317,6 +318,7 @@ export function SlotsScreen() {
         />
       ) : gridQuery.isLoadingError && !grid ? (
         <ErrorState
+          error={gridQuery.error}
           title="The slot grid could not be loaded"
           message={errorText(gridQuery.error, 'Please try again.')}
           onRetry={() => void gridQuery.refetch()}

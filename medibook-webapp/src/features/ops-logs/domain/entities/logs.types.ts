@@ -42,4 +42,10 @@ export interface AuditLogQuery {
   readonly sortDir?: AuditLogSortDir;
   /** One hospital's entries only (its profile); omitted = the whole platform. */
   readonly hospitalId?: string;
+  /** Who acted: `hospital`, `platform`, `patient`, `display` or `system`. */
+  readonly principal?: string;
+  /** One user's actions (their user id). */
+  readonly actorUserId?: string;
+  /** One resource type, exactly as the trail records it (e.g. `PlanListView`). */
+  readonly resourceType?: string;
 }

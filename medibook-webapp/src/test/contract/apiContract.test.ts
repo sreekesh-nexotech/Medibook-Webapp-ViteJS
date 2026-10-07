@@ -91,6 +91,10 @@ import {
   permissionsResponseSchema,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.response';
 import {
+  ticketDetailResponseSchema,
+  ticketPageResponseSchema,
+} from '@/features/ops-support/infrastructure/data-sources/remote/support.response';
+import {
   hospitalPatientPageResponseSchema,
   hospitalPatientResponseSchema,
   patientAppointmentPageResponseSchema,
@@ -120,6 +124,7 @@ import {
   hospitalProfileResponseSchema,
   hospitalSettingsResponseSchema,
   scheduleHoursListResponseSchema,
+  numberingListResponseSchema,
   tokenPolicyResponseSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
 import {
@@ -208,6 +213,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-settlements.payoutRunDetailResponseSchema': payoutRunDetailResponseSchema,
   'ops-settlements.payoutRunPageResponseSchema': payoutRunPageResponseSchema,
   'ops-settlements.periodPageResponseSchema': periodPageResponseSchema,
+  'ops-support.ticketDetailResponseSchema': ticketDetailResponseSchema,
+  'ops-support.ticketPageResponseSchema': ticketPageResponseSchema,
   'ops-users.permissionsResponseSchema': permissionsResponseSchema,
   'ops-users.rolePageResponseSchema': opsUsersRolePageResponseSchema,
   'ops-users.staffPageResponseSchema': opsUsersStaffPageResponseSchema,
@@ -227,6 +234,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'settings.holidayPageResponseSchema': holidayPageResponseSchema,
   'settings.hospitalProfileResponseSchema': hospitalProfileResponseSchema,
   'settings.hospitalSettingsResponseSchema': hospitalSettingsResponseSchema,
+  'settings.numberingListResponseSchema': numberingListResponseSchema,
   'settings.scheduleHoursListResponseSchema': scheduleHoursListResponseSchema,
   'settings.servicePageSchema': servicePageSchema,
   'settings.taxRatePageSchema': taxRatePageSchema,

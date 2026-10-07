@@ -179,6 +179,7 @@ export function HospitalEditProfileModal({ h, onClose }: HospitalEditProfileModa
             ? 'Someone else changed this hospital while you were editing. Close this form, check their changes, then try again.'
             : error.message,
           'error',
+          error,
         );
       }
     },
@@ -205,6 +206,7 @@ export function HospitalEditProfileModal({ h, onClose }: HospitalEditProfileModa
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Edit ${h.name}`}

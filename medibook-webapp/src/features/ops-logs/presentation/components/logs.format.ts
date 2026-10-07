@@ -1,8 +1,3 @@
-import type { AuditLogEntry } from '@/features/ops-logs/domain/entities/logs.types';
-
-/** Leading characters of an actor UUID shown under the action. */
-const ACTOR_ID_PREVIEW = 8;
-
 /** Audit timestamps read in IST, the console's timezone (backend `audit_log_spec`). */
 const LOG_TIME_ZONE = 'Asia/Kolkata';
 
@@ -25,9 +20,7 @@ export function formatLogTime(iso: string): string {
   return `${logDateFormat.format(at)} · ${logClockFormat.format(at)}`;
 }
 
-/** Who acted: the principal, plus the user id when there is one. */
-export function actorLabel(entry: AuditLogEntry): string {
-  return entry.actorUserId
-    ? `${entry.principal} · ${entry.actorUserId.slice(0, ACTOR_ID_PREVIEW)}`
-    : entry.principal;
+/** The request behind an entry — `POST /api/v1/platform/plans` — or a background task. */
+export function requestOf(method: string, path: string): string {
+  return method === 'TASK' || !path ? 'Background task' : `${method} ${path}`;
 }

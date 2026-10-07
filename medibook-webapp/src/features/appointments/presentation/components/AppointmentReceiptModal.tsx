@@ -55,6 +55,7 @@ export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentR
               ? failure.message
               : 'Could not download the receipt.',
           'error',
+          failure,
         ),
     });
   };
@@ -91,6 +92,7 @@ export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentR
         </div>
       ) : receipt.isLoadingError ? (
         <ErrorState
+          error={receipt.error}
           inline
           title="Could not load the receipt"
           message={isFailure(receipt.error) ? receipt.error.message : undefined}
@@ -163,7 +165,7 @@ function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
                 <td className={cn(rcTd, 'text-text-strong font-semibold')}>Total</td>
                 <td
                   colSpan={2}
-                  className={cn(rcTd, 'text-g-700 text-right font-bold tabular-nums')}
+                  className={cn(rcTd, 'text-g-800 text-right font-bold tabular-nums')}
                 >
                   {money(receipt.totalRupees)}
                 </td>

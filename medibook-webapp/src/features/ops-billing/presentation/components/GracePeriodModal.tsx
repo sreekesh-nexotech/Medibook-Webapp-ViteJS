@@ -58,7 +58,7 @@ export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalPr
         );
         onClose();
       } catch (error) {
-        toast(failureText(error, GRACE_FAILED), 'error');
+        toast(failureText(error, GRACE_FAILED), 'error', error);
       }
     },
   });
@@ -68,6 +68,7 @@ export function GracePeriodModal({ invoice, grace, onClose }: GracePeriodModalPr
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Grace window for ${invoice.invoiceNo}`}

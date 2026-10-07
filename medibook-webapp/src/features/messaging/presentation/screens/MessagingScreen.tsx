@@ -25,6 +25,8 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { hospitalSessionOf } from '@/features/auth/application/store/auth.roles';
 import { useExportMessageDeliveriesMutation } from '@/features/messaging/application/queries/useExportMessageDeliveriesMutation';
 import { useMessageDeliveriesQuery } from '@/features/messaging/application/queries/useMessageDeliveriesQuery';
 import { useMessagingTemplatesQuery } from '@/features/messaging/application/queries/useMessagingTemplatesQuery';
@@ -118,6 +120,8 @@ function patientTemplates(templates: readonly MessagingTemplate[]): readonly Mes
  * gateway reports otherwise (THE LAW).
  */
 export function MessagingScreen() {
+  const hospitalName = hospitalSessionOf(useSessionQuery('hospital').data)?.hospital.name;
+  const placeholderSamples = messagingSampleValues(hospitalName);
   const { can } = usePermission();
   const mayEdit = can('Hospital Settings.edit');
 
@@ -205,7 +209,11 @@ export function MessagingScreen() {
         toast(`Exported ${rows.length} outbox rows as CSV`, 'success');
       },
       onError: (error) =>
-        toast(isFailure(error) ? error.message : 'The outbox could not be exported.', 'error'),
+        toast(
+          isFailure(error) ? error.message : 'The outbox could not be exported.',
+          'error',
+          error,
+        ),
     });
   };
 
@@ -242,7 +250,11 @@ export function MessagingScreen() {
           setPendingSend(null);
         },
         onError: (error) => {
-          toast(isFailure(error) ? error.message : 'The message could not be queued.', 'error');
+          toast(
+            isFailure(error) ? error.message : 'The message could not be queued.',
+            'error',
+            error,
+          );
           setPendingSend(null);
         },
       },
@@ -266,6 +278,7 @@ export function MessagingScreen() {
     : outboxQuery.isLoadingError
       ? {
           kind: 'error',
+          error: outboxQuery.error,
           title: "The outbox didn't load.",
           message: isFailure(outboxQuery.error) ? outboxQuery.error.message : undefined,
           onRetry: () => void outboxQuery.refetch(),
@@ -333,6 +346,7 @@ export function MessagingScreen() {
           ) : templatesQuery.isLoadingError ? (
             <Card>
               <ErrorState
+                error={templatesQuery.error}
                 inline
                 title="Templates didn't load."
                 message={isFailure(templatesQuery.error) ? templatesQuery.error.message : undefined}
@@ -350,7 +364,7 @@ export function MessagingScreen() {
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {channelTemplates.map((t) => {
-                const rendered = renderTemplate(t.body, messagingSampleValues());
+                const rendered = renderTemplate(t.body, messagingSampleValues(hospitalName));
                 return (
                   <Card key={t.id}>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -391,7 +405,9 @@ export function MessagingScreen() {
                     <span className="text-text-strong font-medium">{p.token}</span>
                   </td>
                   <td className={tdClass}>{p.label}</td>
-                  <td className={cn(tdClass, 'text-text-muted')}>{p.sample}</td>
+                  <td className={cn(tdClass, 'text-text-muted')}>
+                    {placeholderSamples[p.token] ?? p.sample}
+                  </td>
                 </tr>
               ))}
             </TableShell>

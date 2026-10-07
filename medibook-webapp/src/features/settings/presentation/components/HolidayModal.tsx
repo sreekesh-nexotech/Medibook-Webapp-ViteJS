@@ -15,7 +15,7 @@ import {
 } from '@/features/settings/application/store/profile.form';
 
 const DATE_INPUT_CLASS =
-  'rounded-input border-border text-body text-text-body h-12 w-full border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-12 w-full border bg-white px-3';
 
 interface HolidayForm {
   name: string;
@@ -90,6 +90,7 @@ export function HolidayModal({ open, holiday, departments, onClose, onSave }: Ho
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={holiday ? 'Edit Closure' : 'Add Closure'}

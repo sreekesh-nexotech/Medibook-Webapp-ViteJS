@@ -134,7 +134,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
     const message = isFailure(error) ? error.message : 'Could not save the plan.';
     const codeError = isFailure(error) ? error.fieldErrors.code?.[0] : undefined;
     if (codeError) setNameServerError(`${codeError} Choose a different plan name.`);
-    toast(message, 'error');
+    toast(message, 'error', error);
   };
 
   const validate = useMemo<FormValidators<PlanFormValues>>(
@@ -210,6 +210,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={plan ? `Edit ${plan.name}` : 'Create Plan'}

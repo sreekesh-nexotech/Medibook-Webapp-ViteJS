@@ -37,7 +37,7 @@ export const signedUrlResponseSchema = z.object({
 });
 
 export type StoredFileResponse = z.infer<typeof storedFileResponseSchema>;
-export type UploadTicketResponse = z.infer<typeof uploadTicketResponseSchema>;
+
 export type SignedUrlResponse = z.infer<typeof signedUrlResponseSchema>;
 
 export function toStoredFile(dto: StoredFileResponse): StoredFile {

@@ -9,6 +9,7 @@ import { isFailure } from '@/core/error/failure';
 import { AUTH_LOGIN_PATH, AUTH_SURFACE_OPS, AUTH_SURFACE_PARAM } from '@/app/router/paths';
 
 import { usePasswordForgotMutation } from '@/features/auth/application/queries/usePasswordForgotMutation';
+import { AuthAlert } from '@/features/auth/presentation/components/AuthAlert';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
 
@@ -53,7 +54,7 @@ export function ForgotPasswordScreen() {
   return (
     <div className="flex h-full bg-white">
       <BrandPanel />
-      <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+      <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
         <div className="w-full max-w-100">
           <button
             type="button"
@@ -70,9 +71,18 @@ export function ForgotPasswordScreen() {
               <p className="text-body text-text-muted mb-7.5">
                 Enter the email linked to your staff account and we'll send a reset link.
               </p>
-              <div className="flex flex-col gap-5">
+              <form
+                noValidate
+                className="flex flex-col gap-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
+              >
                 <AuthField
                   label="Email Address"
+                  type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(v) => {
                     setEmail(v);
@@ -80,25 +90,21 @@ export function ForgotPasswordScreen() {
                   }}
                   placeholder={surface === 'platform' ? 'you@medibook.com' : 'you@hospital.med'}
                 />
-                {err && (
-                  <div className="text-caption text-danger bg-d-100 flex items-center gap-2 rounded-sm px-3 py-2.5">
-                    <Icon name="triangle-alert" size={15} /> {err}
-                  </div>
-                )}
+                {err && <AuthAlert message={err} />}
                 <Button
+                  type="submit"
                   variant="info"
                   icon="mail"
                   className="h-13.5 w-full rounded-sm"
-                  onClick={send}
                   busy={forgot.isPending}
                 >
                   Send Mail
                 </Button>
-              </div>
+              </form>
             </>
           ) : (
             <div className="text-center">
-              <div className="bg-g-100 text-g-600 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
+              <div className="bg-g-100 text-g-800 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
                 <Icon name="mail-check" size={34} />
               </div>
               <div className="text-text-strong mb-2.5 text-[26px] font-bold">Check your inbox</div>
@@ -113,7 +119,7 @@ export function ForgotPasswordScreen() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -46,7 +46,7 @@ interface PickedImage {
 const BANNER_IMAGE_ACCEPT = acceptFor('banner');
 
 const dateInputClass =
-  'text-body text-text-body rounded-input border-border h-12 w-full border bg-white px-3';
+  'text-body text-text-body rounded-input border-border-control h-12 w-full border bg-white px-3';
 
 /** The fields this modal opens on — a new banner, a campaign banner, or the default. */
 function initialDraft(banner: CampaignBanner | null): BannerFieldsDraft {
@@ -164,7 +164,7 @@ export function BannerModal({ open, banner, busy = false, onClose, onSave }: Ban
                 <button
                   type="button"
                   onClick={removeImage}
-                  className="text-caption text-d-500 cursor-pointer"
+                  className="text-caption text-d-600 cursor-pointer"
                 >
                   Remove
                 </button>

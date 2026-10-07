@@ -33,7 +33,7 @@
   "bookings": [
     {
       "id": "01a0ee2f-8f69-70f0-b7ce-d02c1efcdb17",
-      "booking_ref": "LKSB-2609-00180",
+      "booking_ref": "EXMB-2609-00180",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
         "name": "Example Multispeciality Hospital"
@@ -48,7 +48,7 @@
     },
     {
       "id": "01a0ee2f-129e-7953-8685-df6ba557887c",
-      "booking_ref": "LKSB-2609-00163",
+      "booking_ref": "EXMB-2609-00163",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
         "name": "Example Multispeciality Hospital"
@@ -63,7 +63,7 @@
     },
     {
       "id": "01a0ee2e-d939-77f0-8c2a-e738a77e276b",
-      "booking_ref": "LKSB-2609-00158",
+      "booking_ref": "EXMB-2609-00158",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
         "name": "Example Multispeciality Hospital"
@@ -78,7 +78,7 @@
     },
     {
       "id": "01a0ee2e-302e-7740-816f-5f1923f046fc",
-      "booking_ref": "LKSB-2609-00148",
+      "booking_ref": "EXMB-2609-00148",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
         "name": "Example Multispeciality Hospital"
@@ -93,7 +93,7 @@
     },
     {
       "id": "01a0ee2d-ba71-79e2-8769-8dcb79584684",
-      "booking_ref": "LKSB-2609-00133",
+      "booking_ref": "EXMB-2609-00133",
       "hospital": {
         "id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
         "name": "Example Multispeciality Hospital"

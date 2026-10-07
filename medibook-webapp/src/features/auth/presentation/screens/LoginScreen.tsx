@@ -24,7 +24,9 @@ import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
 import { useLoginMutation } from '@/features/auth/application/queries/useLoginMutation';
 import { useLogoutMutation } from '@/features/auth/application/queries/useLogoutMutation';
 import { hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
+import { AuthAlert } from '@/features/auth/presentation/components/AuthAlert';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
+import { AuthPasswordField } from '@/features/auth/presentation/components/AuthPasswordField';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
 
 type LoginMode = 'hospital' | 'ops';
@@ -68,7 +70,6 @@ export function LoginScreen() {
   const [mode, setMode] = useState<LoginMode>(isOpsReturnPath(next) ? 'ops' : 'hospital');
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
-  const [show, setShow] = useState(false);
   // Off by default: front-desk terminals are shared (SEC-02).
   const [remember, setRemember] = useState(false);
   const [err, setErr] = useState('');
@@ -126,7 +127,7 @@ export function LoginScreen() {
   return (
     <div className="flex h-full bg-white">
       <BrandPanel />
-      <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+      <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
         <div className="w-full max-w-100">
           <div className="border-border-input bg-bg-subtle mb-7.5 flex gap-1 rounded-md border p-1">
             {MODES.map(([k, l]) => (
@@ -134,6 +135,7 @@ export function LoginScreen() {
                 key={k}
                 type="button"
                 onClick={() => pick(k)}
+                aria-pressed={mode === k}
                 className={cn(
                   'flex-1 cursor-pointer rounded-sm py-2.25 text-center text-[13px] transition-colors duration-150',
                   mode === k
@@ -156,9 +158,19 @@ export function LoginScreen() {
               <Icon name="file-down" size={15} /> Sign in to download the report from your email.
             </div>
           )}
-          <div className="flex flex-col gap-5">
+          {/* A form, so Enter signs in from either field (A11Y-04). */}
+          <form
+            noValidate
+            className="flex flex-col gap-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              go();
+            }}
+          >
             <AuthField
               label="Email Address"
+              type="email"
+              autoComplete="username"
               value={email}
               onChange={(v) => {
                 setEmail(v);
@@ -166,25 +178,16 @@ export function LoginScreen() {
               }}
               placeholder={isOps ? 'you@medibook.com' : 'you@hospital.med'}
             />
-            <AuthField
+            <AuthPasswordField
               label="Password"
-              type={show ? 'text' : 'password'}
+              autoComplete="current-password"
               value={pwd}
               onChange={(v) => {
                 setPwd(v);
                 if (err) setErr('');
               }}
-              trailing={
-                <button type="button" onClick={() => setShow((s) => !s)} className="flex">
-                  <Icon name={show ? 'eye-off' : 'eye'} size={18} />
-                </button>
-              }
             />
-            {err && (
-              <div className="text-caption text-danger bg-d-100 flex items-center gap-2 rounded-sm px-3 py-2.5">
-                <Icon name="triangle-alert" size={15} /> {err}
-              </div>
-            )}
+            {err && <AuthAlert message={err} />}
             <div className="flex items-center justify-between gap-3">
               {isOps ? (
                 <span className="text-caption text-text-muted inline-flex items-center gap-1.75">
@@ -222,21 +225,21 @@ export function LoginScreen() {
               </button>
             </div>
             <Button
+              type="submit"
               variant="info"
               className="h-13.5 w-full rounded-sm"
-              onClick={go}
               busy={loginMutation.isPending}
             >
               Login
             </Button>
-          </div>
-          <p className="text-caption text-text-faint mt-7 text-center">
+          </form>
+          <p className="text-caption text-text-muted mt-7 text-center">
             {isOps
               ? 'Restricted to Medibook operations staff.'
               : 'Trouble signing in? Contact your hospital administrator.'}
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

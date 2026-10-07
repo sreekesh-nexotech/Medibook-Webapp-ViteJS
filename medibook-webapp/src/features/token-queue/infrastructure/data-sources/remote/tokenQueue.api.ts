@@ -1,5 +1,5 @@
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
+import { fetchAllPages, paginatedSchema } from '@/core/api/pagination';
 
 import type {
   SessionCommand,
@@ -14,21 +14,17 @@ import {
 /**
  * Doctor-session queue endpoints (`/api/v1/hospital/sessions…`). The list is
  * paginated server-side (despite `schema.yml` typing it as an object) and
- * fetched in full for the date.
+ * fetched in full for the date, with a hard stop (PERF-03): a list past 50
+ * pages fails with a message instead of looping on.
  */
 
 export const sessionPageSchema = paginatedSchema(sessionSnapshotSchema);
 
 export async function getSessions(date: string): Promise<SessionSnapshotResponse[]> {
-  const rows: SessionSnapshotResponse[] = [];
-  for (let page = 1; ; page += 1) {
-    const response = await hospitalApi.get('/sessions', {
-      params: { date, page, page_size: MAX_PAGE_SIZE },
-    });
-    const data = sessionPageSchema.parse(response.data);
-    rows.push(...data.results);
-    if (!data.has_next) return rows;
-  }
+  return fetchAllPages(async (pageParams) => {
+    const response = await hospitalApi.get('/sessions', { params: { date, ...pageParams } });
+    return sessionPageSchema.parse(response.data);
+  });
 }
 
 export async function postSessionCommand(

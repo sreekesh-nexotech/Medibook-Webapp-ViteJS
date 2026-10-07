@@ -47,8 +47,8 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
       label: 'Monthly Recurring Revenue',
       value: rupeesShort(k.mrrPaise),
       sub: plural(k.subscriptions.active, 'active subscription'),
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
       subClass: 'text-text-muted',
       go: 'billing',
     },
@@ -57,8 +57,8 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
       label: 'Outstanding Invoices',
       value: rupeesShort(k.invoicesOutstandingPaise),
       sub: `${plural(k.invoicesUnpaidCount, 'invoice')} unpaid`,
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       subClass: 'text-text-muted',
       go: 'billing',
     },
@@ -67,8 +67,8 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
       label: 'Bookings (30 days)',
       value: k.appointmentsLast30Days.toLocaleString('en-IN'),
       sub: 'Appointments created, all hospitals',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
       go: 'analytics',
     },
@@ -100,6 +100,7 @@ export function OpsDashboardScreen() {
     return (
       <Card>
         <ErrorState
+          error={dashboardQuery.error}
           title="The dashboard didn't load"
           message={isFailure(dashboardQuery.error) ? dashboardQuery.error.message : undefined}
           onRetry={() => void dashboardQuery.refetch()}

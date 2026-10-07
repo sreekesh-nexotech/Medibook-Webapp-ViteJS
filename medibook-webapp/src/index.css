@@ -5,69 +5,44 @@
 @source not '../docs';
 
 /* ============================================================
- * Medibook mbAdmin — self-hosted Poppins (design bundle TTFs).
+ * Medibook mbAdmin — self-hosted Poppins: the five weights the app uses
+ * (400–800), subset to Latin, punctuation and ₹ and served as WOFF2:
+ * 59 kB in all, down from 1.44 MB of TTF (PERF-02; licence in
+ * public/fonts/OFL.txt). Other scripts fall back to the system font.
  * ============================================================ */
-@font-face {
-  font-family: 'Poppins';
-  font-weight: 300;
-  font-style: normal;
-  src: url('/fonts/Poppins-Light.ttf') format('truetype');
-  font-display: swap;
-}
 @font-face {
   font-family: 'Poppins';
   font-weight: 400;
   font-style: normal;
-  src: url('/fonts/Poppins-Regular.ttf') format('truetype');
+  src: url('/fonts/Poppins-Regular.woff2') format('woff2');
   font-display: swap;
 }
 @font-face {
   font-family: 'Poppins';
   font-weight: 500;
   font-style: normal;
-  src: url('/fonts/Poppins-Medium.ttf') format('truetype');
+  src: url('/fonts/Poppins-Medium.woff2') format('woff2');
   font-display: swap;
 }
 @font-face {
   font-family: 'Poppins';
   font-weight: 600;
   font-style: normal;
-  src: url('/fonts/Poppins-SemiBold.ttf') format('truetype');
+  src: url('/fonts/Poppins-SemiBold.woff2') format('woff2');
   font-display: swap;
 }
 @font-face {
   font-family: 'Poppins';
   font-weight: 700;
   font-style: normal;
-  src: url('/fonts/Poppins-Bold.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  font-weight: 700;
-  font-style: italic;
-  src: url('/fonts/Poppins-BoldItalic.ttf') format('truetype');
+  src: url('/fonts/Poppins-Bold.woff2') format('woff2');
   font-display: swap;
 }
 @font-face {
   font-family: 'Poppins';
   font-weight: 800;
   font-style: normal;
-  src: url('/fonts/Poppins-ExtraBold.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  font-weight: 900;
-  font-style: normal;
-  src: url('/fonts/Poppins-Black.ttf') format('truetype');
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Poppins';
-  font-weight: 900;
-  font-style: italic;
-  src: url('/fonts/Poppins-BlackItalic.ttf') format('truetype');
+  src: url('/fonts/Poppins-ExtraBold.woff2') format('woff2');
   font-display: swap;
 }
 
@@ -107,7 +82,8 @@
   /* Accent blue — tweaked to #2563EB */
   --color-blue: #2563eb;
   --color-blue-strong: #2055ca;
-  --color-blue-soft-bg: rgba(37, 99, 235, 0.12);
+  /* 8%, so blue text on it keeps 4.5:1 (it measured 4.37:1 at 12%, A11Y-06). */
+  --color-blue-soft-bg: rgba(37, 99, 235, 0.08);
 
   /* Greyscale (exact, from the style guide) */
   --color-grey-100: #ffffff;
@@ -156,14 +132,19 @@
   --color-d-900: #5a1610;
 
   /* Semantic aliases (use these in product UI) */
-  --color-success: #16a34a;
+  /* Fills that carry white text, and text on white: each at least 4.5:1
+   * (A11Y-05; the design's #16a34a, #e74c3c and #f2451c measured 3.30, 3.82
+   * and 3.72). Checked by src/test/styles/contrast.test.ts. */
+  --color-success: #15803d;
   --color-warning: #f59e0b;
-  --color-danger: #e74c3c;
+  --color-danger: #cb3a2b;
   --color-info: #2563eb;
-  --color-link: #f2451c;
+  --color-link: #c2380f;
 
   /* Orange accent used for walk-in / no-show tints */
   --color-orange: #ea7c2b;
+  /* Orange for text and icons on white (5.16:1); `orange` itself is 2.83:1. */
+  --color-orange-strong: #b3500f;
 
   /* Surfaces */
   --color-bg-app: #f3f3f3;
@@ -175,6 +156,9 @@
   --color-border: #cccdd0;
   --color-border-soft: #e5e7eb;
   --color-border-input: #eaeaea;
+  /* The edge of a form control: 3.42:1 on white, so the box can be seen
+   * (WCAG 1.4.11, A11Y-06). Cards and dividers keep the softer borders. */
+  --color-border-control: #868b94;
 
   /* ---- Text ----
    *
@@ -185,9 +169,7 @@
    *   --text-strong      #111827   17.74      16.69        15.99   text-safe
    *   --text-navy        #0e2a4a   14.50      13.64        13.06   text-safe
    *   --text-body        #1f2737   14.96      14.08        13.48   text-safe
-   *   --text-muted       #6b7280    4.83       4.55         4.36   text-safe on
-   *                                                               white/grey-200
-   *                                                               only (see below)
+   *   --text-muted       #636b78    5.38       5.06         4.85   text-safe
    *   --text-faint       #9ca3af    2.54       2.39         2.29   DECORATIVE ONLY
    *   --color-grey-900   #4b5363    7.73       7.27         6.97   text-safe
    *
@@ -199,13 +181,11 @@
    *     placeholder glyphs, disabled-state hints duplicated elsewhere,
    *     watermark text, inactive sort chevrons, separators. Never use it for
    *     a sentence the user is meant to read.
-   *   * `text-text-muted` measures 4.36:1 directly on the app background
-   *     (#f3f3f3) — just under the bar. Captions that sit on the page
-   *     background rather than on a white Card should use `text-grey-900`
-   *     (6.97:1) or `text-text-body`. Inside a Card (white) muted is fine. */
+   *   * `text-text-muted` was #6b7280 (4.36:1 on the app background); it is
+   *     now dark enough for every surface the app uses (A11Y-06). */
   --color-text-strong: #111827;
   --color-text-body: #1f2737;
-  --color-text-muted: #6b7280;
+  --color-text-muted: #636b78;
   --color-text-faint: #9ca3af;
   --color-text-on-dark: #ffffff;
   --color-text-navy: #0e2a4a;
@@ -410,6 +390,20 @@
     outline-offset: 2px;
   }
 
+  /* People who ask their system for less motion get none: no slide-ins, pops
+   * or animated transitions (A11Y-07). Durations go near zero rather than to
+   * none, so code waiting for an animation's end still hears it. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   /* Approved "Comfy" table density: every table cell gets 22px vertical
    * padding (the design file's body[data-density="comfy"] rule). */
   td,
@@ -418,21 +412,43 @@
     padding-bottom: 22px;
   }
 
-  /* Printable receipt / token-slip isolation */
+  /* Printing (PRN-01). `printElement` (src/shared/lib/print.ts) copies the
+   * document into a `.print-root` at the end of <body>. On paper only that
+   * copy shows, in normal flow, so a long invoice runs onto as many pages as it
+   * needs at the paper's own width; modal scrolling and clipping are undone. */
+  .print-root {
+    display: none;
+  }
   @media print {
-    body * {
-      visibility: hidden !important;
+    html,
+    body {
+      height: auto !important;
+      background: var(--color-white) !important;
     }
-    .print-area,
-    .print-area * {
-      visibility: visible !important;
+    body > :not(.print-root) {
+      display: none !important;
     }
-    .print-area {
-      position: fixed !important;
-      inset: 0 !important;
-      margin: 0 !important;
+    .print-root {
+      display: block !important;
+    }
+    .print-root * {
+      overflow: visible !important;
+      max-height: none !important;
       box-shadow: none !important;
-      border: none !important;
+    }
+    /* An 80 mm thermal roll prints about 72 mm across. */
+    .print-root.print-slip {
+      page: slip;
+      width: 72mm;
     }
   }
+}
+
+/* Paper margins for printed documents (PRN-01); a token slip uses the narrow
+ * `slip` page, so little of an 80 mm roll is lost to margins. */
+@page {
+  margin: 12mm;
+}
+@page slip {
+  margin: 3mm 4mm;
 }

@@ -127,6 +127,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   if (caseQuery.isLoadingError) {
     return (
       <ErrorState
+        error={caseQuery.error}
         title="This application didn't load"
         message={errorCopy(caseQuery.error)}
         onRetry={() => void caseQuery.refetch()}
@@ -153,7 +154,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
       { caseId: detail.id, code: item.code, update },
       {
         onSuccess: () => toast(done, 'success'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
@@ -167,7 +168,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
           { status: item.status === 'verified' ? 'verified' : 'received', fileId },
           `Scan attached to ${item.name}.`,
         ),
-      onError: (error) => toast(errorCopy(error), 'error'),
+      onError: (error) => toast(errorCopy(error), 'error', error),
       onSettled: () => setUploadingCode(null),
     });
   };
@@ -183,7 +184,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
       toast(`${sendingBack.name} sent back to ${detail.hospitalName}.`, 'info');
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -194,7 +195,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
       toast(`${detail.hospitalName}'s application was rejected.`, 'info');
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -202,7 +203,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const approveCase = (): void => {
     approve.mutate(detail.hospitalId, {
       onSuccess: () => toast(`${detail.hospitalName} approved — waiting on go-live.`, 'success'),
-      onError: (error) => toast(errorCopy(error), 'error'),
+      onError: (error) => toast(errorCopy(error), 'error', error),
     });
   };
 
@@ -225,11 +226,12 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             toast(
               `${detail.hospitalName} is live, but it could not be opened to patients: ${errorCopy(error)} Turn it on from its hospital page.`,
               'error',
+              error,
             ),
         });
       },
       onError: (error) => {
-        toast(errorCopy(error), 'error');
+        toast(errorCopy(error), 'error', error);
         setModal(null);
       },
     });
@@ -278,7 +280,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                       { caseId: detail.id, stage: next },
                       {
                         onSuccess: () => toast(`Moved to ${STAGE_LABEL[next]}.`, 'success'),
-                        onError: (error) => toast(errorCopy(error), 'error'),
+                        onError: (error) => toast(errorCopy(error), 'error', error),
                       },
                     );
                   }}
@@ -322,7 +324,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
 
       {stage === 'rejected' && (
         <Card pad={16} className="flex items-start gap-3">
-          <Icon name="circle-x" size={18} className="text-d-500 mt-0.5 flex-none" />
+          <Icon name="circle-x" size={18} className="text-d-600 mt-0.5 flex-none" />
           <div className="text-body text-text-body">
             <span className="text-text-strong font-medium">Application rejected.</span>{' '}
             {detail.rejectionReason ?? 'No reason was recorded.'}
@@ -336,7 +338,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             <div
               className={cn(
                 'flex size-10 flex-none items-center justify-center rounded-md',
-                live || ready ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+                live || ready ? 'bg-g-100 text-g-800' : 'bg-y-100 text-y-800',
               )}
             >
               <Icon name={live ? 'rocket' : ready ? 'circle-check' : 'triangle-alert'} size={19} />
@@ -358,7 +360,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                 <ul className="mt-2.5 flex list-none flex-col gap-1.5 p-0">
                   {blockers.map((b) => (
                     <li key={b.code} className="text-body text-text-body flex items-start gap-2">
-                      <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
+                      <Icon name="circle-alert" size={15} className="text-y-800 mt-0.5 flex-none" />
                       {blockerCopy(b, detail.checklist)}
                     </li>
                   ))}
@@ -375,7 +377,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
           <div
             className={cn(
               'flex size-9 flex-none items-center justify-center rounded-md',
-              adminAccepted ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+              adminAccepted ? 'bg-g-100 text-g-800' : 'bg-y-100 text-y-800',
             )}
           >
             <Icon name={adminAccepted ? 'user-check' : 'user-plus'} size={17} />
@@ -388,7 +390,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             </div>
             <div className="text-caption text-text-muted">
               The first administrator is invited when the hospital is created. Inviting, resending
-              or adding administrators from the console is not yet available from the server.
+              or adding administrators from the console is coming later.
             </div>
           </div>
         </div>
@@ -445,7 +447,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                         item.fileId &&
                         downloadScan.mutate(
                           { fileId: item.fileId },
-                          { onError: (error) => toast(errorCopy(error), 'error') },
+                          { onError: (error) => toast(errorCopy(error), 'error', error) },
                         )
                       }
                       className="text-caption text-blue mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
@@ -497,7 +499,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                       label="Verify document"
                       box={36}
                       size={16}
-                      color="var(--color-g-600)"
+                      color="var(--color-g-800)"
                       disabled={item.status !== 'received' || updateItem.isPending}
                       title={
                         item.status === 'received'
@@ -530,7 +532,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                       label="Send document back"
                       box={36}
                       size={16}
-                      color="var(--color-d-500)"
+                      color="var(--color-d-600)"
                       disabled={item.status === 'pending' || updateItem.isPending}
                       title={
                         item.status === 'pending'

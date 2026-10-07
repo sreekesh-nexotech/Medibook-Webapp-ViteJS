@@ -30,6 +30,7 @@ export function OpsGuard() {
       }
       return (
         <SessionError
+          error={session.error}
           message={isFailure(session.error) ? session.error.message : undefined}
           onRetry={() => void session.refetch()}
           onLogout={logout}

@@ -60,7 +60,7 @@ const MIN_CODE_LENGTH = 4;
 const PREVIEW_ORDER_VALUE = 1000;
 
 const DATE_INPUT_CLASS =
-  'rounded-input border-border text-body text-text-body h-12 w-full border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-12 w-full border bg-white px-3';
 
 interface CouponForm {
   code: string;
@@ -201,6 +201,7 @@ export function CouponModal({
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={coupon ? `Edit Coupon — ${coupon.code}` : 'Create Coupon'}
@@ -369,7 +370,7 @@ export function CouponModal({
         <div
           className={cn(
             'text-body flex items-center gap-2 rounded-md px-3.5 py-3',
-            sampleDiscount > 0 ? 'bg-g-100 text-g-700' : 'bg-grey-300 text-text-muted',
+            sampleDiscount > 0 ? 'bg-g-100 text-g-800' : 'bg-grey-300 text-text-muted',
           )}
         >
           <Icon name="percent" size={16} className="flex-none" />

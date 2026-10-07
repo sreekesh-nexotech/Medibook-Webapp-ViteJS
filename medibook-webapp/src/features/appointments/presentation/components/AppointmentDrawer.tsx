@@ -103,6 +103,7 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
         </div>
       ) : appt.isLoadingError ? (
         <ErrorState
+          error={appt.error}
           inline
           title="Could not load this appointment"
           message={failureText(appt.error, 'Please try again.')}
@@ -271,7 +272,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
   const [confirmNoShow, setConfirmNoShow] = useState(false);
 
   const onError = (fallback: string) => (error: unknown) =>
-    toast(failureText(error, fallback), 'error');
+    toast(failureText(error, fallback), 'error', error);
 
   const awaiting = needsApproval(appt);
   const closed =
@@ -322,7 +323,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
               </Button>
             </Can>
             <Can perm="Appointments.edit">
-              <Button variant="ghost" className="text-d-500!" onClick={() => setReason('reject')}>
+              <Button variant="ghost" className="text-d-600!" onClick={() => setReason('reject')}>
                 Reject
               </Button>
             </Can>
@@ -389,7 +390,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
         )}
         {!closed && !awaiting && (
           <Can perm="Appointments.del">
-            <Button variant="ghost" className="text-d-500!" onClick={() => setReason('cancel')}>
+            <Button variant="ghost" className="text-d-600!" onClick={() => setReason('cancel')}>
               Cancel
             </Button>
           </Can>

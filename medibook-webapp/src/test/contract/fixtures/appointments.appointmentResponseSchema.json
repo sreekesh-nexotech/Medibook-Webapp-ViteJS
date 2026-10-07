@@ -1,12 +1,12 @@
 {
   "id": "01a0ee28-e882-7011-bb5f-c269c60e2a02",
-  "booking_ref": "LKSB-2608-00002",
+  "booking_ref": "EXMB-2608-00002",
   "status": "no_show",
   "status_reason": null,
   "source": "walk_in",
   "patient": {
     "id": "01a0ee28-e848-76f2-9b5e-2d47712bf5dc",
-    "mrn": "LKSM000002",
+    "mrn": "EXMM000002",
     "full_name": "Ramesh Babu",
     "phone_e164": "+910000000000",
     "gender": "male",

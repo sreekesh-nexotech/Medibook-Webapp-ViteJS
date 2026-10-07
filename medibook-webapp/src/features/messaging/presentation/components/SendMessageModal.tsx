@@ -8,6 +8,8 @@ import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { hospitalSessionOf } from '@/features/auth/application/store/auth.roles';
 import { useMessagingTemplatesQuery } from '@/features/messaging/application/queries/useMessagingTemplatesQuery';
 import { renderTemplate } from '@/features/messaging/application/store/messaging.logic';
 import {
@@ -107,6 +109,7 @@ function destinationFor(channel: PatientChannel, patient: PatientRecord): string
  * Nothing is queued from inside this modal — the screen confirms first.
  */
 export function SendMessageModal({ open, onClose, onReview }: SendMessageModalProps) {
+  const hospitalName = hospitalSessionOf(useSessionQuery('hospital').data)?.hospital.name;
   const [search, setSearch] = useState('');
   const term = search.trim();
   const params: PatientListParams = {
@@ -153,7 +156,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
   const rendered =
     template && appt && patient
       ? renderTemplate(template.body, {
-          ...messagingSampleValues(),
+          ...messagingSampleValues(hospitalName),
           '{{patientName}}': patient.fullName,
           '{{name}}': patient.firstName,
           '{{doctorName}}': appt.doctorName,
@@ -187,6 +190,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title="Send a message"

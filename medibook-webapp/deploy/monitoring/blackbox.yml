@@ -1,0 +1,44 @@
+# blackbox_exporter modules that check the Medibook web app from outside
+# (docs/MONITORING.md, checklist OBS-05). Scrape jobs: prometheus-web.yml;
+# alert rules: web-alerts.yml.
+modules:
+  # The app's page answers 200 over https with the element the app mounts into.
+  medibook_web:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      fail_if_not_ssl: true
+      fail_if_body_not_matches_regexp: ['<div id="root">']
+      preferred_ip_protocol: ip4
+
+  # A static file: the server hands out files, not only index.html.
+  medibook_static:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      fail_if_not_ssl: true
+      fail_if_header_not_matches:
+        - header: Content-Type
+          regexp: 'image/svg\+xml'
+      preferred_ip_protocol: ip4
+
+  # Live updates: the server accepts a WebSocket handshake on /ws/ (101) and
+  # closes it at once without a token. A 502 or 504 means the ASGI server or
+  # the proxy's /ws/ route is down.
+  medibook_websocket:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      valid_status_codes: [101]
+      fail_if_not_ssl: true
+      headers:
+        Connection: Upgrade
+        Upgrade: websocket
+        Sec-WebSocket-Version: '13'
+        Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+      preferred_ip_protocol: ip4

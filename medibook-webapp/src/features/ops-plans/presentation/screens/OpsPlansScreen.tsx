@@ -67,7 +67,8 @@ export function OpsPlansScreen() {
     if (!delPlan) return;
     deleteMutation.mutate(delPlan.id, {
       onSuccess: () => toast('Plan deleted.'),
-      onError: (error) => toast(failureMessage(error, 'Could not delete the plan.'), 'error'),
+      onError: (error) =>
+        toast(failureMessage(error, 'Could not delete the plan.'), 'error', error),
       onSettled: () => setDelPlan(null),
     });
   };
@@ -77,7 +78,8 @@ export function OpsPlansScreen() {
     const { name } = archiveTarget.plan;
     archiveMutation.mutate(archiveTarget.plan.id, {
       onSuccess: () => toast(`Plan "${name}" archived.`),
-      onError: (error) => toast(failureMessage(error, 'Could not archive the plan.'), 'error'),
+      onError: (error) =>
+        toast(failureMessage(error, 'Could not archive the plan.'), 'error', error),
       onSettled: () => setArchiveTarget(null),
     });
   };
@@ -101,6 +103,7 @@ export function OpsPlansScreen() {
       ) : plansQuery.isLoadingError || !plans ? (
         <Card>
           <ErrorState
+            error={plansQuery.error}
             inline
             title="Plan tiers didn't load."
             message={
@@ -124,7 +127,7 @@ export function OpsPlansScreen() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {plans.map((p) => (
             <PlanCard
               key={p.id}

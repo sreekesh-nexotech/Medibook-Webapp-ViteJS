@@ -2,6 +2,7 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { referenceOf } from '@/core/error/reference';
 import { clientFailure, toFailure } from '@/core/error/toFailure';
 
 function httpError(status: number, data: unknown): AxiosError {
@@ -35,6 +36,7 @@ describe('toFailure', () => {
       [423, 'rateLimited'],
       [429, 'rateLimited'],
       [500, 'server'],
+      [501, 'unavailable'],
       [503, 'server'],
       [418, 'unknown'],
     ];
@@ -71,6 +73,21 @@ describe('toFailure', () => {
     expect(failure.code).toBe('INTERNAL');
   });
 
+  it('says plainly that a 501 feature is not available, never the developer message', () => {
+    const failure = toFailure(
+      httpError(
+        501,
+        envelope('NOT_IMPLEMENTED_YET', 'This endpoint is part of the contract but not built yet.'),
+      ),
+    );
+    expect(failure).toMatchObject({
+      kind: 'unavailable',
+      status: 501,
+      code: 'NOT_IMPLEMENTED_YET',
+      message: "This isn't available in Medibook yet.",
+    });
+  });
+
   it('still maps a status when the body is not the error envelope (e.g. a proxy page)', () => {
     const failure = toFailure(httpError(502, '<html>Bad gateway</html>'));
     expect(failure.kind).toBe('server');
@@ -91,6 +108,53 @@ describe('toFailure', () => {
 
   it('treats anything else as unknown', () => {
     expect(toFailure(new Error('boom')).kind).toBe('unknown');
+  });
+});
+
+describe('toFailure request ids (OBS-04)', () => {
+  function sentWith(id: string) {
+    return { headers: new AxiosHeaders({ 'X-Request-Id': id }) };
+  }
+
+  it('prefers the id in the error envelope', () => {
+    const error = httpError(500, envelope('INTERNAL_ERROR', 'x', { request_id: 'from-body' }));
+    expect(toFailure(error).requestId).toBe('from-body');
+  });
+
+  it('falls back to the response header when the body is not the envelope', () => {
+    const config = sentWith('sent-id');
+    const response: AxiosResponse = {
+      status: 502,
+      statusText: '',
+      data: '<html>Bad gateway</html>',
+      headers: { 'x-request-id': 'from-header' },
+      config,
+    };
+    const error = new AxiosError(
+      'Bad gateway',
+      AxiosError.ERR_BAD_RESPONSE,
+      config,
+      null,
+      response,
+    );
+    expect(toFailure(error).requestId).toBe('from-header');
+  });
+
+  it('keeps the id a request was sent with when no response came back', () => {
+    const error = new AxiosError('timeout', AxiosError.ECONNABORTED, sentWith('sent-id'));
+    expect(toFailure(error)).toMatchObject({ kind: 'network', requestId: 'sent-id' });
+  });
+});
+
+describe('referenceOf', () => {
+  it('shows the first 8 characters of a failed request id', () => {
+    const failure = toFailure(httpError(500, envelope('X', 'x', { request_id: '1a2b3c4d-5e6f' })));
+    expect(referenceOf(failure)).toBe('1a2b3c4d');
+  });
+
+  it('has nothing to show for a failure without a request, or a non-failure', () => {
+    expect(referenceOf(clientFailure('validation', 'Too big'))).toBeNull();
+    expect(referenceOf(new Error('boom'))).toBeNull();
   });
 });
 

@@ -7,6 +7,9 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
+
+import { canOpenOpsView } from '@/app/router/opsAccess';
 import { opsPath, type OpsStaticView, type OpsView } from '@/app/router/paths';
 
 import { usePlanChangesQuery } from '@/features/ops-billing/application/queries/usePlanChangesQuery';
@@ -25,6 +28,7 @@ import type {
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 
 import { OPS_META } from './ops-nav';
+import { TopbarMenuItem, TopbarPopover } from './TopbarPopover';
 
 interface OpsNotif {
   readonly key: string;
@@ -129,10 +133,13 @@ export function OpsTopbar({
   const [menu, setMenu] = useState(false);
   const [notif, setNotif] = useState(false);
   const navigate = useNavigate();
+  const checks = useOpsPermission();
   const m = OPS_META[view] ?? ['Operations', ''];
-  const dashboard = useOpsDashboardQuery();
-  const planChanges = usePlanChangesQuery(OPEN_PLAN_CHANGES);
-  const payable = useSettlementPeriodsQuery(PAYABLE_PERIODS);
+  // Each source only for a role that may read it (PERF-04): finance has no
+  // dashboard, support no billing, compliance none of these.
+  const dashboard = useOpsDashboardQuery(checks.can('dashboard.view'));
+  const planChanges = usePlanChangesQuery(OPEN_PLAN_CHANGES, checks.can('billing.view'));
+  const payable = useSettlementPeriodsQuery(PAYABLE_PERIODS, checks.can('settlements.view'));
   const notifs = buildNotifs(
     dashboard.data?.alerts ?? [],
     planChanges.data?.total ?? 0,
@@ -154,7 +161,13 @@ export function OpsTopbar({
           </button>
         )}
         {onBack && (
-          <button type="button" onClick={onBack} className="text-text-strong flex cursor-pointer">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            title="Back"
+            className="text-text-strong flex cursor-pointer"
+          >
             <Icon name="arrow-left" size={24} />
           </button>
         )}
@@ -166,6 +179,9 @@ export function OpsTopbar({
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
+          aria-label={unread > 0 ? `Notifications, ${unread} need action` : 'Notifications'}
+          aria-expanded={notif}
+          aria-haspopup="dialog"
           onClick={() => {
             setNotif((n) => !n);
             setMenu(false);
@@ -177,116 +193,125 @@ export function OpsTopbar({
         >
           <Icon name="bell" size={21} />
           {unread > 0 && (
-            <span className="bg-d-500 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
+            <span className="bg-d-600 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
               {unread}
             </span>
           )}
         </button>
-        {notif && (
-          <>
-            <div onClick={() => setNotif(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-85 max-w-full overflow-hidden rounded-lg border bg-white lg:right-18.5">
-              <div className="border-border-soft text-text-strong border-b px-4 py-3.5 text-[15px] font-semibold">
-                Notifications
+        <TopbarPopover
+          open={notif}
+          onClose={() => setNotif(false)}
+          label="Notifications"
+          className="w-85 lg:right-18.5"
+        >
+          <div className="border-border-soft text-text-strong border-b px-4 py-3.5 text-[15px] font-semibold">
+            Notifications
+          </div>
+          <div className="max-h-90 overflow-y-auto">
+            {notifs.length === 0 && (
+              <div className="text-text-muted text-body py-7 text-center">
+                {"You're all caught up."}
               </div>
-              <div className="max-h-90 overflow-y-auto">
-                {notifs.length === 0 && (
-                  <div className="text-text-faint text-body py-7 text-center">
-                    {"You're all caught up."}
-                  </div>
+            )}
+            {notifs.map((n, i) => (
+              <button
+                type="button"
+                key={n.key}
+                onClick={() => {
+                  void navigate(n.to);
+                  setNotif(false);
+                }}
+                className={cn(
+                  'hover:bg-grey-200 flex w-full cursor-pointer items-start gap-3 px-4 py-3.25 text-left transition-colors duration-150',
+                  i < notifs.length - 1 && 'border-border-soft border-b',
+                  n.unread ? 'bg-bg-app' : 'bg-white',
                 )}
-                {notifs.map((n, i) => (
-                  <div
-                    key={n.key}
-                    onClick={() => {
-                      navigate(n.to);
-                      setNotif(false);
-                    }}
-                    className={cn(
-                      'hover:bg-grey-200 flex cursor-pointer items-start gap-3 px-4 py-3.25 transition-colors duration-150',
-                      i < notifs.length - 1 && 'border-border-soft border-b',
-                      n.unread ? 'bg-bg-app' : 'bg-white',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex size-8.5 flex-none items-center justify-center rounded-md',
-                        n.boxClass,
-                      )}
-                    >
-                      <Icon name={n.icon} size={17} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-body text-text-strong font-medium">{n.t}</div>
-                      <div className="text-caption text-text-muted">{n.s}</div>
-                    </div>
-                    {n.unread && (
-                      <span className="bg-d-500 mt-1.5 size-1.75 flex-none rounded-full" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+              >
+                <span
+                  className={cn(
+                    'flex size-8.5 flex-none items-center justify-center rounded-md',
+                    n.boxClass,
+                  )}
+                >
+                  <Icon name={n.icon} size={17} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="text-body text-text-strong block font-medium">{n.t}</span>
+                  <span className="text-caption text-text-muted block">{n.s}</span>
+                </span>
+                {n.unread && (
+                  <>
+                    <span className="bg-d-600 mt-1.5 size-1.75 flex-none rounded-full" />
+                    <span className="sr-only">Needs action</span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+        </TopbarPopover>
         <div className="bg-border h-7 w-px" />
         <button
           type="button"
           onClick={() => setMenu((v) => !v)}
+          aria-expanded={menu}
+          aria-haspopup="dialog"
           className="flex cursor-pointer items-center gap-2.5"
         >
-          <Avatar name={userName} size={38} />
-          <div className="hidden flex-col items-start sm:flex">
+          <span aria-hidden="true">
+            <Avatar name={userName} size={38} />
+          </span>
+          {/* The name stays readable to screen readers on narrow screens too. */}
+          <span className="sr-only flex-col items-start sm:not-sr-only sm:flex">
             <span className="text-body text-text-strong font-medium">{userName}</span>
             <span className="text-caption text-text-muted">{roleName}</span>
-          </div>
+          </span>
           <Icon name="chevron-down" size={16} className="text-text-muted" />
         </button>
-        {menu && (
-          <>
-            <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-60 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
-              <div className="flex items-center gap-2.5 px-2.5 py-2.25">
-                <Avatar name={userName} size={32} />
-                <div className="min-w-0">
-                  <div className="text-body text-text-strong font-medium">{userName}</div>
-                  <div className="text-caption text-text-muted">{userEmail}</div>
-                </div>
-              </div>
-              <div className="bg-border-soft mx-1 my-1.5 h-px" />
-              <div
-                onClick={() => {
-                  setMenu(false);
-                  onAccount();
-                }}
-                className="text-text-body hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
-              >
-                <Icon name="user" size={18} />{' '}
-                <span className="text-body font-medium">My Account</span>
-              </div>
-              <div
-                onClick={() => {
-                  setMenu(false);
-                  onNavigate('settings');
-                }}
-                className="text-text-body hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
-              >
-                <Icon name="settings" size={18} />{' '}
-                <span className="text-body font-medium">Platform Settings</span>
-              </div>
-              <div
-                onClick={() => {
-                  setMenu(false);
-                  onLogout();
-                }}
-                className="text-d-500 hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
-              >
-                <Icon name="log-out" size={18} />{' '}
-                <span className="text-body font-medium">Log Out</span>
-              </div>
+        <TopbarPopover
+          open={menu}
+          onClose={() => setMenu(false)}
+          label="Account"
+          className="w-60 p-2 lg:right-7"
+        >
+          <div className="flex items-center gap-2.5 px-2.5 py-2.25">
+            <Avatar name={userName} size={32} />
+            <div className="min-w-0">
+              <div className="text-body text-text-strong font-medium">{userName}</div>
+              <div className="text-caption text-text-muted">{userEmail}</div>
             </div>
-          </>
-        )}
+          </div>
+          <div className="bg-border-soft mx-1 my-1.5 h-px" />
+          <TopbarMenuItem
+            icon={<Icon name="user" size={18} />}
+            onClick={() => {
+              setMenu(false);
+              onAccount();
+            }}
+          >
+            My Account
+          </TopbarMenuItem>
+          {canOpenOpsView('settings', checks) && (
+            <TopbarMenuItem
+              icon={<Icon name="settings" size={18} />}
+              onClick={() => {
+                setMenu(false);
+                onNavigate('settings');
+              }}
+            >
+              Platform Settings
+            </TopbarMenuItem>
+          )}
+          <TopbarMenuItem
+            danger
+            icon={<Icon name="log-out" size={18} />}
+            onClick={() => {
+              setMenu(false);
+              onLogout();
+            }}
+          >
+            Log Out
+          </TopbarMenuItem>
+        </TopbarPopover>
       </div>
     </header>
   );

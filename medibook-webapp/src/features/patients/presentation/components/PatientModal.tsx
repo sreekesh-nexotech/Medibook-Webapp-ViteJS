@@ -134,7 +134,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
       onSaved?.(patient.id);
       onClose();
     } catch (error) {
-      toast(saveErrorMessage(error, SAVE_FAILED), 'error');
+      toast(saveErrorMessage(error, SAVE_FAILED), 'error', error);
     }
   };
 
@@ -146,6 +146,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={isNew ? 'Add Patient' : 'Edit Patient'}

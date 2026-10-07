@@ -34,22 +34,6 @@ export const SCHEDULING_HORIZON_OPTIONS = [
 /** How long before the appointment a patient may still cancel. */
 export const CANCEL_BEFORE_OPTIONS = ['1 hour', '2 hours', '4 hours', '24 hours'] as const;
 
-/**
- * Token numbering scheme. `T-001` is the canonical cross-app format
- * (CANONICAL_MASTER_DATA §5) and the default; the per-department variant
- * exists because the design shipped department prefixes and some hospitals
- * still ask for them.
- */
-export const TOKEN_SCHEME_OPTIONS = [
-  'Hospital-wide running (T-001)',
-  'Per-department prefix (C-001)',
-] as const;
-
-export type TokenScheme = (typeof TOKEN_SCHEME_OPTIONS)[number];
-
-/** The canonical scheme — `formatToken()` in `shared/lib/format` implements it. */
-export const CANONICAL_TOKEN_SCHEME: TokenScheme = 'Hospital-wide running (T-001)';
-
 /** Hospital opening-time options. */
 export const OPEN_TIME_OPTIONS = ['7:00 am', '8:00 am', '9:00 am'] as const;
 
@@ -60,8 +44,6 @@ export const CLOSE_TIME_OPTIONS = ['6:00 pm', '8:00 pm', '10:00 pm'] as const;
 
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_HALF_DAY = 12;
-/** Tokens are zero-padded to three digits in every scheme. */
-const TOKEN_DIGITS = 3;
 
 const DURATION_PATTERN = /^(\d+)\s*(min|hour)/i;
 const COUNT_PATTERN = /^(\d+)/;
@@ -120,40 +102,6 @@ export function durationCopy(minutes: number): string {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-/* --------------------------------------------------------------- derivation */
-
-/** Everything `slotsPerDay` needs, so the call site reads like the rule. */
-export interface SlotCapacityInput {
-  readonly openLabel: string;
-  readonly closeLabel: string;
-  readonly slotMinutes: number;
-  readonly bufferMinutes: number;
-}
-
-/**
- * How many consultation slots one doctor's day holds, which is the whole
- * point of the slot-length and buffer rules.
- *
- * **The buffer sits after the consultation, not inside it.** So each slot
- * starts `slotMinutes + bufferMinutes` after the previous one, the patient
- * still gets the full `slotMinutes`, and only the *last* slot needs no buffer
- * — which is why the span is credited one buffer back before dividing.
- */
-export function slotsPerDay({
-  openLabel,
-  closeLabel,
-  slotMinutes,
-  bufferMinutes,
-}: SlotCapacityInput): number {
-  const open = parseTimeLabelMinutes(openLabel);
-  const close = parseTimeLabelMinutes(closeLabel);
-  const span = close - open;
-  const step = slotMinutes + bufferMinutes;
-  if (span <= 0 || slotMinutes <= 0 || step <= 0) return 0;
-  // The final slot needs `slotMinutes` of room; the buffer after it is free.
-  return Math.max(0, Math.floor((span + bufferMinutes) / step));
-}
-
 /** Weekday index of an ISO date on the local calendar, 0 = Monday .. 6 = Sunday. */
 export function isoWeekdayIndex(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);
@@ -185,19 +133,162 @@ export function cancellationDeadline(appointmentTimeLabel: string, cutoffHours: 
   return shiftTimeLabel(appointmentTimeLabel, -cutoffHours * MINUTES_PER_HOUR);
 }
 
-/**
- * A token as the chosen scheme renders it. The hospital-wide scheme is the
- * canonical `T-001`; the per-department scheme prefixes the department's
- * initial instead, which is exactly why it is not the default.
- */
-export function tokenSample(scheme: string, seq: number, department?: string): string {
-  const padded = String(seq).padStart(TOKEN_DIGITS, '0');
-  if (scheme === CANONICAL_TOKEN_SCHEME) return `T-${padded}`;
-  const initial = (department ?? 'Cardiology').trim().charAt(0).toUpperCase() || 'T';
-  return `${initial}-${padded}`;
+/* ------------------------------------------------- token labels and numbers */
+
+/** `{NAME}` or `{NAME:arg}` — the placeholder syntax of both backend renderers. */
+const PLACEHOLDER = /\{([A-Z]+)(?::([A-Za-z0-9]+))?\}/g;
+
+const TOKEN_LABEL_NAMES = ['PREFIX', 'SEQ', 'SRC', 'DOC', 'DEPT', 'DATE'] as const;
+const SERIES_NAMES = ['PREFIX', 'SEQ', 'FY', 'YY', 'YYYY', 'MM'] as const;
+const MAX_SEQ_DIGITS = 12;
+const DEFAULT_DATE_PATTERN = 'DDMM';
+const TWO_DIGITS = 2;
+const CENTURY = 100;
+
+/** A calendar day as plain numbers (month 1–12). */
+export interface CalendarDay {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
 }
 
-/** The first three tokens of a day under `scheme`, e.g. "T-001, T-002, T-003". */
-export function tokenSeriesCopy(scheme: string, department?: string): string {
-  return [1, 2, 3].map((n) => tokenSample(scheme, n, department)).join(', ');
+/** `2026-10-07` → `{year: 2026, month: 10, day: 7}`. */
+export function calendarDay(iso: string): CalendarDay {
+  const [year, month, day] = iso.split('-').map(Number);
+  return { year: year ?? 1970, month: month ?? 1, day: day ?? 1 };
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(TWO_DIGITS, '0');
+}
+
+/** What a format's placeholders name, in order. */
+function placeholders(format: string): { readonly name: string; readonly arg: string }[] {
+  return [...format.matchAll(PLACEHOLDER)].map((m) => ({ name: m[1] ?? '', arg: m[2] ?? '' }));
+}
+
+function unknownNames(format: string, allowed: readonly string[]): string[] {
+  return [...new Set(placeholders(format).map((p) => p.name))].filter((n) => !allowed.includes(n));
+}
+
+/** Why the server would refuse a token label format, or `null` (backend `validate_label_format`). */
+export function tokenFormatProblem(format: string): string | null {
+  const unknown = unknownNames(format, TOKEN_LABEL_NAMES);
+  if (unknown.length > 0) return `Unknown placeholder: {${unknown.join('}, {')}}.`;
+  if (placeholders(format).filter((p) => p.name === 'SEQ').length !== 1) {
+    return 'Use {SEQ} or {SEQ:3} exactly once — it is the token number.';
+  }
+  return null;
+}
+
+/** What a token label shows, as the backend renders it (`render_label`). */
+export interface TokenLabelParts {
+  readonly prefix: string;
+  /** The online or walk-in marker, printed for `{SRC}`. */
+  readonly marker: string;
+  readonly seq: number;
+  readonly doctorCode: string;
+  readonly departmentCode: string;
+  readonly date: CalendarDay;
+}
+
+export function renderTokenLabel(format: string, parts: TokenLabelParts): string {
+  return format.replace(PLACEHOLDER, (whole, name: string, arg: string | undefined) => {
+    if (name === 'SEQ') {
+      return arg && /^\d+$/.test(arg)
+        ? String(parts.seq).padStart(Number(arg), '0')
+        : String(parts.seq);
+    }
+    if (name === 'PREFIX') return parts.prefix;
+    if (name === 'SRC') return parts.marker;
+    if (name === 'DOC') return parts.doctorCode.toUpperCase();
+    if (name === 'DEPT') return parts.departmentCode.toUpperCase();
+    if (name === 'DATE') {
+      const { year, month, day } = parts.date;
+      return (arg || DEFAULT_DATE_PATTERN)
+        .replace('YYYY', String(year))
+        .replace('YY', pad2(year % CENTURY))
+        .replace('MM', pad2(month))
+        .replace('DD', pad2(day));
+    }
+    return whole;
+  });
+}
+
+/** Why the server would refuse a number-series format, or `null` (backend `validate_format`). */
+export function seriesFormatProblem(format: string): string | null {
+  const unknown = unknownNames(format, SERIES_NAMES);
+  if (unknown.length > 0) return `Unknown placeholder: {${unknown.join('}, {')}}.`;
+  const seqs = placeholders(format).filter((p) => p.name === 'SEQ');
+  if (seqs.length !== 1) return 'Use {SEQ} or {SEQ:4} exactly once — it is the running number.';
+  const digits = seqs[0]?.arg ?? '';
+  if (
+    digits !== '' &&
+    !(/^\d+$/.test(digits) && Number(digits) >= 1 && Number(digits) <= MAX_SEQ_DIGITS)
+  ) {
+    return `{SEQ:n} takes 1 to ${MAX_SEQ_DIGITS} digits.`;
+  }
+  const rest = format.replace(PLACEHOLDER, '');
+  if (rest.includes('{') || rest.includes('}')) return 'A brace is not closed.';
+  return null;
+}
+
+/** What a series number shows (backend `numbering.render`). */
+export interface SeriesNumberParts {
+  readonly prefix: string;
+  readonly seq: number;
+  readonly padWidth: number;
+  readonly fyStartMonth: number;
+  readonly date: CalendarDay;
+}
+
+/** `{FY}` for a date: "26-27" when the financial year starts in April 2026. */
+export function financialYearToken(date: CalendarDay, fyStartMonth: number): string {
+  const start = date.month >= fyStartMonth ? date.year : date.year - 1;
+  return `${pad2(start % CENTURY)}-${pad2((start + 1) % CENTURY)}`;
+}
+
+export function renderSeriesNumber(format: string, parts: SeriesNumberParts): string {
+  return format.replace(PLACEHOLDER, (whole, name: string, arg: string | undefined) => {
+    if (name === 'SEQ') return String(parts.seq).padStart(arg ? Number(arg) : parts.padWidth, '0');
+    if (name === 'PREFIX') return parts.prefix;
+    if (name === 'FY') return financialYearToken(parts.date, parts.fyStartMonth);
+    if (name === 'YY') return pad2(parts.date.year % CENTURY);
+    if (name === 'YYYY') return String(parts.date.year);
+    if (name === 'MM') return pad2(parts.date.month);
+    return whole;
+  });
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+}
+
+/**
+ * The running number inside a series' next number — `LKSR/26-27/00170` under
+ * `{PREFIX}/{FY}/{SEQ:5}` is 170 — or `null` when the format can't be read
+ * back unambiguously.
+ */
+export function seqOfNumber(format: string, prefix: string, number: string): number | null {
+  let pattern = '';
+  let last = 0;
+  for (const m of format.matchAll(PLACEHOLDER)) {
+    const index = m.index ?? 0;
+    pattern += escapeRegExp(format.slice(last, index));
+    const name = m[1];
+    pattern +=
+      name === 'SEQ'
+        ? '(\\d+)'
+        : name === 'PREFIX'
+          ? escapeRegExp(prefix)
+          : name === 'FY'
+            ? '\\d{2}-\\d{2}'
+            : name === 'YYYY'
+              ? '\\d{4}'
+              : '\\d{2}';
+    last = index + m[0].length;
+  }
+  pattern += escapeRegExp(format.slice(last));
+  const seq = new RegExp(`^${pattern}$`).exec(number)?.[1];
+  return seq === undefined ? null : Number(seq);
 }

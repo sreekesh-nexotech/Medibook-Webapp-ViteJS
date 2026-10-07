@@ -31,7 +31,7 @@ const MAX_BODY_CHARS = 220;
 const MIN_TITLE_CHARS = 6;
 
 const DATE_INPUT_CLASS =
-  'rounded-input border-border text-body text-text-body h-12 w-full border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-12 w-full border bg-white px-3';
 
 interface BannerForm {
   title: string;
@@ -117,7 +117,11 @@ export function PatientBannerModal({
           setPreview(dataUrl);
         },
         onError: (error) => {
-          toast(isFailure(error) ? error.message : 'The image could not be uploaded.', 'error');
+          toast(
+            isFailure(error) ? error.message : 'The image could not be uploaded.',
+            'error',
+            error,
+          );
         },
       });
     };
@@ -131,6 +135,7 @@ export function PatientBannerModal({
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={banner ? 'Edit Banner' : 'Publish Banner'}
@@ -157,13 +162,18 @@ export function PatientBannerModal({
           error={form.errorFor('body')}
           hint={`${form.values.body.length}/${MAX_BODY_CHARS} characters shown in the app.`}
         >
-          <textarea
-            value={form.values.body}
-            onChange={(e) => form.setField('body', e.target.value.slice(0, MAX_BODY_CHARS))}
-            onBlur={() => form.blurField('body')}
-            placeholder="What the patient should do, in one or two sentences."
-            className="rounded-input border-border text-body text-text-strong box-border h-20 w-full resize-none border p-3"
-          />
+          {({ id, describedById, invalid }) => (
+            <textarea
+              id={id}
+              aria-describedby={describedById}
+              aria-invalid={invalid || undefined}
+              value={form.values.body}
+              onChange={(e) => form.setField('body', e.target.value.slice(0, MAX_BODY_CHARS))}
+              onBlur={() => form.blurField('body')}
+              placeholder="What the patient should do, in one or two sentences."
+              className="rounded-input border-border-control text-body text-text-strong box-border h-20 w-full resize-none border p-3"
+            />
+          )}
         </Field>
 
         <Field label="Banner Image">
@@ -200,7 +210,7 @@ export function PatientBannerModal({
                   type="button"
                   onClick={removeImage}
                   disabled={upload.isPending}
-                  className="text-caption text-d-500 cursor-pointer"
+                  className="text-caption text-d-600 cursor-pointer"
                 >
                   Remove
                 </button>

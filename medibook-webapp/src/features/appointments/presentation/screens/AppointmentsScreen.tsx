@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useSort } from '@/shared/hooks/useSort';
-import { money, todayISO } from '@/shared/lib/format';
+import { formatUpdatedAt, money, todayISO } from '@/shared/lib/format';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -27,7 +27,6 @@ import {
   type HospitalRole,
 } from '@/app/router/paths';
 
-import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
 import {
   useApproveMutation,
   useCheckInMutation,
@@ -192,7 +191,7 @@ export function AppointmentsScreen() {
     const p = primaryAction(a);
     if (!p) return;
     const fail = (fallback: string) => (error: unknown) =>
-      toast(failureText(error, fallback), 'error');
+      toast(failureText(error, fallback), 'error', error);
     if (p.key === 'approve') {
       approve.mutate(
         { id: a.id },
@@ -217,6 +216,7 @@ export function AppointmentsScreen() {
     : query.isLoadingError
       ? {
           kind: 'error',
+          error: query.error,
           message: failureText(query.error, 'Could not load appointments.'),
           onRetry: () => void refresh(),
         }
@@ -274,7 +274,7 @@ export function AppointmentsScreen() {
             onChange={(e) => reset(setExact)(e.target.value)}
             title="Pick a specific date"
             aria-label="Filter by a specific date"
-            className="rounded-input border-border text-body text-text-body h-11 border bg-white px-3"
+            className="rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3"
           />
           <FilterSelect
             value={deptF}
@@ -390,7 +390,7 @@ export function AppointmentsScreen() {
                     )}
                     <IconBtn
                       name="eye"
-                      label="Details"
+                      label={`Details of ${a.patient?.fullName ?? 'the patient'}'s ${timeOf(a.scheduledStartAt)} appointment`}
                       box={36}
                       size={16}
                       onClick={() => setDrawer(a.id)}

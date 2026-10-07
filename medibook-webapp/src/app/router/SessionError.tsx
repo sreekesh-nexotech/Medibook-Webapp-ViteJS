@@ -9,6 +9,8 @@ interface SessionErrorProps {
   /** Re-run the session check (network / server failures). */
   onRetry?: () => void;
   onLogout: () => void;
+  /** The failed session check, so a failed request shows its support reference. */
+  error?: unknown;
 }
 
 /**
@@ -21,10 +23,11 @@ export function SessionError({
   message,
   onRetry,
   onLogout,
+  error,
 }: SessionErrorProps) {
   return (
     <div className="bg-bg-app flex h-full items-center justify-center p-5">
-      <ErrorState title={title} message={message} onRetry={onRetry}>
+      <ErrorState title={title} message={message} onRetry={onRetry} error={error}>
         <Button icon="log-out" onClick={onLogout}>
           Log Out
         </Button>

@@ -44,7 +44,7 @@ export function OpsField({
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className="font-ui text-label text-text-strong">
         {label}
-        {required && <span className="text-d-500"> *</span>}
+        {required && <span className="text-d-600"> *</span>}
       </label>
       <FieldContext.Provider value={field}>
         {typeof children === 'function' ? children(field) : children}

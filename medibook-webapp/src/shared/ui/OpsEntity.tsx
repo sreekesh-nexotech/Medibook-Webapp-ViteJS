@@ -13,20 +13,23 @@ interface OpsEntityProps {
   sub?: ReactNode;
 }
 
-/** Tinted 34px icon box + title/sub column (ops tables' entity cell). */
+/**
+ * Tinted 34px icon box + title/sub column (ops tables' entity cell). Built of
+ * spans so it can sit inside a button.
+ */
 export function OpsEntity({ icon, tint = 'primary', title, sub }: OpsEntityProps) {
   const t = OPS_TINTS[tint];
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <div
+    <span className="flex min-w-0 items-center gap-2.5">
+      <span
         className={cn('flex size-8.5 flex-none items-center justify-center rounded-md', t[0], t[1])}
       >
         <Icon name={icon} size={16} />
-      </div>
-      <div className="flex min-w-0 flex-col">
+      </span>
+      <span className="flex min-w-0 flex-col">
         <span className="text-body text-text-strong truncate font-medium">{title}</span>
         <span className="text-caption text-text-muted truncate">{sub}</span>
-      </div>
-    </div>
+      </span>
+    </span>
   );
 }

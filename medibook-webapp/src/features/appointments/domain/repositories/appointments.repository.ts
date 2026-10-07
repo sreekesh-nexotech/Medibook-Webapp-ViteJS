@@ -4,6 +4,7 @@ import type {
   AppointmentEvent,
   AppointmentList,
   AppointmentRange,
+  ApptSource,
   DeskAppointment,
   DeskReceipt,
   PaymentLineInput,
@@ -18,6 +19,8 @@ import type {
  */
 export interface AppointmentsRepository {
   list(range: AppointmentRange): Promise<Result<AppointmentList>>;
+  /** How many appointments `range` holds, of one `source` or all. */
+  count(range: AppointmentRange, source: ApptSource | null): Promise<Result<number>>;
   get(id: string): Promise<Result<DeskAppointment>>;
   events(id: string): Promise<Result<readonly AppointmentEvent[]>>;
   /** Book one or more walk-in consultations (each on an open slot). */

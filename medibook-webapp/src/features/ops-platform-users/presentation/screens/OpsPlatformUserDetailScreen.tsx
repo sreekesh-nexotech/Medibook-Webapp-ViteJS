@@ -57,6 +57,7 @@ export function OpsPlatformUserDetailScreen() {
     const notFound = isFailure(user.error) && user.error.kind === 'notFound';
     return (
       <ErrorState
+        error={user.error}
         title={notFound ? 'This account does not exist' : "This account didn't load"}
         message={
           notFound
@@ -106,7 +107,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   const onFailure =
     (fallback: string) =>
     (failure: unknown): void =>
-      toast(isFailure(failure) ? failure.message : fallback, 'error');
+      toast(isFailure(failure) ? failure.message : fallback, 'error', failure);
 
   const handleConfirm = (): void => {
     if (blocked) {
@@ -283,7 +284,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
                   maxLength={BLOCK_REASON_MAX}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="e.g. Repeated no-shows reported by three hospitals"
-                  className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
+                  className="border-border-control rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
                 ></textarea>
               )}
             </OpsField>

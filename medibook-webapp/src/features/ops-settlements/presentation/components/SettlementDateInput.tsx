@@ -22,7 +22,7 @@ export function SettlementDateInput({ value, onChange, title }: SettlementDateIn
       onChange={(e) => onChange(e.target.value)}
       title={title}
       aria-label={title}
-      className="border-border rounded-input text-body text-text-body h-11 border bg-white px-3"
+      className="border-border-control rounded-input text-body text-text-body h-11 border bg-white px-3"
     />
   );
 }

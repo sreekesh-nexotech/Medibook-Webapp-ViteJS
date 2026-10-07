@@ -1,12 +1,16 @@
 # Backend integration — module split for parallel sessions
 
+> **Historical.** The integration planned here is done: every screen reads the live API.
+> Open backend gaps are tracked in [`BACKEND_BLOCKERS.md`](BACKEND_BLOCKERS.md) and
+> unbuilt capabilities in [`ROADMAP.md`](ROADMAP.md).
+
 How to replace the web app's fixture-backed Zustand stores with the real Django API,
 split into modules that separate Claude CLI sessions can integrate in parallel without
 writing to the same files.
 
 - **Web app:** this repo. No network code exists yet: `src/core/api` is empty and every
   screen reads a Zustand store seeded from `*.fixtures.ts`.
-- **Backend:** `/Users/neerajapradeep/AMAI/MEDIBOOK/Medibook-backend-django`. The API
+- **Backend:** the `Medibook-backend-django` repository. The API
   contract is `schema.yml` (OpenAPI) at its root. Endpoints are mounted per surface:
   `/api/v1/hospital/…` (151 endpoints) for the hospital app and `/api/v1/platform/…`
   (124 endpoints) for the ops console, plus `/api/v1/shared/…` and the WebSockets in
@@ -157,13 +161,14 @@ build around them:
 Backend features with no screen yet (not assigned to any module):
 
 - **Hospital:** counters admin, display devices, print templates, cash sessions admin.
-- **Platform:** support tickets, FAQs, legal documents, locations, ambulance providers,
-  reviews, messaging templates.
+- **Platform:** FAQs, legal documents, locations, ambulance providers, reviews, messaging
+  templates. (Support tickets now have the ops inbox, `ops-support/**`, from go-live
+  item OBS-02.)
 
 ## Starting a session
 
 Open a new Claude CLI session in its own worktree and say:
 
-> Integrate module `<ID>` from `docs/BACKEND_INTEGRATION_MODULES.md`. The backend is at
-> `/Users/neerajapradeep/AMAI/MEDIBOOK/Medibook-backend-django` (read-only; contract in
+> Integrate module `<ID>` from `docs/BACKEND_INTEGRATION_MODULES.md`. The backend is the
+> `Medibook-backend-django` checkout beside this one (read-only; contract in
 > `schema.yml`). Follow the session rules in that file.

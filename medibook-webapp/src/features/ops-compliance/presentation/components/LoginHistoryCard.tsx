@@ -130,6 +130,7 @@ export function LoginHistoryCard() {
         toast(
           isFailure(error) ? error.message : 'The sign-in history could not be exported.',
           'error',
+          error,
         ),
     });
   };
@@ -139,6 +140,7 @@ export function LoginHistoryCard() {
     : loginsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: loginsQuery.error,
           title: "Sign-in history didn't load.",
           message: isFailure(loginsQuery.error) ? loginsQuery.error.message : undefined,
           onRetry: () => void loginsQuery.refetch(),

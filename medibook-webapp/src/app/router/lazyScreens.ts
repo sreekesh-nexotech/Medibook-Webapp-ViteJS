@@ -100,6 +100,16 @@ export const OpsPlansScreen = lazy(() =>
     default: m.OpsPlansScreen,
   })),
 );
+export const OpsSupportScreen = lazy(() =>
+  import('@/features/ops-support/presentation/screens/OpsSupportScreen').then((m) => ({
+    default: m.OpsSupportScreen,
+  })),
+);
+export const OpsSupportTicketScreen = lazy(() =>
+  import('@/features/ops-support/presentation/screens/OpsSupportTicketScreen').then((m) => ({
+    default: m.OpsSupportTicketScreen,
+  })),
+);
 export const OpsPlatformUserDetailScreen = lazy(() =>
   import('@/features/ops-platform-users/presentation/screens/OpsPlatformUserDetailScreen').then(
     (m) => ({ default: m.OpsPlatformUserDetailScreen }),

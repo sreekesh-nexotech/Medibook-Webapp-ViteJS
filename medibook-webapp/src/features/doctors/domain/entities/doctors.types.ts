@@ -30,6 +30,8 @@ export interface DoctorProfile {
   readonly photoFileId: string | null;
   /** Consultation fee in whole rupees. */
   readonly feeRupees: number;
+  /** Fee for a follow-up visit within the hospital's window; `null` = the consultation fee. */
+  readonly followUpFeeRupees: number | null;
   /** Length of one bookable slot, in minutes (per doctor). */
   readonly slotLengthMin: number;
   readonly room: string;
@@ -130,6 +132,10 @@ export interface DoctorInput {
   readonly bio: string;
   readonly room: string;
   readonly feeRupees: number;
+  /** `null` charges the consultation fee for follow-ups too. */
+  readonly followUpFeeRupees: number | null;
+  /** Whether patients can book this doctor in the Medibook app. */
+  readonly isBookableOnline: boolean;
   readonly status: DoctorStatus;
   readonly photoFileId: string | null;
 }

@@ -110,7 +110,11 @@ export function InvoiceModal({ invoiceId, invoiceNo, onClose }: InvoiceModalProp
     pdf.mutate(invoiceId, {
       onSuccess: (blob) => downloadBlob(blob, `${invoiceNo}.pdf`),
       onError: (failure) =>
-        toast(isFailure(failure) ? failure.message : 'Could not download the PDF.', 'error'),
+        toast(
+          isFailure(failure) ? failure.message : 'Could not download the PDF.',
+          'error',
+          failure,
+        ),
     });
   };
 
@@ -152,6 +156,7 @@ export function InvoiceModal({ invoiceId, invoiceNo, onClose }: InvoiceModalProp
         </div>
       ) : invoiceQuery.isLoadingError || !inv || !status ? (
         <ErrorState
+          error={invoiceQuery.error}
           inline
           title="This invoice didn't load"
           message={isFailure(invoiceQuery.error) ? invoiceQuery.error.message : undefined}

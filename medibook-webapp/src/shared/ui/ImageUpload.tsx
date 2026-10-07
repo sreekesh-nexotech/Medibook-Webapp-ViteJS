@@ -1,6 +1,5 @@
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
-import { toast } from '@/shared/ui/toast/toast.store';
 
 interface ImageUploadProps {
   label?: string;
@@ -12,7 +11,11 @@ interface ImageUploadProps {
   icon?: IconName;
 }
 
-/** Dashed image-upload placeholder (admin fills with real imagery later). */
+/**
+ * Dashed image placeholder, shown where no image is set yet. It is not a
+ * control: the upload is the file input it sits inside (PRD-03 — it used to
+ * be a button that only said "demo").
+ */
 export function ImageUpload({
   label = 'Upload image',
   hint,
@@ -21,15 +24,13 @@ export function ImageUpload({
   icon = 'image-plus',
 }: ImageUploadProps) {
   return (
-    <button
-      type="button"
-      onClick={() => toast('Image upload — demo', 'info')}
+    <span
       className="border-border bg-bg-subtle text-text-muted hover:border-blue hover:bg-blue-soft-bg flex cursor-pointer flex-col items-center justify-center gap-1.75 rounded-lg border-[1.5px] border-dashed transition-all duration-150"
       style={{ width: w, height: h }}
     >
       <Icon name={icon} size={24} />
       <span className="text-body font-medium">{label}</span>
-      {hint && <span className="text-caption text-text-faint">{hint}</span>}
-    </button>
+      {hint && <span className="text-caption text-text-muted">{hint}</span>}
+    </span>
   );
 }

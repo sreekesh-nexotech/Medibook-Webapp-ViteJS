@@ -3,10 +3,9 @@ import { formatInstant } from '@/shared/lib/format';
 
 import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
-import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
+import { ClearChip } from '@/shared/ui/ClearChip';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
-import type { OpsTint } from '@/shared/ui/OpsConfirm';
 import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
@@ -14,11 +13,17 @@ import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 
-import type { LogSeverity } from '@/features/ops-logs/application/store/logs.types';
 import { useLogsQuery } from '@/features/ops-logs/application/queries/useLogsQuery';
 import { useRefreshLogs } from '@/features/ops-logs/application/queries/useRefreshLogs';
 import type { AuditLogEntry } from '@/features/ops-logs/domain/entities/logs.types';
-import { actorLabel, formatLogTime } from '@/features/ops-logs/presentation/components/logs.format';
+import { LogActor, type PickedActor } from '@/features/ops-logs/presentation/components/LogActor';
+import {
+  RESOURCE_MENU,
+  isListedResource,
+  resourceName,
+  resourceTypeOf,
+} from '@/features/ops-logs/presentation/components/logResources';
+import { formatLogTime, requestOf } from '@/features/ops-logs/presentation/components/logs.format';
 import { useLogsDebouncedValue } from '@/features/ops-logs/presentation/hooks/useLogsDebouncedValue';
 
 const OPS_LOG_PAGE = 7;
@@ -26,50 +31,40 @@ const OPS_LOG_PAGE = 7;
 /** Typing pause before the search box is sent as `?q=`. */
 const SEARCH_DEBOUNCE_MS = 350;
 
-/**
- * The audit trail carries no severity yet (backend gap, flagged in P9): every
- * row reads as Info until `audit_log` gains one. The Severity filter is kept
- * on screen but cannot narrow the trail.
- */
-const INTERIM_SEVERITY: LogSeverity = 'Info';
-
 /** Shown for a missing IP or an unknown refresh time. */
 const NONE = '—';
 
-const SEV_TINT: Record<LogSeverity, OpsTint> = {
-  Critical: 'danger',
-  Warning: 'warning',
-  Info: 'info',
-};
+/**
+ * The trail records no severity, so there is no severity column: every row is
+ * a change that succeeded (the backend records nothing for refused requests).
+ */
+const LOG_COLUMNS = ['Action', 'Who', 'Resource', 'IP Address', 'Timestamp'] as const;
 
-const LOG_COLUMNS = ['Action', 'Module', 'IP Address', 'Timestamp', 'Severity'] as const;
-
-const SEVERITY_OPTIONS = ['All', 'Info', 'Warning', 'Critical'] as const;
-
-const MODULE_OPTIONS = [
-  'All',
-  'Hospitals',
-  'Settlements',
-  'Billing',
-  'Subscription Plans',
-  'Users & Roles',
-  'Platform Users',
-  'Reports',
-  'Settings',
-  'Auth',
-  'Media',
-  'Notifications',
-  'Compliance',
-] as const;
+/** Who acted (`principal` on the server), in menu order. */
+const WHO_FILTERS: readonly (readonly [string, string])[] = [
+  ['Medibook staff', 'platform'],
+  ['Hospital staff', 'hospital'],
+  ['Patients', 'patient'],
+  ['Display screens', 'display'],
+  ['System', 'system'],
+];
+const WHO_ALL = 'Who: All';
+const RESOURCE_ALL = 'Resource: All';
 
 const dateInputClass =
-  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
 
-/** Compliance logs — the platform audit trail (design `OpsLogs`, Ops.jsx). */
+/**
+ * Compliance logs — the platform audit trail (design `OpsLogs`, Ops.jsx). Every
+ * filter is sent to `/platform/logs` (PRD-08): who acted, one person (picked
+ * from a row), one resource type, dates and an exact-match search.
+ */
 export function OpsLogsScreen() {
   const [q, setQ] = useState('');
-  const [sevF, setSevF] = useState('All');
-  const [modF, setModF] = useState('All');
+  const [whoF, setWhoF] = useState(WHO_ALL);
+  const [actor, setActor] = useState<PickedActor | null>(null);
+  /** One resource type, from the menu or a row. */
+  const [resource, setResource] = useState<string | null>(null);
   const [dateF, setDateF] = useState('');
   const [dateT, setDateT] = useState('');
   const [page, setPage] = useState(0);
@@ -79,6 +74,7 @@ export function OpsLogsScreen() {
 
   const ql = q.trim();
   const debouncedQ = useLogsDebouncedValue(ql, SEARCH_DEBOUNCE_MS);
+  const principal = WHO_FILTERS.find(([label]) => label === whoF)?.[1];
   const logsQuery = useLogsQuery({
     page: page + 1,
     pageSize: OPS_LOG_PAGE,
@@ -86,6 +82,9 @@ export function OpsLogsScreen() {
     ...(dateT ? { dateTo: dateT } : {}),
     ...(debouncedQ ? { q: debouncedQ } : {}),
     ...(sort.key === 'time' ? { sortDir: sort.dir } : {}),
+    ...(principal ? { principal } : {}),
+    ...(actor ? { actorUserId: actor.id } : {}),
+    ...(resource ? { resourceType: resource } : {}),
   });
   const total = logsQuery.data?.total ?? 0;
   const rows = logsQuery.data?.items ?? [];
@@ -97,11 +96,20 @@ export function OpsLogsScreen() {
       fn(v);
       setPage(0);
     };
-  const filtersActive = Boolean(ql || sevF !== 'All' || modF !== 'All' || dateF || dateT);
+  const pickActor = (picked: PickedActor | null): void => {
+    setActor(picked);
+    setPage(0);
+  };
+  const pickResource = (type: string | null): void => {
+    setResource(type);
+    setPage(0);
+  };
+  const filtersActive = Boolean(ql || whoF !== WHO_ALL || actor || resource || dateF || dateT);
   const clearAll = (): void => {
     setQ('');
-    setSevF('All');
-    setModF('All');
+    setWhoF(WHO_ALL);
+    setActor(null);
+    setResource(null);
     setDateF('');
     setDateT('');
     setPage(0);
@@ -115,12 +123,19 @@ export function OpsLogsScreen() {
     setRefreshing(false);
   };
 
+  // A request row's resource (a view name) isn't in the menu; list it while it is picked.
+  const resourceOptions =
+    resource && !isListedResource(resource)
+      ? [RESOURCE_ALL, resourceName(resource)]
+      : [RESOURCE_ALL];
+
   const tableState: TableStateSpec | undefined =
     logsQuery.isPending || refreshing
       ? { kind: 'loading', rows: OPS_LOG_PAGE }
       : logsQuery.isLoadingError
         ? {
             kind: 'error',
+            error: logsQuery.error,
             message: isFailure(logsQuery.error) ? logsQuery.error.message : undefined,
             onRetry: () => void logsQuery.refetch(),
           }
@@ -143,24 +158,29 @@ export function OpsLogsScreen() {
           <SearchField
             value={q}
             onChange={reset(setQ)}
-            placeholder="Search action or user"
-            aria-label="Search audit trail by action or user"
+            placeholder="Exact action, request ID or user ID"
+            aria-label="Search the audit trail by exact action code, request ID or user ID"
           />
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={handleRefresh} title="Refresh audit trail" />
           <FilterSelect
-            value={sevF === 'All' ? 'Severity: All' : sevF}
-            aria-label="Filter by severity"
-            options={SEVERITY_OPTIONS.map((x) => (x === 'All' ? 'Severity: All' : x))}
-            onChange={(v) => reset(setSevF)(v === 'Severity: All' ? 'All' : v)}
+            value={whoF}
+            aria-label="Filter by who acted"
+            options={[WHO_ALL, ...WHO_FILTERS.map(([label]) => label)]}
+            onChange={reset(setWhoF)}
           />
           <FilterSelect
-            value={modF === 'All' ? 'Module: All' : modF}
-            aria-label="Filter by module"
-            options={MODULE_OPTIONS.map((x) => (x === 'All' ? 'Module: All' : x))}
-            onChange={(v) => reset(setModF)(v === 'Module: All' ? 'All' : v)}
+            value={resource ? resourceName(resource) : RESOURCE_ALL}
+            aria-label="Filter by resource"
+            options={resourceOptions}
+            groups={RESOURCE_MENU}
+            onChange={(label) => {
+              if (label === RESOURCE_ALL) pickResource(null);
+              else pickResource(resourceTypeOf(label) ?? resource);
+            }}
           />
+          {actor && <ClearChip label={`Actor: ${actor.name}`} onClick={() => pickActor(null)} />}
           <input
             type="date"
             value={dateF}
@@ -206,24 +226,35 @@ export function OpsLogsScreen() {
           onSort={onSort}
           state={tableState}
         >
-          {rows.map((l) => (
-            <tr key={l.id}>
-              <td className={`${tdClass} max-w-90`}>
-                <OpsEntity
-                  icon="scroll-text"
-                  tint={SEV_TINT[INTERIM_SEVERITY]}
-                  title={l.action}
-                  sub={actorLabel(l)}
-                />
-              </td>
-              <td className={tdClass}>{l.resourceType}</td>
-              <td className={`${tdClass} tabular-nums`}>{l.ip ?? NONE}</td>
-              <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
-              <td className={tdClass}>
-                <Badge status={INTERIM_SEVERITY} />
-              </td>
-            </tr>
-          ))}
+          {rows.map((l) => {
+            const request = requestOf(l.method, l.path);
+            return (
+              <tr key={l.id}>
+                <td className={`${tdClass} max-w-90`}>
+                  <OpsEntity
+                    icon="scroll-text"
+                    title={l.action}
+                    sub={<span title={request}>{request}</span>}
+                  />
+                </td>
+                <td className={tdClass}>
+                  <LogActor entry={l} onPick={pickActor} />
+                </td>
+                <td className={tdClass}>
+                  <button
+                    type="button"
+                    title="Show only this resource"
+                    onClick={() => pickResource(l.resourceType)}
+                    className="text-text-body hover:text-blue cursor-pointer text-left underline-offset-2 hover:underline"
+                  >
+                    {resourceName(l.resourceType)}
+                  </button>
+                </td>
+                <td className={`${tdClass} tabular-nums`}>{l.ip ?? NONE}</td>
+                <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
+              </tr>
+            );
+          })}
         </TableShell>
         <Pager
           total={total}

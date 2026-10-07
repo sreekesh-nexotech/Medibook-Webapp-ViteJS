@@ -51,9 +51,6 @@ const BYTES_PER_GB = 1024 ** 3;
 /** A suspension applied from this page is recorded as a manual review. */
 const MANUAL_SUSPENSION_NOTE = 'Suspended from the hospital profile by operations.';
 
-/** Shown where the platform API has no value for a field. */
-const NOT_AVAILABLE = 'Not available on the platform yet';
-
 const ACTION_FAILED_MESSAGE = 'That did not go through. Please try again.';
 
 function usageValue(
@@ -117,7 +114,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
   const stage = h.onboarding ? ONBOARDING_STAGE_VIEW[h.onboarding.stage] : null;
 
   const failToast = (error: unknown) =>
-    toast(isFailure(error) ? error.message : ACTION_FAILED_MESSAGE, 'error');
+    toast(isFailure(error) ? error.message : ACTION_FAILED_MESSAGE, 'error', error);
 
   const handleSuspend = () =>
     suspendMutation.mutate(
@@ -162,16 +159,16 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
       label: 'Doctors',
       value: usageValue(h.usage.doctors),
       sub: usageSub(h.usage.doctors, 'doctor limit'),
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'layers',
       label: 'Storage',
       value: usageValue(h.usage.storage, gb),
       sub: usageSub(h.usage.storage, 'storage'),
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
   ];
 
@@ -186,8 +183,6 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
     { k: 'Legal Name', v: h.legalName || '—' },
     { k: 'GSTIN', v: h.gstin || 'Not on file', num: Boolean(h.gstin) },
     { k: 'Registration No.', v: h.registrationNo || 'Not on file' },
-    { k: 'Payout Account', v: NOT_AVAILABLE },
-    { k: 'Payment Grace', v: NOT_AVAILABLE },
     ...(suspension
       ? [
           { k: 'Suspended Since', v: longDateFromTimestamp(suspension.suspendedAt) },
@@ -243,7 +238,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
       {isSuspended && (
         <Card pad={16} className="border-d-500">
           <div className="flex flex-wrap items-start gap-3.5">
-            <div className="bg-d-100 text-d-500 flex size-10 flex-none items-center justify-center rounded-md">
+            <div className="bg-d-100 text-d-600 flex size-10 flex-none items-center justify-center rounded-md">
               <Icon name="ban" size={19} />
             </div>
             <div className="min-w-50 flex-1">
@@ -305,7 +300,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
               <ul className="flex list-none flex-col gap-1.5 p-0">
                 {h.goLiveBlockers.map((b) => (
                   <li key={b.code} className="text-body text-text-body flex items-start gap-2">
-                    <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
+                    <Icon name="circle-alert" size={15} className="text-y-800 mt-0.5 flex-none" />
                     <span>
                       {GO_LIVE_BLOCKER_LABEL[b.code] ?? GO_LIVE_BLOCKER_FALLBACK}
                       {b.details.length > 0 && (
@@ -320,7 +315,7 @@ export function HospitalProfile({ h }: HospitalProfileProps) {
               </ul>
             )}
           </Card>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {KPIS.map((k) => (
               <StatCard key={k.label} k={k} />
             ))}

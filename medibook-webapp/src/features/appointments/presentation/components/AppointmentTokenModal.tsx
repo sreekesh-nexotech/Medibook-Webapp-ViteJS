@@ -21,7 +21,7 @@ interface AppointmentTokenModalProps {
  */
 export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTokenModalProps) {
   const slip = useTokenSlipQuery(appointmentId);
-  const { ref, print } = usePrintArea<HTMLDivElement>();
+  const { ref, print } = usePrintArea<HTMLDivElement>('slip');
 
   const row = (k: string, v: string) => (
     <div className="flex justify-between gap-3">
@@ -53,6 +53,7 @@ export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTok
         </div>
       ) : slip.isLoadingError ? (
         <ErrorState
+          error={slip.error}
           inline
           title="No token slip"
           message={isFailure(slip.error) ? slip.error.message : undefined}

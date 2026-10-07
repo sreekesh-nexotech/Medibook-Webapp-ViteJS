@@ -134,6 +134,7 @@ export function PlanBilling() {
         toast(
           isFailure(failure) ? failure.message : 'Could not send the plan change request.',
           'error',
+          failure,
         );
       }
     },
@@ -164,6 +165,7 @@ export function PlanBilling() {
     ) : (
       <Card>
         <ErrorState
+          error={subscriptionQuery.error}
           inline
           title="Your plan didn't load"
           message={isFailure(subscriptionQuery.error) ? subscriptionQuery.error.message : undefined}
@@ -257,6 +259,7 @@ export function PlanBilling() {
         <SkeletonCards count={1} lines={3} />
       ) : usageQuery.isLoadingError ? (
         <ErrorState
+          error={usageQuery.error}
           inline
           title="Usage didn't load"
           message={isFailure(usageQuery.error) ? usageQuery.error.message : undefined}
@@ -279,7 +282,7 @@ export function PlanBilling() {
                     <div
                       className={cn(
                         'h-full rounded-full',
-                        pct > QUOTA_ALERT_PCT ? 'bg-d-500' : 'bg-blue',
+                        pct > QUOTA_ALERT_PCT ? 'bg-d-600' : 'bg-blue',
                       )}
                       style={{ width: `${pct}%` }}
                     />
@@ -307,6 +310,7 @@ export function PlanBilling() {
     : invoicesQuery.isLoadingError
       ? {
           kind: 'error',
+          error: invoicesQuery.error,
           message: isFailure(invoicesQuery.error) ? invoicesQuery.error.message : undefined,
           onRetry: () => void invoicesQuery.refetch(),
         }
@@ -375,6 +379,7 @@ export function PlanBilling() {
       </Card>
 
       <FormModal
+        dirty={form.isDirty}
         open={reqOpen}
         onClose={() => setReqOpen(false)}
         title="Request Plan Change"
@@ -390,6 +395,7 @@ export function PlanBilling() {
         </p>
         {plansQuery.isLoadingError ? (
           <ErrorState
+            error={plansQuery.error}
             inline
             title="Plans didn't load"
             message={isFailure(plansQuery.error) ? plansQuery.error.message : undefined}
@@ -431,7 +437,7 @@ export function PlanBilling() {
                   maxLength={NOTE_MAX_LENGTH}
                   onChange={(e) => form.setField('note', e.target.value)}
                   placeholder="e.g. We are adding a second branch next month"
-                  className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
+                  className="border-border-control rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
                 />
               )}
             </Field>

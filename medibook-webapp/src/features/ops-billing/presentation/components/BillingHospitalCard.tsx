@@ -32,6 +32,7 @@ interface ListState {
   readonly isPending: boolean;
   /** Failed with nothing to show; a failed refresh keeps the rows (RUN-04). */
   readonly isLoadingError: boolean;
+  readonly error: unknown;
   readonly refetch: () => unknown;
 }
 
@@ -41,7 +42,8 @@ function tableState(
   emptyTitle: string,
 ): TableStateSpec | undefined {
   if (query.isPending) return { kind: 'loading', rows: 3 };
-  if (query.isLoadingError) return { kind: 'error', onRetry: () => void query.refetch() };
+  if (query.isLoadingError)
+    return { kind: 'error', error: query.error, onRetry: () => void query.refetch() };
   if (rows === 0) return { kind: 'empty', icon: 'file-text', title: emptyTitle };
   return undefined;
 }
@@ -110,7 +112,19 @@ export function BillingHospitalCard({ hospitalId }: BillingHospitalCardProps) {
                 onClick={() => navigate(opsInvoiceDetailPath(inv.id))}
                 className="cursor-pointer"
               >
-                <td className={tdClass}>{inv.invoiceNo}</td>
+                <td className={tdClass}>
+                  {/* The row is clickable; this button is the keyboard way in (A11Y-01). */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void navigate(opsInvoiceDetailPath(inv.id));
+                    }}
+                    className="text-text-strong cursor-pointer font-medium underline-offset-2 hover:underline"
+                  >
+                    {inv.invoiceNo}
+                  </button>
+                </td>
                 <td className={tdClass}>
                   {inv.periodStart} – {inv.periodEnd}
                 </td>
@@ -138,7 +152,20 @@ export function BillingHospitalCard({ hospitalId }: BillingHospitalCardProps) {
                 }
                 className="cursor-pointer"
               >
-                <td className={tdClass}>{pay.invoiceNo}</td>
+                <td className={tdClass}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void navigate(opsPaymentDetailPath(pay.id), {
+                        state: { invoiceId: pay.invoiceId },
+                      });
+                    }}
+                    className="text-text-strong cursor-pointer font-medium underline-offset-2 hover:underline"
+                  >
+                    {pay.invoiceNo}
+                  </button>
+                </td>
                 <td className={tdClass}>{dateOf(pay.attemptedAt)}</td>
                 <td className={tdClass}>{METHOD_LABELS[pay.method]}</td>
                 <td className={`${tdClass} tabular-nums`}>{rupees(pay.amountPaise)}</td>

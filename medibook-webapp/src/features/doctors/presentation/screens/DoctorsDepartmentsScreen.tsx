@@ -144,6 +144,7 @@ export function DoctorsDepartmentsScreen() {
     : doctorsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: doctorsQuery.error,
           title: 'Could not load doctors',
           message: failureText(doctorsQuery.error, 'Please try again.'),
           onRetry: () => void doctorsQuery.refetch(),
@@ -282,7 +283,7 @@ export function DoctorsDepartmentsScreen() {
                         title={`Remove ${d.name}`}
                         box={34}
                         size={15}
-                        color="var(--color-d-500)"
+                        color="var(--color-d-600)"
                         onClick={() => setConfirm({ kind: 'doc', item: d })}
                       />
                     </Can>
@@ -297,6 +298,7 @@ export function DoctorsDepartmentsScreen() {
       ) : departmentsQuery.isLoadingError ? (
         <Card>
           <ErrorState
+            error={departmentsQuery.error}
             inline
             title="Could not load departments"
             message={failureText(departmentsQuery.error, 'Please try again.')}
@@ -367,7 +369,7 @@ export function DoctorsDepartmentsScreen() {
                           title={`Remove ${d.name}`}
                           box={32}
                           size={15}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() => setConfirm({ kind: 'dept', item: d })}
                         />
                       </Can>
@@ -422,7 +424,7 @@ export function DoctorsDepartmentsScreen() {
               attempt: (isConfirmed) => deleteDoctor.mutateAsync({ id, confirm: isConfirmed }),
               onApplied: () => toast('Doctor removed', 'info'),
               onError: (error) =>
-                toast(failureText(error, 'Could not remove the doctor.'), 'error'),
+                toast(failureText(error, 'Could not remove the doctor.'), 'error', error),
             });
             return;
           }
@@ -434,6 +436,7 @@ export function DoctorsDepartmentsScreen() {
                   ? 'Move or remove its doctors first — a department with doctors cannot be deleted.'
                   : failureText(error, 'Could not delete the department.'),
                 'error',
+                error,
               ),
           });
         }}

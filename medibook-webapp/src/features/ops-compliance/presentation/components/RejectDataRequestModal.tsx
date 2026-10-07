@@ -41,6 +41,7 @@ export function RejectDataRequestModal({
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Reject ${requestNo}?`}

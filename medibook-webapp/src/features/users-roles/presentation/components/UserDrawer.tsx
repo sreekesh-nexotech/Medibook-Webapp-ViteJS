@@ -82,20 +82,21 @@ export function UserDrawer({
         onClose();
       },
       onError: (failure) =>
-        toast(failureText(failure, `Could not activate ${user.name}.`), 'error'),
+        toast(failureText(failure, `Could not activate ${user.name}.`), 'error', failure),
     });
 
   const handleUnlock = (): void =>
     unlock.mutate(user.id, {
       onSuccess: () => toast(`${user.name} unlocked — they can sign in again`, 'success'),
-      onError: (failure) => toast(failureText(failure, `Could not unlock ${user.name}.`), 'error'),
+      onError: (failure) =>
+        toast(failureText(failure, `Could not unlock ${user.name}.`), 'error', failure),
     });
 
   const handleResend = (): void =>
     resend.mutate(user.id, {
       onSuccess: () => toast(`Invitation resent to ${user.email}`, 'success'),
       onError: (failure) =>
-        toast(failureText(failure, 'Could not resend the invitation.'), 'error'),
+        toast(failureText(failure, 'Could not resend the invitation.'), 'error', failure),
     });
 
   const handleRevoke = (): void =>
@@ -105,7 +106,7 @@ export function UserDrawer({
         onClose();
       },
       onError: (failure) =>
-        toast(failureText(failure, 'Could not revoke the invitation.'), 'error'),
+        toast(failureText(failure, 'Could not revoke the invitation.'), 'error', failure),
     });
 
   return (
@@ -133,7 +134,7 @@ export function UserDrawer({
               <Button
                 variant="ghost"
                 icon="user-x"
-                style={{ color: 'var(--color-d-500)' }}
+                style={{ color: 'var(--color-d-600)' }}
                 onClick={handleRevoke}
                 busy={revoke.isPending}
               >
@@ -153,7 +154,7 @@ export function UserDrawer({
               <Button
                 variant={active ? 'ghost' : 'success'}
                 icon={active ? 'user-x' : 'user-check'}
-                style={active ? { color: 'var(--color-d-500)' } : undefined}
+                style={active ? { color: 'var(--color-d-600)' } : undefined}
                 busy={reactivate.isPending}
                 onClick={() => {
                   if (active) {

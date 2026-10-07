@@ -70,7 +70,7 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
   return (
     <div className="flex h-full bg-white">
       <BrandPanel />
-      <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+      <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
         <div className="w-full max-w-100">
           <button
             type="button"
@@ -81,7 +81,7 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
           </button>
           {!token ? (
             <div className="text-center">
-              <div className="bg-d-100 text-d-500 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
+              <div className="bg-d-100 text-d-600 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
                 <Icon name="triangle-alert" size={34} />
               </div>
               <div className="text-h2 text-text-strong mb-2.5">This link is incomplete</div>
@@ -95,7 +95,7 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
             </div>
           ) : reset.isSuccess ? (
             <div className="text-center">
-              <div className="bg-g-100 text-g-600 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
+              <div className="bg-g-100 text-g-800 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
                 <Icon name="circle-check" size={34} />
               </div>
               <div className="text-h2 text-text-strong mb-2.5">Password updated</div>
@@ -114,9 +114,17 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
                 Choose a password you haven't used here before — at least 10 characters, without
                 your name or email.
               </p>
-              <div className="flex flex-col gap-5">
+              <form
+                noValidate
+                className="flex flex-col gap-5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit();
+                }}
+              >
                 <AuthPasswordField
                   label="New Password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(v) => {
                     setPassword(v);
@@ -125,6 +133,7 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
                 />
                 <AuthPasswordField
                   label="Confirm New Password"
+                  autoComplete="new-password"
                   value={confirm}
                   onChange={(v) => {
                     setConfirm(v);
@@ -133,19 +142,19 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
                 />
                 {err && <AuthAlert message={err} />}
                 <Button
+                  type="submit"
                   variant="info"
                   icon="key-round"
                   className="h-13.5 w-full rounded-sm"
-                  onClick={submit}
                   busy={reset.isPending}
                 >
                   Update Password
                 </Button>
-              </div>
+              </form>
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

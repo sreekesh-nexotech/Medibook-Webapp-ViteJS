@@ -245,7 +245,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
           if (field && messages[0]) mapped[field] = messages[0];
         }
         setServerErrors(mapped);
-        toast(error.message, 'error');
+        toast(error.message, 'error', error);
       }
     },
   });
@@ -282,6 +282,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title="Onboard Hospital"

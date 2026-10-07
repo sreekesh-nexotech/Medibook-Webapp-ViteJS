@@ -18,8 +18,8 @@ interface ErrorsBySurfaceCardProps {
 
 /** Bar colour per row: red past critical, amber past warning, else accent. */
 function barColor(errorPct: number): string {
-  if (errorPct >= ERROR_PCT_CRITICAL) return 'var(--color-d-500)';
-  if (errorPct >= ERROR_PCT_WARNING) return 'var(--color-y-600)';
+  if (errorPct >= ERROR_PCT_CRITICAL) return 'var(--color-d-600)';
+  if (errorPct >= ERROR_PCT_WARNING) return 'var(--color-y-800)';
   return 'var(--color-blue)';
 }
 

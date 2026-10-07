@@ -123,7 +123,7 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
           onClose();
         },
         onError: (error) =>
-          toast(failureText(error, 'Could not save the date exception.'), 'error'),
+          toast(failureText(error, 'Could not save the date exception.'), 'error', error),
       });
     },
   });
@@ -132,6 +132,7 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
   return (
     <>
       <FormModal
+        dirty={form.isDirty}
         open
         onClose={onClose}
         title={exception ? 'Edit Date Exception' : 'Add Date Exception'}
@@ -235,7 +236,7 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
         }),
       onApplied: () => toast('Date exception removed', 'info'),
       onError: (error) =>
-        toast(failureText(error, 'Could not remove the date exception.'), 'error'),
+        toast(failureText(error, 'Could not remove the date exception.'), 'error', error),
     });
   };
 
@@ -276,8 +277,8 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
               <div
                 className={
                   e.kind === 'closed'
-                    ? 'bg-d-100 text-d-500 flex size-8.5 flex-none items-center justify-center rounded-md'
-                    : 'bg-g-100 text-g-700 flex size-8.5 flex-none items-center justify-center rounded-md'
+                    ? 'bg-d-100 text-d-600 flex size-8.5 flex-none items-center justify-center rounded-md'
+                    : 'bg-g-100 text-g-800 flex size-8.5 flex-none items-center justify-center rounded-md'
                 }
               >
                 <Icon name={e.kind === 'closed' ? 'calendar-x' : 'calendar-check'} size={17} />
@@ -304,7 +305,7 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
                   label="Remove date exception"
                   box={32}
                   size={15}
-                  color="var(--color-d-500)"
+                  color="var(--color-d-600)"
                   onClick={() => setRemoving(e)}
                 />
               </Can>

@@ -69,7 +69,7 @@ export function AppointmentReasonModal({
             onChange={(e) => setReason(e.target.value)}
             onBlur={() => setTouched(true)}
             placeholder="e.g. Doctor unavailable — patient informed"
-            className="rounded-input border-border text-body text-text-strong box-border h-20 w-full resize-none border p-3"
+            className="rounded-input border-border-control text-body text-text-strong box-border h-20 w-full resize-none border p-3"
           />
         )}
       </Field>

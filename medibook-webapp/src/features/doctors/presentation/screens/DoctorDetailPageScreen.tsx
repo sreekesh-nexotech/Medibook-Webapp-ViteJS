@@ -43,6 +43,7 @@ import { Select } from '@/shared/ui/Select';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { Tabs } from '@/shared/ui/Tabs';
 import { TextInput } from '@/shared/ui/TextInput';
+import { Toggle } from '@/shared/ui/Toggle';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { DateExceptionsPanel } from '../components/DateExceptionsPanel';
@@ -81,7 +82,7 @@ const NEW_DOCTOR_WEEK: WeekGrid = sessionsToGrid(
   })),
 );
 
-/** Editable draft — `fee` and `exp` are digits-only text until parsed on save. */
+/** Editable draft — the fees and `exp` are digits-only text until parsed on save. */
 interface DoctorForm {
   name: string;
   departmentId: string;
@@ -91,6 +92,9 @@ interface DoctorForm {
   exp: string;
   reg: string;
   fee: string;
+  /** Empty = follow-ups cost the consultation fee. */
+  followUpFee: string;
+  bookableOnline: boolean;
   status: DoctorStatusLabel;
   photoFileId: string | null;
   about: string;
@@ -127,6 +131,8 @@ function blankDoctorForm(): DoctorForm {
     exp: '',
     reg: '',
     fee: '',
+    followUpFee: '',
+    bookableOnline: true,
     status: 'Active',
     photoFileId: null,
     about: '',
@@ -143,6 +149,8 @@ function toForm(d: DoctorProfile): DoctorForm {
     exp: d.experienceYears === null ? '' : String(d.experienceYears),
     reg: d.registrationNo,
     fee: d.feeRupees ? String(d.feeRupees) : '',
+    followUpFee: d.followUpFeeRupees === null ? '' : String(d.followUpFeeRupees),
+    bookableOnline: d.isBookableOnline,
     status: DOCTOR_STATUS_LABEL[d.status],
     photoFileId: d.photoFileId,
     about: d.bio,
@@ -160,6 +168,8 @@ function toInput(values: DoctorForm): DoctorInput {
     bio: values.about.trim(),
     room: values.room.trim(),
     feeRupees: Number(digits(values.fee)) || 0,
+    followUpFeeRupees: values.followUpFee === '' ? null : Number(values.followUpFee),
+    isBookableOnline: values.bookableOnline,
     status: doctorStatusFromLabel(values.status),
     photoFileId: values.photoFileId,
   };
@@ -214,7 +224,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
   };
 
   const onError = (error: unknown): void => {
-    toast(failureText(error, 'Could not save the doctor.'), 'error');
+    toast(failureText(error, 'Could not save the doctor.'), 'error', error);
   };
 
   /** Replace the weekly sessions when they changed, then finish. */
@@ -269,7 +279,8 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
           if (localPhoto) URL.revokeObjectURL(localPhoto);
           setLocalPhoto(URL.createObjectURL(file));
         },
-        onError: (error) => toast(failureText(error, 'Could not upload the photo.'), 'error'),
+        onError: (error) =>
+          toast(failureText(error, 'Could not upload the photo.'), 'error', error),
       },
     );
   };
@@ -283,7 +294,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
         toast('Doctor profile deleted', 'info');
         back();
       },
-      onError: (error) => toast(failureText(error, 'Could not delete the doctor.'), 'error'),
+      onError: (error) => toast(failureText(error, 'Could not delete the doctor.'), 'error', error),
     });
   };
 
@@ -455,11 +466,40 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     <InfoDot text="What patients pay & see in the app for a consultation with this doctor." />
                   </div>
                 </Field>
+                <Field label="Follow-up Fee" className="col-span-full">
+                  <div className="flex items-center gap-2">
+                    <div className="max-w-90 flex-1">
+                      <TextInput
+                        value={values.followUpFee ? `₹ ${values.followUpFee}` : ''}
+                        placeholder="Same as the consultation fee"
+                        inputMode="numeric"
+                        onChange={(v) => form.setField('followUpFee', digits(v))}
+                      />
+                    </div>
+                    <InfoDot text="Charged instead of the consultation fee when a patient comes back within your hospital's follow-up window. Leave empty to charge the consultation fee." />
+                  </div>
+                </Field>
+                <div className="col-span-full flex items-center gap-3">
+                  <Toggle
+                    value={values.bookableOnline}
+                    onChange={(v) => form.setField('bookableOnline', v)}
+                    aria-labelledby="doctor-bookable-online"
+                  />
+                  <div>
+                    <div id="doctor-bookable-online" className="text-label text-text-strong">
+                      Bookable in the Medibook app
+                    </div>
+                    <div className="text-caption text-text-muted">
+                      Off: patients can't book this doctor in the app. The front desk can still book
+                      them.
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <div className="mb-2 flex items-center gap-2">
                   <span className="text-label font-ui text-text-strong">Department</span>
-                  <span className="text-d-500">*</span>
+                  <span className="text-d-600">*</span>
                   <InfoDot text="A doctor belongs to one department." />
                 </div>
                 {departments.length === 0 && (
@@ -502,7 +542,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     value={values.about}
                     placeholder="Short bio shown in the patient app"
                     onChange={(e) => form.setField('about', e.target.value)}
-                    className="border-border text-body-lg text-text-strong rounded-input box-border h-18 w-full resize-none border p-3"
+                    className="border-border-control text-body-lg text-text-strong rounded-input box-border h-18 w-full resize-none border p-3"
                   />
                 )}
               </Field>
@@ -615,7 +655,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
             <Button
               variant="ghost"
               icon="trash-2"
-              style={{ color: 'var(--color-d-500)' }}
+              style={{ color: 'var(--color-d-600)' }}
               onClick={() => setConfirmDelete(true)}
             >
               Delete Profile
@@ -681,6 +721,7 @@ export function DoctorDetailPageScreen() {
     }
     return (
       <ErrorState
+        error={failed.error}
         title="Could not load this doctor"
         message={failureText(failed.error, 'Please try again.')}
         onRetry={() => {

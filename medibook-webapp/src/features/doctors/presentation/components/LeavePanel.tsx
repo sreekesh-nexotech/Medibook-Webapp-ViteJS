@@ -97,12 +97,13 @@ function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
           toast(leave ? 'Leave updated' : 'Leave added', 'success');
           onClose();
         },
-        onError: (error) => toast(failureText(error, 'Could not save the leave.'), 'error'),
+        onError: (error) => toast(failureText(error, 'Could not save the leave.'), 'error', error),
       }),
   });
   return (
     <>
       <FormModal
+        dirty={form.isDirty}
         open
         onClose={onClose}
         title={leave ? 'Edit Leave' : 'Add Leave'}
@@ -186,7 +187,7 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
           confirm: isConfirmed,
         }),
       onApplied: () => toast('Leave removed', 'info'),
-      onError: (error) => toast(failureText(error, 'Could not remove the leave.'), 'error'),
+      onError: (error) => toast(failureText(error, 'Could not remove the leave.'), 'error', error),
     });
   };
 
@@ -250,7 +251,7 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
                   label="Remove leave"
                   box={32}
                   size={15}
-                  color="var(--color-d-500)"
+                  color="var(--color-d-600)"
                   onClick={() => setRemoving(l)}
                 />
               </Can>

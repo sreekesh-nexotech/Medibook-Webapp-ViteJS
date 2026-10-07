@@ -154,7 +154,8 @@ export function OpsSettlementsScreen() {
     setApprovingId(runId);
     approve.mutate(runId, {
       onSuccess: (d) => toast(`Payout run ${d.run.runNo} approved — ready to release.`, 'success'),
-      onError: (failure) => toast(failureText(failure, 'Could not approve the run.'), 'error'),
+      onError: (failure) =>
+        toast(failureText(failure, 'Could not approve the run.'), 'error', failure),
       onSettled: () => setApprovingId(null),
     });
   };
@@ -174,8 +175,8 @@ export function OpsSettlementsScreen() {
       label: 'Payable Now',
       value: moneyShort(payable.reduce((a, b) => a + b.netRupees, 0)),
       sub: `${payable.length} statements pending release`,
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'clock',
@@ -190,8 +191,8 @@ export function OpsSettlementsScreen() {
       label: 'Released This Month',
       value: moneyShort(releasedThisMonth.reduce((a, p) => a + p.amountRupees, 0)),
       sub: `${releasedThisMonth.length} payout${releasedThisMonth.length === 1 ? '' : 's'} recorded`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'indian-rupee',
@@ -221,6 +222,7 @@ export function OpsSettlementsScreen() {
   if (loadError && periods.length === 0) {
     return (
       <ErrorState
+        error={loadError}
         title="Settlements could not load"
         message={failureText(loadError, 'Retrying usually fixes it — nothing has been lost.')}
         onRetry={() => void refetchAll()}
@@ -292,6 +294,7 @@ export function OpsSettlementsScreen() {
       </div>
       {details.isError && (
         <ErrorState
+          error={details.error}
           inline
           title="Some payout runs could not be loaded"
           message={failureText(

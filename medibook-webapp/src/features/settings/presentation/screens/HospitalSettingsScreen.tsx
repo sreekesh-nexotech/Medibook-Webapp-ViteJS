@@ -8,6 +8,7 @@ import { useBankAccountsQuery } from '@/features/settings/application/queries/us
 import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
+import { useNumberingQuery } from '@/features/settings/application/queries/useNumberingQuery';
 import { useTokenPolicyQuery } from '@/features/settings/application/queries/useTokenPolicyQuery';
 import { payoutAccountOf } from '@/features/settings/application/store/settings.form';
 
@@ -21,7 +22,7 @@ const CARD_SKELETON_PAD = 28;
 
 /**
  * Hospital Settings (module H2) — loads the hospital's profile, rulebook,
- * working hours and token policy from the API, then hands them to
+ * working hours, token policy and number series from the API, then hands them to
  * `SettingsEditor`. The payout account loads on its own (it needs the
  * Billing & Settlements permission), so a refusal there never blocks the
  * rest of the screen.
@@ -35,6 +36,7 @@ export function HospitalSettingsScreen() {
   const rules = useHospitalRuleSettingsQuery(canView);
   const hours = useHospitalHoursQuery(canView);
   const tokenPolicy = useTokenPolicyQuery(canView);
+  const numbering = useNumberingQuery(canView);
   const bankAccounts = useBankAccountsQuery(canViewBank);
 
   if (!canView) {
@@ -49,10 +51,12 @@ export function HospitalSettingsScreen() {
     );
   }
 
-  const core = [profile, rules, hours, tokenPolicy];
-  if (core.some((q) => q.isLoadingError)) {
+  const core = [profile, rules, hours, tokenPolicy, numbering];
+  const failed = core.find((q) => q.isLoadingError);
+  if (failed) {
     return (
       <ErrorState
+        error={failed.error}
         title="Hospital settings did not load"
         message="Nothing has changed. Retry to load the settings again."
         onRetry={() => {
@@ -62,7 +66,7 @@ export function HospitalSettingsScreen() {
     );
   }
 
-  if (!profile.data || !rules.data || !hours.data || !tokenPolicy.data) {
+  if (!profile.data || !rules.data || !hours.data || !tokenPolicy.data || !numbering.data) {
     return (
       <div className="flex items-start gap-5" aria-busy="true">
         <SkeletonBlock w={NAV_SKELETON_WIDTH} h={NAV_SKELETON_HEIGHT} className="flex-none" />
@@ -76,7 +80,7 @@ export function HospitalSettingsScreen() {
   const bank: BankAccountsState = !canViewBank
     ? { status: 'hidden' }
     : bankAccounts.isLoadingError
-      ? { status: 'error', retry: () => void bankAccounts.refetch() }
+      ? { status: 'error', error: bankAccounts.error, retry: () => void bankAccounts.refetch() }
       : bankAccounts.data
         ? { status: 'ready', account: payoutAccountOf(bankAccounts.data) }
         : { status: 'loading' };
@@ -87,6 +91,7 @@ export function HospitalSettingsScreen() {
       rules={rules.data}
       hours={hours.data}
       tokenPolicy={tokenPolicy.data}
+      numbering={numbering.data}
       bank={bank}
     />
   );

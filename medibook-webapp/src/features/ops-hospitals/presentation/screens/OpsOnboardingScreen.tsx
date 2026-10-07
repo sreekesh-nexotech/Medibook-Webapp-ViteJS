@@ -146,6 +146,7 @@ export function OpsOnboardingScreen() {
         <SkeletonCards count={3} lines={4} />
       ) : pipeline.isLoadingError ? (
         <ErrorState
+          error={pipeline.error}
           title="The onboarding pipeline didn't load"
           message={isFailure(pipeline.error) ? pipeline.error.message : undefined}
           onRetry={() => void pipeline.refetch()}

@@ -34,7 +34,7 @@ function varianceCell(session: CashSession) {
     <span
       className={cn(
         'font-medium tabular-nums',
-        balance === 'balanced' && 'text-g-700',
+        balance === 'balanced' && 'text-g-800',
         balance === 'short' && 'text-d-700',
         balance === 'over' && 'text-y-800',
       )}
@@ -67,6 +67,7 @@ export function PaymentsCashReconcile() {
     : list.isLoadingError
       ? {
           kind: 'error',
+          error: list.error,
           title: 'Cash drawers didn’t load',
           message: isFailure(list.error) ? list.error.message : undefined,
           onRetry: () => void list.refetch(),
@@ -90,6 +91,7 @@ export function PaymentsCashReconcile() {
         toast(
           isFailure(failure) ? failure.message : 'The drawer could not be reconciled.',
           'error',
+          failure,
         ),
     });
   };

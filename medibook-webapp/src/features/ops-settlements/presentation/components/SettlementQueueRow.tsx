@@ -40,17 +40,20 @@ export function SettlementQueueRow({
   const note = s.payout?.failureReason ?? s.payout?.notes ?? null;
   return (
     <tr>
-      <td
-        onClick={() => onOpenHosp(s.hospitalId)}
-        title="Open hospital profile"
-        className={cn(tdClass, 'cursor-pointer')}
-      >
-        <OpsEntity
-          icon="landmark"
-          tint={opsTintOf(Math.round(s.grossRupees) % 5)}
-          title={s.hospitalName}
-          sub={s.periodLabel}
-        />
+      <td className={tdClass}>
+        <button
+          type="button"
+          onClick={() => onOpenHosp(s.hospitalId)}
+          title="Open hospital profile"
+          className="w-full cursor-pointer text-left"
+        >
+          <OpsEntity
+            icon="landmark"
+            tint={opsTintOf(Math.round(s.grossRupees) % 5)}
+            title={s.hospitalName}
+            sub={s.periodLabel}
+          />
+        </button>
         {note && <div className="text-caption text-blue mt-1 ml-11">“{note}”</div>}
       </td>
       <td className={cn(tdClass, 'text-right tabular-nums')}>{money(s.grossRupees)}</td>
@@ -80,7 +83,7 @@ export function SettlementQueueRow({
             )}
           </CanOps>
         ) : s.status === 'Released' ? (
-          <span className="text-caption text-g-600 inline-flex items-center gap-1.25">
+          <span className="text-caption text-g-800 inline-flex items-center gap-1.25">
             <Icon name="check" size={15} /> {fmtDate(datePart(s.payout?.releasedAt ?? null))}
           </span>
         ) : (

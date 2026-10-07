@@ -34,7 +34,7 @@ export function SendReminderModal({ invoice, hospitalEmail, onClose }: SendRemin
         toast(`Reminder queued for ${invoice.invoiceNo}.`, 'success');
         onClose();
       },
-      onError: (error) => toast(failureText(error, REMINDER_FAILED), 'error'),
+      onError: (error) => toast(failureText(error, REMINDER_FAILED), 'error', error),
     });
   };
 

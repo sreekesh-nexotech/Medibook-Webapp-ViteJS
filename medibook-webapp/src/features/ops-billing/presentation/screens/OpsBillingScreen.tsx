@@ -207,8 +207,8 @@ export function OpsBillingScreen() {
       label: 'Open Invoices',
       value: countOf(openCount),
       sub: 'Issued and not yet paid',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
       subClass: 'text-text-muted',
     },
     {
@@ -216,8 +216,8 @@ export function OpsBillingScreen() {
       label: 'Overdue',
       value: countOf(overdueCount),
       sub: 'Past their due date',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       subClass: 'text-text-muted',
     },
     {
@@ -225,8 +225,8 @@ export function OpsBillingScreen() {
       label: 'Failed Payments',
       value: countOf(failedCount),
       sub: 'Gateway attempts that did not go through',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
     },
   ];
@@ -283,6 +283,7 @@ export function OpsBillingScreen() {
           toast(
             isNotImplemented(error) ? PDF_UNAVAILABLE : failureText(error, PDF_FAILED),
             'error',
+            error,
           ),
       },
     );
@@ -295,7 +296,7 @@ export function OpsBillingScreen() {
           saveFile(file);
           toast(`Exported ${file.filename}`, 'success');
         },
-        onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error'),
+        onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error', error),
       });
       return;
     }
@@ -330,12 +331,12 @@ export function OpsBillingScreen() {
           'success',
         );
       },
-      onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error'),
+      onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error', error),
     });
   };
 
   const dateInputClass =
-    'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+    'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
   const filtersActive = Boolean(
     q || statusF !== STATUS_ALL || methodF !== METHOD_ALL || dateF || dateT,
   );
@@ -355,6 +356,7 @@ export function OpsBillingScreen() {
     if (activeQuery.isLoadingError)
       return {
         kind: 'error',
+        error: activeQuery.error,
         message: failureText(activeQuery.error, `The ${noun} could not be loaded.`),
         onRetry: () => void activeQuery.refetch(),
       };

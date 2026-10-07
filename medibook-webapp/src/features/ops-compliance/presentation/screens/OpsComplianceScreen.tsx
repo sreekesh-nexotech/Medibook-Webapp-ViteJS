@@ -38,7 +38,9 @@ function announceOutcome(requestNo: string, outcome: DataRequestProcessOutcome):
     return;
   }
   const { request } = outcome;
-  if (request.status === 'completed' && request.exportFileId) {
+  if (request.status === 'completed' && request.kind === 'rectification') {
+    toast(`${requestNo} marked done.`, 'success');
+  } else if (request.status === 'completed' && request.exportFileId) {
     toast(`${requestNo}: export ready — download it from Recorded Requests.`, 'success');
   } else if (request.status === 'no_data') {
     toast(`${requestNo}: no records are held for this account — nothing was exported.`, 'info');
@@ -73,6 +75,7 @@ export function OpsComplianceScreen() {
             isFailure(error) ? error.message : 'please try again.'
           }`,
           'error',
+          error,
         ),
       onSettled: () => setProcessingId(null),
     });
@@ -100,6 +103,7 @@ export function OpsComplianceScreen() {
               ? error.message
               : `The export for ${value.subjectLabel} could not be filed.`,
             'error',
+            error,
           ),
       },
     );

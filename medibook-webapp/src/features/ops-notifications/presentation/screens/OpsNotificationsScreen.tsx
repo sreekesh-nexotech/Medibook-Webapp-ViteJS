@@ -93,7 +93,8 @@ export function OpsNotificationsScreen() {
           );
           setEdit(null);
         },
-        onError: (error) => toast(failureMessage(error, 'Could not save the banner.'), 'error'),
+        onError: (error) =>
+          toast(failureMessage(error, 'Could not save the banner.'), 'error', error),
       },
     );
   };
@@ -106,7 +107,7 @@ export function OpsNotificationsScreen() {
     [next[i], next[j]] = [next[j], next[i]];
     reorderMutation.mutate(next, {
       onError: (error) =>
-        toast(failureMessage(error, 'Could not change the rotation order.'), 'error'),
+        toast(failureMessage(error, 'Could not change the rotation order.'), 'error', error),
     });
   };
 
@@ -116,6 +117,7 @@ export function OpsNotificationsScreen() {
         toast(
           failureMessage(error, `Could not ${b.active ? 'pause' : 'resume'} the banner.`),
           'error',
+          error,
         ),
     });
 
@@ -126,7 +128,8 @@ export function OpsNotificationsScreen() {
         toast('Banner deleted.', 'success');
         setDelId(null);
       },
-      onError: (error) => toast(failureMessage(error, 'Could not delete the banner.'), 'error'),
+      onError: (error) =>
+        toast(failureMessage(error, 'Could not delete the banner.'), 'error', error),
     });
   };
 
@@ -157,6 +160,7 @@ export function OpsNotificationsScreen() {
         <SkeletonCards count={1} lines={5} />
       ) : tab === 'App Banners' && bannersQuery.isLoadingError ? (
         <ErrorState
+          error={bannersQuery.error}
           title="Banners didn't load"
           message={failureMessage(
             bannersQuery.error,
@@ -167,7 +171,7 @@ export function OpsNotificationsScreen() {
       ) : tab === 'App Banners' ? (
         <>
           <Card pad={16} className="flex items-center gap-3">
-            <div className="bg-g-100 text-g-600 flex size-9.5 flex-none items-center justify-center rounded-md">
+            <div className="bg-g-100 text-g-800 flex size-9.5 flex-none items-center justify-center rounded-md">
               <Icon name="smartphone" size={18} />
             </div>
             <div className="min-w-0">
@@ -280,7 +284,7 @@ export function OpsNotificationsScreen() {
                       name="trash-2"
                       box={36}
                       size={15}
-                      color="var(--color-d-500)"
+                      color="var(--color-d-600)"
                       label="Delete banner"
                       title={`Delete “${b.title}”`}
                       disabled={!canDelete}

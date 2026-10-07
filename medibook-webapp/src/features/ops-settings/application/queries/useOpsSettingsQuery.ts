@@ -12,8 +12,9 @@ import { fetchOpsSettings } from '@/features/ops-settings/application/usecases/f
  * The platform settings record. No refetch on window focus: the form is seeded
  * from this record, so it should only change on a save or an explicit reload.
  */
-export function useOpsSettingsQuery() {
+export function useOpsSettingsQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: opsSettingsKeys.settings(),
     queryFn: async () => unwrap(await fetchOpsSettings()),
     staleTime: OPS_SETTINGS_STALE_TIME_MS,

@@ -2,9 +2,17 @@ import { cn } from '@/shared/lib/cn';
 import { Icon } from '@/shared/ui/Icon';
 import { useFieldContext } from '@/shared/ui/field-context';
 
+/** Options listed under a heading (`<optgroup>`). */
+export interface FilterSelectGroup {
+  readonly label: string;
+  readonly options: readonly string[];
+}
+
 interface FilterSelectProps {
   value: string;
   options: readonly string[];
+  /** Further options under headings, after `options`. Labels must be unique overall. */
+  groups?: readonly FilterSelectGroup[];
   onChange?: (value: string) => void;
 
   /* ---- form wiring — all optional, inherited from the enclosing field ---- */
@@ -30,6 +38,7 @@ interface FilterSelectProps {
 export function FilterSelect({
   value,
   options,
+  groups,
   onChange,
   id,
   name,
@@ -57,7 +66,7 @@ export function FilterSelect({
         aria-label={ariaLabel}
         className={cn(
           'rounded-input text-body text-text-body h-11 appearance-none border bg-white pr-10 pl-4',
-          isInvalid ? 'border-d-500' : 'border-border',
+          isInvalid ? 'border-d-500' : 'border-border-control',
           disabled ? 'bg-grey-200 cursor-not-allowed' : 'cursor-pointer',
           className,
         )}
@@ -66,6 +75,15 @@ export function FilterSelect({
           <option key={o} value={o}>
             {o}
           </option>
+        ))}
+        {groups?.map((g) => (
+          <optgroup key={g.label} label={g.label}>
+            {g.options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <span className="text-text-muted pointer-events-none absolute top-1/2 right-3 -translate-y-1/2">

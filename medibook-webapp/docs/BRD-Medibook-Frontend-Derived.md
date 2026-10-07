@@ -1,5 +1,12 @@
 # Medibook — Hospital Booking SaaS
 
+> **Historical (10 September 2026).** Written from the front-end prototypes before the
+> backend existed, so parts are out of date: GAP-058, for example, says no backend or
+> deployment exists. It is kept as the record of the comparison with the contract.
+> Current gaps are in [`BACKEND_BLOCKERS.md`](BACKEND_BLOCKERS.md) and
+> [`ROADMAP.md`](ROADMAP.md). `BRD-Medibook-Frontend-Derived.docx` is an older export of
+> this file and differs from it; read this Markdown version.
+
 # Business Requirements Document derived from the built front ends
 
 **Version 1.0 · 10 September 2026 · Prepared for Nexotech Solutions (service provider) and Navora Cloud Soft Private Limited (client)**

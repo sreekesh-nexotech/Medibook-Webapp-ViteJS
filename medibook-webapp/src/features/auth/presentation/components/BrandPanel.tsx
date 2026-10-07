@@ -1,12 +1,14 @@
 /**
  * The auth screens' left brand panel (design `Auth.jsx` `BrandPanel`): a navy
  * gradient with soft geometric circles, the Medibook wordmark, the headline
- * copy and the three-stat row — ported 1:1.
+ * copy and a row of what the panel covers. The design's figures ("288
+ * appointments / day", "99.9% uptime") described no real hospital, so the row
+ * names features instead (PRD-03).
  */
-const STATS: readonly (readonly [string, string])[] = [
-  ['288', 'Appointments / day'],
-  ['12', 'Departments'],
-  ['99.9%', 'Uptime'],
+const FEATURES: readonly (readonly [string, string])[] = [
+  ['Front desk', 'Bookings and walk-ins'],
+  ['Live queue', 'Tokens update at every desk'],
+  ['Accounts', 'Payments and settlements'],
 ];
 
 export function BrandPanel() {
@@ -20,7 +22,7 @@ export function BrandPanel() {
       </div>
       <div className="relative flex items-center gap-3">
         <div className="flex size-11.5 items-center justify-center rounded-lg bg-white">
-          <img src="/assets/medibook-mark.svg" alt="" className="size-8.5" />
+          <img src="/brand/medibook-mark.svg" alt="" className="size-8.5" />
         </div>
         <span className="text-h2 font-bold">Medibook</span>
       </div>
@@ -36,9 +38,9 @@ export function BrandPanel() {
         </p>
       </div>
       <div className="relative flex gap-7">
-        {STATS.map(([n, l]) => (
-          <div key={l}>
-            <div className="text-h1 font-bold text-white">{n}</div>
+        {FEATURES.map(([n, l]) => (
+          <div key={n}>
+            <div className="text-h3 font-bold text-white">{n}</div>
             <div className="text-caption text-white/70">{l}</div>
           </div>
         ))}

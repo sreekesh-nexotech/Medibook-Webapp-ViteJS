@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEventHandler, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, MouseEventHandler, ReactNode } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 
@@ -14,10 +14,18 @@ interface CardProps {
   className?: string;
 }
 
+/** Enter or Space on a clickable card clicks it, like a button (A11Y-01). */
+function clickOnKey(e: KeyboardEvent<HTMLDivElement>): void {
+  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  e.currentTarget.click();
+}
+
 export function Card({ children, style, pad = 20, onClick, hover, className }: CardProps) {
   return (
     <div
       onClick={onClick}
+      {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: clickOnKey } : {})}
       className={cn(
         'border-border shadow-card rounded-xl border bg-white transition-shadow duration-150',
         hover && 'hover:shadow-pop',

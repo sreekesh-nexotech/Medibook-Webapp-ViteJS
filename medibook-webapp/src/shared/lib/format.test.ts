@@ -9,7 +9,6 @@ import {
   daysFromTodayISO,
   DEFAULT_CALENDAR_ZONE,
   fmtDate,
-  formatToken,
   isoToRel,
   isPastISO,
   minutesOfDay,
@@ -19,6 +18,7 @@ import {
   moneyFromPaise,
   moneyShort,
   parseHundredths,
+  phoneDisplay,
   relToISO,
   setCalendarZone,
   timeToMinutes,
@@ -138,13 +138,6 @@ describe('timeToMinutes', () => {
   });
 });
 
-describe('formatToken', () => {
-  it('pads the running token to three digits', () => {
-    expect(formatToken(7)).toBe('T-007');
-    expect(formatToken(1234)).toBe('T-1234');
-  });
-});
-
 describe('parseHundredths', () => {
   it('reads rupees as paise without floating-point rounding', () => {
     expect(parseHundredths('500')).toBe(50000);
@@ -228,5 +221,20 @@ describe('money always shows two decimals from integer paise (DATA-06)', () => {
     expect(rupeesFromPaise(9050)).toBe('90.50');
     expect(rupeesFromPaise(-5)).toBe('-0.05');
     expect(rupeesFixed(124.875)).toBe('124.88');
+  });
+});
+
+describe('phoneDisplay', () => {
+  it('groups an Indian mobile number 5 + 5', () => {
+    expect(phoneDisplay('+919876543210')).toBe('+91 98765 43210');
+  });
+
+  it('groups an Indian landline 3 + 3 + 4', () => {
+    expect(phoneDisplay('+914847100000')).toBe('+91 484 710 0000');
+  });
+
+  it('shows anything else as stored', () => {
+    expect(phoneDisplay('+441632960961')).toBe('+441632960961');
+    expect(phoneDisplay('+9118002004567')).toBe('+9118002004567');
   });
 });

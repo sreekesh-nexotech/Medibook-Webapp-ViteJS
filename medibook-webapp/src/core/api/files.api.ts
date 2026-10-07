@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 import { isFileStoreUrl } from '@/core/api/fileUrls';
-import { ifMatch } from '@/core/api/headers';
 import { sharedApi } from '@/core/api/http';
 import { activeSurface } from '@/core/api/surface';
 import { FILE_UPLOAD_MAX_BYTES, FILE_UPLOAD_RULES, normaliseMime } from '@/core/api/files.rules';
@@ -125,19 +124,5 @@ export function getFileUrl(fileId: string): Promise<Result<SignedFileUrl>> {
       );
     }
     return signed;
-  });
-}
-
-/**
- * `DELETE /files/{id}` — soft delete. Pass the `version` you read to guard
- * against a concurrent change. Fails with `conflict` / `FILE_IN_USE` while a
- * record still references the file.
- */
-export function deleteFile(fileId: string, version?: number): Promise<Result<null>> {
-  return attempt(async () => {
-    await sharedApi.delete(`/files/${encodeURIComponent(fileId)}`, {
-      headers: version === undefined ? undefined : ifMatch(version),
-    });
-    return null;
   });
 }

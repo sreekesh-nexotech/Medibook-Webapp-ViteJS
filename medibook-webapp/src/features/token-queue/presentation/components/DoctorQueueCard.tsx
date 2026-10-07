@@ -38,7 +38,7 @@ const STATUS_DOT: Readonly<Record<QueuePill, string>> = {
 
 /** Per-status pill background + text (design `DOC_STATUS_META`). */
 const STATUS_PILL: Readonly<Record<QueuePill, string>> = {
-  Consulting: 'bg-g-100 text-g-700',
+  Consulting: 'bg-g-100 text-g-800',
   Waiting: 'bg-y-100 text-y-700',
   'On Break': 'bg-grey-300 text-text-muted',
   Available: 'bg-blue-soft-bg text-blue',
@@ -97,7 +97,7 @@ export function DoctorQueueCard({
   const canCall = isOpen && session.waitingCount > 0 && session.queueState !== 'consulting';
 
   const onError = (fallback: string) => (error: unknown) =>
-    toast(failureText(error, fallback), 'error');
+    toast(failureText(error, fallback), 'error', error);
 
   const runSession = (command: 'open' | 'call-next' | 'pause' | 'resume' | 'close') =>
     sessionCommand.mutate(
@@ -170,7 +170,7 @@ export function DoctorQueueCard({
             <span
               className={cn(
                 'text-caption flex-none font-semibold',
-                elapsed != null && elapsed > LONG_WAIT_MINUTES ? 'text-d-500' : 'text-text-muted',
+                elapsed != null && elapsed > LONG_WAIT_MINUTES ? 'text-d-600' : 'text-text-muted',
               )}
             >
               {elapsed == null ? '' : elapsed === 0 ? 'just now' : `${elapsed} min`}
@@ -287,7 +287,7 @@ export function DoctorQueueCard({
               title={isPaused ? 'Resume' : 'Take a break'}
               box={34}
               size={15}
-              color={isPaused ? 'var(--color-g-600)' : undefined}
+              color={isPaused ? 'var(--color-g-800)' : undefined}
               onClick={() => runSession(isPaused ? 'resume' : 'pause')}
             />
           )}

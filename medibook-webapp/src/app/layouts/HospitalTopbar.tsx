@@ -1,18 +1,22 @@
 import { useState } from 'react';
 
+import { usePermission } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
-import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { HospitalRole } from '@/app/router/paths';
 
 import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
 import { useDashboardAlertsLive } from '@/features/dashboard/application/queries/useDashboardAlertsLive';
-import type { DashboardAlerts } from '@/features/dashboard/domain/entities/dashboard.types';
+import { useReceptionDashboardQuery } from '@/features/dashboard/application/queries/useReceptionDashboardQuery';
+import type {
+  DashboardAlerts,
+  ReceptionDashboard,
+} from '@/features/dashboard/domain/entities/dashboard.types';
 import { useSettlementPeriodsQuery } from '@/features/settlements/application/queries/useSettlementPeriodsQuery';
 import type {
   SettlementPeriod,
@@ -20,6 +24,7 @@ import type {
 } from '@/features/settlements/domain/entities/settlements.entities';
 
 import type { HospitalNavView } from './hospital-nav';
+import { TopbarMenuItem, TopbarPopover } from './TopbarPopover';
 
 interface HospitalNotif {
   readonly icon: IconName;
@@ -40,6 +45,17 @@ function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
 
+/** The two desk counts the bell shows non-admin roles, from the front-desk dashboard. */
+function deskAlerts(reception: ReceptionDashboard | undefined): DashboardAlerts | undefined {
+  if (!reception) return undefined;
+  return {
+    pendingApprovals: reception.pendingApprovals.count,
+    unpaidWalkInsToday: reception.unpaidWalkIns.count,
+    pendingPatientChanges: 0,
+    cashSessionsToReconcile: 0,
+  };
+}
+
 function netRupees(periods: readonly SettlementPeriod[]): number {
   return periods.reduce((sum, p) => sum + p.netPayablePaise, 0) / PAISE_PER_RUPEE;
 }
@@ -47,7 +63,9 @@ function netRupees(periods: readonly SettlementPeriod[]): number {
 /**
  * The bell's items, all from live data: desk work for every role, plus
  * patient changes, cash drawers and settlements for admins. Anything that
- * needs action is unread; an empty list shows the bell's empty state.
+ * needs action is highlighted until the work is done — there is no "mark all
+ * read", because reading an item does not do the work (PRD-04). An empty list
+ * shows the bell's empty state.
  */
 function buildNotifs(
   isAdmin: boolean,
@@ -58,7 +76,7 @@ function buildNotifs(
   if (alerts && alerts.unpaidWalkInsToday > 0) {
     out.push({
       icon: 'indian-rupee',
-      boxClass: 'bg-d-100 text-d-500',
+      boxClass: 'bg-d-100 text-d-600',
       t: `${plural(alerts.unpaidWalkInsToday, 'walk-in payment')} pending`,
       s: 'Collect at the desk to issue tokens',
       go: 'appointments',
@@ -89,7 +107,7 @@ function buildNotifs(
   if (alerts && alerts.cashSessionsToReconcile > 0) {
     out.push({
       icon: 'scale',
-      boxClass: 'bg-y-100 text-y-600',
+      boxClass: 'bg-y-100 text-y-800',
       t: `${plural(alerts.cashSessionsToReconcile, 'cash session')} to reconcile`,
       s: 'Closed desk drawers awaiting a check',
       go: 'payments',
@@ -99,7 +117,7 @@ function buildNotifs(
   if (onHold.length) {
     out.push({
       icon: 'triangle-alert',
-      boxClass: 'bg-y-100 text-y-600',
+      boxClass: 'bg-y-100 text-y-800',
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
       go: 'settlements',
@@ -110,7 +128,7 @@ function buildNotifs(
   if (awaiting.length) {
     out.push({
       icon: 'circle-check',
-      boxClass: 'bg-g-100 text-g-600',
+      boxClass: 'bg-g-100 text-g-800',
       t: `${plural(awaiting.length, 'settlement')} awaiting payout`,
       s: `${money(netRupees(awaiting))} expected from Medibook`,
       go: 'settlements',
@@ -158,12 +176,18 @@ export function HospitalTopbar({
   const [menu, setMenu] = useState(false);
   const [notif, setNotif] = useState(false);
   const isAdmin = role === 'admin';
-  // Live counts: today's dashboard alerts (H10), refreshed on every booking
-  // push, and — for admins — the latest settlement periods (H11).
+  // Live counts, refreshed on every booking push (H10): admins read the admin
+  // dashboard and the latest settlement periods (H11); other roles read only
+  // the front-desk dashboard, so a receptionist never loads the hospital's
+  // figures; a role without the dashboard permission polls nothing (PERF-04).
+  const { can } = usePermission();
+  const mayReadDashboard = can('Dashboard.view');
   useDashboardAlertsLive();
-  const alertsQuery = useAdminDashboardQuery('today');
+  const adminQuery = useAdminDashboardQuery('today', isAdmin && mayReadDashboard);
+  const receptionQuery = useReceptionDashboardQuery(!isAdmin && mayReadDashboard);
+  const alertsQuery = isAdmin ? adminQuery : receptionQuery;
   const periodsQuery = useSettlementPeriodsQuery(LATEST_PERIODS, isAdmin);
-  const alerts = alertsQuery.data?.alerts;
+  const alerts = isAdmin ? adminQuery.data?.alerts : deskAlerts(receptionQuery.data);
   const periods = periodsQuery.data?.items ?? [];
   const notifs = buildNotifs(isAdmin, alerts, periods);
   // A source that never loaded must not read as "all caught up" (RUN-05).
@@ -188,7 +212,13 @@ export function HospitalTopbar({
           </button>
         )}
         {onBack && (
-          <button type="button" onClick={onBack} className="text-text-strong flex cursor-pointer">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            title="Back"
+            className="text-text-strong flex cursor-pointer"
+          >
             <Icon name="arrow-left" size={24} />
           </button>
         )}
@@ -202,7 +232,9 @@ export function HospitalTopbar({
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="button"
-          aria-label="Notifications"
+          aria-label={unread > 0 ? `Notifications, ${unread} need action` : 'Notifications'}
+          aria-expanded={notif}
+          aria-haspopup="dialog"
           onClick={() => {
             setNotif((n) => !n);
             setMenu(false);
@@ -214,125 +246,122 @@ export function HospitalTopbar({
         >
           <Icon name="bell" size={21} />
           {unread > 0 && (
-            <span className="bg-d-500 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
+            <span className="bg-d-600 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
               {unread}
             </span>
           )}
         </button>
-        {notif && (
-          <>
-            <div onClick={() => setNotif(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-83 max-w-full overflow-hidden rounded-lg border bg-white lg:right-18.5">
-              <div className="border-border-soft flex items-center justify-between border-b px-4 py-3.5">
-                <span className="text-text-strong text-[15px] font-semibold">Notifications</span>
-                {unread > 0 && (
+        <TopbarPopover
+          open={notif}
+          onClose={() => setNotif(false)}
+          label="Notifications"
+          className="w-83 lg:right-18.5"
+        >
+          <div className="border-border-soft flex items-center justify-between border-b px-4 py-3.5">
+            <span className="text-text-strong text-[15px] font-semibold">Notifications</span>
+          </div>
+          <div className="max-h-90 overflow-y-auto">
+            {notifs.length === 0 && notifsFailed ? (
+              <div className="text-body text-text-muted flex flex-col items-center gap-2 py-7 text-center">
+                {"Notifications couldn't load."}
+                <Button size="sm" variant="secondary" onClick={retryNotifs}>
+                  Retry
+                </Button>
+              </div>
+            ) : notifs.length === 0 ? (
+              <div className="text-text-muted text-body py-7 text-center">
+                {"You're all caught up."}
+              </div>
+            ) : (
+              notifs.map((n, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  onClick={() => {
+                    onNavigate(n.go);
+                    setNotif(false);
+                  }}
+                  className={cn(
+                    'hover:bg-grey-200 flex w-full cursor-pointer items-start gap-3 px-4 py-3.25 text-left transition-colors duration-150',
+                    i < notifs.length - 1 && 'border-border-soft border-b',
+                    n.unread ? 'bg-bg-app' : 'bg-white',
+                  )}
+                >
                   <span
-                    className="text-caption text-blue cursor-pointer"
-                    onClick={() => {
-                      toast('All caught up', 'success');
-                      setNotif(false);
-                    }}
+                    className={cn(
+                      'flex size-8.5 flex-none items-center justify-center rounded-md',
+                      n.boxClass,
+                    )}
                   >
-                    Mark all read
+                    <Icon name={n.icon} size={17} />
                   </span>
-                )}
-              </div>
-              <div className="max-h-90 overflow-y-auto">
-                {notifs.length === 0 && notifsFailed ? (
-                  <div className="text-body text-text-muted flex flex-col items-center gap-2 py-7 text-center">
-                    {"Notifications couldn't load."}
-                    <Button size="sm" variant="secondary" onClick={retryNotifs}>
-                      Retry
-                    </Button>
-                  </div>
-                ) : notifs.length === 0 ? (
-                  <div className="text-text-faint text-body py-7 text-center">
-                    {"You're all caught up."}
-                  </div>
-                ) : (
-                  notifs.map((n, i) => (
-                    <div
-                      key={i}
-                      onClick={() => {
-                        onNavigate(n.go);
-                        setNotif(false);
-                      }}
-                      className={cn(
-                        'hover:bg-grey-200 flex cursor-pointer items-start gap-3 px-4 py-3.25 transition-colors duration-150',
-                        i < notifs.length - 1 && 'border-border-soft border-b',
-                        n.unread ? 'bg-bg-app' : 'bg-white',
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          'flex size-8.5 flex-none items-center justify-center rounded-md',
-                          n.boxClass,
-                        )}
-                      >
-                        <Icon name={n.icon} size={17} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-body text-text-strong font-medium">{n.t}</div>
-                        <div className="text-caption text-text-muted">{n.s}</div>
-                      </div>
-                      {n.unread && (
-                        <span className="bg-blue mt-1.5 size-1.75 flex-none rounded-full" />
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </>
-        )}
+                  <span className="min-w-0 flex-1">
+                    <span className="text-body text-text-strong block font-medium">{n.t}</span>
+                    <span className="text-caption text-text-muted block">{n.s}</span>
+                  </span>
+                  {n.unread && (
+                    <>
+                      <span className="bg-blue mt-1.5 size-1.75 flex-none rounded-full" />
+                      <span className="sr-only">Needs action</span>
+                    </>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </TopbarPopover>
         <div className="bg-border h-7 w-px" />
         <button
           type="button"
           onClick={() => setMenu((m) => !m)}
+          aria-expanded={menu}
+          aria-haspopup="dialog"
           className="flex cursor-pointer items-center gap-2.5"
         >
-          <Avatar name={userName} size={38} />
-          <div className="hidden flex-col items-start sm:flex">
+          <span aria-hidden="true">
+            <Avatar name={userName} size={38} />
+          </span>
+          {/* The name stays readable to screen readers on narrow screens too. */}
+          <span className="sr-only flex-col items-start sm:not-sr-only sm:flex">
             <span className="text-body text-text-strong font-medium">{userName}</span>
             <span className="text-caption text-text-muted">{roleName}</span>
-          </div>
+          </span>
           <Icon name="chevron-down" size={16} className="text-text-muted" />
         </button>
-        {menu && (
-          <>
-            <div onClick={() => setMenu(false)} className="fixed inset-0 z-30" />
-            <div className="border-border shadow-pop absolute top-18 right-2 z-40 w-58 max-w-full overflow-hidden rounded-lg border bg-white p-2 lg:right-7">
-              <div className="flex items-center gap-2.5 px-2.5 py-2.25">
-                <Avatar name={userName} size={32} />
-                <div className="min-w-0">
-                  <div className="text-body text-text-strong font-medium">{userName}</div>
-                  <div className="text-caption text-text-muted">{roleName}</div>
-                </div>
-              </div>
-              <div className="bg-border-soft mx-1 my-1.5 h-px" />
-              <div
-                onClick={() => {
-                  setMenu(false);
-                  onAccount();
-                }}
-                className="text-text-body hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
-              >
-                <Icon name="user" size={18} />{' '}
-                <span className="text-body font-medium">My Account</span>
-              </div>
-              <div
-                onClick={() => {
-                  setMenu(false);
-                  onLogout();
-                }}
-                className="text-d-500 hover:bg-grey-200 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 transition-colors duration-150"
-              >
-                <Icon name="log-out" size={18} />{' '}
-                <span className="text-body font-medium">Log Out</span>
-              </div>
+        <TopbarPopover
+          open={menu}
+          onClose={() => setMenu(false)}
+          label="Account"
+          className="w-58 p-2 lg:right-7"
+        >
+          <div className="flex items-center gap-2.5 px-2.5 py-2.25">
+            <Avatar name={userName} size={32} />
+            <div className="min-w-0">
+              <div className="text-body text-text-strong font-medium">{userName}</div>
+              <div className="text-caption text-text-muted">{roleName}</div>
             </div>
-          </>
-        )}
+          </div>
+          <div className="bg-border-soft mx-1 my-1.5 h-px" />
+          <TopbarMenuItem
+            icon={<Icon name="user" size={18} />}
+            onClick={() => {
+              setMenu(false);
+              onAccount();
+            }}
+          >
+            My Account
+          </TopbarMenuItem>
+          <TopbarMenuItem
+            danger
+            icon={<Icon name="log-out" size={18} />}
+            onClick={() => {
+              setMenu(false);
+              onLogout();
+            }}
+          >
+            Log Out
+          </TopbarMenuItem>
+        </TopbarPopover>
       </div>
     </header>
   );

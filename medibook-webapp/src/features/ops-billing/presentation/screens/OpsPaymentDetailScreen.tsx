@@ -47,14 +47,14 @@ function historyOf(pay: SubscriptionPayment): readonly HistoryStep[] {
     ],
   ];
   if (pay.status === 'captured' || pay.status === 'refunded') {
-    steps.push(['Payment received', fmtDateTime(pay.capturedAt ?? pay.attemptedAt), 'bg-g-600']);
+    steps.push(['Payment received', fmtDateTime(pay.capturedAt ?? pay.attemptedAt), 'bg-success']);
   }
-  if (pay.status === 'refunded') steps.push(['Refunded', '—', 'bg-d-500']);
+  if (pay.status === 'refunded') steps.push(['Refunded', '—', 'bg-d-600']);
   if (pay.status === 'failed') {
     steps.push([
       pay.failureReason ? `Failed — ${pay.failureReason}` : 'Payment failed',
       fmtDateTime(pay.attemptedAt),
-      'bg-d-500',
+      'bg-d-600',
     ]);
   }
   if (pay.status === 'created') steps.push(['Awaiting confirmation', 'In progress', 'bg-y-600']);
@@ -89,6 +89,7 @@ export function OpsPaymentDetailScreen() {
     return (
       <Card pad={32}>
         <ErrorState
+          error={paymentsQuery.error}
           inline
           title="This payment didn't load"
           message={failureText(paymentsQuery.error, 'Please try again.')}
@@ -123,7 +124,7 @@ export function OpsPaymentDetailScreen() {
     <div className="flex flex-col gap-5">
       <Card>
         <div className="flex flex-wrap items-center gap-4">
-          <div className="bg-g-100 text-g-600 flex size-14 flex-none items-center justify-center rounded-lg">
+          <div className="bg-g-100 text-g-800 flex size-14 flex-none items-center justify-center rounded-lg">
             <Icon name="indian-rupee" size={26} />
           </div>
           <div className="flex min-w-0 flex-col gap-1">

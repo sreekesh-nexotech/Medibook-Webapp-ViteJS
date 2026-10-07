@@ -5,9 +5,6 @@
 /** The two staff surfaces: the hospital app and the operations console. */
 export type AuthSurface = 'hospital' | 'platform';
 
-/** Hospital roles (backend `RoleCodeEnum`, exactly four — Q60). */
-export type HospitalRoleCode = 'admin' | 'receptionist' | 'accountant' | 'dept_front_desk';
-
 /** Hospital lifecycle (backend `Hospital.Status`). */
 export type HospitalStatus = 'draft' | 'onboarding' | 'active' | 'suspended' | 'closed';
 

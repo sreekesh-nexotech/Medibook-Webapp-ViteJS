@@ -56,7 +56,7 @@ export function PayoutRunCard({
         <div
           className={cn(
             'flex size-9.5 flex-none items-center justify-center rounded-md',
-            due ? 'bg-y-100 text-y-600' : 'bg-blue-soft-bg text-text-navy',
+            due ? 'bg-y-100 text-y-800' : 'bg-blue-soft-bg text-text-navy',
           )}
         >
           <Icon name="calendar-days" size={18} />

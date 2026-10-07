@@ -65,6 +65,20 @@ CORE-07 is fixed in the backend (see `docs/BACKEND_BLOCKERS.md`).
 | 6   | Billing: record a payment against an invoice.                                          | The invoice shows paid.                                                       |
 | 7   | Settlements: run a payout for last week and release it.                                | The hospital's settlement shows released.                                     |
 | 8   | Sign in as a finance-only ops user.                                                    | Only finance screens and actions are offered (SEC-05).                        |
+| 9   | Support Tickets: open a ticket a hospital raised, reply, and mark it resolved.         | The hospital's requester gets the reply by email (OBS-02).                    |
+
+## Printing and browsers (QA)
+
+On the hospital's own printers and devices, before go-live (PRN-01, PRN-02, PERF-01).
+
+| #   | Step                                                                             | Expected                                                          |
+| --- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1   | Print a token slip on the desk's 80 mm thermal printer from Chrome.              | The slip prints about 72 mm wide; nothing is cut at the edges.    |
+| 2   | Print a receipt on A4 and on A5 from Chrome.                                     | One page each, with every line and the total.                     |
+| 3   | Ops Billing: print a long invoice (30 lines) on A4 and A5.                       | Every line prints, over as many pages as needed, with the footer. |
+| 4   | Repeat steps 1 and 2 from an iPad (Safari).                                      | The same results.                                                 |
+| 5   | Leave a receipt open for 15 minutes, then use Download PDF and Save as PDF.      | Both work; the app stays open.                                    |
+| 6   | Run Front desk steps 1–6 on the oldest browsers in `docs/SUPPORTED_BROWSERS.md`. | All pass. Record the browser versions used.                       |
 
 ## Sign-off
 

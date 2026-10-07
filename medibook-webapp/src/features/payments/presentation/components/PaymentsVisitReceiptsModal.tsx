@@ -52,6 +52,7 @@ export function PaymentsVisitReceiptsModal({
         <SkeletonCards count={1} lines={3} />
       ) : receipts.isLoadingError ? (
         <ErrorState
+          error={receipts.error}
           inline
           title="The receipts didn't load"
           message={isFailure(receipts.error) ? receipts.error.message : undefined}

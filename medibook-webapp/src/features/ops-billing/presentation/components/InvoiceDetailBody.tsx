@@ -135,7 +135,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
         onError: (error) => {
           // No server-side PDF renderer: print the invoice through the browser.
           if (isNotImplemented(error)) print();
-          else toast(failureText(error, PDF_FAILED), 'error');
+          else toast(failureText(error, PDF_FAILED), 'error', error);
         },
       },
     );
@@ -215,6 +215,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
     : remindersQuery.isLoadingError
       ? {
           kind: 'error',
+          error: remindersQuery.error,
           message: failureText(remindersQuery.error, 'The reminder history could not be loaded.'),
           onRetry: () => void remindersQuery.refetch(),
         }
@@ -238,6 +239,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
     : paymentsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: paymentsQuery.error,
           message: failureText(paymentsQuery.error, 'The payments could not be loaded.'),
           onRetry: () => void paymentsQuery.refetch(),
         }
@@ -309,7 +311,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
             <div
               className={cn(
                 'flex size-10 flex-none items-center justify-center rounded-md',
-                grace.expired ? 'bg-d-100 text-d-500' : 'bg-y-100 text-y-600',
+                grace.expired ? 'bg-d-100 text-d-600' : 'bg-y-100 text-y-800',
               )}
             >
               <Icon name={grace.expired ? 'triangle-alert' : 'hourglass'} size={19} />
@@ -369,7 +371,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
       {suspended && suspension && !(unpaid && grace) && (
         <Card pad={16} className="border-d-500">
           <div className="flex flex-wrap items-start gap-3.5">
-            <div className="bg-d-100 text-d-500 flex size-10 flex-none items-center justify-center rounded-md">
+            <div className="bg-d-100 text-d-600 flex size-10 flex-none items-center justify-center rounded-md">
               <Icon name="ban" size={19} />
             </div>
             <div className="min-w-50 flex-1">
@@ -516,15 +518,12 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
         )}
       </Card>
 
-      {/* Browser-print fallback when the server cannot render PDFs. `invisible`
-          (not `hidden`) because the print rule restores visibility; `display:
-          none` could not be undone. */}
-      <div
-        ref={printRef}
-        aria-hidden="true"
-        className="pointer-events-none invisible fixed inset-0 -z-10 overflow-hidden bg-white"
-      >
-        <InvoicePrintSheet invoice={inv} planName={planName} />
+      {/* Browser-print fallback when the server cannot render PDFs. Kept out of
+          view; `printElement` sends a copy of it to paper (PRN-01). */}
+      <div hidden>
+        <div ref={printRef}>
+          <InvoicePrintSheet invoice={inv} planName={planName} />
+        </div>
       </div>
 
       {modal === 'reminder' && (
@@ -570,7 +569,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
                 );
                 setModal(null);
               },
-              onError: (error) => toast(failureText(error, SUSPEND_FAILED), 'error'),
+              onError: (error) => toast(failureText(error, SUSPEND_FAILED), 'error', error),
             },
           )
         }
@@ -590,7 +589,7 @@ export function InvoiceDetailBody({ invoice: inv }: InvoiceDetailBodyProps) {
               toast(`${inv.hospitalName} reactivated.`, 'success');
               setModal(null);
             },
-            onError: (error) => toast(failureText(error, REINSTATE_FAILED), 'error'),
+            onError: (error) => toast(failureText(error, REINSTATE_FAILED), 'error', error),
           })
         }
       />

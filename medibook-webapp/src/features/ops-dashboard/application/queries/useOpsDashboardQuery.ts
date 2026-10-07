@@ -9,8 +9,9 @@ import { fetchOpsDashboard } from '@/features/ops-dashboard/application/usecases
 const OPS_DASHBOARD_STALE_TIME_MS = 60_000;
 
 /** The platform dashboard: KPIs, computed alerts and recent onboarding cases. */
-export function useOpsDashboardQuery() {
+export function useOpsDashboardQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: opsDashboardKeys.summary(),
     queryFn: async () => unwrap(await fetchOpsDashboard()),
     staleTime: OPS_DASHBOARD_STALE_TIME_MS,

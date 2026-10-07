@@ -1,0 +1,31 @@
+# Scrape jobs for the web app checks (docs/MONITORING.md, checklist OBS-05).
+# Add these to scrape_configs in the backend's deploy/prometheus/prometheus.yml,
+# run blackbox_exporter with blackbox.yml as `blackbox:9115`, add web-alerts.yml
+# to rule_files, and replace medibook.example.com with the production host.
+scrape_configs:
+  - job_name: medibook-web
+    metrics_path: /probe
+    params: { module: [medibook_web] }
+    static_configs: [{ targets: ['https://medibook.example.com/'] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: 'blackbox:9115' }
+
+  - job_name: medibook-web-static
+    metrics_path: /probe
+    params: { module: [medibook_static] }
+    static_configs: [{ targets: ['https://medibook.example.com/brand/medibook-mark.svg'] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: 'blackbox:9115' }
+
+  - job_name: medibook-ws
+    metrics_path: /probe
+    params: { module: [medibook_websocket] }
+    static_configs: [{ targets: ['https://medibook.example.com/ws/hospital/queue'] }]
+    relabel_configs:
+      - { source_labels: [__address__], target_label: __param_target }
+      - { source_labels: [__param_target], target_label: instance }
+      - { target_label: __address__, replacement: 'blackbox:9115' }

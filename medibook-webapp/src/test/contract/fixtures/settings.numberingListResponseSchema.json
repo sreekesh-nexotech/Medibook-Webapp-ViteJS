@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "kind": "booking",
+      "format": "{PREFIX}-{YY}{MM}-{SEQ:5}",
+      "prefix": "EXMB",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "calendar_year",
+      "fy_start_month": 4,
+      "gapless": false,
+      "editable_by": "hospital_admin",
+      "locked": false,
+      "has_allocated": true,
+      "next_preview": "EXMB-2610-00227",
+      "version": 1,
+      "updated_at": "2026-10-06T20:14:37.556741Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    },
+    {
+      "kind": "mrn",
+      "format": "{PREFIX}{SEQ:6}",
+      "prefix": "EXMM",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "never",
+      "fy_start_month": 4,
+      "gapless": false,
+      "editable_by": "hospital_admin",
+      "locked": true,
+      "has_allocated": true,
+      "next_preview": "EXMM000044",
+      "version": 1,
+      "updated_at": "2026-10-04T08:53:09.836751Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    },
+    {
+      "kind": "receipt",
+      "format": "{PREFIX}/{FY}/{SEQ:5}",
+      "prefix": "EXMR",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "fiscal_year",
+      "fy_start_month": 4,
+      "gapless": true,
+      "editable_by": "hospital_admin",
+      "locked": false,
+      "has_allocated": true,
+      "next_preview": "EXMR/26-27/00170",
+      "version": 1,
+      "updated_at": "2026-10-06T19:03:46.080692Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    }
+  ]
+}

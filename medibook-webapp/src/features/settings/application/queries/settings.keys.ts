@@ -5,6 +5,7 @@ export const settingsKeys = {
   rules: () => [...settingsKeys.all, 'rules'] as const,
   hours: () => [...settingsKeys.all, 'hours'] as const,
   tokenPolicy: () => [...settingsKeys.all, 'token-policy'] as const,
+  numbering: () => [...settingsKeys.all, 'numbering'] as const,
   bankAccounts: () => [...settingsKeys.all, 'bank-accounts'] as const,
   imageUrl: (fileId: string) => [...settingsKeys.all, 'image-url', fileId] as const,
 };

@@ -18,8 +18,8 @@ interface InvoicePrintSheetProps {
 /**
  * The invoice as a document — the browser-print fallback for "Save as PDF"
  * when the server cannot render PDFs (`GET …/{id}.pdf` → 501). This is the
- * node `usePrintArea()` prints: the `.print-area` rule in `src/index.css`
- * hides everything else and lays this out full page.
+ * node `usePrintArea()` prints: a copy goes to paper on its own, in normal
+ * flow, so every line prints however long the invoice is (PRN-01).
  *
  * Every figure comes from the invoice as issued: its lines, its tax and the
  * parties' details snapshotted at issue time.

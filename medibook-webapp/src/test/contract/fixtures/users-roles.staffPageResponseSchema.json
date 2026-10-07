@@ -14,7 +14,7 @@
         "code": "admin",
         "name": "Admin"
       },
-      "employee_code": "LKS-A1",
+      "employee_code": "EXM-A1",
       "designation": "Hospital Administrator",
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -37,7 +37,7 @@
         "code": "receptionist",
         "name": "Receptionist"
       },
-      "employee_code": "LKS-01",
+      "employee_code": "EXM-01",
       "designation": null,
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -60,7 +60,7 @@
         "code": "receptionist",
         "name": "Receptionist"
       },
-      "employee_code": "LKS-02",
+      "employee_code": "EXM-02",
       "designation": null,
       "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
       "status": "active",
@@ -83,7 +83,7 @@
         "code": "accountant",
         "name": "Accountant"
       },
-      "employee_code": "LKS-03",
+      "employee_code": "EXM-03",
       "designation": null,
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -106,7 +106,7 @@
         "code": "dept_front_desk",
         "name": "Department Front Desk"
       },
-      "employee_code": "LKS-04",
+      "employee_code": "EXM-04",
       "designation": null,
       "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
       "status": "active",

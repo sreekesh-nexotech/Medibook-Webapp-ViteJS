@@ -26,6 +26,7 @@ export function OpsHospitalDetailScreen() {
     const isNotFound = isFailure(hospital.error) && hospital.error.kind === 'notFound';
     return (
       <ErrorState
+        error={hospital.error}
         icon={isNotFound ? 'building-2' : undefined}
         title={isNotFound ? 'Hospital not found' : "This hospital didn't load"}
         message={

@@ -64,9 +64,9 @@ export function Select({
         aria-label={ariaLabel}
         className={cn(
           'rounded-input text-body w-full appearance-none border bg-white pr-11 pl-4',
-          isInvalid ? 'border-d-500' : 'border-border',
+          isInvalid ? 'border-d-500' : 'border-border-control',
           disabled ? 'text-text-muted bg-grey-200 cursor-not-allowed' : 'cursor-pointer',
-          value ? 'text-text-strong' : 'text-text-faint',
+          value ? 'text-text-strong' : 'text-text-muted',
           className,
         )}
         style={{ height }}

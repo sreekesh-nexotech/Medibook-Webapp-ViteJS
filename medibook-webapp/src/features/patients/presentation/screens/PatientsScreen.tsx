@@ -1,3 +1,4 @@
+import { formatUpdatedAt } from '@/shared/lib/format';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -21,7 +22,6 @@ import {
   isHospitalRole,
 } from '@/app/router/paths';
 
-import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import { usePatientVisitCountsQuery } from '@/features/patients/application/queries/usePatientVisitCountsQuery';
 import type {
@@ -138,6 +138,7 @@ export function PatientsScreen() {
     : patientsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: patientsQuery.error,
           message: patientsQuery.error.message,
           onRetry: () => void patientsQuery.refetch(),
         }

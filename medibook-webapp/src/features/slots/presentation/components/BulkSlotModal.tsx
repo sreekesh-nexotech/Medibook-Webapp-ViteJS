@@ -239,7 +239,7 @@ export function BulkSlotModal({
           setConfirmKey(null);
           onClose();
         },
-        onError: (error) => toast(isFailure(error) ? error.message : APPLY_FAILED, 'error'),
+        onError: (error) => toast(isFailure(error) ? error.message : APPLY_FAILED, 'error', error),
       },
     );
   };
@@ -257,6 +257,7 @@ export function BulkSlotModal({
   return (
     <>
       <FormModal
+        dirty={form.isDirty}
         open={!confirming}
         onClose={onClose}
         title="Bulk Update Slots"
@@ -349,7 +350,7 @@ export function BulkSlotModal({
                     : 'circle-alert'
               }
               size={16}
-              className={cn('flex-none', bookings.length > 0 && 'text-d-500')}
+              className={cn('flex-none', bookings.length > 0 && 'text-d-600')}
             />
             <span>{hint}</span>
             {preview.isLoadingError && (

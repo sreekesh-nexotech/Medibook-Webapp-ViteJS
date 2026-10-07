@@ -99,6 +99,7 @@ export function TaxModal({ open, tax, onClose, onSave }: TaxModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={tax ? 'Edit Tax Rate' : 'Add Tax Rate'}

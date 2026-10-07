@@ -45,7 +45,8 @@ export function OpsReportCard({ report }: OpsReportCardProps) {
           );
         }
       },
-      onError: (error) => toast(isFailure(error) ? error.message : EXPORT_FAILED_MESSAGE, 'error'),
+      onError: (error) =>
+        toast(isFailure(error) ? error.message : EXPORT_FAILED_MESSAGE, 'error', error),
     });
   };
 

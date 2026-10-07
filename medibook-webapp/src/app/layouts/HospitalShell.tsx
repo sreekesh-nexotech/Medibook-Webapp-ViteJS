@@ -31,6 +31,7 @@ import {
 import { HospitalSidebar } from './HospitalSidebar';
 import { HospitalTopbar } from './HospitalTopbar';
 import { ScreenError } from './ScreenError';
+import { MAIN_CONTENT_ID, SkipLink } from './SkipLink';
 import { ScreenLoading } from './ScreenLoading';
 import { SidebarDrawer } from './SidebarDrawer';
 import { useSidebarMode } from './useSidebarMode';
@@ -116,6 +117,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
 
   return (
     <div className="bg-bg-app flex h-full overflow-hidden">
+      <SkipLink />
       {sidebarMode !== 'drawer' && sidebar(sidebarMode)}
       <div className="flex min-w-0 flex-1 flex-col">
         <HospitalTopbar
@@ -131,18 +133,27 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
         <ConnectionNotice />
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+        <main
+          id={MAIN_CONTENT_ID}
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto p-3 outline-none sm:p-4 lg:p-5"
+        >
           <ErrorBoundary
             key={view}
-            fallback={(err, reset) => (
-              <ScreenError error={err} onRetry={reset} onHome={() => handleNavigate('dashboard')} />
+            fallback={(err, reset, reference) => (
+              <ScreenError
+                error={err}
+                reference={reference}
+                onRetry={reset}
+                onHome={() => handleNavigate('dashboard')}
+              />
             )}
           >
             <Suspense fallback={<ScreenLoading />}>
               <Outlet />
             </Suspense>
           </ErrorBoundary>
-        </div>
+        </main>
       </div>
       <SidebarDrawer
         open={navOpen && sidebarMode !== 'full'}

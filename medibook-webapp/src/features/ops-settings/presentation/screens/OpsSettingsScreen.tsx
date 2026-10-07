@@ -26,6 +26,7 @@ export function OpsSettingsScreen() {
   } else if (settings.isLoadingError) {
     form = (
       <ErrorState
+        error={settings.error}
         title="Could not load platform settings"
         message={isFailure(settings.error) ? settings.error.message : undefined}
         onRetry={() => void settings.refetch()}

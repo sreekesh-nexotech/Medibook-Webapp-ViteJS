@@ -8,7 +8,7 @@ import {
 } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
 import { cn } from '@/shared/lib/cn';
-import { formatToken, money } from '@/shared/lib/format';
+import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -24,8 +24,13 @@ import type { StatCardData } from '@/shared/ui/StatCard';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 
-import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
 import { useReceptionDashboardQuery } from '@/features/dashboard/application/queries/useReceptionDashboardQuery';
+import { useAppointmentCountQuery } from '@/features/appointments/application/queries/useAppointmentCountQuery';
+import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
+import {
+  rangeForWindow,
+  totalsOf,
+} from '@/features/payments/presentation/components/payments.view';
 import {
   actionItems,
   clockTime,
@@ -49,9 +54,11 @@ const ACTION_ROWS = 5;
  *
  * Today's queue and to-dos come from `GET /hospital/dashboard/reception`
  * (doctor sessions, queue counts, unpaid walk-ins, bookings awaiting
- * approval); walk-in count and desk collections from
- * `GET /hospital/dashboard/admin?period=today`. Sessions carry only a doctor
- * id, so the per-department rows group them through the doctor roster (H1).
+ * approval); the walk-in count from the appointments list's total, and desk
+ * collections from today's captured payments — never the admin dashboard,
+ * which front-desk terminals have no need to load (PERF-04). Sessions carry
+ * only a doctor id, so the per-department rows group them through the doctor
+ * roster (H1).
  */
 export function ReceptionistDashboardScreen() {
   const navigate = useNavigate();
@@ -61,15 +68,28 @@ export function ReceptionistDashboardScreen() {
     navigate(hospitalPath(activeRole, view));
   };
 
+  // The front desk reads its own figures, never the admin dashboard (PERF-04):
+  // today's walk-ins as a count, and today's collection from the same payment
+  // lines the Payments screen adds up.
+  const todayRange = rangeForWindow('Today');
   const reception = useReceptionDashboardQuery();
-  const today = useAdminDashboardQuery('today');
+  const walkIns = useAppointmentCountQuery(todayRange, 'walk_in');
+  const collected = usePaymentTotalsQuery({
+    ...todayRange,
+    statuses: ['captured'],
+    method: null,
+    doctorId: null,
+    departmentId: null,
+    q: '',
+  });
   const doctors = useDoctorsQuery();
   const departments = useDepartmentsQuery();
 
   const refresh = async (): Promise<void> => {
     await Promise.all([
       reception.refetch(),
-      today.refetch(),
+      walkIns.refetch(),
+      collected.refetch(),
       doctors.refetch(),
       departments.refetch(),
     ]);
@@ -81,6 +101,7 @@ export function ReceptionistDashboardScreen() {
   if (reception.isLoadingError && !data) {
     return (
       <ErrorState
+        error={reception.error}
         title="The front desk view could not load"
         message={
           isFailure(reception.error)
@@ -107,20 +128,18 @@ export function ReceptionistDashboardScreen() {
         id: d.id,
         name: d.name,
         waiting: own.reduce((n, s) => n + s.waitingCount, 0),
+        // The number only: the label (e.g. "W007") follows the hospital's token format.
         servTok:
-          servingSession?.currentTokenNo != null
-            ? formatToken(servingSession.currentTokenNo)
-            : null,
+          servingSession?.currentTokenNo != null ? `#${servingSession.currentTokenNo}` : null,
       };
     });
 
   const actions = data ? actionItems(data) : [];
 
-  const todayFigures = today.data;
-  const deskCash = todayFigures?.collectedByMethod.cash ?? 0;
-  const deskTotal = todayFigures?.collectedByChannel.desk ?? 0;
-  const deskOther = Math.max(0, deskTotal - deskCash);
-  const onlinePrepaid = todayFigures?.collectedByChannel.online ?? 0;
+  const totals = totalsOf(collected.data?.lines ?? []);
+  const deskCash = totals.deskCash;
+  const deskOther = Math.max(0, totals.deskTotal - totals.deskCash);
+  const onlinePrepaid = totals.onlineTotal;
 
   const KPIS: readonly ReceptionKpi[] = [
     {
@@ -128,8 +147,8 @@ export function ReceptionistDashboardScreen() {
       label: 'Appointments Today',
       value: summary?.total ?? 0,
       sub: 'Across all departments',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
       go: 'appointments',
     },
     {
@@ -146,25 +165,25 @@ export function ReceptionistDashboardScreen() {
       label: 'Pending Payment',
       value: data?.unpaidWalkIns.count ?? 0,
       sub: 'Walk-ins to collect',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       go: 'appointments',
     },
     {
       icon: 'footprints',
       label: 'Walk-ins Today',
-      value: today.isLoadingError ? '—' : (todayFigures?.appointmentsBySource.walk_in ?? 0),
+      value: walkIns.isLoadingError ? '—' : (walkIns.data ?? 0),
       sub: 'Booked at the desk',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       go: 'appointments',
     },
   ];
 
   const collections: readonly { label: string; value: number; cls: string }[] = [
     { label: 'Desk Cash', value: deskCash, cls: 'text-blue' },
-    { label: 'Desk UPI / Card', value: deskOther, cls: 'text-y-600' },
-    { label: 'Collected at Desk', value: deskTotal, cls: 'text-g-600' },
+    { label: 'Desk UPI / Card', value: deskOther, cls: 'text-y-800' },
+    { label: 'Collected at Desk', value: totals.deskTotal, cls: 'text-g-800' },
   ];
 
   return (
@@ -228,6 +247,7 @@ export function ReceptionistDashboardScreen() {
               // Without the doctor list every department would read "idle, 0 waiting" (RUN-05).
               <ErrorState
                 inline
+                error={departments.error ?? doctors.error}
                 title="Departments could not be loaded"
                 onRetry={() => {
                   void departments.refetch();
@@ -246,7 +266,7 @@ export function ReceptionistDashboardScreen() {
                 >
                   <span className="text-text-body flex-1">{d.name}</span>
                   {d.servTok ? (
-                    <span className="text-caption text-g-600">
+                    <span className="text-caption text-g-800">
                       serving <b className="text-blue">{d.servTok}</b>
                     </span>
                   ) : (
@@ -325,11 +345,12 @@ export function ReceptionistDashboardScreen() {
             Open Payments
           </button>
         </div>
-        {today.isLoadingError ? (
+        {collected.isLoadingError ? (
           <ErrorState
+            error={collected.error}
             inline
             title="Today's collection could not be loaded"
-            onRetry={() => void today.refetch()}
+            onRetry={() => void collected.refetch()}
           />
         ) : (
           <div className="flex gap-4">
@@ -337,7 +358,7 @@ export function ReceptionistDashboardScreen() {
               <div key={c.label} className="bg-blue-soft-bg flex-1 rounded-lg p-4.5 text-center">
                 <div className="text-body text-text-body">{c.label}</div>
                 <div className={cn('text-h2 mt-1.5 tabular-nums', c.cls)}>
-                  {today.isLoading ? '…' : money(c.value)}
+                  {collected.isLoading ? '…' : money(c.value)}
                 </div>
               </div>
             ))}

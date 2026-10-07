@@ -1,6 +1,6 @@
 import { useCallback, useRef, type RefObject } from 'react';
 
-import { printElement } from '@/shared/lib/print';
+import { printElement, type PrintLayout } from '@/shared/lib/print';
 
 /**
  * Turns one element into a real "Save as PDF" target — audit 3.1.5. Put `ref`
@@ -20,8 +20,11 @@ export interface UsePrintAreaResult<T extends HTMLElement> {
   print: () => void;
 }
 
-export function usePrintArea<T extends HTMLElement = HTMLDivElement>(): UsePrintAreaResult<T> {
+/** `layout`: `slip` for an 80 mm thermal token slip, else an A4/A5 page. */
+export function usePrintArea<T extends HTMLElement = HTMLDivElement>(
+  layout: PrintLayout = 'page',
+): UsePrintAreaResult<T> {
   const ref = useRef<T | null>(null);
-  const print = useCallback(() => printElement(ref.current), []);
+  const print = useCallback(() => printElement(ref.current, layout), [layout]);
   return { ref, print };
 }

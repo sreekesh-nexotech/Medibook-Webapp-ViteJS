@@ -2,7 +2,7 @@
   "results": [
     {
       "id": "01a1061d-f850-72d2-9684-a119c346d805",
-      "mrn": "LKSM000043",
+      "mrn": "EXMM000043",
       "legacy_mrn": null,
       "first_name": "Testbaby",
       "last_name": null,
@@ -31,7 +31,7 @@
     },
     {
       "id": "01a105d3-0a5c-7f71-8971-c5640e42a981",
-      "mrn": "LKSM000042",
+      "mrn": "EXMM000042",
       "legacy_mrn": null,
       "first_name": "Ishaan",
       "last_name": "Varma",
@@ -60,7 +60,7 @@
     },
     {
       "id": "01a0f1e0-225e-76b2-acd5-1276f288b005",
-      "mrn": "LKSM000041",
+      "mrn": "EXMM000041",
       "legacy_mrn": null,
       "first_name": "Testperson",
       "last_name": null,
@@ -89,7 +89,7 @@
     },
     {
       "id": "01a0f17f-75c7-7df3-a7a5-79c25b540b01",
-      "mrn": "LKSM000040",
+      "mrn": "EXMM000040",
       "legacy_mrn": null,
       "first_name": "Integration",
       "last_name": "TestDependant",
@@ -118,7 +118,7 @@
     },
     {
       "id": "01a0f15b-bcb9-76a2-bdc1-035db94efa27",
-      "mrn": "LKSM000039",
+      "mrn": "EXMM000039",
       "legacy_mrn": null,
       "first_name": "Test",
       "last_name": "Dependant",

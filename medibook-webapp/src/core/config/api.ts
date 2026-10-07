@@ -61,7 +61,6 @@ export const WS_RECONNECT_MAX_MS = 30_000;
 
 /** Server close codes (`core/ws.py`): bad/missing token, idle timeout. */
 export const WS_CLOSE_UNAUTHORIZED = 4401;
-export const WS_CLOSE_IDLE = 4408;
 
 /** Normal closure — what `socket.close()` sends when the app closes it on purpose. */
 export const WS_CLOSE_NORMAL = 1000;

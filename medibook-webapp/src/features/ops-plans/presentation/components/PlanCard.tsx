@@ -82,7 +82,7 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
             <>
               or <span className="tabular-nums">{money(plan.priceYearly)}</span> / year
               {discount !== null && discount > 0 && (
-                <span className="text-g-600 font-medium"> · save {discount}%</span>
+                <span className="text-g-800 font-medium"> · save {discount}%</span>
               )}
             </>
           )}
@@ -106,7 +106,7 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
         <>
           <div className="bg-border-soft h-px" />
           <div className="flex items-center gap-2">
-            <Icon name="circle-check" size={16} className="text-g-600 flex-none" />
+            <Icon name="circle-check" size={16} className="text-g-800 flex-none" />
             <span className="text-body text-text-body">{plan.description}</span>
           </div>
         </>
@@ -148,7 +148,7 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
             label="Delete plan"
             box={40}
             size={16}
-            color="var(--color-d-500)"
+            color="var(--color-d-600)"
             title={
               knownCount !== null && knownCount > 0 ? 'Hospitals are on this plan' : 'Delete plan'
             }

@@ -93,11 +93,17 @@ export function downloadCsv(filename: string, rows: readonly (readonly CsvCell[]
  * link from `GET /shared/files/{id}/url`, whose response already carries
  * `Content-Disposition: attachment`. `filename` is a hint only: browsers
  * ignore `download` on cross-origin links and use the server's name.
+ *
+ * Callers mint the link when the user asks (signed links expire after 10
+ * minutes, PRN-02). A link to another origin opens in a new tab, so a file
+ * the store serves inline (a PDF) never replaces the app the user is working
+ * in; an attachment still just downloads.
  */
 export function downloadFromUrl(url: string, filename?: string): void {
   const a = document.createElement('a');
   a.href = url;
   if (filename) a.download = filename;
+  if (new URL(url, window.location.href).origin !== window.location.origin) a.target = '_blank';
   a.rel = 'noopener';
   a.style.display = 'none';
   document.body.appendChild(a);

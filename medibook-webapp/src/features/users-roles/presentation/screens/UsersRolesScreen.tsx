@@ -16,6 +16,7 @@ import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { IconBtn } from '@/shared/ui/IconBtn';
+import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
@@ -77,6 +78,9 @@ const ALL_STATUS = 'All Status';
 
 const USER_COLUMNS = ['User', 'Username', 'Role', 'Last Active', 'Status', 'Action'] as const;
 
+/** Users shown per page. */
+const USERS_PAGE = 25;
+
 const USER_SORT_KEYS: Readonly<Record<string, string | undefined>> = {
   User: 'name',
   Username: 'username',
@@ -129,6 +133,7 @@ export function UsersRolesScreen() {
   const [roleFilter, setRoleFilter] = useState(ALL_ROLES);
   const [statusFilter, setStatusFilter] = useState(ALL_STATUS);
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [signInAs, setSignInAs] = useState<HospitalRole | null>(null);
 
   const roles: readonly RoleView[] = (rolesQuery.data ?? []).map(toRoleView);
@@ -170,7 +175,7 @@ export function UsersRolesScreen() {
       icon: 'user-check',
       label: 'Active',
       value: users.filter((u) => u.status === 'Active').length,
-      fg: 'text-g-600',
+      fg: 'text-g-800',
       bg: 'bg-g-100',
     },
     { icon: 'shield', label: 'Roles', value: roles.length, fg: 'text-p-500', bg: 'bg-p-100' },
@@ -178,7 +183,7 @@ export function UsersRolesScreen() {
       icon: 'mail',
       label: 'Pending Invites',
       value: users.filter((u) => u.invite === 'Pending').length,
-      fg: 'text-y-600',
+      fg: 'text-y-800',
       bg: 'bg-y-100',
     },
   ];
@@ -188,13 +193,26 @@ export function UsersRolesScreen() {
     setQ('');
     setRoleFilter(ALL_ROLES);
     setStatusFilter(ALL_STATUS);
+    setPage(0);
   };
+  // One page of rows on screen, so a hospital with thousands of staff still
+  // types and filters instantly (PERF-03); filters and sorting cover them all.
+  const ordered = sorted(shown, {
+    name: (u) => u.name,
+    username: (u) => u.username,
+    role: (u) => roleById[u.roleId]?.name,
+    status: (u) => u.status,
+  });
+  const lastPage = Math.max(0, Math.ceil(ordered.length / USERS_PAGE) - 1);
+  const pageNow = Math.min(page, lastPage);
+  const pageRows = ordered.slice(pageNow * USERS_PAGE, pageNow * USERS_PAGE + USERS_PAGE);
 
   let tableState: TableStateSpec | undefined;
   if (loading) tableState = { kind: 'loading', rows: 5 };
   else if (staffQuery.isLoadingError)
     tableState = {
       kind: 'error',
+      error: staffQuery.error,
       title: 'Users could not be loaded',
       message: failureText(staffQuery.error, 'Check your connection and try again.'),
       onRetry: () => void staffQuery.refetch(),
@@ -224,6 +242,7 @@ export function UsersRolesScreen() {
 
   const rolesError = rolesQuery.isLoadingError ? (
     <ErrorState
+      error={rolesQuery.error}
       inline
       title="Roles could not be loaded"
       message={failureText(rolesQuery.error, 'Check your connection and try again.')}
@@ -238,7 +257,7 @@ export function UsersRolesScreen() {
         setDeactivate(null);
       },
       onError: (failure) => {
-        toast(failureText(failure, `Could not deactivate ${user.name}.`), 'error');
+        toast(failureText(failure, `Could not deactivate ${user.name}.`), 'error', failure);
         setDeactivate(null);
       },
     });
@@ -288,7 +307,10 @@ export function UsersRolesScreen() {
             <div className="mb-4">
               <SearchField
                 value={q}
-                onChange={setQ}
+                onChange={(v) => {
+                  setQ(v);
+                  setPage(0);
+                }}
                 placeholder="Search users by name, email or username"
               />
             </div>
@@ -296,13 +318,19 @@ export function UsersRolesScreen() {
               <FilterSelect
                 value={roleFilter}
                 options={[ALL_ROLES, ...roles.map((r) => r.name)]}
-                onChange={setRoleFilter}
+                onChange={(v) => {
+                  setRoleFilter(v);
+                  setPage(0);
+                }}
                 aria-label="Filter users by role"
               />
               <FilterSelect
                 value={statusFilter}
                 options={STATUS_OPTIONS}
-                onChange={setStatusFilter}
+                onChange={(v) => {
+                  setStatusFilter(v);
+                  setPage(0);
+                }}
                 aria-label="Filter users by status"
               />
               {filtersActive && <ClearChip onClick={clearFilters} />}
@@ -313,6 +341,7 @@ export function UsersRolesScreen() {
             </div>
             {invitationsQuery.isLoadingError && (
               <ErrorState
+                error={invitationsQuery.error}
                 inline
                 title="Pending invitations could not be loaded"
                 message={failureText(
@@ -327,16 +356,14 @@ export function UsersRolesScreen() {
               columns={USER_COLUMNS}
               sortKeys={USER_SORT_KEYS}
               sort={sort}
-              onSort={onSort}
+              onSort={(key) => {
+                onSort(key);
+                setPage(0);
+              }}
               state={tableState}
               scrollLabel="Hospital users"
             >
-              {sorted(shown, {
-                name: (u) => u.name,
-                username: (u) => u.username,
-                role: (u) => roleById[u.roleId]?.name,
-                status: (u) => u.status,
-              }).map((u) => {
+              {pageRows.map((u) => {
                 const r = roleById[u.roleId];
                 return (
                   <tr
@@ -401,6 +428,13 @@ export function UsersRolesScreen() {
                 );
               })}
             </TableShell>
+            <Pager
+              total={ordered.length}
+              page={pageNow}
+              pageSize={USERS_PAGE}
+              onPage={setPage}
+              noun="users"
+            />
           </Card>
         </>
       ) : tab === 'Roles & Permissions' ? (
@@ -470,6 +504,7 @@ export function UsersRolesScreen() {
             rolesError
           ) : !previewRole ? (
             <ErrorState
+              error={rolesQuery.error}
               inline
               title="No roles to preview"
               message="This hospital has no roles provisioned yet."
@@ -477,6 +512,7 @@ export function UsersRolesScreen() {
             />
           ) : previewQuery.isLoadingError || !previewPerms ? (
             <ErrorState
+              error={previewQuery.error}
               inline
               title={`${previewRole.name} access could not be loaded`}
               message={failureText(previewQuery.error, 'Check your connection and try again.')}

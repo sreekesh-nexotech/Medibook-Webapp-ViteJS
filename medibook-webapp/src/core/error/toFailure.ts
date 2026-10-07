@@ -1,5 +1,8 @@
 import { isAxiosError } from 'axios';
+import type { AxiosError } from 'axios';
 import { z } from 'zod';
+
+import { REQUEST_ID_HEADER } from '@/core/config/api';
 
 import type { Failure, FailureKind, FieldErrors } from '@/core/error/failure';
 import { isFailure } from '@/core/error/failure';
@@ -13,6 +16,7 @@ const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
   notFound: 'That record could not be found.',
   conflict: 'This record changed in the meantime. Refresh and try again.',
   rateLimited: 'Too many attempts. Please wait a moment and try again.',
+  unavailable: "This isn't available in Medibook yet.",
   server: 'Something went wrong on our side. Please try again.',
   parse: 'The server sent an unexpected response. Please try again.',
   unknown: 'Something went wrong. Please try again.',
@@ -40,6 +44,7 @@ const HTTP_PRECONDITION_FAILED = 412;
 const HTTP_LOCKED = 423;
 const HTTP_TOO_MANY_REQUESTS = 429;
 const HTTP_SERVER_ERROR_MIN = 500;
+const HTTP_NOT_IMPLEMENTED = 501;
 
 function kindForStatus(status: number): FailureKind {
   if (status === HTTP_BAD_REQUEST) return 'validation';
@@ -48,6 +53,7 @@ function kindForStatus(status: number): FailureKind {
   if (status === HTTP_NOT_FOUND) return 'notFound';
   if (status === HTTP_CONFLICT || status === HTTP_PRECONDITION_FAILED) return 'conflict';
   if (status === HTTP_LOCKED || status === HTTP_TOO_MANY_REQUESTS) return 'rateLimited';
+  if (status === HTTP_NOT_IMPLEMENTED) return 'unavailable';
   if (status >= HTTP_SERVER_ERROR_MIN) return 'server';
   return 'unknown';
 }
@@ -62,6 +68,19 @@ function toFieldErrors(raw: Readonly<Record<string, unknown>> | undefined): Fiel
     if (messages.length > 0) out[field] = messages;
   }
   return out;
+}
+
+/**
+ * The id support can look up: the one the backend answered with (envelope or
+ * header), else the one this request was sent with — a request that timed out
+ * may still have reached the server and its logs.
+ */
+function requestIdOf(error: AxiosError, envelopeId: string | null | undefined): string | null {
+  if (envelopeId) return envelopeId;
+  const answered: unknown = error.response?.headers[REQUEST_ID_HEADER.toLowerCase()];
+  if (typeof answered === 'string' && answered) return answered;
+  const sent: unknown = error.config?.headers.get(REQUEST_ID_HEADER);
+  return typeof sent === 'string' && sent ? sent : null;
 }
 
 function failure(kind: FailureKind, partial: Partial<Failure> = {}): Failure {
@@ -82,7 +101,9 @@ function failure(kind: FailureKind, partial: Partial<Failure> = {}): Failure {
  *
  * Backend messages are the curated, user-facing sentences of its error table
  * (`core/errors.py`), so 4xx messages are passed through; 5xx always uses the
- * generic sentence so no internal detail ever reaches the UI.
+ * generic sentence so no internal detail ever reaches the UI. A 501's own
+ * message is written for developers ("part of the contract but not built
+ * yet"), so it gets the plain "not available" sentence too.
  */
 export function toFailure(error: unknown): Failure {
   if (isFailure(error)) return error;
@@ -91,20 +112,22 @@ export function toFailure(error: unknown): Failure {
 
   if (isAxiosError(error)) {
     const response = error.response;
-    if (!response) return failure('network');
+    if (!response) return failure('network', { requestId: requestIdOf(error, null) });
 
     const kind = kindForStatus(response.status);
     const parsed = errorEnvelopeSchema.safeParse(response.data);
-    if (!parsed.success) return failure(kind, { status: response.status });
+    if (!parsed.success) {
+      return failure(kind, { status: response.status, requestId: requestIdOf(error, null) });
+    }
 
     const body = parsed.data;
-    const isServerSide = kind === 'server';
+    const isServerSide = kind === 'server' || kind === 'unavailable';
     return failure(kind, {
       status: response.status,
       code: body.code ?? null,
       message: !isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind],
       fieldErrors: toFieldErrors(body.errors),
-      requestId: body.request_id ?? null,
+      requestId: requestIdOf(error, body.request_id),
       meta: body.meta ?? {},
     });
   }

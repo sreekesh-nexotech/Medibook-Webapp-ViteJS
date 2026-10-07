@@ -1,4 +1,4 @@
-import { type ChangeEvent, type MouseEvent, useState } from 'react';
+import { type ChangeEvent, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { type HospitalStaticView, hospitalPath, isHospitalRole } from '@/app/router/paths';
@@ -37,6 +37,8 @@ import type {
   HospitalImagePurpose,
   HospitalProfile,
   HospitalRuleSettings,
+  NumberingKind,
+  NumberingSeries,
   TokenPolicy,
 } from '@/features/settings/domain/entities/settings.entities';
 import { useHospitalImageUrlQuery } from '@/features/settings/application/queries/useHospitalImageUrlQuery';
@@ -44,59 +46,77 @@ import { useReplaceHospitalHoursMutation } from '@/features/settings/application
 import { useSaveBankAccountMutation } from '@/features/settings/application/queries/useSaveBankAccountMutation';
 import { useUpdateHospitalProfileMutation } from '@/features/settings/application/queries/useUpdateHospitalProfileMutation';
 import { useUpdateHospitalRuleSettingsMutation } from '@/features/settings/application/queries/useUpdateHospitalRuleSettingsMutation';
-import { useUpdateTokenScopeMutation } from '@/features/settings/application/queries/useUpdateTokenScopeMutation';
+import { useUpdateNumberingMutation } from '@/features/settings/application/queries/useUpdateNumberingMutation';
+import { useUpdateTokenPolicyMutation } from '@/features/settings/application/queries/useUpdateTokenPolicyMutation';
 import { useUploadHospitalImageMutation } from '@/features/settings/application/queries/useUploadHospitalImageMutation';
 import {
   type BankForm,
+  CONSULT_MINUTES_MAX,
   FEE_VALIDITY_MAX_DAYS,
   HOLD_TIMEOUT_SERVER_OPTIONS,
   type HoursForm,
+  NO_SHOW_CALL_OPTIONS,
+  NUMBERING_KINDS,
+  type NumberingForm,
   type ProfileForm,
+  REFUND_OPTIONS,
   type RulesForm,
   SETTINGS_FORM_SECTIONS,
   type SettingsForm,
   type SettingsFormSection,
+  TOKEN_CANCEL_OPTIONS,
+  TOKEN_RESET_OPTIONS,
+  TOKEN_SCOPE_OPTIONS,
+  type TokenForm,
   bankInput,
   hasMixedHours,
   hoursFromForm,
   isSectionDirty,
+  numberingChanges,
   profileChanges,
   rulesChanges,
-  schemeForScope,
-  scopeForScheme,
   toBankForm,
   toHoursForm,
+  toNumberingForm,
   toProfileForm,
   toRulesForm,
+  toTokenForm,
+  tokenChanges,
+  tokenResetLabel,
+  tokenCancelMinutes,
+  tokenScopeLabel,
   withCurrent,
   withoutSections,
 } from '@/features/settings/application/store/settings.form';
 import {
   CANCEL_BEFORE_OPTIONS,
-  CANONICAL_TOKEN_SCHEME,
   CLOSE_TIME_OPTIONS,
   OPEN_TIME_OPTIONS,
   SCHEDULING_HORIZON_OPTIONS,
-  TOKEN_SCHEME_OPTIONS,
+  calendarDay,
   cancellationDeadline,
   durationCopy,
   openDaysInHorizon,
   parseCount,
   parseDurationMinutes,
-  tokenSeriesCopy,
+  renderTokenLabel,
+  seriesFormatProblem,
+  tokenFormatProblem,
 } from '@/features/settings/application/store/settings.rules';
 
+import { type NumberingErrorField, NumberingSettings } from './NumberingSettings';
 import { RuleCard } from './RuleCard';
 import { RuleRow } from './RuleRow';
 import { SettingsHead } from './SettingsHead';
 
 type SettingsSection =
-  'General' | 'Management' | 'System Rules' | 'Working Hours' | 'Notifications';
+  'General' | 'Management' | 'System Rules' | 'Numbering' | 'Working Hours' | 'Notifications';
 
 const SETTINGS_NAV: readonly { readonly id: SettingsSection; readonly icon: IconName }[] = [
   { id: 'General', icon: 'building-2' },
   { id: 'Management', icon: 'layout-grid' },
   { id: 'System Rules', icon: 'sliders-horizontal' },
+  { id: 'Numbering', icon: 'hash' },
   { id: 'Working Hours', icon: 'clock' },
   { id: 'Notifications', icon: 'bell' },
 ];
@@ -116,23 +136,27 @@ const MANAGE_LINKS: readonly [string, string, HospitalStaticView, IconName][] = 
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const PATIENT_COMMS: readonly [string, string, string][] = [
-  ['confirm', 'Appointment Confirmation', 'Notify the patient when a booking is confirmed'],
-  ['reminder', 'Visit Reminder', 'Remind patients before their appointment'],
+/**
+ * What Medibook sends, from the backend's message rules (PRD-05). There is no
+ * per-hospital switch for any of them yet, so each says what happens.
+ */
+const PATIENT_MESSAGES: readonly (readonly [string, string])[] = [
+  ['Booking confirmed or approved', 'When a booking is confirmed, or approved by the desk'],
+  ['Visit reminder', 'Before the appointment'],
+  ['Cancellations and no-shows', 'When a booking is cancelled, rejected or marked a no-show'],
+  ['Payments and refunds', 'When a payment is received or a refund is processed'],
 ];
 
-const ADMIN_ALERTS: readonly [string, string, string][] = [
-  ['settleReceived', 'Settlement Received', 'When a Medibook transfer reaches your account'],
-  ['settleOverdue', 'Settlement Overdue', 'When an expected settlement is late'],
-  ['quotaLow', 'Plan Quota Low', 'When online-appointment credits are running out'],
+const STAFF_EMAILS: readonly (readonly [string, string, string])[] = [
+  ['Subscription invoices', 'Each invoice and its reminders, to admins', 'Always sent'],
+  ['Plan usage', 'At 80% and 100% of the plan’s limits, to admins', 'Always sent'],
+  ['Settlement statements', 'Each statement, to admins and accountants', 'Always sent'],
+  ['Late settlement alerts', 'When an expected settlement is overdue', 'Coming later'],
 ];
 
 /** The illustrative appointment the cancellation example is written against. */
 const EXAMPLE_APPOINTMENT_TIME = '2:00 pm';
 
-/** Shown on every control the backend has no field for (H2 gap list). */
-const NOT_AVAILABLE_HINT = 'Not yet available from the server — this setting is not saved.';
-const NOT_AVAILABLE_PLACEHOLDER = 'Not available';
 const PLATFORM_MANAGED_HINT = 'Managed by Medibook — contact support to change it.';
 
 /** Fallback artwork while the hospital has no logo of its own. */
@@ -143,13 +167,11 @@ const MAX_PHONE_DIGITS = 11;
 const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
 
-/** The map box is a stylised projection of this area (degrees). */
-const MAP_ORIGIN_LAT = 12.84;
-const MAP_ORIGIN_LNG = 77.54;
-const MAP_SPAN_DEG = 0.14;
-const MAP_COORD_DECIMALS = 4;
-const PERCENT = 100;
-const MAP_CENTRE_PCT = 50;
+/** "9.9312, 76.2673" — the pair a map app copies; pasted into Latitude, it fills both. */
+const COORD_PAIR = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
+
+/** Street-level zoom for the "check on a map" link. */
+const MAP_LINK_ZOOM = 17;
 
 const ACCOUNT_NUMBER_PATTERN = /^\d{9,18}$/;
 const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -167,6 +189,13 @@ type SettingsErrorKey =
   | 'lat'
   | 'lng'
   | 'feeValidity'
+  | 'consultMinutes'
+  | 'tokenFormat'
+  | 'tokenPrefix'
+  | 'onlineMarker'
+  | 'offlineMarker'
+  | 'tokenRanges'
+  | `${NumberingKind}${'Format' | 'Prefix' | 'PadWidth'}`
   | 'bankHolder'
   | 'bankName'
   | 'bankAccount'
@@ -175,7 +204,7 @@ type SettingsErrorKey =
 
 type SettingsErrors = Partial<Record<SettingsErrorKey, string>>;
 
-/** Backend field name → the inline error slot it belongs to. */
+/** Backend field name → the inline error slot it belongs to (profile, rules and bank). */
 const SERVER_FIELD_KEY: Readonly<Record<string, SettingsErrorKey>> = {
   name: 'name',
   email: 'email',
@@ -187,6 +216,7 @@ const SERVER_FIELD_KEY: Readonly<Record<string, SettingsErrorKey>> = {
   lat: 'lat',
   lng: 'lng',
   follow_up_window_days: 'feeValidity',
+  expected_consult_minutes: 'consultMinutes',
   account_holder: 'bankHolder',
   bank_name: 'bankName',
   account_number: 'bankAccount',
@@ -194,14 +224,55 @@ const SERVER_FIELD_KEY: Readonly<Record<string, SettingsErrorKey>> = {
   upi_id: 'bankUpi',
 };
 
+/** Token policy fields — `format` and `prefix` also exist on the number series. */
+const TOKEN_FIELD_KEY: Readonly<Record<string, SettingsErrorKey>> = {
+  format: 'tokenFormat',
+  prefix: 'tokenPrefix',
+  online_marker: 'onlineMarker',
+  offline_marker: 'offlineMarker',
+  separate_ranges: 'tokenRanges',
+  online_range_start: 'tokenRanges',
+  online_range_end: 'tokenRanges',
+  offline_range_start: 'tokenRanges',
+  offline_range_end: 'tokenRanges',
+};
+
+function numberingErrorKey(kind: NumberingKind, field: NumberingErrorField): SettingsErrorKey {
+  return field === 'format'
+    ? `${kind}Format`
+    : field === 'prefix'
+      ? `${kind}Prefix`
+      : `${kind}PadWidth`;
+}
+
+/** Number series fields, by backend name. */
+const NUMBERING_FIELD: Readonly<Record<string, NumberingErrorField>> = {
+  format: 'format',
+  prefix: 'prefix',
+  pad_width: 'padWidth',
+};
+
 /** What each section is called in a "not saved" message. */
 const SECTION_LABEL: Readonly<Record<SettingsFormSection, string>> = {
   profile: 'Profile & location',
   hours: 'Working hours',
   rules: 'System rules',
-  token: 'Token scheme',
+  token: 'Token settings',
   bank: 'Bank details',
+  mrn: 'MRN numbering',
+  booking: 'Booking numbering',
+  receipt: 'Receipt numbering',
 };
+
+const TOKEN_FORMAT_MAX = 64;
+const TOKEN_PREFIX_MAX = 10;
+const TOKEN_MARKER_MAX = 8;
+const SERIES_FORMAT_MAX = 64;
+const SERIES_PREFIX_MAX = 20;
+const SERIES_DIGITS_MAX = 12;
+
+/** The token in the label preview. */
+const PREVIEW_TOKEN_NO = 7;
 
 function validateCoord(value: string, max: number, label: string): string | undefined {
   if (value.trim() === '') return undefined;
@@ -237,7 +308,81 @@ function validateProfile(p: ProfileForm, errors: SettingsErrors): void {
 function validateRules(r: RulesForm, errors: SettingsErrors): void {
   const days = r.feeValidity.trim();
   if (days === '' || !/^\d+$/.test(days) || Number(days) > FEE_VALIDITY_MAX_DAYS) {
-    errors.feeValidity = `Fee validity must be 0–${FEE_VALIDITY_MAX_DAYS} days.`;
+    errors.feeValidity = `The follow-up window must be 0–${FEE_VALIDITY_MAX_DAYS} days.`;
+  }
+  const minutes = Number(r.consultMinutes);
+  if (!/^\d+$/.test(r.consultMinutes) || minutes < 1 || minutes > CONSULT_MINUTES_MAX) {
+    errors.consultMinutes = `Enter 1–${CONSULT_MINUTES_MAX} minutes.`;
+  }
+}
+
+function validateToken(t: TokenForm, errors: SettingsErrors): void {
+  const format = t.format.trim();
+  const problem =
+    format === ''
+      ? 'Enter a format, e.g. {SRC}{SEQ:3}.'
+      : format.length > TOKEN_FORMAT_MAX
+        ? `Keep the format to ${TOKEN_FORMAT_MAX} characters.`
+        : tokenFormatProblem(format);
+  if (problem) errors.tokenFormat = problem;
+  if (t.prefix.trim().length > TOKEN_PREFIX_MAX) {
+    errors.tokenPrefix = `Keep the prefix to ${TOKEN_PREFIX_MAX} characters.`;
+  }
+  const marker = (value: string): string | undefined => {
+    const v = value.trim();
+    return v === '' || v.length > TOKEN_MARKER_MAX
+      ? `Enter 1–${TOKEN_MARKER_MAX} characters.`
+      : undefined;
+  };
+  const online = marker(t.onlineMarker);
+  if (online) errors.onlineMarker = online;
+  const offline = marker(t.offlineMarker);
+  if (offline) errors.offlineMarker = offline;
+  if (!t.separateRanges) return;
+  const [onlineFrom, onlineTo, walkInFrom, walkInTo] = [
+    t.onlineFrom,
+    t.onlineTo,
+    t.walkInFrom,
+    t.walkInTo,
+  ].map((v) => (/^\d+$/.test(v.trim()) ? Number(v) : 0));
+  if (!onlineFrom || !onlineTo || !walkInFrom || !walkInTo) {
+    errors.tokenRanges = 'Enter all four numbers, each 1 or more.';
+  } else if (onlineFrom >= onlineTo || walkInFrom >= walkInTo) {
+    errors.tokenRanges = 'Each range must start below where it ends.';
+  } else if (onlineFrom <= walkInTo && walkInFrom <= onlineTo) {
+    errors.tokenRanges = 'The online and walk-in ranges must not overlap.';
+  }
+}
+
+function validateNumbering(
+  kind: NumberingKind,
+  n: NumberingForm,
+  base: NumberingForm,
+  errors: SettingsErrors,
+): void {
+  const format = n.format.trim();
+  const problem =
+    format === ''
+      ? 'Enter a format.'
+      : format.length > SERIES_FORMAT_MAX
+        ? `Keep the format to ${SERIES_FORMAT_MAX} characters.`
+        : seriesFormatProblem(format);
+  if (problem) errors[`${kind}Format`] = problem;
+  if (n.prefix.trim().length > SERIES_PREFIX_MAX) {
+    errors[`${kind}Prefix`] = `Keep the prefix to ${SERIES_PREFIX_MAX} characters.`;
+  }
+  const digits = Number(n.padWidth);
+  if (!/^\d+$/.test(n.padWidth) || digits < 1 || digits > SERIES_DIGITS_MAX) {
+    errors[`${kind}PadWidth`] = `Enter 1–${SERIES_DIGITS_MAX} digits.`;
+  }
+  // The server's own rule for booking references (backend `numbering._booking_prefix`).
+  if (kind === 'booking' && (n.format !== base.format || n.prefix !== base.prefix)) {
+    if (!problem && !format.includes('{PREFIX}')) {
+      errors.bookingFormat = 'Booking references must include {PREFIX}.';
+    }
+    if (n.prefix.trim() === '') {
+      errors.bookingPrefix = 'Enter a prefix — it marks your hospital’s booking references.';
+    }
   }
 }
 
@@ -260,36 +405,56 @@ function validateBank(b: BankForm, hasAccount: boolean, errors: SettingsErrors):
   }
 }
 
+/** Which inline slot a backend field's error belongs to, for the section that sent it. */
+function errorKeyFor(section: SettingsFormSection, field: string): SettingsErrorKey | undefined {
+  if (section === 'token') return TOKEN_FIELD_KEY[field];
+  if (section === 'mrn' || section === 'booking' || section === 'receipt') {
+    const slot = NUMBERING_FIELD[field];
+    return slot ? numberingErrorKey(section, slot) : undefined;
+  }
+  return SERVER_FIELD_KEY[field];
+}
+
 /** Server field errors, mapped onto this screen's inline slots. */
-function serverFieldErrors(failure: Failure): SettingsErrors {
+function serverFieldErrors(failure: Failure, section: SettingsFormSection): SettingsErrors {
   const out: SettingsErrors = {};
   for (const [field, messages] of Object.entries(failure.fieldErrors)) {
-    const key = SERVER_FIELD_KEY[field];
+    const key = errorKeyFor(section, field);
     const first = messages[0];
     if (key && first) out[key] = first;
   }
   return out;
 }
 
-/** Map-box pin position for the saved coordinates (inverse of the click handler). */
-function pinFor(lat: string, lng: string): { readonly x: number; readonly y: number } {
+/** Today's value and a change waiting to apply, or when a change would take effect. */
+function schedulingCopy<T extends string>(
+  today: T,
+  pending: T | null,
+  effectiveDate: string | null,
+  label: (value: T) => string,
+): string {
+  return pending && pending !== today && effectiveDate
+    ? `Today: ${label(today)}. From ${fmtDate(effectiveDate)}: ${label(pending)}.`
+    : 'A change takes effect tomorrow.';
+}
+
+/**
+ * An OpenStreetMap link centred on the coordinates, to check them before
+ * saving (PRD-01); `null` until both are valid numbers.
+ */
+function mapLinkFor(lat: string, lng: string): string | null {
+  if (lat.trim() === '' || lng.trim() === '') return null;
+  if (validateCoord(lat, MAX_LATITUDE, '') || validateCoord(lng, MAX_LONGITUDE, '')) return null;
   const la = Number(lat);
   const ln = Number(lng);
-  if (lat.trim() === '' || lng.trim() === '' || !Number.isFinite(la) || !Number.isFinite(ln)) {
-    return { x: MAP_CENTRE_PCT, y: MAP_CENTRE_PCT };
-  }
-  const clamp = (n: number) => Math.max(0, Math.min(PERCENT, Math.round(n)));
-  return {
-    x: clamp(((ln - MAP_ORIGIN_LNG) / MAP_SPAN_DEG) * PERCENT),
-    y: clamp((1 - (la - MAP_ORIGIN_LAT) / MAP_SPAN_DEG) * PERCENT),
-  };
+  return `https://www.openstreetmap.org/?mlat=${la}&mlon=${ln}#map=${MAP_LINK_ZOOM}/${la}/${ln}`;
 }
 
 /** The bank section's data, which loads (and may be refused) separately. */
 export type BankAccountsState =
   | { readonly status: 'hidden' }
   | { readonly status: 'loading' }
-  | { readonly status: 'error'; readonly retry: () => void }
+  | { readonly status: 'error'; readonly error: unknown; readonly retry: () => void }
   | { readonly status: 'ready'; readonly account: BankAccount | null };
 
 interface SettingsEditorProps {
@@ -297,6 +462,7 @@ interface SettingsEditorProps {
   rules: HospitalRuleSettings;
   hours: readonly HospitalHoursDay[];
   tokenPolicy: TokenPolicy;
+  numbering: readonly NumberingSeries[];
   bank: BankAccountsState;
 }
 
@@ -308,10 +474,18 @@ interface SettingsEditorProps {
  *
  * Save sends only the sections that changed, in parallel; a section that
  * fails keeps its edits and says why, while the ones that saved are done.
- * Controls the backend has no field for stay visible but disabled, with
- * `NOT_AVAILABLE_HINT` — they are never saved and never show invented values.
+ * Every setting the backend stores and uses is editable here (PRD-06); rules
+ * the backend has no field for are stated as facts, not shown as dead
+ * controls (PRD-05).
  */
-export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: SettingsEditorProps) {
+export function SettingsEditor({
+  profile,
+  rules,
+  hours,
+  tokenPolicy,
+  numbering,
+  bank,
+}: SettingsEditorProps) {
   const navigate = useNavigate();
   const { role: roleParam } = useParams();
   const role = isHospitalRole(roleParam) ? roleParam : 'admin';
@@ -323,7 +497,8 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
   const updateProfile = useUpdateHospitalProfileMutation();
   const updateRules = useUpdateHospitalRuleSettingsMutation();
   const replaceHours = useReplaceHospitalHoursMutation();
-  const updateTokenScope = useUpdateTokenScopeMutation();
+  const updateTokenPolicy = useUpdateTokenPolicyMutation();
+  const updateNumbering = useUpdateNumberingMutation();
   const saveBank = useSaveBankAccountMutation();
   const uploadImage = useUploadHospitalImageMutation();
 
@@ -332,8 +507,11 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
     profile: toProfileForm(profile),
     hours: toHoursForm(hours),
     rules: toRulesForm(rules),
-    token: { scheme: schemeForScope(tokenPolicy.scope) },
+    token: toTokenForm(tokenPolicy),
     bank: toBankForm(bankAccount),
+    mrn: toNumberingForm(numbering.find((x) => x.kind === 'mrn')),
+    booking: toNumberingForm(numbering.find((x) => x.kind === 'booking')),
+    receipt: toNumberingForm(numbering.find((x) => x.kind === 'receipt')),
   };
 
   const [sec, setSec] = useState<SettingsSection>('General');
@@ -350,6 +528,10 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
   const errors: SettingsErrors = {};
   if (dirtySections.includes('profile')) validateProfile(draft.profile, errors);
   if (dirtySections.includes('rules')) validateRules(draft.rules, errors);
+  if (dirtySections.includes('token')) validateToken(draft.token, errors);
+  for (const kind of NUMBERING_KINDS) {
+    if (dirtySections.includes(kind)) validateNumbering(kind, draft[kind], base[kind], errors);
+  }
   if (dirtySections.includes('bank')) validateBank(draft.bank, bankAccount !== null, errors);
   const errorCount = Object.keys(errors).length;
   const errorFor = (key: SettingsErrorKey): string | undefined =>
@@ -367,7 +549,10 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
     setEdits((e) => ({ ...e, hours: { ...(e.hours ?? base.hours), [k]: v } }));
   const setRule = <K extends keyof RulesForm>(k: K, v: RulesForm[K]) =>
     setEdits((e) => ({ ...e, rules: { ...(e.rules ?? base.rules), [k]: v } }));
-  const setScheme = (scheme: string) => setEdits((e) => ({ ...e, token: { scheme } }));
+  const setToken = <K extends keyof TokenForm>(k: K, v: TokenForm[K]) =>
+    setEdits((e) => ({ ...e, token: { ...(e.token ?? base.token), [k]: v } }));
+  const setNumbering = (kind: NumberingKind, k: keyof NumberingForm, v: string) =>
+    setEdits((e) => ({ ...e, [kind]: { ...(e[kind] ?? base[kind]), [k]: v } }));
   const setBank = (k: keyof BankForm, v: string) =>
     setEdits((e) => ({ ...e, bank: { ...(e.bank ?? base.bank), [k]: v } }));
 
@@ -405,12 +590,24 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
       case 'hours':
         return replaceHours.mutateAsync(hoursFromForm(draft.hours));
       case 'token':
-        return updateTokenScope.mutateAsync({
-          scope: scopeForScheme(draft.token.scheme),
+        return updateTokenPolicy.mutateAsync({
+          changes: tokenChanges(base.token, draft.token),
           version: tokenPolicy.version,
         });
       case 'bank':
         return saveBank.mutateAsync({ input: bankInput(draft.bank), existing: bankAccount });
+      case 'mrn':
+      case 'booking':
+      case 'receipt': {
+        const series = numbering.find((x) => x.kind === section);
+        // A series the server did not list is never shown, so it never has edits.
+        if (!series) return Promise.resolve();
+        return updateNumbering.mutateAsync({
+          kind: section,
+          changes: numberingChanges(base[section], draft[section]),
+          version: series.version,
+        });
+      }
     }
   };
 
@@ -420,6 +617,9 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
     if (errorCount > 0) return;
     const sections = dirtySections.filter((s) => s !== 'bank' || canEditBank);
     if (sections.length === 0) return;
+    const tokenScheduled =
+      sections.includes('token') &&
+      (draft.token.scope !== base.token.scope || draft.token.reset !== base.token.reset);
     setSaving(true);
     const results = await Promise.allSettled(sections.map(saveJob));
     setSaving(false);
@@ -435,8 +635,10 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
       }
       const reason: unknown = result.reason;
       const message = isFailure(reason) ? reason.message : 'Something went wrong.';
-      if (isFailure(reason)) fieldErrors = { ...fieldErrors, ...serverFieldErrors(reason) };
-      toast(`${SECTION_LABEL[section]} not saved — ${message}`, 'error');
+      if (isFailure(reason)) {
+        fieldErrors = { ...fieldErrors, ...serverFieldErrors(reason, section) };
+      }
+      toast(`${SECTION_LABEL[section]} not saved — ${message}`, 'error', reason);
     });
 
     setEdits((e) => withoutSections(e, saved));
@@ -444,8 +646,8 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
     if (saved.length === sections.length) {
       setAttempted(false);
       toast(
-        saved.includes('token')
-          ? 'Settings saved — the new token scheme applies from tomorrow'
+        tokenScheduled
+          ? 'Settings saved — the token counter change takes effect tomorrow'
           : 'Settings saved',
         'success',
       );
@@ -471,7 +673,11 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
               onUploaded(fileId);
             },
             onError: (error) => {
-              toast(isFailure(error) ? error.message : 'The image could not be uploaded.', 'error');
+              toast(
+                isFailure(error) ? error.message : 'The image could not be uploaded.',
+                'error',
+                error,
+              );
             },
           },
         );
@@ -504,19 +710,6 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
     </div>
   );
 
-  /** A rule the backend has no field for: visible, disabled, empty. */
-  const unavailableSel = (ariaLabel: string) => (
-    <div className="w-32.5">
-      <Select
-        value=""
-        placeholder={NOT_AVAILABLE_PLACEHOLDER}
-        height={40}
-        aria-label={ariaLabel}
-        disabled
-      />
-    </div>
-  );
-
   /* ---- derived consequences of the draft's own rules (audit 2.6.4) ---- */
 
   const estimate = rules.derived.slotsPerSessionEstimate;
@@ -532,11 +725,29 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
   const holdMinutes = parseDurationMinutes(draft.rules.holdTimeout, 5);
   const openDays = draft.hours.days.filter(Boolean).length;
   const feeDays = parseCount(draft.rules.feeValidity, 0);
-  const pin = pinFor(draft.profile.lat, draft.profile.lng);
+  const mapLink = mapLinkFor(draft.profile.lat, draft.profile.lng);
   const hoursUnset = hours.length === 0;
   const hoursMixed = hasMixedHours(hours);
-  const schemeOptions = withCurrent(TOKEN_SCHEME_OPTIONS, draft.token.scheme);
-  const pendingScheme = tokenPolicy.pendingScope ? schemeForScope(tokenPolicy.pendingScope) : null;
+  const tokenCancelMin = tokenCancelMinutes(draft.rules.tokenCancel);
+  const tokenCancelCopy =
+    tokenCancelMin === null
+      ? 'Patients can cancel in the app until their token is called'
+      : tokenCancelMin === 0
+        ? 'Patients can cancel in the app until the session starts'
+        : `Patients can cancel in the app until ${durationCopy(tokenCancelMin)} before the session`;
+  const tokenFormat = draft.token.format.trim();
+  const previewLabel = (marker: string): string =>
+    renderTokenLabel(tokenFormat, {
+      prefix: draft.token.prefix.trim(),
+      marker: marker.trim(),
+      seq: PREVIEW_TOKEN_NO,
+      doctorCode: '‹doctor›',
+      departmentCode: '‹department›',
+      date: calendarDay(todayISO()),
+    });
+  const tokenPreviewCopy = tokenFormatProblem(tokenFormat)
+    ? 'Must contain {SEQ} or {SEQ:3} once'
+    : `Token ${PREVIEW_TOKEN_NO} shows as ${previewLabel(draft.token.onlineMarker)} for an online booking and ${previewLabel(draft.token.offlineMarker)} for a walk-in`;
 
   return (
     <div className="flex items-start gap-5">
@@ -556,7 +767,12 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
               )}
             >
               <Icon name={s.icon} size={19} /> {s.id}
-              {dirty && !active && <span className="bg-y-600 ml-auto size-2 rounded-full" />}
+              {dirty && !active && (
+                <>
+                  <span className="bg-y-600 ml-auto size-2 rounded-full" />
+                  <span className="sr-only">(unsaved edits)</span>
+                </>
+              )}
             </button>
           );
         })}
@@ -579,7 +795,7 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
 
         {attempted && errorCount > 0 && (
           <Card pad={14} className="flex items-center gap-2.5">
-            <Icon name="triangle-alert" size={16} className="text-d-500 flex-none" />
+            <Icon name="triangle-alert" size={16} className="text-d-600 flex-none" />
             <span className="text-body text-d-700">
               {errorCount === 1
                 ? 'One field needs attention before these settings can be saved.'
@@ -605,14 +821,15 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                 </div>
                 <div>
                   <label className="inline-block">
+                    {/* Visually hidden but focusable: Tab reaches it, Space opens the picker. */}
                     <input
                       type="file"
                       accept={acceptFor('logo')}
-                      className="hidden"
+                      className="peer sr-only"
                       disabled={!mayEdit || uploadImage.isPending}
                       onChange={pickImage('logo', (id) => setProfile('logoFileId', id))}
                     />
-                    <span className="text-body border-text-navy text-text-navy inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3.5 py-2 font-medium">
+                    <span className="text-body border-text-navy text-text-navy peer-focus-visible:outline-blue inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3.5 py-2 font-medium peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2">
                       <Icon name="upload" size={16} /> Change Logo
                     </span>
                   </label>
@@ -653,14 +870,6 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                     disabled={!mayEdit}
                   />
                 </Field>
-                <Field label="About" className="col-span-full" hint={NOT_AVAILABLE_HINT}>
-                  <textarea
-                    value=""
-                    placeholder={NOT_AVAILABLE_PLACEHOLDER}
-                    disabled
-                    className="rounded-input border-border text-body-lg text-text-strong box-border h-23 w-full resize-none border p-3.5"
-                  ></textarea>
-                </Field>
               </div>
             </Card>
 
@@ -673,7 +882,8 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                   <input
                     type="file"
                     accept={acceptFor('cover')}
-                    className="hidden"
+                    aria-label="Cover photo"
+                    className="peer sr-only"
                     disabled={!mayEdit || uploadImage.isPending}
                     onChange={pickImage('cover', (id) => setProfile('coverFileId', id))}
                   />
@@ -689,131 +899,102 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                     </span>
                   )}
                 </label>
-                <div className="pointer-events-none block opacity-50">
-                  <ImageUpload label="Reception" h={130} />
-                </div>
-                <div className="pointer-events-none block opacity-50">
-                  <ImageUpload label="Add photo" h={130} icon="plus" />
-                </div>
               </div>
               <div className="text-caption text-text-muted mt-4">
-                Only the cover photo is stored today — more gallery photos are not yet available
-                from the server.
+                The cover photo is the one patients see. More gallery photos are coming later.
               </div>
             </Card>
 
             <Card pad={28}>
-              <SettingsHead info="Patients see your location and get directions in the Medibook app. Click the map to drop the pin.">
+              <SettingsHead info="Patients see your location and get directions in the Medibook app. Copy the coordinates from a map app and paste them here.">
                 Location
               </SettingsHead>
-              <div className="flex items-stretch gap-5">
-                <div className="flex flex-1 flex-col gap-4">
-                  <Field label="Address" required error={errorFor('address')}>
+              <div className="flex flex-col gap-4">
+                <Field label="Address" required error={errorFor('address')}>
+                  <TextInput
+                    value={draft.profile.address}
+                    onChange={(v) => setProfile('address', v)}
+                    disabled={!mayEdit}
+                  />
+                </Field>
+                <div className="grid grid-cols-3 gap-4">
+                  <Field label="City" required error={errorFor('city')}>
                     <TextInput
-                      value={draft.profile.address}
-                      onChange={(v) => setProfile('address', v)}
+                      value={draft.profile.city}
+                      onChange={(v) => setProfile('city', v)}
                       disabled={!mayEdit}
                     />
                   </Field>
-                  <div className="grid grid-cols-3 gap-4">
-                    <Field label="City" required error={errorFor('city')}>
-                      <TextInput
-                        value={draft.profile.city}
-                        onChange={(v) => setProfile('city', v)}
-                        disabled={!mayEdit}
-                      />
-                    </Field>
-                    <Field label="State" required error={errorFor('state')}>
-                      <TextInput
-                        value={draft.profile.state}
-                        onChange={(v) => setProfile('state', v)}
-                        disabled={!mayEdit}
-                      />
-                    </Field>
-                    <Field label="PIN Code" required error={errorFor('pincode')}>
-                      <TextInput
-                        value={draft.profile.pincode}
-                        onChange={(v) => setProfile('pincode', v)}
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                        disabled={!mayEdit}
-                      />
-                    </Field>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="Latitude" error={errorFor('lat')}>
-                      <TextInput
-                        value={draft.profile.lat}
-                        onChange={(v) => setProfile('lat', v)}
-                        inputMode="decimal"
-                        disabled={!mayEdit}
-                      />
-                    </Field>
-                    <Field label="Longitude" error={errorFor('lng')}>
-                      <TextInput
-                        value={draft.profile.lng}
-                        onChange={(v) => setProfile('lng', v)}
-                        inputMode="decimal"
-                        disabled={!mayEdit}
-                      />
-                    </Field>
-                  </div>
-                  <div className="text-caption text-text-muted flex items-center gap-1.5">
-                    <Icon name="map-pin" size={14} /> Click anywhere on the map to set the location
-                    pin.
-                  </div>
-                </div>
-                <div
-                  onClick={(e: MouseEvent<HTMLDivElement>) => {
-                    if (!mayEdit) return;
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const x = Math.max(
-                      0,
-                      Math.min(PERCENT, Math.round(((e.clientX - r.left) / r.width) * PERCENT)),
-                    );
-                    const y = Math.max(
-                      0,
-                      Math.min(PERCENT, Math.round(((e.clientY - r.top) / r.height) * PERCENT)),
-                    );
-                    setEdits((ed) => ({
-                      ...ed,
-                      profile: {
-                        ...(ed.profile ?? base.profile),
-                        lat: (MAP_ORIGIN_LAT + (1 - y / PERCENT) * MAP_SPAN_DEG).toFixed(
-                          MAP_COORD_DECIMALS,
-                        ),
-                        lng: (MAP_ORIGIN_LNG + (x / PERCENT) * MAP_SPAN_DEG).toFixed(
-                          MAP_COORD_DECIMALS,
-                        ),
-                      },
-                    }));
-                  }}
-                  className="border-border relative min-h-50 flex-1 cursor-crosshair overflow-hidden rounded-lg border"
-                  style={{ background: 'linear-gradient(135deg, #dbe7f3 0%, #cdddec 100%)' }}
-                >
-                  <svg width="100%" height="100%" className="absolute inset-0 opacity-50">
-                    <path
-                      d="M0 60 L400 90 M0 130 L400 100 M120 0 L150 240 M260 0 L240 240"
-                      stroke="#9fb6cd"
-                      strokeWidth="3"
-                      fill="none"
+                  <Field label="State" required error={errorFor('state')}>
+                    <TextInput
+                      value={draft.profile.state}
+                      onChange={(v) => setProfile('state', v)}
+                      disabled={!mayEdit}
                     />
-                  </svg>
-                  <div
-                    className="text-d-500 absolute -translate-x-1/2 -translate-y-full"
-                    style={{ top: `${pin.y}%`, left: `${pin.x}%` }}
-                  >
-                    <Icon name="map-pin" size={36} />
-                  </div>
-                  <span className="text-caption text-text-muted absolute right-3 bottom-2.5">
-                    Click to drop pin
+                  </Field>
+                  <Field label="PIN Code" required error={errorFor('pincode')}>
+                    <TextInput
+                      value={draft.profile.pincode}
+                      onChange={(v) => setProfile('pincode', v)}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      disabled={!mayEdit}
+                    />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Latitude" error={errorFor('lat')}>
+                    <TextInput
+                      value={draft.profile.lat}
+                      onChange={(v) => {
+                        const pair = COORD_PAIR.exec(v);
+                        if (pair?.[1] && pair[2]) {
+                          const [, lat, lng] = pair;
+                          setEdits((ed) => ({
+                            ...ed,
+                            profile: { ...(ed.profile ?? base.profile), lat, lng },
+                          }));
+                        } else {
+                          setProfile('lat', v);
+                        }
+                      }}
+                      inputMode="decimal"
+                      placeholder="e.g. 9.9312"
+                      disabled={!mayEdit}
+                    />
+                  </Field>
+                  <Field label="Longitude" error={errorFor('lng')}>
+                    <TextInput
+                      value={draft.profile.lng}
+                      onChange={(v) => setProfile('lng', v)}
+                      inputMode="decimal"
+                      placeholder="e.g. 76.2673"
+                      disabled={!mayEdit}
+                    />
+                  </Field>
+                </div>
+                <div className="text-caption text-text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="map-pin" size={14} /> In a map app, copy your entrance's coordinates
+                    and paste them into Latitude — both fields fill in.
                   </span>
+                  {mapLink && (
+                    <a
+                      href={mapLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-link font-medium underline-offset-2 hover:underline"
+                    >
+                      Check on OpenStreetMap
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  )}
                 </div>
               </div>
             </Card>
 
             <Card pad={28}>
-              <SettingsHead info="Medibook releases online-booking settlements to this account. Operations sees these details (masked) on your hospital profile.">
+              <SettingsHead info="Medibook releases online-booking settlements to this account. Medibook's operations team sees only its last four digits, on each payout.">
                 Bank &amp; Payouts
               </SettingsHead>
               {bank.status === 'hidden' && (
@@ -834,6 +1015,7 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                   inline
                   title="Bank details did not load"
                   message="The rest of the settings are fine. Retry to load the payout account."
+                  error={bank.error}
                   onRetry={bank.retry}
                 />
               )}
@@ -1008,18 +1190,23 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
           <>
             <div className="flex items-center gap-2">
               <span className="text-caption text-grey-900">
-                Hospital-wide defaults. A doctor&apos;s custom availability or fee settings override
-                these. Each rule shows what it does with its current value.
+                Hospital-wide rules. Slot length, consultation and follow-up fees are set per
+                doctor. Each rule shows what it does with its current value.
               </span>
-              <InfoDot text="These apply to every department and doctor unless a doctor has custom settings, which always take precedence." />
+              <InfoDot text="These apply to every department and doctor. A doctor's own slot length, fees and expected consultation time always take precedence." />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <RuleCard title="Appointment Rules" hint="Applies to all new appointments">
+              <RuleCard title="Booking" hint="Applies to new bookings">
                 <RuleRow
-                  label="Default consultation duration"
-                  hint="Slot length is set per doctor in Doctors & Departments — no hospital-wide default is stored."
+                  label="Scheduling horizon"
+                  hint={`Booking is open to ${fmtDate(horizonEnd)} — ${horizonOpenDays} open ${horizonOpenDays === 1 ? 'day' : 'days'}. Nothing past it is generated or offered.`}
                 >
-                  {unavailableSel('Default consultation duration')}
+                  {sel(
+                    draft.rules.horizon,
+                    SCHEDULING_HORIZON_OPTIONS,
+                    (v) => setRule('horizon', v),
+                    'Scheduling horizon',
+                  )}
                 </RuleRow>
                 <RuleRow
                   label="Online appointment booking"
@@ -1037,97 +1224,18 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                   />
                 </RuleRow>
                 <RuleRow
-                  label="Scheduling horizon"
-                  hint={`Booking is open to ${fmtDate(horizonEnd)} — ${horizonOpenDays} open ${horizonOpenDays === 1 ? 'day' : 'days'}. Nothing past it is generated or offered.`}
+                  label="Approve online bookings"
+                  hint={
+                    draft.rules.onlineApproval
+                      ? 'Online bookings wait in Appointments until the desk approves or rejects them'
+                      : 'Online bookings are confirmed without waiting for the desk'
+                  }
                 >
-                  {sel(
-                    draft.rules.horizon,
-                    SCHEDULING_HORIZON_OPTIONS,
-                    (v) => setRule('horizon', v),
-                    'Scheduling horizon',
-                  )}
-                </RuleRow>
-                <RuleRow
-                  label="Max appointments per slot"
-                  hint="Each slot holds one patient — fixed by the server, not configurable here."
-                >
-                  {unavailableSel('Maximum appointments per slot')}
-                </RuleRow>
-                <RuleRow
-                  label="Buffer time between appointments"
-                  hint="Slots run back to back — no buffer is stored by the server."
-                  last
-                >
-                  {unavailableSel('Buffer time between appointments')}
-                </RuleRow>
-              </RuleCard>
-
-              <RuleCard title="Cancellation & No-show Rules">
-                <RuleRow label="Allow patient cancellation" hint={NOT_AVAILABLE_HINT}>
                   <Toggle
-                    value={false}
-                    onChange={() => undefined}
-                    label="Allow patients to cancel their own booking"
-                    disabled
-                  />
-                </RuleRow>
-                <RuleRow
-                  label="Cancellation allowed before"
-                  hint={`For a ${EXAMPLE_APPOINTMENT_TIME} appointment the cut-off is ${cancelDeadline}; later cancellations fall outside the refund window`}
-                >
-                  {sel(
-                    draft.rules.cancelBefore,
-                    CANCEL_BEFORE_OPTIONS,
-                    (v) => setRule('cancelBefore', v),
-                    'Cancellation cut-off',
-                  )}
-                </RuleRow>
-                <RuleRow label="Auto mark No-show after" hint={NOT_AVAILABLE_HINT} last>
-                  {unavailableSel('Auto mark No-show after')}
-                </RuleRow>
-              </RuleCard>
-
-              <RuleCard title="Token Queue Behaviour" hint="Applies to all departments">
-                <RuleRow
-                  label="Token scheme"
-                  hint={`Tokens issue as ${tokenSeriesCopy(draft.token.scheme)}${
-                    draft.token.scheme === CANONICAL_TOKEN_SCHEME
-                      ? ' — the format the patient app shows'
-                      : ' — the patient app expects the hospital-wide T-001 series'
-                  }. ${
-                    pendingScheme && tokenPolicy.pendingEffectiveDate
-                      ? `Switching to ${pendingScheme} on ${fmtDate(tokenPolicy.pendingEffectiveDate)}.`
-                      : 'A change applies from tomorrow.'
-                  }`}
-                >
-                  <div className="w-45">
-                    <Select
-                      value={draft.token.scheme}
-                      options={schemeOptions}
-                      onChange={setScheme}
-                      height={40}
-                      aria-label="Token scheme"
-                      disabled={!mayEdit}
-                    />
-                  </div>
-                </RuleRow>
-                <RuleRow label="Token generation" hint={NOT_AVAILABLE_HINT}>
-                  {unavailableSel('Token generation')}
-                </RuleRow>
-                <RuleRow label="Show token number to patient" hint={NOT_AVAILABLE_HINT}>
-                  <Toggle
-                    value={false}
-                    onChange={() => undefined}
-                    label="Show the token number to the patient"
-                    disabled
-                  />
-                </RuleRow>
-                <RuleRow label="Allow hold token" hint={NOT_AVAILABLE_HINT}>
-                  <Toggle
-                    value={false}
-                    onChange={() => undefined}
-                    label="Allow a token to be held"
-                    disabled
+                    value={draft.rules.onlineApproval}
+                    onChange={(v) => setRule('onlineApproval', v)}
+                    label="Approve online bookings before they are confirmed"
+                    disabled={!mayEdit}
                   />
                 </RuleRow>
                 <RuleRow
@@ -1141,39 +1249,333 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                     'Hold timeout',
                   )}
                 </RuleRow>
-                <RuleRow label="Grace period" hint={NOT_AVAILABLE_HINT}>
-                  {unavailableSel('Grace period')}
+                <RuleRow
+                  label="Appointment notes"
+                  hint={
+                    draft.rules.patientNotes
+                      ? 'Notes typed when booking, by the patient or the desk, are kept'
+                      : 'Notes typed when booking are discarded'
+                  }
+                  last
+                >
+                  <Toggle
+                    value={draft.rules.patientNotes}
+                    onChange={(v) => setRule('patientNotes', v)}
+                    label="Keep notes typed when booking"
+                    disabled={!mayEdit}
+                  />
                 </RuleRow>
-                <RuleRow label="After grace" hint={NOT_AVAILABLE_HINT} last>
-                  {unavailableSel('After the grace period')}
-                </RuleRow>
+                <p className="text-caption text-text-muted m-0 pt-2">
+                  Each slot holds one patient and slots run back to back; slot length is set per
+                  doctor in Doctors &amp; Departments.
+                </p>
               </RuleCard>
 
-              <RuleCard
-                title="Consultation Fees"
-                hint="Default OP fee for doctors without a custom fee"
-              >
+              <RuleCard title="Cancellations & refunds" hint="When a patient cancels">
                 <RuleRow
-                  label="OP Consultation Fee"
-                  hint="Fees are set per doctor — no hospital default is stored."
+                  label="Cancellation cut-off"
+                  hint={`For a ${EXAMPLE_APPOINTMENT_TIME} appointment the cut-off is ${cancelDeadline}`}
                 >
-                  <div className="w-32.5">
-                    <TextInput
-                      id="op-fee"
-                      value=""
-                      placeholder={NOT_AVAILABLE_PLACEHOLDER}
+                  {sel(
+                    draft.rules.cancelBefore,
+                    CANCEL_BEFORE_OPTIONS,
+                    (v) => setRule('cancelBefore', v),
+                    'Cancellation cut-off',
+                  )}
+                </RuleRow>
+                <RuleRow
+                  label="Refund before the cut-off"
+                  hint={`Cancelling by ${cancelDeadline} refunds ${draft.rules.refundBefore} of the fee`}
+                >
+                  {sel(
+                    draft.rules.refundBefore,
+                    REFUND_OPTIONS,
+                    (v) => setRule('refundBefore', v),
+                    'Refund before the cut-off',
+                  )}
+                </RuleRow>
+                <RuleRow
+                  label="Refund after the cut-off"
+                  hint={`Cancelling after ${cancelDeadline} refunds ${draft.rules.refundAfter}`}
+                >
+                  {sel(
+                    draft.rules.refundAfter,
+                    REFUND_OPTIONS,
+                    (v) => setRule('refundAfter', v),
+                    'Refund after the cut-off',
+                  )}
+                </RuleRow>
+                <RuleRow
+                  label="Refund the convenience fee"
+                  hint={
+                    draft.rules.refundFee
+                      ? "A patient's refund includes Medibook's convenience fee"
+                      : "Medibook's convenience fee is kept when a patient cancels"
+                  }
+                  last
+                >
+                  <Toggle
+                    value={draft.rules.refundFee}
+                    onChange={(v) => setRule('refundFee', v)}
+                    label="Include the convenience fee in patient refunds"
+                    disabled={!mayEdit}
+                  />
+                </RuleRow>
+                <p className="text-caption text-text-muted m-0 pt-2">
+                  When the hospital cancels, the patient always gets everything back, convenience
+                  fee included.
+                </p>
+              </RuleCard>
+
+              <RuleCard title="Token queue" hint="Applies to all departments">
+                <RuleRow
+                  label="Token counter"
+                  hint={`Which counter token numbers come from. ${schedulingCopy(
+                    tokenPolicy.scope,
+                    tokenPolicy.pendingScope,
+                    tokenPolicy.pendingEffectiveDate,
+                    tokenScopeLabel,
+                  )}`}
+                >
+                  <div className="w-52">
+                    <Select
+                      value={draft.token.scope}
+                      options={TOKEN_SCOPE_OPTIONS}
+                      onChange={(v) => setToken('scope', v)}
                       height={40}
-                      aria-label="OP consultation fee in rupees"
-                      disabled
+                      aria-label="Token counter"
+                      disabled={!mayEdit}
                     />
                   </div>
                 </RuleRow>
                 <RuleRow
-                  label="Validity (days)"
+                  label="Numbers start again"
+                  hint={schedulingCopy(
+                    tokenPolicy.reset,
+                    tokenPolicy.pendingReset,
+                    tokenPolicy.pendingEffectiveDate,
+                    tokenResetLabel,
+                  )}
+                >
+                  {sel(
+                    draft.token.reset,
+                    TOKEN_RESET_OPTIONS,
+                    (v) => setToken('reset', v),
+                    'Token numbers start again',
+                  )}
+                </RuleRow>
+                <RuleRow
+                  label="Reuse cancelled numbers"
+                  hint={
+                    draft.token.reuseCancelled
+                      ? 'A cancelled token’s number is given to the next patient who joins'
+                      : 'Cancelled numbers are skipped'
+                  }
+                >
+                  <Toggle
+                    value={draft.token.reuseCancelled}
+                    onChange={(v) => setToken('reuseCancelled', v)}
+                    label="Reuse cancelled token numbers"
+                    disabled={!mayEdit}
+                  />
+                </RuleRow>
+                <RuleRow
+                  label="Expected consultation time"
+                  hint="Minutes per patient for wait estimates, when a doctor has no time of their own"
+                >
+                  <div className="w-32.5">
+                    <Field label="" htmlFor="consult-minutes" error={errorFor('consultMinutes')}>
+                      <TextInput
+                        id="consult-minutes"
+                        value={draft.rules.consultMinutes}
+                        onChange={(v) => setRule('consultMinutes', v.replace(/[^0-9]/g, ''))}
+                        height={40}
+                        inputMode="numeric"
+                        aria-label="Expected consultation time in minutes"
+                        disabled={!mayEdit}
+                      />
+                    </Field>
+                  </div>
+                </RuleRow>
+                <RuleRow
+                  label="Offer No-show after"
+                  hint={`After ${draft.rules.noShowCalls} the queue offers to mark the patient a no-show`}
+                >
+                  {sel(
+                    draft.rules.noShowCalls,
+                    NO_SHOW_CALL_OPTIONS,
+                    (v) => setRule('noShowCalls', v),
+                    'Offer No-show after',
+                  )}
+                </RuleRow>
+                <RuleRow label="Patients can cancel a token" hint={tokenCancelCopy}>
+                  <div className="w-52">
+                    <Select
+                      value={draft.rules.tokenCancel}
+                      options={withCurrent(TOKEN_CANCEL_OPTIONS, draft.rules.tokenCancel)}
+                      onChange={(v) => setRule('tokenCancel', v)}
+                      height={40}
+                      aria-label="How long patients can cancel a token"
+                      disabled={!mayEdit}
+                    />
+                  </div>
+                </RuleRow>
+                <RuleRow
+                  label="Full names on the queue display"
+                  hint={
+                    draft.rules.displayFullName
+                      ? 'The waiting-room screen shows each patient’s full name'
+                      : 'The waiting-room screen shows first name and last initial'
+                  }
+                  last
+                >
+                  <Toggle
+                    value={draft.rules.displayFullName}
+                    onChange={(v) => setRule('displayFullName', v)}
+                    label="Show full names on the queue display"
+                    disabled={!mayEdit}
+                  />
+                </RuleRow>
+              </RuleCard>
+
+              <RuleCard title="Token label" hint="How a token number is printed and shown">
+                <RuleRow label="Format" hint={tokenPreviewCopy}>
+                  <div className="w-40">
+                    <Field label="" htmlFor="token-format" error={errorFor('tokenFormat')}>
+                      <TextInput
+                        id="token-format"
+                        value={draft.token.format}
+                        onChange={(v) => setToken('format', v)}
+                        height={40}
+                        aria-label="Token label format"
+                        disabled={!mayEdit}
+                      />
+                    </Field>
+                  </div>
+                </RuleRow>
+                <RuleRow label="Prefix" hint="Printed for {PREFIX}">
+                  <div className="w-32.5">
+                    <Field label="" htmlFor="token-prefix" error={errorFor('tokenPrefix')}>
+                      <TextInput
+                        id="token-prefix"
+                        value={draft.token.prefix}
+                        onChange={(v) => setToken('prefix', v)}
+                        height={40}
+                        aria-label="Token prefix"
+                        disabled={!mayEdit}
+                      />
+                    </Field>
+                  </div>
+                </RuleRow>
+                <RuleRow label="Online marker" hint="Printed for {SRC} on an online booking">
+                  <div className="w-32.5">
+                    <Field label="" htmlFor="online-marker" error={errorFor('onlineMarker')}>
+                      <TextInput
+                        id="online-marker"
+                        value={draft.token.onlineMarker}
+                        onChange={(v) => setToken('onlineMarker', v)}
+                        height={40}
+                        aria-label="Online booking marker"
+                        disabled={!mayEdit}
+                      />
+                    </Field>
+                  </div>
+                </RuleRow>
+                <RuleRow label="Walk-in marker" hint="Printed for {SRC} on a walk-in">
+                  <div className="w-32.5">
+                    <Field label="" htmlFor="walk-in-marker" error={errorFor('offlineMarker')}>
+                      <TextInput
+                        id="walk-in-marker"
+                        value={draft.token.offlineMarker}
+                        onChange={(v) => setToken('offlineMarker', v)}
+                        height={40}
+                        aria-label="Walk-in marker"
+                        disabled={!mayEdit}
+                      />
+                    </Field>
+                  </div>
+                </RuleRow>
+                <RuleRow
+                  label="Separate number ranges"
+                  hint={
+                    draft.token.separateRanges
+                      ? 'Online and walk-in tokens count within their own ranges'
+                      : 'Online and walk-in tokens share one count'
+                  }
+                  last={!draft.token.separateRanges}
+                >
+                  <Toggle
+                    value={draft.token.separateRanges}
+                    onChange={(v) => setToken('separateRanges', v)}
+                    label="Give online and walk-in tokens separate number ranges"
+                    disabled={!mayEdit}
+                  />
+                </RuleRow>
+                {draft.token.separateRanges && (
+                  <div className="flex flex-col gap-3 pt-3.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Online from" htmlFor="online-from">
+                        <TextInput
+                          id="online-from"
+                          value={draft.token.onlineFrom}
+                          onChange={(v) => setToken('onlineFrom', v.replace(/[^0-9]/g, ''))}
+                          height={40}
+                          inputMode="numeric"
+                          disabled={!mayEdit}
+                        />
+                      </Field>
+                      <Field label="Online to" htmlFor="online-to">
+                        <TextInput
+                          id="online-to"
+                          value={draft.token.onlineTo}
+                          onChange={(v) => setToken('onlineTo', v.replace(/[^0-9]/g, ''))}
+                          height={40}
+                          inputMode="numeric"
+                          disabled={!mayEdit}
+                        />
+                      </Field>
+                      <Field label="Walk-in from" htmlFor="walk-in-from">
+                        <TextInput
+                          id="walk-in-from"
+                          value={draft.token.walkInFrom}
+                          onChange={(v) => setToken('walkInFrom', v.replace(/[^0-9]/g, ''))}
+                          height={40}
+                          inputMode="numeric"
+                          disabled={!mayEdit}
+                        />
+                      </Field>
+                      <Field label="Walk-in to" htmlFor="walk-in-to">
+                        <TextInput
+                          id="walk-in-to"
+                          value={draft.token.walkInTo}
+                          onChange={(v) => setToken('walkInTo', v.replace(/[^0-9]/g, ''))}
+                          height={40}
+                          inputMode="numeric"
+                          disabled={!mayEdit}
+                        />
+                      </Field>
+                    </div>
+                    {errorFor('tokenRanges') && (
+                      <span className="text-caption text-d-700 flex items-center gap-1.5">
+                        <Icon name="triangle-alert" size={13} /> {errorFor('tokenRanges')}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <p className="text-caption text-text-muted m-0 pt-2">
+                  Placeholders: {'{SEQ}'} or {'{SEQ:3}'} the number (once), {'{SRC}'} the marker,{' '}
+                  {'{PREFIX}'}, {'{DOC}'} the doctor’s code, {'{DEPT}'} the department’s code,{' '}
+                  {'{DATE}'} the date. Changes apply to new tokens at once.
+                </p>
+              </RuleCard>
+
+              <RuleCard title="Fees & patient records">
+                <RuleRow
+                  label="Follow-up window (days)"
                   hint={
                     feeDays > 0
-                      ? `A follow-up within ${feeDays} ${feeDays === 1 ? 'day' : 'days'} is not charged again`
-                      : 'Every visit is charged'
+                      ? `A return visit within ${feeDays} ${feeDays === 1 ? 'day' : 'days'} is charged the doctor’s follow-up fee (the consultation fee if they have none)`
+                      : 'Every visit is charged the consultation fee'
                   }
                 >
                   <div className="w-32.5">
@@ -1184,20 +1586,31 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
                         onChange={(v) => setRule('feeValidity', v.replace(/[^0-9]/g, ''))}
                         height={40}
                         inputMode="numeric"
-                        aria-label="Fee validity in days"
+                        aria-label="Follow-up window in days"
                         disabled={!mayEdit}
                       />
                     </Field>
                   </div>
                 </RuleRow>
-                <RuleRow label="Apply to all departments" hint={NOT_AVAILABLE_HINT} last>
+                <RuleRow
+                  label="Approve patient detail changes"
+                  hint={
+                    draft.rules.patientEditApproval
+                      ? 'A desk edit to a patient’s details waits for an admin to approve it'
+                      : 'Desk edits to patient details apply at once'
+                  }
+                  last
+                >
                   <Toggle
-                    value={false}
-                    onChange={() => undefined}
-                    label="Apply the default fee to all departments"
-                    disabled
+                    value={draft.rules.patientEditApproval}
+                    onChange={(v) => setRule('patientEditApproval', v)}
+                    label="Require approval for desk edits to patient details"
+                    disabled={!mayEdit}
                   />
                 </RuleRow>
+                <p className="text-caption text-text-muted m-0 pt-2">
+                  Consultation and follow-up fees are set per doctor in Doctors &amp; Departments.
+                </p>
               </RuleCard>
             </div>
             <Card pad={16} className="flex items-start gap-2.5">
@@ -1221,45 +1634,44 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
           </>
         )}
 
+        {sec === 'Numbering' && (
+          <NumberingSettings
+            series={numbering}
+            bases={{ mrn: base.mrn, booking: base.booking, receipt: base.receipt }}
+            drafts={{ mrn: draft.mrn, booking: draft.booking, receipt: draft.receipt }}
+            onChange={setNumbering}
+            errorFor={(kind, field) => errorFor(numberingErrorKey(kind, field))}
+            mayEdit={mayEdit}
+          />
+        )}
+
         {sec === 'Notifications' && (
           <>
             <Card pad={14} className="flex items-center gap-2.5">
               <Icon name="info" size={16} className="text-text-muted flex-none" />
               <span className="text-body text-text-muted">
-                Notification preferences are not yet available from the server — these switches are
-                not saved.
+                Medibook sends these automatically. Switching individual messages off is coming
+                later.
               </span>
             </Card>
             <Card pad={28}>
-              <SettingsHead info="Messages the hospital sends to patients via the Medibook app.">
-                Patient Communications
+              <SettingsHead info="Sent by SMS, WhatsApp and the Medibook app whenever Medibook has a message template for the event. App reminders wait out quiet hours (9 pm–8 am).">
+                Patient Messages
               </SettingsHead>
-              {PATIENT_COMMS.map(([k, t, s]) => (
-                <div key={k} className="border-border-soft flex items-center gap-4 border-b py-4">
-                  <div className="flex-1">
-                    <div className="text-body text-text-strong font-medium">{t}</div>
-                    <div className="text-caption text-text-muted">{s}</div>
-                  </div>
-                  <Toggle value={false} onChange={() => undefined} label={t} disabled />
-                </div>
+              {PATIENT_MESSAGES.map(([title, sub]) => (
+                <NotificationRow key={title} title={title} sub={sub} status="Always sent" />
               ))}
               <div className="text-caption text-text-muted mt-4 flex items-center gap-1.5">
-                <Icon name="megaphone" size={14} /> The wording of these messages is edited in
-                Messaging, where each event and channel has its own template.
+                <Icon name="megaphone" size={14} /> The wording of these messages is in Messaging,
+                where each event and channel has its own template.
               </div>
             </Card>
             <Card pad={28}>
-              <SettingsHead info="Alerts for the hospital admin about billing & settlements.">
-                Admin Alerts
+              <SettingsHead info="Emails about billing and settlements, sent to the hospital's staff accounts.">
+                Staff Emails
               </SettingsHead>
-              {ADMIN_ALERTS.map(([k, t, s]) => (
-                <div key={k} className="border-border-soft flex items-center gap-4 border-b py-4">
-                  <div className="flex-1">
-                    <div className="text-body text-text-strong font-medium">{t}</div>
-                    <div className="text-caption text-text-muted">{s}</div>
-                  </div>
-                  <Toggle value={false} onChange={() => undefined} label={t} disabled />
-                </div>
+              {STAFF_EMAILS.map(([title, sub, status]) => (
+                <NotificationRow key={title} title={title} sub={sub} status={status} />
               ))}
             </Card>
           </>
@@ -1286,6 +1698,19 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
         onClose={keepEditing}
         onConfirm={discard}
       />
+    </div>
+  );
+}
+
+/** One automatic message: what it is, and whether it is sent. */
+function NotificationRow({ title, sub, status }: { title: string; sub: string; status: string }) {
+  return (
+    <div className="border-border-soft flex items-center gap-4 border-b py-4">
+      <div className="flex-1">
+        <div className="text-body text-text-strong font-medium">{title}</div>
+        <div className="text-caption text-text-muted">{sub}</div>
+      </div>
+      <span className="text-caption text-text-muted flex-none font-medium">{status}</span>
     </div>
   );
 }

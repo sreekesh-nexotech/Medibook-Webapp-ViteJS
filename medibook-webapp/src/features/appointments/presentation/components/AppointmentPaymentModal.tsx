@@ -189,7 +189,7 @@ function PaymentForm({
               label="Remove line"
               box={40}
               size={15}
-              color="var(--color-d-500)"
+              color="var(--color-d-600)"
               onClick={() =>
                 setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : ls))
               }

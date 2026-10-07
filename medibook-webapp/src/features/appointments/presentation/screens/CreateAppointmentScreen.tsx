@@ -51,7 +51,7 @@ const GENDER_VALUE: Readonly<Record<GenderLabel, NewWalkInPatient['gender']>> = 
 
 /** Native date-input styling — the design's `dateField`. */
 const dateInputClass =
-  'rounded-input border-border text-body text-text-strong h-13.5 w-full border bg-white px-4';
+  'rounded-input border-border-control text-body text-text-strong h-13.5 w-full border bg-white px-4';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -205,6 +205,7 @@ export function CreateAppointmentScreen() {
             ? 'That slot was just taken — pick another time.'
             : failureText(error, 'Could not book the appointment.'),
           'error',
+          error,
         );
       }
     },
@@ -445,7 +446,7 @@ export function CreateAppointmentScreen() {
           <div className="mb-2.5 flex items-center gap-2">
             <span className="font-ui text-label text-text-strong">
               Consultations
-              <span className="text-d-500"> *</span>
+              <span className="text-d-600"> *</span>
             </span>
             <InfoDot text={CONSULT_HINT} />
           </div>
@@ -525,7 +526,7 @@ export function CreateAppointmentScreen() {
                       name="trash-2"
                       label="Remove consultation"
                       box={54}
-                      color="var(--color-d-500)"
+                      color="var(--color-d-600)"
                       onClick={() => removeConsult(c.id)}
                     />
                   ) : (
@@ -552,7 +553,7 @@ export function CreateAppointmentScreen() {
                 value={form.values.remark}
                 onChange={(e) => form.setField('remark', e.target.value)}
                 placeholder="Add any relevant notes..."
-                className="rounded-input border-border text-body-lg text-text-strong h-23 w-full resize-none border p-3.5"
+                className="rounded-input border-border-control text-body-lg text-text-strong h-23 w-full resize-none border p-3.5"
               ></textarea>
             )}
           </Field>

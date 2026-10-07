@@ -162,8 +162,8 @@ export function AdminDashboardScreen() {
       label: period === 'Today' ? 'Appointments Today' : 'Appointments',
       value: data?.appointmentsTotal ?? 0,
       sub: 'Online + walk-in',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'stethoscope',
@@ -191,8 +191,8 @@ export function AdminDashboardScreen() {
         data && data.refundedRupees > 0
           ? `Collected less ${money(data.refundedRupees)} refunded`
           : 'Desk + online prepaid, collected',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
   ];
 
@@ -203,7 +203,7 @@ export function AdminDashboardScreen() {
   if (alerts && alerts.unpaidWalkInsToday > 0) {
     ALERTS.push({
       icon: 'indian-rupee',
-      iconClass: 'bg-d-100 text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
       t: `${plural(alerts.unpaidWalkInsToday, 'walk-in payment')} pending`,
       s: 'Awaiting collection at the desk today',
       go: 'appointments',
@@ -230,7 +230,7 @@ export function AdminDashboardScreen() {
   if (alerts && alerts.cashSessionsToReconcile > 0) {
     ALERTS.push({
       icon: 'scale',
-      iconClass: 'bg-y-100 text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
       t: `${plural(alerts.cashSessionsToReconcile, 'cash session')} to reconcile`,
       s: 'Closed desk drawers awaiting a check',
       go: 'payments',
@@ -239,7 +239,7 @@ export function AdminDashboardScreen() {
   if (onHold.length) {
     ALERTS.push({
       icon: 'triangle-alert',
-      iconClass: 'bg-y-100 text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
       go: 'settlements',
@@ -270,6 +270,7 @@ export function AdminDashboardScreen() {
   if (dashboard.isLoadingError && !data) {
     return (
       <ErrorState
+        error={dashboard.error}
         title="The dashboard could not load"
         message={
           isFailure(dashboard.error)
@@ -290,8 +291,9 @@ export function AdminDashboardScreen() {
         onRefresh={refresh}
       />
       {loading ? <SkeletonKpiStrip count={KPIS.length} /> : <KpiStrip items={KPIS} />}
-      <div className="flex gap-5">
-        <Card className="flex-[3]">
+      {/* Side by side on wide screens; stacked on tablets and small laptops (PERF-05). */}
+      <div className="flex flex-col gap-5 xl:flex-row">
+        <Card className="min-w-0 xl:flex-3">
           <SectionTitle size={16} className="mb-4.5">
             Appointments by Department — {period}
           </SectionTitle>
@@ -311,7 +313,7 @@ export function AdminDashboardScreen() {
             Appointments per department {periodWord}, cancellations and no-shows excluded.
           </div>
         </Card>
-        <Card className="flex-[2]">
+        <Card className="min-w-0 xl:flex-2">
           <SectionTitle size={16} className="mb-4">
             Requires Attention
           </SectionTitle>
@@ -352,8 +354,8 @@ export function AdminDashboardScreen() {
           )}
         </Card>
       </div>
-      <div className="flex gap-5">
-        <Card className="flex-[2]">
+      <div className="flex flex-col gap-5 xl:flex-row">
+        <Card className="min-w-0 xl:flex-2">
           <div className="mb-4 flex items-center justify-between">
             <SectionTitle size={16}>Doctor Performance</SectionTitle>
             <button
@@ -401,7 +403,7 @@ export function AdminDashboardScreen() {
             ; ratings and availability from the doctor roster.
           </div>
         </Card>
-        <Card className="flex-1">
+        <Card className="min-w-0 xl:flex-1">
           <SectionTitle size={16} className="mb-4">
             Appointments by Status — {period}
           </SectionTitle>

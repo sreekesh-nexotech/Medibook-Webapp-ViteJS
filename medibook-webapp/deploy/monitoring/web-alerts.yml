@@ -1,0 +1,35 @@
+# Alerts for the Medibook web app, next to the backend's deploy/prometheus/alerts.yml
+# (docs/MONITORING.md, checklist OBS-05). Severities follow the backend's routing:
+# page = on-call now, ticket = next working day. Tests: web-alerts_test.yml.
+groups:
+  - name: medibook-web
+    rules:
+      - alert: WebAppDown
+        # 2 minutes of failed checks at a 15 s interval, so a blip does not page.
+        expr: probe_success{job="medibook-web"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations: { summary: 'The Medibook web app is not loading at {{ $labels.instance }}' }
+      - alert: WebStaticFilesDown
+        expr: probe_success{job="medibook-web-static"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          { summary: "The web app's files are not being served at {{ $labels.instance }}" }
+      - alert: WebSocketRouteDown
+        expr: probe_success{job="medibook-ws"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          { summary: 'Live updates (queue, alerts) are unreachable at {{ $labels.instance }}' }
+      - alert: WebChecksMissing
+        # The checks themselves stopped (blackbox_exporter down or the jobs removed).
+        expr: absent(probe_success{job="medibook-web"}) or absent(probe_success{job="medibook-ws"})
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: 'The web app checks have not run for 10 minutes' }
+      - alert: WebCertificateExpiring
+        expr: probe_ssl_earliest_cert_expiry{job="medibook-web"} - time() < 14 * 86400
+        for: 1h
+        labels: { severity: ticket }
+        annotations: { summary: "The web app's TLS certificate expires in under 14 days" }

@@ -44,13 +44,14 @@ export function VoidInvoiceModal({ invoice, onClose }: VoidInvoiceModalProps) {
         toast(`${invoice.invoiceNo} voided.`, 'success');
         onClose();
       } catch (error) {
-        toast(failureText(error, VOID_FAILED), 'error');
+        toast(failureText(error, VOID_FAILED), 'error', error);
       }
     },
   });
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Void ${invoice.invoiceNo}?`}

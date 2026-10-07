@@ -63,6 +63,7 @@ export function ReportsScreen() {
   if (catalog.isLoadingError) {
     return (
       <ErrorState
+        error={catalog.error}
         title="Reports didn't load"
         message={isFailure(catalog.error) ? catalog.error.message : undefined}
         onRetry={() => void catalog.refetch()}

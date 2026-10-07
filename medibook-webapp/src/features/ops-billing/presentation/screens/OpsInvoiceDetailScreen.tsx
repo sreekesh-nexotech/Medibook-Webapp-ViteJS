@@ -37,6 +37,7 @@ export function OpsInvoiceDetailScreen() {
           />
         ) : (
           <ErrorState
+            error={invoiceQuery.error}
             inline
             title="This invoice didn't load"
             message={failureText(invoiceQuery.error, 'Please try again.')}

@@ -2,16 +2,21 @@ import { ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
 import { fetchAllPages } from '@/core/api/pagination';
 
+import type { NumberingKind } from '@/features/settings/domain/entities/settings.entities';
 import type {
   BankAccountWriteRequest,
   HospitalProfilePatchRequest,
   HospitalSettingsPutRequest,
+  NumberingPutRequest,
   ScheduleHoursPutRequest,
+  TokenPolicyPutRequest,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.request';
 import type {
   BankAccountResponse,
   HospitalProfileResponse,
   HospitalSettingsResponse,
+  NumberingListResponse,
+  NumberingSeriesResponse,
   ScheduleHoursListResponse,
   TokenPolicyResponse,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
@@ -20,6 +25,8 @@ import {
   bankAccountResponseSchema,
   hospitalProfileResponseSchema,
   hospitalSettingsResponseSchema,
+  numberingListResponseSchema,
+  numberingSeriesResponseSchema,
   scheduleHoursListResponseSchema,
   tokenPolicyResponseSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
@@ -30,6 +37,7 @@ const PROFILE_PATH = '/profile';
 const SETTINGS_PATH = '/settings';
 const HOURS_PATH = '/hours';
 const TOKEN_POLICY_PATH = '/token-policy';
+const NUMBERING_PATH = '/numbering';
 const BANK_ACCOUNTS_PATH = '/billing/bank-accounts';
 
 export async function getProfile(): Promise<HospitalProfileResponse> {
@@ -75,11 +83,29 @@ export async function getTokenPolicy(): Promise<TokenPolicyResponse> {
 }
 
 export async function putTokenPolicy(
-  body: { readonly scope: string },
+  body: TokenPolicyPutRequest,
   version: number,
 ): Promise<TokenPolicyResponse> {
   const response = await hospitalApi.put(TOKEN_POLICY_PATH, body, { headers: ifMatch(version) });
   return tokenPolicyResponseSchema.parse(response.data);
+}
+
+/** `GET /hospital/numbering` — the MRN, booking and receipt series. */
+export async function getNumbering(): Promise<NumberingListResponse> {
+  const response = await hospitalApi.get(NUMBERING_PATH);
+  return numberingListResponseSchema.parse(response.data);
+}
+
+/** `PUT /hospital/numbering/{kind}` — omitted fields keep their value. */
+export async function putNumbering(
+  kind: NumberingKind,
+  body: NumberingPutRequest,
+  version: number,
+): Promise<NumberingSeriesResponse> {
+  const response = await hospitalApi.put(`${NUMBERING_PATH}/${kind}`, body, {
+    headers: ifMatch(version),
+  });
+  return numberingSeriesResponseSchema.parse(response.data);
 }
 
 export async function listBankAccounts(): Promise<readonly BankAccountResponse[]> {

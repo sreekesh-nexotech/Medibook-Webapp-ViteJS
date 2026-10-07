@@ -62,8 +62,11 @@ function statusNote(r: DataRequest): string {
   if (r.status === 'completed') return r.exportFileId ? 'File ready to download' : 'Closed';
   if (r.status === 'no_data') return 'No records held — nothing was written';
   if (r.status === 'rejected') return r.notes ?? 'Rejected';
-  if (OPEN_DATA_REQUEST_STATUSES.has(r.status)) return 'The nightly run prepares it if not now';
-  return '';
+  if (!OPEN_DATA_REQUEST_STATUSES.has(r.status)) return '';
+  // The backend refuses to process or reject a deletion: the account-deletion flow owns it.
+  if (r.kind === 'deletion') return 'Handled by the account deletion — nothing to do here';
+  if (r.kind === 'rectification') return 'Correct the record, then mark it done';
+  return 'The nightly run prepares it if not now';
 }
 
 interface ExportRequestsCardProps {
@@ -78,8 +81,10 @@ interface ExportRequestsCardProps {
  *
  * THE LAW, made visible: a request shows its real status — Requested while
  * waiting, Completed with a downloadable file only once the server wrote one,
- * No data when the account held nothing. Open requests can be prepared now
- * or rejected with a reason.
+ * No data when the account held nothing. Open export requests can be
+ * prepared now, rectifications marked done once the record is corrected, and
+ * either rejected with a reason. Deletion requests follow the patient's own
+ * account deletion, so they offer no action here (the backend refuses one).
  */
 export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCardProps) {
   const [page, setPage] = useState(0);
@@ -98,7 +103,11 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
       { fileId: r.exportFileId, filename: `medibook-${r.requestNo.toLowerCase()}` },
       {
         onError: (error) =>
-          toast(isFailure(error) ? error.message : 'The export file could not be opened.', 'error'),
+          toast(
+            isFailure(error) ? error.message : 'The export file could not be opened.',
+            'error',
+            error,
+          ),
       },
     );
   };
@@ -114,7 +123,11 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
           setRejecting(null);
         },
         onError: (error) =>
-          toast(isFailure(error) ? error.message : 'The request could not be rejected.', 'error'),
+          toast(
+            isFailure(error) ? error.message : 'The request could not be rejected.',
+            'error',
+            error,
+          ),
       },
     );
   };
@@ -124,6 +137,7 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
     : requestsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: requestsQuery.error,
           title: "Recorded requests didn't load.",
           message: isFailure(requestsQuery.error) ? requestsQuery.error.message : undefined,
           onRetry: () => void requestsQuery.refetch(),
@@ -146,6 +160,8 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
           const look = DATA_REQUEST_LOOK[r.status];
           const isOpen = canAct && OPEN_DATA_REQUEST_STATUSES.has(r.status);
           const canPrepare = isOpen && r.kind === 'export';
+          const canMarkDone = isOpen && r.kind === 'rectification';
+          const canReject = isOpen && r.kind !== 'deletion';
           return (
             <tr key={r.id}>
               <td className={cn(tdClass, 'whitespace-nowrap')}>
@@ -204,11 +220,21 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
                       Prepare now
                     </Button>
                   )}
-                  {isOpen && (
+                  {canMarkDone && (
+                    <Button
+                      size="sm"
+                      busy={processingId === r.id}
+                      disabled={processingId != null && processingId !== r.id}
+                      onClick={() => onProcess(r)}
+                    >
+                      Mark done
+                    </Button>
+                  )}
+                  {canReject && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-d-500"
+                      className="text-d-600"
                       onClick={() => setRejecting(r)}
                     >
                       Reject

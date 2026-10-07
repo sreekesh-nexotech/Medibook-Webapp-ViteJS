@@ -59,6 +59,7 @@ function PatternModal({ pattern, onSave, onClose }: PatternModalProps) {
   });
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={pattern ? 'Edit Shift Pattern' : 'Add Shift Pattern'}
@@ -210,7 +211,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
                     title={`Remove ${p.name}`}
                     box={32}
                     size={15}
-                    color="var(--color-d-500)"
+                    color="var(--color-d-600)"
                     onClick={() => setRemoving(p)}
                   />
                 </Can>

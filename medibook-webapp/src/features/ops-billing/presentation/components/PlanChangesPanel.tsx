@@ -69,6 +69,7 @@ export function PlanChangesPanel() {
     : query.isLoadingError
       ? {
           kind: 'error',
+          error: query.error,
           message: failureText(query.error, DECIDE_FAILED),
           onRetry: () => void query.refetch(),
         }
@@ -91,7 +92,7 @@ export function PlanChangesPanel() {
         toast(`Plan changed to ${planName(approving.toPlanId)}.`, 'success');
         setApproving(null);
       },
-      onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error'),
+      onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error', error),
     });
   };
 
@@ -105,7 +106,7 @@ export function PlanChangesPanel() {
           setRejecting(null);
           setNote('');
         },
-        onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error'),
+        onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error', error),
       },
     );
   };

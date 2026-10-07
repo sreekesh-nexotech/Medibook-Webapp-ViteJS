@@ -9,8 +9,22 @@ Zustand (client state) · Axios · Zod · React Router · Tailwind CSS v4 · oxl
 
 ```bash
 npm install
+cp .env.example .env.local   # then point the dev proxy at a backend
 npm run dev
 ```
+
+The full setup — Node version, running the backend locally or using the shared test
+server, seeded sign-ins — is in [`docs/SETUP.md`](docs/SETUP.md).
+
+## Runbooks
+
+| Task                     | Where                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| Set up a machine         | [`docs/SETUP.md`](docs/SETUP.md)                                                             |
+| Cut a release            | [`docs/RELEASING.md`](docs/RELEASING.md)                                                     |
+| Deploy and roll back     | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §5–6                                              |
+| Handle an incident       | [`docs/INCIDENTS.md`](docs/INCIDENTS.md)                                                     |
+| Backend gaps and roadmap | [`docs/BACKEND_BLOCKERS.md`](docs/BACKEND_BLOCKERS.md), [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 
 ## Scripts
 
@@ -27,10 +41,18 @@ npm run dev
 | `npm run e2e`          | Browser smoke tests (Playwright; needs `E2E_*`)  |
 | `npm run preview`      | Preview the production build                     |
 
+`npm run build` needs the API and WebSocket origins (`docs/DEPLOYMENT.md`); for a
+local check, set `VITE_API_BASE_URL=same-origin` and `VITE_WS_BASE_URL=same-origin`
+in `.env.local` (development treats them like empty values).
+
 All of `lint`, `typecheck`, `format:check`, `test`, and `build` must pass before
 merging; CI (`.github/workflows/ci.yml`) runs them, plus `npm audit`, on every pull
 request. Releases, tests and fixtures are described in
-[`docs/RELEASING.md`](docs/RELEASING.md).
+[`docs/RELEASING.md`](docs/RELEASING.md); building and hosting a release in
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md); error reports and alerts in
+[`docs/MONITORING.md`](docs/MONITORING.md); supported browsers in
+[`docs/SUPPORTED_BROWSERS.md`](docs/SUPPORTED_BROWSERS.md); polling and list limits in
+[`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 ## Documentation — read before writing code
 

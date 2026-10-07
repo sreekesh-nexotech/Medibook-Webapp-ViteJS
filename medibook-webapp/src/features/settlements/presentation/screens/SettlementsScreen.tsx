@@ -138,24 +138,24 @@ export function SettlementsScreen() {
       label: 'Paid Out',
       value: rupeesShort(paid),
       sub: `${total ? Math.round((paid / total) * PERCENT) : 0}% of total`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'triangle-alert',
       label: 'On Hold',
       value: rupees(sumNet(onHold)),
       sub: `${onHold.length} period${onHold.length === 1 ? '' : 's'}`,
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
     },
     {
       icon: 'clock',
       label: 'Current Period (Accruing)',
       value: rupees(accruing),
       sub: 'net so far, paid out after the period closes',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
   ];
 
@@ -182,6 +182,7 @@ export function SettlementsScreen() {
   else if (periodsQuery.isLoadingError)
     tableState = {
       kind: 'error',
+      error: periodsQuery.error,
       message: isFailure(periodsQuery.error) ? periodsQuery.error.message : undefined,
       onRetry: () => void periodsQuery.refetch(),
     };

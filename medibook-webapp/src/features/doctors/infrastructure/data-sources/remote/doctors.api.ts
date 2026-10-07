@@ -137,6 +137,11 @@ function doctorBody(input: DoctorInput) {
     bio: input.bio || null,
     room: input.room || null,
     consultation_fee_paise: Math.round(input.feeRupees * PAISE_PER_RUPEE),
+    follow_up_fee_paise:
+      input.followUpFeeRupees === null
+        ? null
+        : Math.round(input.followUpFeeRupees * PAISE_PER_RUPEE),
+    is_bookable_online: input.isBookableOnline,
     status: input.status,
     photo_file_id: input.photoFileId,
   };

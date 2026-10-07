@@ -25,6 +25,8 @@ interface FormModalProps {
   disabled?: boolean;
   /** Extra footer content, rendered to the left of Cancel. */
   footerLeft?: ReactNode;
+  /** Unsaved changes: closing other than by Cancel asks first (A11Y-07). */
+  dirty?: boolean;
 }
 
 /**
@@ -49,6 +51,7 @@ export function FormModal({
   busy = false,
   disabled = false,
   footerLeft,
+  dirty = false,
 }: FormModalProps) {
   const formId = `form-modal-${useId()}`;
   return (
@@ -57,6 +60,7 @@ export function FormModal({
       onClose={onClose}
       title={title}
       width={width}
+      dirty={dirty && !busy}
       footer={
         <>
           {footerLeft}

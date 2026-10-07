@@ -7,16 +7,13 @@ import { HospitalShell } from '@/app/layouts/HospitalShell';
 import { AUTH_LOGIN_PATH, hospitalDashboardPath, isHospitalRole } from '@/app/router/paths';
 import { SessionError } from '@/app/router/SessionError';
 import { SessionLoading } from '@/app/router/SessionLoading';
+import { SuspendedMessage } from '@/app/router/SuspendedMessage';
 import { useSessionExit } from '@/app/router/useSessionExit';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import { hospitalSessionOf, hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
 import { NotFoundScreen } from '@/app/layouts/NotFoundScreen';
 import { OfflineSession } from '@/app/router/SessionError';
-
-/** Shown when the backend has suspended the hospital (login still works, D-30). */
-const SUSPENDED_MESSAGE =
-  "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate.";
 
 /**
  * Guard for the `/:role/*` layout. Validates the stored tokens with
@@ -42,6 +39,7 @@ export function HospitalGuard() {
       }
       return (
         <SessionError
+          error={session.error}
           message={isFailure(session.error) ? session.error.message : undefined}
           onRetry={() => void session.refetch()}
           onLogout={logout}
@@ -61,7 +59,7 @@ export function HospitalGuard() {
 
   if (data.hospital.status === 'suspended') {
     return (
-      <SessionError title="Hospital suspended" message={SUSPENDED_MESSAGE} onLogout={logout} />
+      <SessionError title="Hospital suspended" message={<SuspendedMessage />} onLogout={logout} />
     );
   }
 

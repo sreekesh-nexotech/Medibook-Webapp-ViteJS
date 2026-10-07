@@ -2,10 +2,12 @@ import { getFileUrl, uploadFile } from '@/core/api/files.api';
 import { attempt } from '@/core/error/attempt';
 import type { Result } from '@/core/error/failure';
 import { ok } from '@/core/error/failure';
+import { clientFailure } from '@/core/error/toFailure';
 
 import type { SettingsRepository } from '@/features/settings/domain/repositories/settings.repository';
 import {
   getHours,
+  getNumbering,
   getProfile,
   getSettings,
   getTokenPolicy,
@@ -14,22 +16,29 @@ import {
   patchProfile,
   postBankAccount,
   putHours,
+  putNumbering,
   putSettings,
   putTokenPolicy,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.api';
 import {
   toBankAccountWriteRequest,
   toHoursPutRequest,
+  toNumberingPutRequest,
   toProfilePatchRequest,
   toSettingsPutRequest,
+  toTokenPolicyPutRequest,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.request';
 import {
   toBankAccount,
   toHospitalHours,
   toHospitalProfile,
   toHospitalRuleSettings,
+  toNumberingList,
+  toNumberingSeries,
   toTokenPolicy,
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
+
+const UNEXPECTED_RESPONSE = 'The server sent an unexpected response. Please try again.';
 
 export const settingsRepository: SettingsRepository = {
   getProfile: () => attempt(async () => toHospitalProfile(await getProfile())),
@@ -53,8 +62,22 @@ export const settingsRepository: SettingsRepository = {
 
   getTokenPolicy: () => attempt(async () => toTokenPolicy(await getTokenPolicy())),
 
-  updateTokenScope: (scope, version) =>
-    attempt(async () => toTokenPolicy(await putTokenPolicy({ scope }, version))),
+  updateTokenPolicy: (changes, version) =>
+    attempt(async () =>
+      toTokenPolicy(await putTokenPolicy(toTokenPolicyPutRequest(changes), version)),
+    ),
+
+  listNumbering: () => attempt(async () => toNumberingList(await getNumbering())),
+
+  updateNumbering: (kind, changes, version) =>
+    attempt(async () => {
+      const series = toNumberingSeries(
+        await putNumbering(kind, toNumberingPutRequest(changes), version),
+      );
+      // The server answers with the series it was sent; anything else is a broken response.
+      if (!series) throw clientFailure('parse', UNEXPECTED_RESPONSE);
+      return series;
+    }),
 
   listBankAccounts: () => attempt(async () => (await listBankAccounts()).map(toBankAccount)),
 

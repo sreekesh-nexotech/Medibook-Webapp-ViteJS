@@ -161,7 +161,7 @@
               "hold_expires_at": null,
               "booking": {
                 "appointment_id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
-                "booking_ref": "LKSB-2610-00211",
+                "booking_ref": "EXMB-2610-00211",
                 "token_label": "W001",
                 "status": "scheduled"
               }

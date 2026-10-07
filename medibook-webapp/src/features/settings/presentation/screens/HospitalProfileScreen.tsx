@@ -61,9 +61,10 @@ import { HolidayModal } from '@/features/settings/presentation/components/Holida
 import { PatientBannerModal } from '@/features/settings/presentation/components/PatientBannerModal';
 import { PatientBannerThumb } from '@/features/settings/presentation/components/PatientBannerThumb';
 
-type ProfileTab = 'Branches' | 'Holiday Calendar' | 'Patient App Banners';
+/** No Branches tab: the backend has no branches yet (PRD-05; PRD-10 roadmap). */
+type ProfileTab = 'Holiday Calendar' | 'Patient App Banners';
 
-const TABS: readonly ProfileTab[] = ['Branches', 'Holiday Calendar', 'Patient App Banners'];
+const TABS: readonly ProfileTab[] = ['Holiday Calendar', 'Patient App Banners'];
 
 /** Window the "closures ahead" summary counts over. */
 const HORIZON_DAYS = 90;
@@ -229,7 +230,7 @@ export function HospitalProfileScreen() {
       toast(holidayOpSuccessCopy(op), 'success');
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -248,7 +249,7 @@ export function HospitalProfileScreen() {
         'success',
       );
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
     }
   };
 
@@ -271,7 +272,7 @@ export function HospitalProfileScreen() {
       }
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -282,14 +283,14 @@ export function HospitalProfileScreen() {
       { id: b.id, changes: { isEnabled: nowEnabled }, version: b.version },
       {
         onSuccess: () => toast(nowEnabled ? 'Banner resumed' : 'Banner paused', 'info'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
 
   const moveBanner = (index: number, dir: -1 | 1): void => {
     reorderBanners.mutate(moved(banners, index, dir), {
-      onError: (error) => toast(`Order not fully saved — ${errorCopy(error)}`, 'error'),
+      onError: (error) => toast(`Order not fully saved — ${errorCopy(error)}`, 'error', error),
     });
   };
 
@@ -311,7 +312,7 @@ export function HospitalProfileScreen() {
       { id: target.id, version: target.version },
       {
         onSuccess: () => toast('Banner deleted — it is off the patient app', 'info'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
@@ -333,6 +334,7 @@ export function HospitalProfileScreen() {
     : holidaysQuery.isLoadingError
       ? {
           kind: 'error',
+          error: holidaysQuery.error,
           title: 'The holiday calendar did not load',
           message: 'Nothing has changed. Retry to load it again.',
           onRetry: () => void holidaysQuery.refetch(),
@@ -368,7 +370,7 @@ export function HospitalProfileScreen() {
           </div>
           <div className="text-caption text-text-muted">
             Closures stop slot generation; banners show on the hospital&apos;s page in the patient
-            app. Branches are not yet available from the server.
+            app. Branches are coming later.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-5">
@@ -406,16 +408,6 @@ export function HospitalProfileScreen() {
         )}
       </Card>
 
-      {tab === 'Branches' && (
-        <Card>
-          <EmptyState
-            icon="building"
-            title="Branches are not yet available from the server"
-            message="The hospital API has no branches endpoint yet, so branches cannot be listed or edited here. The holiday calendar and patient-app banners are live."
-          />
-        </Card>
-      )}
-
       {tab === 'Holiday Calendar' && (
         <Card>
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -436,7 +428,7 @@ export function HospitalProfileScreen() {
             <div
               className={cn(
                 'text-body mb-4 flex items-start gap-2 rounded-md px-3.5 py-3',
-                nextClosure ? 'bg-y-100 text-y-800' : 'bg-g-100 text-g-700',
+                nextClosure ? 'bg-y-100 text-y-800' : 'bg-g-100 text-g-800',
               )}
             >
               <Icon
@@ -543,7 +535,7 @@ export function HospitalProfileScreen() {
                           title={`Remove ${h.name}`}
                           box={36}
                           size={15}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() =>
                             setToDelete({
                               kind: 'holiday',
@@ -569,7 +561,7 @@ export function HospitalProfileScreen() {
       {tab === 'Patient App Banners' && (
         <>
           <Card pad={16} className="flex items-center gap-3">
-            <div className="bg-g-100 text-g-600 flex size-9.5 flex-none items-center justify-center rounded-md">
+            <div className="bg-g-100 text-g-800 flex size-9.5 flex-none items-center justify-center rounded-md">
               <Icon name="smartphone" size={18} />
             </div>
             <div className="min-w-0">
@@ -606,6 +598,7 @@ export function HospitalProfileScreen() {
               <SkeletonCards count={2} lines={3} />
             ) : bannersQuery.isLoadingError ? (
               <ErrorState
+                error={bannersQuery.error}
                 inline
                 title="Banners did not load"
                 message="Nothing has changed. Retry to load them again."
@@ -709,7 +702,7 @@ export function HospitalProfileScreen() {
                           title={`Delete “${b.title}”`}
                           box={36}
                           size={15}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() =>
                             setToDelete({
                               kind: 'banner',

@@ -122,6 +122,7 @@ export function PatientDetailScreen() {
           />
         ) : (
           <ErrorState
+            error={patientQuery.error}
             inline
             title="This patient didn't load"
             message={patientQuery.error.message}
@@ -164,6 +165,7 @@ export function PatientDetailScreen() {
     : historyQuery.isLoadingError
       ? {
           kind: 'error',
+          error: historyQuery.error,
           message: historyQuery.error.message,
           onRetry: () => void historyQuery.refetch(),
         }
@@ -206,8 +208,9 @@ export function PatientDetailScreen() {
         </Can>
       </Card>
       {p.pendingChange && <PatientChangeNotice change={p.pendingChange} />}
-      <div className="flex gap-5">
-        <div className="flex flex-[2] flex-col gap-5">
+      {/* Side by side on wide screens; stacked on tablets (PERF-05). */}
+      <div className="flex flex-col gap-5 xl:flex-row">
+        <div className="flex min-w-0 flex-col gap-5 xl:flex-2">
           <Card>
             <SectionTitle size={16} className="mb-3.5">
               Booking History
@@ -257,7 +260,7 @@ export function PatientDetailScreen() {
             )}
           </Card>
         </div>
-        <div className="flex flex-1 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 xl:flex-1">
           <Card>
             <SectionTitle size={16} className="mb-2">
               Contact Details
@@ -286,7 +289,7 @@ export function PatientDetailScreen() {
             )}
             {infoRow(
               'Outstanding',
-              <span className={cn('tabular-nums', pending ? 'text-d-500' : 'text-text-strong')}>
+              <span className={cn('tabular-nums', pending ? 'text-d-600' : 'text-text-strong')}>
                 {historyQuery.isSuccess ? money(paiseToRupees(pending)) : '—'}
               </span>,
             )}

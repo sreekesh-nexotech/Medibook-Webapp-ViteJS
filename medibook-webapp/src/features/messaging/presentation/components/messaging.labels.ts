@@ -108,10 +108,15 @@ export const MESSAGING_PLACEHOLDERS: readonly PlaceholderDef[] = [
   ...PLATFORM_PLACEHOLDERS,
 ];
 
-/** Sample values for every token, for the template preview. */
-export function messagingSampleValues(): Readonly<Record<string, string>> {
+/**
+ * Sample values for every token, for the template preview — with the signed-in
+ * hospital's own name when it is known, so a preview never names another
+ * hospital (PRD-03).
+ */
+export function messagingSampleValues(hospitalName?: string): Readonly<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const p of MESSAGING_PLACEHOLDERS) out[p.token] = p.sample;
+  if (hospitalName) out['{{hospitalName}}'] = hospitalName;
   return out;
 }
 

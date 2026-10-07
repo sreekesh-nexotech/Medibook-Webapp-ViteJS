@@ -39,7 +39,11 @@ function RemarkForm({ appt, onClose }: { appt: DeskAppointment; onClose: () => v
           onClose();
         },
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not save the remark.', 'error'),
+          toast(
+            isFailure(failure) ? failure.message : 'Could not save the remark.',
+            'error',
+            failure,
+          ),
       },
     );
   };
@@ -70,7 +74,7 @@ function RemarkForm({ appt, onClose }: { appt: DeskAppointment; onClose: () => v
             id={field.id}
             value={remark}
             onChange={(e) => setRemark(e.target.value)}
-            className="rounded-input border-border text-body text-text-strong box-border h-24 w-full resize-none border p-3"
+            className="rounded-input border-border-control text-body text-text-strong box-border h-24 w-full resize-none border p-3"
           />
         )}
       </Field>

@@ -113,11 +113,15 @@ interface ProviderMeta {
 /** The providers the backend meters (`analytics/services/rollup.py` `PROVIDERS`). */
 const PROVIDER_META: Readonly<Record<string, ProviderMeta>> = {
   sms: { label: 'SMS', icon: 'message-circle', color: 'var(--color-blue)' },
-  whatsapp: { label: 'WhatsApp', icon: 'smartphone', color: 'var(--color-g-600)' },
+  whatsapp: { label: 'WhatsApp', icon: 'smartphone', color: 'var(--color-g-800)' },
   email: { label: 'Email', icon: 'mail', color: 'var(--color-p-500)' },
-  push: { label: 'Push notifications', icon: 'bell-ring', color: 'var(--color-y-600)' },
-  razorpay: { label: 'Payments · Razorpay', icon: 'credit-card', color: 'var(--color-orange)' },
-  storage: { label: 'File storage', icon: 'layers', color: 'var(--color-d-500)' },
+  push: { label: 'Push notifications', icon: 'bell-ring', color: 'var(--color-y-800)' },
+  razorpay: {
+    label: 'Payments · Razorpay',
+    icon: 'credit-card',
+    color: 'var(--color-orange-strong)',
+  },
+  storage: { label: 'File storage', icon: 'layers', color: 'var(--color-d-600)' },
   clamav: { label: 'Virus scan · ClamAV', icon: 'shield-check', color: 'var(--color-text-navy)' },
 };
 

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { referenceOf } from '@/core/error/reference';
+
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -16,6 +18,9 @@ import type { IconName } from '@/shared/ui/icon-registry';
  *            (`app/layouts/ScreenError` is this, with the crash copy)
  *   inline   no card, no min-height — for one failed section, panel or
  *            drawer body inside an otherwise healthy screen.
+ *
+ * Pass the query's `error` and a failed request shows its support reference,
+ * the id the backend logged it under (OBS-04).
  */
 
 const DEFAULT_TITLE = 'Something went wrong';
@@ -33,6 +38,10 @@ interface ErrorStateProps {
   children?: ReactNode;
   /** Section variant: no card, no min-height centring. */
   inline?: boolean;
+  /** What failed; a failed request adds its support reference. */
+  error?: unknown;
+  /** A reference to show instead (a crash report's id). */
+  reference?: string | null;
   className?: string;
 }
 
@@ -44,20 +53,30 @@ export function ErrorState({
   retryLabel = 'Retry',
   children,
   inline = false,
+  error,
+  reference,
   className,
 }: ErrorStateProps) {
+  const supportRef = reference ?? referenceOf(error);
+  const gap = inline ? 'mb-4' : 'mb-5.5';
   const body = (
     <>
       <div
         className={cn(
-          'bg-d-100 text-d-500 mx-auto flex items-center justify-center rounded-lg',
+          'bg-d-100 text-d-600 mx-auto flex items-center justify-center rounded-lg',
           inline ? 'mb-3 size-11' : 'mb-4 size-14',
         )}
       >
         <Icon name={icon} size={inline ? 22 : 26} />
       </div>
       <div className={cn('text-text-strong mb-2', inline ? 'text-h3' : 'text-h2')}>{title}</div>
-      <p className={cn('text-body text-text-muted', inline ? 'mb-4' : 'mb-5.5')}>{message}</p>
+      <p className={cn('text-body text-text-muted', supportRef ? 'mb-1.5' : gap)}>{message}</p>
+      {supportRef && (
+        <p className={cn('text-caption text-text-muted', gap)}>
+          Support reference{' '}
+          <span className="text-text-body font-mono font-medium select-all">{supportRef}</span>
+        </p>
+      )}
       <div className="flex flex-wrap justify-center gap-3">
         {onRetry && (
           <Button

@@ -1,6 +1,6 @@
 {
   "id": "01a0ee28-e8d9-7aa0-86ce-0edfb7c2b13f",
-  "receipt_no": "LKSR/26-27/00002",
+  "receipt_no": "EXMR/26-27/00002",
   "fy_code": "FY2026-27",
   "appointment_id": "01a0ee28-e882-7011-bb5f-c269c60e2a02",
   "visit_id": null,
@@ -19,7 +19,7 @@
       "tax_code": "EXEMPT",
       "tax_paise": 0,
       "unit_paise": 90000,
-      "booking_ref": "LKSB-2608-00002",
+      "booking_ref": "EXMB-2608-00002",
       "description": "Consultation",
       "tax_rate_bp": 0,
       "amount_paise": 90000,

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { todayISO } from '@/shared/lib/format';
+import { formatUpdatedAt, todayISO } from '@/shared/lib/format';
 import { useSearchParams } from 'react-router-dom';
 
 import { useNow } from '@/shared/hooks/useNow';
@@ -17,7 +17,6 @@ import { isFailure } from '@/core/error/failure';
 import { TOKEN_DEPT_PARAM } from '@/app/router/paths';
 
 import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
-import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import { useQueueSessionsQuery } from '@/features/token-queue/application/queries/tokenQueue.queries';
@@ -109,7 +108,7 @@ export function TokenCountersScreen() {
     {
       label: 'Longest',
       val: longest ? `${longest}m` : '—',
-      color: longest > LONG_WAIT_MINUTES ? 'text-d-500' : 'text-g-600',
+      color: longest > LONG_WAIT_MINUTES ? 'text-d-600' : 'text-g-800',
     },
   ];
 
@@ -127,11 +126,11 @@ export function TokenCountersScreen() {
   // RUN-07: say when live updates are off, not "Reconnecting" for ever.
   const live =
     socketStatus === 'open'
-      ? { label: 'Live', dot: 'bg-g-600', title: 'Live updates on' }
+      ? { label: 'Live', dot: 'bg-success', title: 'Live updates on' }
       : socketStatus === 'unauthorized'
         ? {
             label: 'Live updates off',
-            dot: 'bg-d-500',
+            dot: 'bg-d-600',
             title: 'Live updates are off; the queue still refreshes every minute',
           }
         : { label: 'Reconnecting', dot: 'bg-y-700', title: 'Live updates reconnecting' };
@@ -195,6 +194,7 @@ export function TokenCountersScreen() {
         <Card pad={24}>
           <ErrorState
             inline
+            error={loadError}
             title="The live queue didn't load"
             message={isFailure(loadError) ? loadError.message : undefined}
             onRetry={() => {

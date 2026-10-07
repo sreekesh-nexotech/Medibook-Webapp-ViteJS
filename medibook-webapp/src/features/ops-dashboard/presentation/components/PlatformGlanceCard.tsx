@@ -7,12 +7,12 @@ import type { OpsDashboardKpis } from '@/features/ops-dashboard/domain/entities/
 const CHART_HEIGHT = 180;
 
 /** Bar colors from the `@theme` tokens, one per status. */
-const COLOR_ACTIVE = 'var(--color-g-600)';
-const COLOR_PENDING = 'var(--color-y-600)';
-const COLOR_PROBLEM = 'var(--color-d-500)';
+const COLOR_ACTIVE = 'var(--color-g-800)';
+const COLOR_PENDING = 'var(--color-y-800)';
+const COLOR_PROBLEM = 'var(--color-d-600)';
 const COLOR_NEUTRAL = 'var(--color-text-muted)';
 const COLOR_INFO = 'var(--color-blue)';
-const COLOR_WARNING = 'var(--color-orange)';
+const COLOR_WARNING = 'var(--color-orange-strong)';
 
 interface PlatformGlanceCardProps {
   kpis: OpsDashboardKpis;

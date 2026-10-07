@@ -2,13 +2,13 @@
   "results": [
     {
       "id": "01a1061d-f875-7f50-bf58-d7c724fbc6ec",
-      "booking_ref": "LKSB-2610-00191",
+      "booking_ref": "EXMB-2610-00191",
       "status": "cancelled",
       "status_reason": null,
       "source": "online",
       "patient": {
         "id": "01a1061d-f850-72d2-9684-a119c346d805",
-        "mrn": "LKSM000043",
+        "mrn": "EXMM000043",
         "full_name": "Testbaby",
         "phone_e164": "+910000000000",
         "gender": null,
@@ -89,13 +89,13 @@
     },
     {
       "id": "01a10fd4-1a93-7771-89f4-c99a61492e7c",
-      "booking_ref": "LKSB-2610-00211",
+      "booking_ref": "EXMB-2610-00211",
       "status": "scheduled",
       "status_reason": null,
       "source": "walk_in",
       "patient": {
         "id": "01a1061d-f850-72d2-9684-a119c346d805",
-        "mrn": "LKSM000043",
+        "mrn": "EXMM000043",
         "full_name": "Testbaby",
         "phone_e164": "+910000000000",
         "gender": null,

@@ -4,6 +4,7 @@ import { MAX_PAGE_SIZE, paginatedSchema, fetchCappedPages } from '@/core/api/pag
 
 import type {
   AppointmentRange,
+  ApptSource,
   PaymentLineInput,
   WalkInInput,
 } from '@/features/appointments/domain/entities/appointments.entities';
@@ -60,6 +61,20 @@ export function getAppointments(range: AppointmentRange) {
     });
     return appointmentPageSchema.parse(response.data);
   }, APPOINTMENT_PAGES_MAX);
+}
+
+/** How many appointments a window holds, optionally of one source — one row is read. */
+export async function getAppointmentCount(range: AppointmentRange, source: ApptSource | null) {
+  const response = await hospitalApi.get('/appointments', {
+    params: {
+      page: 1,
+      page_size: 1,
+      date_from: range.dateFrom,
+      date_to: range.dateTo,
+      ...(source ? { source } : {}),
+    },
+  });
+  return appointmentPageSchema.parse(response.data).total;
 }
 
 export async function getAppointment(id: string) {

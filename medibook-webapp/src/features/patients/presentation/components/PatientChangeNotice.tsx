@@ -59,7 +59,7 @@ export function PatientChangeNotice({ change }: PatientChangeNoticeProps) {
     approve.mutate(change.id, {
       onSuccess: () =>
         toast(change.kind === 'delete' ? 'Deletion approved' : 'Change approved', 'success'),
-      onError: (error) => toast(saveErrorMessage(error, DECIDE_FAILED), 'error'),
+      onError: (error) => toast(saveErrorMessage(error, DECIDE_FAILED), 'error', error),
     });
   };
 
@@ -73,7 +73,7 @@ export function PatientChangeNotice({ change }: PatientChangeNoticeProps) {
           toast('Request rejected', 'success');
           setIsRejecting(false);
         },
-        onError: (error) => toast(saveErrorMessage(error, DECIDE_FAILED), 'error'),
+        onError: (error) => toast(saveErrorMessage(error, DECIDE_FAILED), 'error', error),
       },
     );
   };

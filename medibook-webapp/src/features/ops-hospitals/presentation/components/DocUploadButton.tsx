@@ -61,7 +61,9 @@ export function DocUploadButton({
         type="file"
         accept={acceptFor('kyc')}
         onChange={handleChange}
-        className="sr-only"
+        // The button below is the control people use; the picker stays out
+        // of the page's reading and Tab order (A11Y-04).
+        hidden
       />
       <button
         type="button"

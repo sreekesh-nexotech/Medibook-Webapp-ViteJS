@@ -34,14 +34,14 @@ import type {
  */
 const ROLE_PRESENTATION: Readonly<Record<StaffRoleCode, { color: string; desc: string }>> = {
   admin: {
-    color: 'var(--color-y-600)',
+    color: 'var(--color-y-800)',
     desc: 'Full access to every module, settings and finance.',
   },
   receptionist: {
     color: 'var(--color-blue)',
     desc: 'Front desk — books walk-ins, records payments, issues tokens.',
   },
-  accountant: { color: 'var(--color-g-600)', desc: 'Payments, settlements and financial reports.' },
+  accountant: { color: 'var(--color-g-800)', desc: 'Payments, settlements and financial reports.' },
   dept_front_desk: {
     color: 'var(--color-p-500)',
     desc: "Manages a department's live token queue and its appointments.",

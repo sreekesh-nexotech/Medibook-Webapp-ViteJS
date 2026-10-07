@@ -7,9 +7,10 @@ import { fetchHospital } from '@/features/ops-hospitals/application/usecases/fet
 
 const HOSPITAL_DETAIL_STALE_TIME_MS = 30_000;
 
-/** One hospital's full platform profile. */
-export function useHospitalQuery(id: string) {
+/** One hospital's full platform profile. Pass `enabled: false` to stay idle. */
+export function useHospitalQuery(id: string, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: hospitalsKeys.detail(id),
     queryFn: async () => unwrap(await fetchHospital(id)),
     staleTime: HOSPITAL_DETAIL_STALE_TIME_MS,

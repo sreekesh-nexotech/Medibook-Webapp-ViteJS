@@ -4,6 +4,7 @@ import { cn } from '@/shared/lib/cn';
 import type { HospitalRole, HospitalView } from '@/app/router/paths';
 
 import { NAV_MODEL, NAV_PERMISSION_MODULE, type HospitalNavView } from './hospital-nav';
+import { HospitalLogo } from './HospitalLogo';
 import { HospitalNavItem } from './HospitalNavItem';
 import type { SidebarMode } from './useSidebarMode';
 
@@ -53,11 +54,11 @@ export function HospitalSidebar({
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <img src="/assets/medibook-mark.svg" alt="" className="size-8.5 flex-none" />
+        <HospitalLogo className="size-8.5 flex-none rounded-md object-contain" />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg truncate font-bold text-black">{hospitalName}</div>
-            <div className="text-text-faint text-[10.5px] font-medium tracking-[.04em]">
+            <div className="text-text-muted text-[10.5px] font-medium tracking-[.04em]">
               Medibook · mbAdmin
             </div>
           </div>
@@ -73,7 +74,7 @@ export function HospitalSidebar({
               {s.section}
             </div>
           )}
-          <nav className="flex flex-col gap-1">
+          <nav aria-label={s.section} className="flex flex-col gap-1">
             {s.items.map((i) => (
               <HospitalNavItem
                 key={i.id}

@@ -75,7 +75,8 @@ export function RoleEditor({ role, onClose }: RoleEditorProps) {
           toast(`${role.name} permissions updated`, 'success');
           onClose();
         },
-        onError: (failure) => toast(failureText(failure, 'Could not save the role.'), 'error'),
+        onError: (failure) =>
+          toast(failureText(failure, 'Could not save the role.'), 'error', failure),
       },
     );
 

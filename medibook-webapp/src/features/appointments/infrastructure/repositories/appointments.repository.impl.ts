@@ -15,6 +15,8 @@ export const appointmentsRepository: AppointmentsRepository = {
       const { rows, truncated } = await api.getAppointments(range);
       return { items: rows.map(toAppointment), truncated };
     }),
+
+  count: (range, source) => attempt(() => api.getAppointmentCount(range, source)),
   get: (id) => attempt(async () => toAppointment(await api.getAppointment(id))),
   events: (id) => attempt(async () => (await api.getEvents(id)).map(toEvent)),
   createWalkIn: (input, replayKey) =>

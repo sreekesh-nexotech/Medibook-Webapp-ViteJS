@@ -14,37 +14,48 @@ interface SortThProps {
   onSort?: (key: string) => void;
 }
 
-/** Shared clickable sort header cell — used by table shells. */
+/**
+ * Shared sort header cell — used by table shells. A sortable column holds a
+ * real button and says how it is sorted (`aria-sort`), so it works from the
+ * keyboard and a screen reader hears the order (A11Y-01).
+ */
 export function SortTh({ label, baseClassName, right, sortKeys, sort, onSort }: SortThProps) {
   const key = sortKeys?.[label];
-  const clickable = Boolean(key && onSort);
   const active = Boolean(sort && key && sort.key === key);
+  const ariaSort = active && sort ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined;
+  if (!key || !onSort) {
+    return (
+      <th className={cn(baseClassName, right ? 'text-right' : 'text-left', 'select-none')}>
+        {label}
+      </th>
+    );
+  }
   return (
     <th
-      onClick={key && onSort ? () => onSort(key) : undefined}
-      className={cn(
-        baseClassName,
-        right ? 'text-right' : 'text-left',
-        clickable ? 'cursor-pointer' : 'cursor-default',
-        'select-none',
-      )}
+      aria-sort={ariaSort}
+      className={cn(baseClassName, right ? 'text-right' : 'text-left', 'select-none')}
     >
-      <span className={cn('inline-flex items-center gap-1.25', right && 'flex-row-reverse')}>
-        {label}
-        {clickable && (
-          <Icon
-            name={
-              active && sort
-                ? sort.dir === 'asc'
-                  ? 'chevron-up'
-                  : 'chevron-down'
-                : 'chevrons-up-down'
-            }
-            size={14}
-            className={active ? 'text-text-navy' : 'text-text-faint'}
-          />
+      <button
+        type="button"
+        onClick={() => onSort(key)}
+        className={cn(
+          'inline-flex cursor-pointer items-center gap-1.25',
+          right && 'flex-row-reverse',
         )}
-      </span>
+      >
+        {label}
+        <Icon
+          name={
+            active && sort
+              ? sort.dir === 'asc'
+                ? 'chevron-up'
+                : 'chevron-down'
+              : 'chevrons-up-down'
+          }
+          size={14}
+          className={active ? 'text-text-navy' : 'text-text-faint'}
+        />
+      </button>
     </th>
   );
 }

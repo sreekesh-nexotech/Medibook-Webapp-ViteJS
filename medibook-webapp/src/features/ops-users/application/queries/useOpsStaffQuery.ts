@@ -9,8 +9,9 @@ import { fetchOpsStaff } from '@/features/ops-users/application/usecases/fetchOp
 const STAFF_STALE_TIME_MS = 60_000;
 
 /** Internal staff (`GET /platform/staff`), first page of up to 100. */
-export function useOpsStaffQuery() {
+export function useOpsStaffQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: opsUsersKeys.staff(),
     queryFn: async () => unwrap(await fetchOpsStaff()),
     staleTime: STAFF_STALE_TIME_MS,

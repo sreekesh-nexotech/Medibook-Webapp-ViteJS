@@ -8,8 +8,9 @@ import { billingKeys } from '@/features/ops-billing/application/queries/billing.
 import { fetchPlanChanges } from '@/features/ops-billing/application/usecases/fetchPlanChanges';
 
 /** Hospitals' plan-change requests, newest first. */
-export function usePlanChangesQuery(params: PlanChangeListParams) {
+export function usePlanChangesQuery(params: PlanChangeListParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: billingKeys.planChanges(params),
     queryFn: async () => unwrap(await fetchPlanChanges(params)),
     placeholderData: keepPreviousData,

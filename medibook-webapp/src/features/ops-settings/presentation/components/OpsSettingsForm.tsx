@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
-import { Button } from '@/shared/ui/Button';
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
@@ -9,7 +8,6 @@ import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
-import { Toggle } from '@/shared/ui/Toggle';
 import { UnsavedBar } from '@/shared/ui/UnsavedBar';
 import { toast } from '@/shared/ui/toast/toast.store';
 
@@ -46,22 +44,16 @@ const SERVER_FIELD: Partial<Record<keyof PlatformSettingsValues, FormKey>> = {
   sessionTimeoutMin: 'sessTimeout',
 };
 
-/** Shown on controls the platform API does not store yet. */
-const UNAVAILABLE = 'Not available yet';
-const UNAVAILABLE_HINT = 'Not available yet — the platform API does not store this setting.';
-
-const NOTIF_TOGGLES: readonly { key: string; title: string; desc: string }[] = [
-  {
-    key: 'notifSettle',
-    title: 'Settlement alerts',
-    desc: 'Notify when a payout fails or is on hold.',
-  },
-  {
-    key: 'notifCompliance',
-    title: 'Compliance alerts',
-    desc: 'Notify on critical audit events in real time.',
-  },
-  { key: 'notifDigest', title: 'Weekly digest', desc: 'Platform summary every Monday at 09:00.' },
+/**
+ * Settings the platform API does not store yet. They are listed as coming
+ * later instead of being shown as controls that do nothing (PRD-05).
+ */
+const COMING_LATER: readonly string[] = [
+  'A support email address',
+  'A payout schedule',
+  'Settlement and compliance alerts, and a weekly digest',
+  'Requiring two-factor sign-in',
+  'API keys',
 ];
 
 /** GSTINs are exactly 15 characters. */
@@ -112,9 +104,9 @@ interface OpsSettingsFormProps {
 }
 
 /**
- * Platform settings — Organisation, Payouts & Billing, Notifications, Security
- * (Ops.jsx OpsSettings), saved through `PUT /platform/settings`. Controls with
- * no backend field are shown disabled rather than saved locally.
+ * Platform settings — Organisation, Payouts & Billing, Security (Ops.jsx
+ * OpsSettings), saved through `PUT /platform/settings`. Settings the API does
+ * not store are listed as coming later, not shown as dead controls.
  */
 export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
   const initial = toForm(settings);
@@ -165,7 +157,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
             if (formKey) fromServer[formKey] = messages[0] ?? null;
           }
           setErr((p) => ({ ...p, ...fromServer }));
-          toast(failure.message, 'error');
+          toast(failure.message, 'error', failure);
         },
       },
     );
@@ -187,7 +179,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
       )}
       <Card>
         <SectionTitle className="mb-4">Organisation</SectionTitle>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <OpsField
             label="Platform Name"
             error={err.legalName}
@@ -197,16 +189,6 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
               value={f.legalName}
               name="legalName"
               onChange={(v) => upd('legalName', v)}
-              height={48}
-            />
-          </OpsField>
-          <OpsField label="Support Email" hint={UNAVAILABLE_HINT}>
-            <TextInput
-              value=""
-              name="orgEmail"
-              type="email"
-              placeholder={UNAVAILABLE}
-              disabled
               height={48}
             />
           </OpsField>
@@ -229,58 +211,20 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
 
       <Card>
         <SectionTitle className="mb-4">Payouts &amp; Billing</SectionTitle>
-        <div className="grid grid-cols-3 gap-4">
-          <OpsField label="Payout Schedule" hint={UNAVAILABLE_HINT}>
-            <Select value="" placeholder={UNAVAILABLE} disabled height={48} />
-          </OpsField>
-          <OpsField
-            label="Platform Commission (%)"
-            hint="Set per hospital: open it under Hospitals, then Billing & Settlements › Commercial Terms. There is no platform-wide default."
-          >
-            <TextInput value="" name="commission" placeholder={UNAVAILABLE} disabled height={48} />
-          </OpsField>
+        <div className="grid grid-cols-2 gap-4">
           <OpsField label="GST Number" error={err.gstin} hint="Shown on every invoice and receipt.">
             <TextInput value={f.gstin} name="gst" onChange={(v) => upd('gstin', v)} height={48} />
           </OpsField>
         </div>
-      </Card>
-
-      <Card>
-        <SectionTitle className="mb-4.5">Notifications</SectionTitle>
-        <div className="flex flex-col gap-4.5">
-          {NOTIF_TOGGLES.map(({ key, title, desc }) => (
-            <div key={key} className="flex items-start gap-3">
-              <Toggle value={false} onChange={() => undefined} label={title} disabled />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-body text-text-strong font-medium">{title}</span>
-                <span className="text-caption text-text-muted">{desc}</span>
-                <span className="text-caption text-text-faint">{UNAVAILABLE_HINT}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <p className="text-caption text-text-muted m-0 mt-3">
+          Commission is set per hospital, not platform-wide: open the hospital under Hospitals, then
+          Billing &amp; Settlements › Commercial Terms.
+        </p>
       </Card>
 
       <Card>
         <SectionTitle className="mb-4.5">Security</SectionTitle>
         <div className="flex flex-col gap-4.5">
-          <div className="flex items-start gap-3">
-            <Toggle
-              value={false}
-              onChange={() => undefined}
-              label="Require 2FA for all admins"
-              disabled
-            />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-body text-text-strong font-medium">
-                Require 2FA for all admins
-              </span>
-              <span className="text-caption text-text-muted">
-                Admins without 2FA are prompted at next sign-in.
-              </span>
-              <span className="text-caption text-text-faint">{UNAVAILABLE_HINT}</span>
-            </div>
-          </div>
           <div className="w-72">
             <OpsField
               label="Session Timeout"
@@ -295,15 +239,19 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
               />
             </OpsField>
           </div>
-          <div className="border-border-soft flex flex-wrap items-center gap-3 border-t pt-4">
-            <span className="text-body text-text-strong font-medium">API Key</span>
-            <span className="text-body text-text-muted">{UNAVAILABLE_HINT}</span>
-            <div className="flex-1" />
-            <Button size="sm" variant="secondary" icon="refresh-cw" disabled>
-              Rotate Key
-            </Button>
-          </div>
         </div>
+      </Card>
+
+      <Card>
+        <SectionTitle className="mb-2">Coming later</SectionTitle>
+        <p className="text-caption text-text-muted m-0 mb-2">
+          The platform does not store these settings yet:
+        </p>
+        <ul className="text-body text-text-body m-0 flex list-disc flex-col gap-1 pl-5">
+          {COMING_LATER.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </Card>
 
       {canEdit && <UnsavedBar dirty={dirty} busy={saving} onSave={onSave} onDiscard={onDiscard} />}

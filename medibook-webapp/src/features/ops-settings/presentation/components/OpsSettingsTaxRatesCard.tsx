@@ -53,7 +53,11 @@ export function OpsSettingsTaxRatesCard() {
       {
         onSuccess: () => toast(`${target.code} deleted.`, 'success'),
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not delete that rate.', 'error'),
+          toast(
+            isFailure(failure) ? failure.message : 'Could not delete that rate.',
+            'error',
+            failure,
+          ),
       },
     );
   };
@@ -64,6 +68,7 @@ export function OpsSettingsTaxRatesCard() {
   } else if (rates.isLoadingError) {
     state = {
       kind: 'error',
+      error: rates.error,
       title: 'Could not load tax rates',
       message: isFailure(rates.error) ? rates.error.message : undefined,
       onRetry: () => void rates.refetch(),
@@ -128,7 +133,7 @@ export function OpsSettingsTaxRatesCard() {
         ))}
       </TableShell>
       {total > items.length && (
-        <p className="text-caption text-text-faint mt-3">
+        <p className="text-caption text-text-muted mt-3">
           Showing {items.length} of {total} rates.
         </p>
       )}

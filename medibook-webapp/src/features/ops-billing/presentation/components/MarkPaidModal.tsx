@@ -109,7 +109,7 @@ export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
         );
         onClose();
       } catch (error) {
-        toast(failureText(error, MARK_PAID_FAILED), 'error');
+        toast(failureText(error, MARK_PAID_FAILED), 'error', error);
       }
     },
   });
@@ -119,6 +119,7 @@ export function MarkPaidModal({ invoice, onClose }: MarkPaidModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Mark ${invoice.invoiceNo} as paid`}

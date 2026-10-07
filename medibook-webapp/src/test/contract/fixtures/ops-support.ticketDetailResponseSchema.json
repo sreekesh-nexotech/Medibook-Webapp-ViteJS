@@ -1,0 +1,47 @@
+{
+  "id": "01a0ee2d-898f-72b0-94ec-70af74f010e6",
+  "ticket_no": "TKT-2026-0014",
+  "raised_by_kind": "hospital_staff",
+  "hospital_id": "01a0ee28-8170-7771-8658-5ceccb9495f1",
+  "category": "billing",
+  "subject": "Sample subject",
+  "description": "Sample description.",
+  "priority": "normal",
+  "status": "resolved",
+  "resolved_at": "2026-09-25T16:30:00.078506Z",
+  "closed_at": null,
+  "created_at": "2026-09-19T16:30:00.220405Z",
+  "updated_at": "2026-09-25T16:30:00.078535Z",
+  "version": 3,
+  "raised_by_id": "01a0ee28-8edd-7671-9c98-0ec68610cb82",
+  "assigned_to_id": "01a0ee28-7ddc-7f42-9b03-c073d081697a",
+  "messages": [
+    {
+      "id": "01a0ee2d-8998-7a41-9c0d-47adcda98616",
+      "author_kind": "requester",
+      "author_name": "Sample Person",
+      "body": "Sample message.",
+      "attachment_file_ids": ["01a0ee2d-8933-7833-bc26-37b96e4cabba"],
+      "occurred_at": "2026-09-19T16:30:00.229368Z",
+      "is_internal": false
+    },
+    {
+      "id": "01a0ee2d-cc36-74d2-adf0-fadd74ef796b",
+      "author_kind": "platform_staff",
+      "author_name": "Sample Person",
+      "body": "Sample message.",
+      "attachment_file_ids": [],
+      "occurred_at": "2026-09-21T16:30:01.364510Z",
+      "is_internal": false
+    },
+    {
+      "id": "01a0ee2d-cc56-70e1-b2e9-8807d5c1d5be",
+      "author_kind": "platform_staff",
+      "author_name": "Sample Person",
+      "body": "Sample message.",
+      "attachment_file_ids": [],
+      "occurred_at": "2026-09-21T16:30:01.396341Z",
+      "is_internal": true
+    }
+  ]
+}

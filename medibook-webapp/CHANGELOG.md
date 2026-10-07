@@ -26,6 +26,46 @@ All notable changes to the Medibook web app. The format follows
 - A branded error page with Reload and Log out for any crash outside a screen.
 - Appointment lists that include today refresh every minute.
 
+- Support Tickets in the ops console: filter, find by number, reply (emailed to the
+  person who raised it), internal notes, status and priority, and assignment for
+  roles that can list staff.
+- Error messages show a support reference that matches the backend's logs; every
+  API request carries an `X-Request-Id`.
+- Error reports — crashes, failed requests, unreadable responses — go to a monitor
+  when `VITE_MONITORING_URL` is set, without patient data and at most ten a minute.
+- Hospital Settings saves every rule the backend uses: approval of online bookings,
+  refunds before and after the cut-off and of the convenience fee, appointment
+  notes, missed calls before a no-show, token cancellation, expected consultation
+  time, full names on the queue display and approval of patient edits. The token
+  label (format, prefix, markers, number ranges, reuse, counter and restart) and a
+  new Numbering section for MRN, booking and receipt numbers are editable too, with
+  a preview of what the next one will look like.
+- Doctors have a follow-up fee and a "Bookable in the Medibook app" switch.
+- Ops Logs filter by who acted, by one person and by resource, and name the actor
+  where the role can look them up.
+- Paste "lat, lng" from a map app into Hospital Settings, and check the point on
+  OpenStreetMap.
+- The sidebar shows the hospital's own logo to roles with Hospital Settings access.
+- Hosting kit: an nginx config, security headers, a post-deploy checker, uptime
+  probes and alert rules.
+- Setup, deployment, incident, monitoring, browser, performance and roadmap docs.
+
+### Changed
+
+- Fonts ship as five WOFF2 files (59 kB) instead of nine TTF files (1.44 MB).
+- Each role polls only what it can read: receptionists no longer poll the admin
+  dashboard, and roles without Dashboard access poll none.
+- Users & Roles shows 25 people a page; dashboards stack on smaller screens, and no
+  screen scrolls sideways from 768 to 1366 px wide.
+- Receipts and invoices print in full on A4 and A5, and token slips 72 mm wide.
+- The payments CSV follows the Walk-in / Online filter.
+- A feature the server has not built yet (501) says "This isn't available in Medibook
+  yet." instead of "Something went wrong", and is not reported as a crash.
+- Help & Support shows only the contacts the platform has configured, and its FAQs
+  match the app.
+- The front-desk dashboard shows the serving token's number, not a "T-0xx" label
+  the hospital's token format may not use.
+
 ### Fixed
 
 - Bank accounts, holidays, banners, the onboarding document catalogue and active
@@ -53,6 +93,27 @@ All notable changes to the Medibook web app. The format follows
   Availability legend card; its yellow outline now comes from a token Tailwind
   cannot read as a border width.
 
+- Sign-in and other forms are labelled and submit with Enter; every screen has a
+  skip link and a main landmark; dialogs keep focus inside, Escape closes one layer
+  at a time, and leaving an edited form asks first; tabs, toggles and sortable
+  columns work from the keyboard; toasts are announced and error toasts stay until
+  dismissed; text and control colours meet WCAG AA contrast.
+- Ops Logs labelled every row "Info" and ignored the severity and module filters.
+- The follow-up window's description said return visits are free; they are charged
+  the doctor's follow-up fee.
+
+### Removed
+
+- Made-up figures on the sign-in screen, a "Mark all read" button that marked
+  nothing, a stand-in map, an image placeholder that only said "demo", and a
+  preview that named another hospital.
+- Controls that did nothing and columns that were always empty: in Hospital Settings,
+  the add-user options, Ops Settings, and the ops lists of hospitals, users and
+  patient accounts; the Branches tab. What is not built yet is listed in
+  `docs/ROADMAP.md`.
+- Unused code: a timer-based "refresh", unused chart and icon components, and the
+  Vite default favicon.
+
 ### Security
 
 - axios 1.20.0 and source-map-js 1.2.2 (high-severity advisories in earlier
@@ -76,3 +137,7 @@ All notable changes to the Medibook web app. The format follows
   cells that a spreadsheet would run as a formula are neutralised.
 - Real hospital names, identifiers and images are gone from the app, its docs and
   its test fixtures.
+- The app will not start over plain http, except on localhost and the dev server.
+- Browsers older than the supported list see an update notice instead of a broken
+  page.
+- Release builds refuse http API and WebSocket origins.

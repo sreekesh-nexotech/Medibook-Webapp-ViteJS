@@ -65,7 +65,11 @@ function StatementButton({ statement }: { statement: SettlementStatement }) {
   const filename = `${statement.statementNo}.pdf`;
 
   const onError = (failure: unknown): void =>
-    toast(isFailure(failure) ? failure.message : 'Could not download the statement.', 'error');
+    toast(
+      isFailure(failure) ? failure.message : 'Could not download the statement.',
+      'error',
+      failure,
+    );
 
   const handleDownload = (): void => {
     if (statement.pdfFileId) {
@@ -112,6 +116,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
   } else if (detailQuery.isLoadingError || !detail) {
     body = (
       <ErrorState
+        error={detailQuery.error}
         inline
         title="This settlement didn't load"
         message={isFailure(detailQuery.error) ? detailQuery.error.message : undefined}
@@ -180,7 +185,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
               <Line label="Transfer ref (UTR)" value={payout.utrRef ?? '—'} />
               <Line label="Released on" value={fmtDateTime(payout.releasedAt)} />
               {payout.failureReason && (
-                <p className="text-caption text-d-500 m-0 mt-1.5">{payout.failureReason}</p>
+                <p className="text-caption text-d-600 m-0 mt-1.5">{payout.failureReason}</p>
               )}
               {payout.notes && (
                 <p className="text-caption text-text-body m-0 mt-1.5">

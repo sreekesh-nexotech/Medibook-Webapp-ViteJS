@@ -11,10 +11,3 @@ export const HEALTH_STATUS: Readonly<Record<Health, string>> = {
   warning: 'Warning',
   critical: 'Critical',
 };
-
-/** Bar fill per health level, for the allowance meters. */
-export const HEALTH_BAR: Readonly<Record<Health, string>> = {
-  healthy: 'bg-g-600',
-  warning: 'bg-y-600',
-  critical: 'bg-d-500',
-};

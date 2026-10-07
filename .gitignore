@@ -1,0 +1,3 @@
+# Local AI-assistant settings, wherever a session starts (DEP-14). The web app
+# has its own .gitignore in medibook-webapp/.
+.claude/

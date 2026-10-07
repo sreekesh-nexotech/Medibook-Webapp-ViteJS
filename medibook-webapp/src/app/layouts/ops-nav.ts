@@ -48,6 +48,7 @@ export const OPS_NAV: readonly OpsNavSection[] = [
     items: [
       { id: 'users', label: 'Users & Roles', icon: 'shield-check' },
       { id: 'platform-users', label: 'Platform Users', icon: 'users' },
+      { id: 'support', label: 'Support Tickets', icon: 'life-buoy' },
       { id: 'notifications', label: 'Notifications', icon: 'megaphone' },
     ],
   },
@@ -63,6 +64,7 @@ export const OPS_DETAIL_PARENT: Readonly<Partial<Record<OpsView, OpsStaticView>>
   'invoice-detail': 'billing',
   'payment-detail': 'billing',
   'platform-user-detail': 'platform-users',
+  'support-ticket': 'support',
 };
 
 /** Topbar [title, subtitle] per ops view (design `OPS_META`). */
@@ -98,6 +100,8 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
   ],
   compliance: ['Compliance', 'Registration, licence and document compliance per hospital instance'],
   account: ['My Account', 'Your name, password and signed-in devices'],
+  support: ['Support Tickets', 'Questions and problems raised by hospitals and patients'],
+  'support-ticket': ['Support Ticket', 'The conversation, its status and who raised it'],
 };
 
 /** Browser-tab title per ops view — audit 3.9.2 (the console ran under the

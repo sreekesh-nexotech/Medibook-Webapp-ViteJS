@@ -158,25 +158,6 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   account: 'account',
 };
 
-/**
- * Hospital views that must sit behind `RequireAdmin` in the route tree — a
- * receptionist reaching one gets `ForbiddenScreen`, not a silent redirect.
- */
-export const ADMIN_ONLY_HOSPITAL_VIEWS: readonly HospitalView[] = [
-  'settlements',
-  'doctors',
-  'doctor-detail',
-  'users',
-  'reports',
-  'settings',
-  'slots',
-  'profile',
-  'services',
-  'messaging',
-  'audit',
-  'billing',
-];
-
 /** Absolute path for a param-free hospital view. */
 export function hospitalPath(role: HospitalRole, view: HospitalStaticView): string {
   return `/${role}/${HOSPITAL_VIEW_SEGMENT[view]}`;
@@ -228,26 +209,6 @@ export function hospitalDashboardPath(role: HospitalRole): string {
 
 export function hospitalSlotsPath(role: HospitalRole): string {
   return hospitalPath(role, 'slots');
-}
-
-export function hospitalProfilePath(role: HospitalRole): string {
-  return hospitalPath(role, 'profile');
-}
-
-export function hospitalServicesPath(role: HospitalRole): string {
-  return hospitalPath(role, 'services');
-}
-
-export function hospitalMessagingPath(role: HospitalRole): string {
-  return hospitalPath(role, 'messaging');
-}
-
-export function hospitalAuditPath(role: HospitalRole): string {
-  return hospitalPath(role, 'audit');
-}
-
-export function hospitalBillingPath(role: HospitalRole): string {
-  return hospitalPath(role, 'billing');
 }
 
 export function hospitalAccountPath(role: HospitalRole): string {
@@ -313,11 +274,18 @@ export type OpsView =
   /** Document/regulatory compliance per hospital. */
   | 'compliance'
   /** The signed-in user's own account: name, password, sessions. */
-  | 'account';
+  | 'account'
+  /** Support tickets from hospitals and patients (OBS-02). */
+  | 'support'
+  | 'support-ticket';
 
 /** Ops detail views whose URL carries a param (`OpsSel` selection → URL). */
 export type OpsDetailView =
-  'hospital-detail' | 'invoice-detail' | 'payment-detail' | 'platform-user-detail';
+  | 'hospital-detail'
+  | 'invoice-detail'
+  | 'payment-detail'
+  | 'platform-user-detail'
+  | 'support-ticket';
 
 /** Ops views navigable without a param (nav items, notification targets). */
 export type OpsStaticView = Exclude<OpsView, OpsDetailView>;
@@ -343,6 +311,8 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   onboarding: 'onboarding',
   compliance: 'compliance',
   account: 'account',
+  support: 'support',
+  'support-ticket': 'support/:id',
 };
 
 /** Absolute path for a param-free ops view. */
@@ -361,6 +331,16 @@ export function opsPaymentDetailPath(id: string): string {
   return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['payment-detail'].replace(':id', encodeURIComponent(id))}`;
 }
 
+/** One patient account in the ops console. */
+export function opsPlatformUserDetailPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['platform-users']}/${encodeURIComponent(id)}`;
+}
+
+/** One support ticket in the ops inbox. */
+export function opsSupportTicketPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.support}/${encodeURIComponent(id)}`;
+}
+
 export function opsHospitalDetailPath(id: string): string {
   return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.hospitals}/${encodeURIComponent(id)}`;
 }
@@ -369,10 +349,6 @@ export function opsHospitalDetailPath(id: string): string {
 
 export function opsOnboardingPath(): string {
   return opsPath('onboarding');
-}
-
-export function opsCompliancePath(): string {
-  return opsPath('compliance');
 }
 
 export function opsAccountPath(): string {
@@ -396,6 +372,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'onboarding',
   'compliance',
   'account',
+  'support',
 ];
 
 /** Current ops view id from an `/ops/...` pathname. */
@@ -408,5 +385,6 @@ export function opsViewFromPath(pathname: string): OpsView {
   if (first === 'billing' && second === 'invoices' && third) return 'invoice-detail';
   if (first === 'billing' && second === 'payments' && third) return 'payment-detail';
   if (first === 'platform-users' && second) return 'platform-user-detail';
+  if (first === 'support' && second) return 'support-ticket';
   return OPS_SEGMENT_VIEWS.find((v) => v === first) ?? 'dashboard';
 }

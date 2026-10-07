@@ -1,4 +1,4 @@
-import { minutesOfDay, todayISO } from '@/shared/lib/format';
+import { todayISO } from '@/shared/lib/format';
 
 /**
  * Pure local-calendar + clock-time helpers for the catalog and the slot grid.
@@ -107,13 +107,6 @@ export function isoWeekdayLabel(iso: string): WeekDayLabel {
   return WEEK_DAYS[isoWeekdayIndex(iso)];
 }
 
-/** True when `iso` falls inside the inclusive `from`–`to` range (ISO compares lexically). */
-export function isIsoWithin(iso: string, from: string, to: string): boolean {
-  const lo = from <= to ? from : to;
-  const hi = from <= to ? to : from;
-  return iso >= lo && iso <= hi;
-}
-
 /** "Mon 15 Sep" — the slot grid's date-navigator caption. */
 export function formatIsoDayLabel(iso: string): string {
   const date = parseIsoDate(iso);
@@ -149,9 +142,4 @@ export function minutesToTimeLabel(minutes: number): string {
   const hour12 =
     hour24 % HOURS_PER_HALF_DAY === 0 ? HOURS_PER_HALF_DAY : hour24 % HOURS_PER_HALF_DAY;
   return `${hour12}:${String(mins).padStart(2, '0')} ${suffix}`;
-}
-
-/** Minutes since midnight on the hospital's clock, right now — the "past slot" cutoff. */
-export function minutesNow(): number {
-  return minutesOfDay();
 }

@@ -16,10 +16,10 @@
       "collected_by_name": "Vineeth Kumar",
       "counter_code": "C1",
       "cash_session_id": "01a10fd1-2acc-7213-9be2-a84a3c8a5075",
-      "booking_refs": ["LKSB-2610-00211"],
+      "booking_refs": ["EXMB-2610-00211"],
       "patient": {
         "id": "01a1061d-f850-72d2-9684-a119c346d805",
-        "mrn": "LKSM000043",
+        "mrn": "EXMM000043",
         "full_name": "Testbaby"
       },
       "created_at": "2026-10-06T06:09:01.978529Z"
@@ -40,10 +40,10 @@
       "collected_by_name": null,
       "counter_code": null,
       "cash_session_id": null,
-      "booking_refs": ["LKSB-2609-00179"],
+      "booking_refs": ["EXMB-2609-00179"],
       "patient": {
         "id": "01a0ee29-0392-7b20-890f-c734c51972ef",
-        "mrn": "LKSM000006",
+        "mrn": "EXMM000006",
         "full_name": "Priya Nair"
       },
       "created_at": "2026-09-29T17:21:29.207386Z"
@@ -64,10 +64,10 @@
       "collected_by_name": null,
       "counter_code": null,
       "cash_session_id": null,
-      "booking_refs": ["LKSB-2609-00178"],
+      "booking_refs": ["EXMB-2609-00178"],
       "patient": {
         "id": "01a0ee29-0f81-7461-b6dc-da2751b22ea8",
-        "mrn": "LKSM000007",
+        "mrn": "EXMM000007",
         "full_name": "Jacob Mathew"
       },
       "created_at": "2026-09-29T17:21:28.660435Z"
@@ -88,10 +88,10 @@
       "collected_by_name": null,
       "counter_code": null,
       "cash_session_id": null,
-      "booking_refs": ["LKSB-2609-00177"],
+      "booking_refs": ["EXMB-2609-00177"],
       "patient": {
         "id": "01a0ee2a-a70e-7171-9d52-e07d666e0abf",
-        "mrn": "LKSM000016",
+        "mrn": "EXMM000016",
         "full_name": "Imran Sheikh"
       },
       "created_at": "2026-09-29T17:21:27.777915Z"
@@ -112,10 +112,10 @@
       "collected_by_name": null,
       "counter_code": null,
       "cash_session_id": null,
-      "booking_refs": ["LKSB-2609-00176"],
+      "booking_refs": ["EXMB-2609-00176"],
       "patient": {
         "id": "01a0ee29-0392-7b20-890f-c734c51972ef",
-        "mrn": "LKSM000006",
+        "mrn": "EXMM000006",
         "full_name": "Priya Nair"
       },
       "created_at": "2026-09-29T17:21:27.185541Z"

@@ -1,4 +1,4 @@
-import { calendarDate, calendarTimeHm, todayISO } from '@/shared/lib/format';
+import { calendarDate, calendarTimeHm } from '@/shared/lib/format';
 
 /**
  * The one clock every trail-stamped action reads: the hospital's, whatever the
@@ -16,16 +16,4 @@ export function localDateIso(d: Date = new Date()): string {
 /** A moment's wall-clock time as 24h `HH:MM` on the hospital's clock. */
 export function localTimeHm(d: Date = new Date()): string {
   return calendarTimeHm(d);
-}
-
-/** Today as `yyyy-mm-dd` on the hospital's calendar. */
-export function todayIso(): string {
-  return todayISO();
-}
-
-/** Weekday index of an ISO date, 0 = Monday … 6 = Sunday. */
-export function isoWeekdayIndex(iso: string): number {
-  const [y, m, d] = iso.split('-').map(Number);
-  const at = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
-  return (at.getDay() + 6) % 7;
 }

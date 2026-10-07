@@ -35,7 +35,12 @@ const OPS_PU_PAGE = 6;
 /** Wait this long after the last keystroke before searching the server. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-const PU_COLUMNS = ['User', 'Phone', 'City', 'Bookings', 'Joined', 'Status', 'Action'] as const;
+/**
+ * Patient accounts carry no city or booking count, and the server can't count
+ * monthly-active or new accounts (PRD-05-B), so those columns and tiles are
+ * left out rather than shown as dashes.
+ */
+const PU_COLUMNS = ['User', 'Phone', 'Joined', 'Status', 'Action'] as const;
 
 /** The one column the server can sort — registration date. */
 const JOINED_SORT_KEY = 'joined';
@@ -49,9 +54,6 @@ const STATUS_FILTERS: readonly (readonly [string, PlatformUserStatus])[] = [
   ['Pending deletion', 'pending_deletion'],
   ['Deleted', 'deleted'],
 ];
-
-/** Sub-line for tiles the backend has no figure for yet. */
-const NOT_AVAILABLE_SUB = 'Not available yet';
 
 /** A count tile's value: the number, or an em dash while loading or on error. */
 function countValue(count: number | undefined): string {
@@ -96,30 +98,12 @@ export function OpsPlatformUsersScreen() {
       subClass: 'text-text-muted',
     },
     {
-      icon: 'trending-up',
-      label: 'Monthly Active',
-      value: NO_VALUE,
-      sub: NOT_AVAILABLE_SUB,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
-      subClass: 'text-text-muted',
-    },
-    {
-      icon: 'user-plus',
-      label: 'New This Week',
-      value: NO_VALUE,
-      sub: NOT_AVAILABLE_SUB,
-      iconClass: 'bg-blue-soft-bg text-blue',
-      valueClass: 'text-blue',
-      subClass: 'text-text-muted',
-    },
-    {
       icon: 'ban',
       label: 'Blocked Accounts',
       value: countValue(blockedCount.data),
       sub: 'Fraud or abuse reports',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
     },
   ];
 
@@ -160,6 +144,7 @@ export function OpsPlatformUsersScreen() {
     : list.isLoadingError
       ? {
           kind: 'error',
+          error: list.error,
           title: "Patient accounts didn't load",
           message: isFailure(list.error) ? list.error.message : undefined,
           onRetry: () => void list.refetch(),
@@ -178,7 +163,7 @@ export function OpsPlatformUsersScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
         {kpis.map((k) => (
           <StatCard key={k.label} k={k} />
         ))}
@@ -213,7 +198,6 @@ export function OpsPlatformUsersScreen() {
         <TableShell
           columns={PU_COLUMNS}
           scrollLabel="Patient accounts"
-          rightCols={['Bookings']}
           sortKeys={{ Joined: JOINED_SORT_KEY }}
           sort={sort}
           onSort={handleSort}
@@ -232,8 +216,6 @@ export function OpsPlatformUsersScreen() {
                   <OpsPerson row={{ name, email: u.email ?? NO_VALUE }} />
                 </td>
                 <td className={`${tdClass} tabular-nums`}>{u.phone ?? NO_VALUE}</td>
-                <td className={tdClass}>{NO_VALUE}</td>
-                <td className={`${tdClass} text-right tabular-nums`}>{NO_VALUE}</td>
                 <td className={tdClass}>{formatDate(u.createdAt)}</td>
                 <td className={tdClass}>
                   <Badge status={pill.badge}>{pill.label}</Badge>

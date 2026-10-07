@@ -48,7 +48,8 @@ export function OpsSettlementsHospitalCard({ hospitalId }: OpsSettlementsHospita
 
   let state: TableStateSpec | undefined;
   if (periods.isPending) state = { kind: 'loading', rows: 3 };
-  else if (periods.isLoadingError) state = { kind: 'error', onRetry: () => void periods.refetch() };
+  else if (periods.isLoadingError)
+    state = { kind: 'error', error: periods.error, onRetry: () => void periods.refetch() };
   else if (rows.length === 0)
     state = { kind: 'empty', icon: 'banknote', title: 'No settlement periods yet.' };
 

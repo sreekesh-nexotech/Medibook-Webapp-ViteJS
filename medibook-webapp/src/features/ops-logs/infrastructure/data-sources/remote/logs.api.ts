@@ -18,6 +18,9 @@ interface LogsParams {
   readonly q?: string;
   readonly sort?: string;
   readonly hospital_id?: string;
+  readonly principal?: string;
+  readonly actor?: string;
+  readonly resource_type?: string;
 }
 
 function toParams(query: AuditLogQuery): LogsParams {
@@ -28,6 +31,9 @@ function toParams(query: AuditLogQuery): LogsParams {
     ...(query.dateTo ? { date_to: query.dateTo } : {}),
     ...(query.q ? { q: query.q } : {}),
     ...(query.hospitalId ? { hospital_id: query.hospitalId } : {}),
+    ...(query.principal ? { principal: query.principal } : {}),
+    ...(query.actorUserId ? { actor: query.actorUserId } : {}),
+    ...(query.resourceType ? { resource_type: query.resourceType } : {}),
     ...(query.sortDir ? { sort: query.sortDir === 'asc' ? SORT_COLUMN : `-${SORT_COLUMN}` } : {}),
   };
 }

@@ -113,6 +113,11 @@ export function formatInstant(
   return zonedFormat(locale, options).format(new Date(instant));
 }
 
+/** "10:42" — the "Updated …" caption beside a list's Refresh button. */
+export function formatUpdatedAt(updatedAt: number): string {
+  return formatInstant(updatedAt, { hour: '2-digit', minute: '2-digit' });
+}
+
 function zonedPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
   return parts.find((p) => p.type === type)?.value ?? '';
 }
@@ -272,16 +277,6 @@ export function timeToMinutes(t: string | null | undefined): number {
   return h * 60 + Number(m[2]);
 }
 
-/** "June 13, 2026 · 09:42" -> timestamp (date part only), for log sorting. */
-export function opsTime(s: string): number {
-  return Date.parse(String(s).split('·')[0].trim()) || 0;
-}
-
-/** Hospital-wide running token: 7 -> "T-007". */
-export function formatToken(seq: number): string {
-  return 'T-' + String(seq).padStart(3, '0');
-}
-
 /** Up to nine whole digits and at most two decimals, commas allowed ("1,250.75"). */
 const HUNDREDTHS_PATTERN = /^(\d{1,9})(?:\.(\d{1,2}))?$/;
 
@@ -296,4 +291,22 @@ export function parseHundredths(text: string): number | null {
   if (!match) return null;
   const [, whole = '0', fraction = ''] = match;
   return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+}
+
+/** India's country code; numbers there are shown in the national grouping. */
+const INDIA_PREFIX = '+91';
+const INDIAN_NUMBER = /^\d{10}$/;
+const INDIAN_MOBILE = /^[6-9]/;
+
+/**
+ * An E.164 number as people read it: `+919876543210` → "+91 98765 43210",
+ * `+914847100000` → "+91 484 710 0000". Anything else is shown as stored.
+ */
+export function phoneDisplay(e164: string): string {
+  if (!e164.startsWith(INDIA_PREFIX)) return e164;
+  const digits = e164.slice(INDIA_PREFIX.length);
+  if (!INDIAN_NUMBER.test(digits)) return e164;
+  return INDIAN_MOBILE.test(digits)
+    ? `${INDIA_PREFIX} ${digits.slice(0, 5)} ${digits.slice(5)}`
+    : `${INDIA_PREFIX} ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
 }

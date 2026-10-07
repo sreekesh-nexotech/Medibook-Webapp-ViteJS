@@ -15,12 +15,18 @@ import type {
   HospitalProfileChanges,
   HospitalRuleChanges,
   HospitalRuleSettings,
+  NumberingChanges,
+  NumberingKind,
+  NumberingReset,
+  NumberingSeries,
+  TokenPolicy,
+  TokenPolicyChanges,
+  TokenReset,
   TokenScope,
 } from '@/features/settings/domain/entities/settings.entities';
 
 import {
-  CANONICAL_TOKEN_SCHEME,
-  TOKEN_SCHEME_OPTIONS,
+  durationCopy,
   minutesToTimeLabel,
   parseCount,
   parseDurationMinutes,
@@ -53,13 +59,52 @@ export interface HoursForm {
 
 export interface RulesForm {
   readonly horizon: string;
-  readonly cancelBefore: string;
+  readonly onlineApproval: boolean;
   readonly holdTimeout: string;
+  readonly cancelBefore: string;
+  /** "100%" … "0%". */
+  readonly refundBefore: string;
+  readonly refundAfter: string;
+  readonly refundFee: boolean;
   readonly feeValidity: string;
+  /** "3 missed calls". */
+  readonly noShowCalls: string;
+  /** "Until the token is called" / "30 min before the session". */
+  readonly tokenCancel: string;
+  /** Digits, 1–240. */
+  readonly consultMinutes: string;
+  readonly patientNotes: boolean;
+  readonly patientEditApproval: boolean;
+  readonly displayFullName: boolean;
 }
 
 export interface TokenForm {
-  readonly scheme: string;
+  /** A `TOKEN_SCOPE_OPTIONS` label. */
+  readonly scope: string;
+  /** A `TOKEN_RESET_OPTIONS` label. */
+  readonly reset: string;
+  readonly format: string;
+  readonly prefix: string;
+  readonly onlineMarker: string;
+  readonly offlineMarker: string;
+  readonly separateRanges: boolean;
+  readonly onlineFrom: string;
+  readonly onlineTo: string;
+  readonly walkInFrom: string;
+  readonly walkInTo: string;
+  readonly reuseCancelled: boolean;
+}
+
+/** One number series' draft (MRN, booking or receipt). */
+export interface NumberingForm {
+  readonly format: string;
+  readonly prefix: string;
+  /** Digits, 1–12. */
+  readonly padWidth: string;
+  /** A `NUMBERING_RESET_OPTIONS` label. */
+  readonly reset: string;
+  /** A month name. */
+  readonly fyStartMonth: string;
 }
 
 export interface BankForm {
@@ -71,13 +116,19 @@ export interface BankForm {
   readonly upi: string;
 }
 
-/** One draft per backend resource, so each section saves on its own. */
+/**
+ * One draft per backend resource, so each section saves on its own — each
+ * number series is its own resource with its own version.
+ */
 export interface SettingsForm {
   readonly profile: ProfileForm;
   readonly hours: HoursForm;
   readonly rules: RulesForm;
   readonly token: TokenForm;
   readonly bank: BankForm;
+  readonly mrn: NumberingForm;
+  readonly booking: NumberingForm;
+  readonly receipt: NumberingForm;
 }
 
 export type SettingsFormSection = keyof SettingsForm;
@@ -88,7 +139,13 @@ export const SETTINGS_FORM_SECTIONS: readonly SettingsFormSection[] = [
   'rules',
   'token',
   'bank',
+  'mrn',
+  'booking',
+  'receipt',
 ];
+
+/** The series this screen manages, in display order. */
+export const NUMBERING_KINDS: readonly NumberingKind[] = ['mrn', 'booking', 'receipt'];
 
 /* ----------------------------------------------------------------- helpers */
 
@@ -132,6 +189,9 @@ export function withoutSections(
     ...(edits.rules && keep('rules') && { rules: edits.rules }),
     ...(edits.token && keep('token') && { token: edits.token }),
     ...(edits.bank && keep('bank') && { bank: edits.bank }),
+    ...(edits.mrn && keep('mrn') && { mrn: edits.mrn }),
+    ...(edits.booking && keep('booking') && { booking: edits.booking }),
+    ...(edits.receipt && keep('receipt') && { receipt: edits.receipt }),
   };
 }
 
@@ -271,54 +331,267 @@ export function hoursFromForm(form: HoursForm): readonly HospitalHoursDay[] {
 
 /* ------------------------------------------------------------------- rules */
 
+const BASIS_POINTS_PER_PERCENT = 100;
+const UNTIL_CALLED = 'Until the token is called';
+const UNTIL_SESSION_STARTS = 'Until the session starts';
+const BEFORE_SESSION = 'before the session';
+const MAX_NO_SHOW_CALLS = 10;
+const TOKEN_CANCEL_CHOICES_MIN = [15, 30, 60, 120] as const;
+
+/** Refund shares offered (`refund_*_cutoff_bp`, 0–10000). */
+export const REFUND_OPTIONS = ['100%', '75%', '50%', '25%', '0%'] as const;
+
+/** Expected consultation bounds (`expected_consult_minutes`, 1–240). */
+export const CONSULT_MINUTES_MAX = 240;
+
 function hoursLabel(hours: number): string {
   return hours === 1 ? '1 hour' : `${hours} hours`;
+}
+
+/** 10000 → "100%", 3333 → "33.33%". */
+export function refundLabel(bp: number): string {
+  const percent = bp / BASIS_POINTS_PER_PERCENT;
+  return `${Number.isInteger(percent) ? percent : percent.toFixed(2)}%`;
+}
+
+function refundBp(label: string): number {
+  const percent = Number.parseFloat(label);
+  return Number.isFinite(percent) ? Math.round(percent * BASIS_POINTS_PER_PERCENT) : 0;
+}
+
+function noShowCallsLabel(calls: number): string {
+  return calls === 1 ? '1 missed call' : `${calls} missed calls`;
+}
+
+/** Missed calls before the desk is offered a no-show (`no_show_call_attempts`, 1–10). */
+export const NO_SHOW_CALL_OPTIONS: readonly string[] = Array.from(
+  { length: MAX_NO_SHOW_CALLS },
+  (_, i) => noShowCallsLabel(i + 1),
+);
+
+function tokenCancelLabel(minutes: number | null): string {
+  if (minutes === null) return UNTIL_CALLED;
+  if (minutes === 0) return UNTIL_SESSION_STARTS;
+  return `${durationCopy(minutes)} ${BEFORE_SESSION}`;
+}
+
+/** How long a patient can cancel a token (`token_cancel_limit_min`, null or 0–1440). */
+export const TOKEN_CANCEL_OPTIONS: readonly string[] = [
+  UNTIL_CALLED,
+  UNTIL_SESSION_STARTS,
+  ...TOKEN_CANCEL_CHOICES_MIN.map(tokenCancelLabel),
+];
+
+/** "1 h 30 min before the session" → 90; the two fixed choices → null / 0. */
+export function tokenCancelMinutes(label: string): number | null {
+  if (label === UNTIL_CALLED) return null;
+  if (label === UNTIL_SESSION_STARTS) return 0;
+  const m = /^(?:(\d+) h)?\s*(?:(\d+) min)?/.exec(label);
+  return Number(m?.[1] ?? 0) * MINUTES_PER_HOUR + Number(m?.[2] ?? 0);
 }
 
 export function toRulesForm(r: HospitalRuleSettings): RulesForm {
   return {
     horizon: `${r.bookingWindowDays} days`,
-    cancelBefore: hoursLabel(r.cancellationCutoffHours),
+    onlineApproval: r.onlineRequiresApproval,
     holdTimeout: `${Math.round(r.holdTimeoutSeconds / SECONDS_PER_MINUTE)} mins`,
+    cancelBefore: hoursLabel(r.cancellationCutoffHours),
+    refundBefore: refundLabel(r.refundBeforeCutoffBp),
+    refundAfter: refundLabel(r.refundAfterCutoffBp),
+    refundFee: r.refundIncludesConvenienceFee,
     feeValidity: String(r.followUpWindowDays),
+    noShowCalls: noShowCallsLabel(r.noShowCallAttempts),
+    tokenCancel: tokenCancelLabel(r.tokenCancelLimitMin),
+    consultMinutes: String(r.expectedConsultMinutes),
+    patientNotes: r.patientNotesEnabled,
+    patientEditApproval: r.patientEditRequiresApproval,
+    displayFullName: r.displayShowFullName,
   };
 }
 
 /** Only the rules that changed, in API units. */
 export function rulesChanges(base: RulesForm, draft: RulesForm): HospitalRuleChanges {
+  const changed = (k: keyof RulesForm): boolean => draft[k] !== base[k];
   return {
-    ...(draft.horizon !== base.horizon && { bookingWindowDays: parseCount(draft.horizon, 1) }),
-    ...(draft.cancelBefore !== base.cancelBefore && {
-      cancellationCutoffHours: parseDurationMinutes(draft.cancelBefore, 0) / MINUTES_PER_HOUR,
-    }),
-    ...(draft.holdTimeout !== base.holdTimeout && {
+    ...(changed('horizon') && { bookingWindowDays: parseCount(draft.horizon, 1) }),
+    ...(changed('onlineApproval') && { onlineRequiresApproval: draft.onlineApproval }),
+    ...(changed('holdTimeout') && {
       holdTimeoutSeconds: parseDurationMinutes(draft.holdTimeout, 0) * SECONDS_PER_MINUTE,
     }),
-    ...(draft.feeValidity !== base.feeValidity && {
-      followUpWindowDays: parseCount(draft.feeValidity, 0),
+    ...(changed('cancelBefore') && {
+      cancellationCutoffHours: parseDurationMinutes(draft.cancelBefore, 0) / MINUTES_PER_HOUR,
     }),
+    ...(changed('refundBefore') && { refundBeforeCutoffBp: refundBp(draft.refundBefore) }),
+    ...(changed('refundAfter') && { refundAfterCutoffBp: refundBp(draft.refundAfter) }),
+    ...(changed('refundFee') && { refundIncludesConvenienceFee: draft.refundFee }),
+    ...(changed('feeValidity') && { followUpWindowDays: parseCount(draft.feeValidity, 0) }),
+    ...(changed('noShowCalls') && { noShowCallAttempts: parseCount(draft.noShowCalls, 1) }),
+    ...(changed('tokenCancel') && { tokenCancelLimitMin: tokenCancelMinutes(draft.tokenCancel) }),
+    ...(changed('consultMinutes') && {
+      expectedConsultMinutes: parseCount(draft.consultMinutes, 1),
+    }),
+    ...(changed('patientNotes') && { patientNotesEnabled: draft.patientNotes }),
+    ...(changed('patientEditApproval') && {
+      patientEditRequiresApproval: draft.patientEditApproval,
+    }),
+    ...(changed('displayFullName') && { displayShowFullName: draft.displayFullName }),
   };
 }
 
-/* ------------------------------------------------------------- token scope */
+/* ------------------------------------------------------------ token policy */
 
-/** The per-doctor series exists server-side but was never in the design's list. */
-const PER_DOCTOR_SCHEME = 'Per-doctor running (T-001)';
+const TOKEN_SCOPES: readonly (readonly [TokenScope, string])[] = [
+  ['hospital', 'One series for the hospital'],
+  ['department', 'One series per department'],
+  ['doctor', 'One series per doctor'],
+];
 
-const SCHEME_FOR_SCOPE: Readonly<Record<TokenScope, string>> = {
-  hospital: CANONICAL_TOKEN_SCHEME,
-  department: TOKEN_SCHEME_OPTIONS[1],
-  doctor: PER_DOCTOR_SCHEME,
-};
+const TOKEN_RESETS: readonly (readonly [TokenReset, string])[] = [
+  ['session', 'Every session'],
+  ['day', 'Every day'],
+];
 
-export function schemeForScope(scope: TokenScope): string {
-  return SCHEME_FOR_SCOPE[scope];
+export const TOKEN_SCOPE_OPTIONS: readonly string[] = TOKEN_SCOPES.map(([, label]) => label);
+export const TOKEN_RESET_OPTIONS: readonly string[] = TOKEN_RESETS.map(([, label]) => label);
+
+/** The label for a value; `pairs` lists every value, so the fallback never shows. */
+function labelOf<K extends string>(pairs: readonly (readonly [K, string])[], key: K): string {
+  return pairs.find(([k]) => k === key)?.[1] ?? key;
 }
 
-export function scopeForScheme(scheme: string): TokenScope {
-  if (scheme === SCHEME_FOR_SCOPE.department) return 'department';
-  if (scheme === SCHEME_FOR_SCOPE.doctor) return 'doctor';
-  return 'hospital';
+function keyOf<K extends string>(
+  pairs: readonly (readonly [K, string])[],
+  label: string,
+): K | null {
+  return pairs.find(([, l]) => l === label)?.[0] ?? null;
+}
+
+export function tokenScopeLabel(scope: TokenScope): string {
+  return labelOf(TOKEN_SCOPES, scope);
+}
+
+export function tokenResetLabel(reset: TokenReset): string {
+  return labelOf(TOKEN_RESETS, reset);
+}
+
+function numberCopy(n: number | null): string {
+  return n === null ? '' : String(n);
+}
+
+function rangeValue(text: string): number | null {
+  const t = text.trim();
+  return t === '' ? null : Number(t);
+}
+
+/**
+ * The policy as the screen edits it. Scope and reset show the value that will
+ * apply (a pending change, if any), so choosing today's value again cancels it.
+ */
+export function toTokenForm(p: TokenPolicy): TokenForm {
+  return {
+    scope: tokenScopeLabel(p.pendingScope ?? p.scope),
+    reset: tokenResetLabel(p.pendingReset ?? p.reset),
+    format: p.format,
+    prefix: p.prefix,
+    onlineMarker: p.onlineMarker,
+    offlineMarker: p.offlineMarker,
+    separateRanges: p.separateRanges,
+    onlineFrom: numberCopy(p.onlineRangeStart),
+    onlineTo: numberCopy(p.onlineRangeEnd),
+    walkInFrom: numberCopy(p.offlineRangeStart),
+    walkInTo: numberCopy(p.offlineRangeEnd),
+    reuseCancelled: p.reuseCancelled,
+  };
+}
+
+/** Only the policy fields that changed, in API units. */
+export function tokenChanges(base: TokenForm, draft: TokenForm): TokenPolicyChanges {
+  const changed = (k: keyof TokenForm): boolean => draft[k] !== base[k];
+  const scope = keyOf(TOKEN_SCOPES, draft.scope);
+  const reset = keyOf(TOKEN_RESETS, draft.reset);
+  return {
+    ...(changed('scope') && scope && { scope }),
+    ...(changed('reset') && reset && { reset }),
+    ...(changed('format') && { format: draft.format.trim() }),
+    ...(changed('prefix') && { prefix: draft.prefix.trim() }),
+    ...(changed('onlineMarker') && { onlineMarker: draft.onlineMarker.trim() }),
+    ...(changed('offlineMarker') && { offlineMarker: draft.offlineMarker.trim() }),
+    ...(changed('separateRanges') && { separateRanges: draft.separateRanges }),
+    ...(changed('onlineFrom') && { onlineRangeStart: rangeValue(draft.onlineFrom) }),
+    ...(changed('onlineTo') && { onlineRangeEnd: rangeValue(draft.onlineTo) }),
+    ...(changed('walkInFrom') && { offlineRangeStart: rangeValue(draft.walkInFrom) }),
+    ...(changed('walkInTo') && { offlineRangeEnd: rangeValue(draft.walkInTo) }),
+    ...(changed('reuseCancelled') && { reuseCancelled: draft.reuseCancelled }),
+  };
+}
+
+/* --------------------------------------------------------------- numbering */
+
+const NUMBERING_RESETS: readonly (readonly [NumberingReset, string])[] = [
+  ['never', 'Never'],
+  ['fiscal_year', 'Every financial year'],
+  ['calendar_year', 'Every calendar year'],
+  ['monthly', 'Every month'],
+];
+
+export const NUMBERING_RESET_OPTIONS: readonly string[] = NUMBERING_RESETS.map(([, l]) => l);
+
+/** MRNs never restart (the backend refuses any other reset for them). */
+export const MRN_RESET_OPTIONS: readonly string[] = [labelOf(NUMBERING_RESETS, 'never')];
+
+export const MONTH_OPTIONS: readonly string[] = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+export function isFiscalReset(label: string): boolean {
+  return keyOf(NUMBERING_RESETS, label) === 'fiscal_year';
+}
+
+/** A blank draft, for a series the server did not list (it is never shown or saved). */
+const EMPTY_NUMBERING_FORM: NumberingForm = {
+  format: '',
+  prefix: '',
+  padWidth: '',
+  reset: '',
+  fyStartMonth: '',
+};
+
+export function toNumberingForm(series: NumberingSeries | undefined): NumberingForm {
+  if (!series) return EMPTY_NUMBERING_FORM;
+  return {
+    format: series.format,
+    prefix: series.prefix ?? '',
+    padWidth: String(series.padWidth),
+    reset: labelOf(NUMBERING_RESETS, series.reset),
+    fyStartMonth: MONTH_OPTIONS[series.fyStartMonth - 1] ?? '',
+  };
+}
+
+/** Only the series fields that changed, in API units. */
+export function numberingChanges(base: NumberingForm, draft: NumberingForm): NumberingChanges {
+  const changed = (k: keyof NumberingForm): boolean => draft[k] !== base[k];
+  const reset = keyOf(NUMBERING_RESETS, draft.reset);
+  const prefix = draft.prefix.trim();
+  return {
+    ...(changed('format') && { format: draft.format.trim() }),
+    ...(changed('prefix') && { prefix: prefix === '' ? null : prefix }),
+    ...(changed('padWidth') && { padWidth: parseCount(draft.padWidth, 1) }),
+    ...(changed('reset') && reset && { reset }),
+    ...(changed('fyStartMonth') && {
+      fyStartMonth: MONTH_OPTIONS.indexOf(draft.fyStartMonth) + 1,
+    }),
+  };
 }
 
 /* -------------------------------------------------------------------- bank */

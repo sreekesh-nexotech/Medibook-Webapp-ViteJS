@@ -117,7 +117,8 @@ export function ReportView({ report }: ReportViewProps) {
             );
           }
         },
-        onError: (failure) => toast(isFailure(failure) ? failure.message : EXPORT_FAILED, 'error'),
+        onError: (failure) =>
+          toast(isFailure(failure) ? failure.message : EXPORT_FAILED, 'error', failure),
       },
     );
   };
@@ -136,6 +137,7 @@ export function ReportView({ report }: ReportViewProps) {
     : result.isLoadingError && !data
       ? {
           kind: 'error',
+          error: result.error,
           message: isFailure(result.error) ? result.error.message : REPORT_FAILED,
           onRetry: () => void result.refetch(),
         }
@@ -234,7 +236,7 @@ export function ReportView({ report }: ReportViewProps) {
           )}
           {notes.length > 0 && <InfoDot text={notes.join(' ')} />}
         </div>
-        {rangeError !== undefined && <span className="text-body text-d-500">{rangeError}</span>}
+        {rangeError !== undefined && <span className="text-body text-d-600">{rangeError}</span>}
       </Card>
 
       {/* summary tiles — computed by the server over every filtered row */}

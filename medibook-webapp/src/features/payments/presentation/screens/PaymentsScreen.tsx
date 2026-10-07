@@ -36,6 +36,7 @@ import type {
   PaymentLineStatus,
 } from '@/features/payments/domain/entities/payments.entities';
 import { useExportPaymentsMutation } from '@/features/payments/application/queries/useExportPaymentsMutation';
+import { SERVER_EXPORT_MAX_ROWS } from '@/features/payments/application/usecases/exportPayments';
 import { useInvalidatePayments } from '@/features/payments/application/queries/useInvalidatePayments';
 import { usePaymentRefundsQuery } from '@/features/payments/application/queries/usePaymentRefundsQuery';
 import { usePaymentsQuery } from '@/features/payments/application/queries/usePaymentsQuery';
@@ -216,8 +217,8 @@ export function PaymentsScreen() {
       label: 'Collected at Desk',
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
       sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} today · as collected${partial}`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'banknote',
@@ -232,16 +233,16 @@ export function PaymentsScreen() {
       label: 'Prepaid Online',
       value: totalsQuery.data ? money(totals.onlineTotal) : '—',
       sub: `via Medibook · settled later${partial}`,
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'circle-alert',
       label: 'Pending Collection',
       value: todayApptsQuery.data ? pendingToday : '—',
       sub: 'Walk-ins to collect today',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
     },
   ];
 
@@ -283,13 +284,28 @@ export function PaymentsScreen() {
   };
 
   const runExport = (): void => {
-    exportCsv.mutate(filters, {
-      onSuccess: (csv) => {
-        downloadTextFile(CSV_FILENAME, csv, CSV_MIME);
-        toast(`Exported ${CSV_FILENAME}`, 'success');
+    const channel =
+      sourceF === SOURCE_ONLINE ? 'online' : sourceF === SOURCE_WALK_IN ? 'desk' : null;
+    exportCsv.mutate(
+      { filters, channel },
+      {
+        onSuccess: (file) => {
+          downloadTextFile(CSV_FILENAME, file.csv, CSV_MIME);
+          if (file.capped) {
+            toast(
+              `Exported ${CSV_FILENAME}. Exports stop at ${SERVER_EXPORT_MAX_ROWS.toLocaleString('en-IN')} payments, so some are missing — narrow the dates and export again.`,
+              'info',
+            );
+          } else {
+            toast(
+              `Exported ${file.rows} payment${file.rows === 1 ? '' : 's'} to ${CSV_FILENAME}`,
+              'success',
+            );
+          }
+        },
+        onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error', error),
       },
-      onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error'),
-    });
+    );
   };
 
   const confirmRefund = (reason: string): void => {
@@ -309,6 +325,7 @@ export function PaymentsScreen() {
               ? REFUND_NEEDS_DRAWER
               : (errorCopy(error) ?? 'The refund failed.'),
             'error',
+            error,
           ),
       },
     );
@@ -341,6 +358,7 @@ export function PaymentsScreen() {
     : failed
       ? {
           kind: 'error',
+          error: linesQuery.error ?? apptsQuery.error,
           message: errorCopy(linesQuery.error ?? apptsQuery.error),
           onRetry: () => void refresh(),
         }
@@ -447,7 +465,8 @@ export function PaymentsScreen() {
         </div>
         {sourceF !== ALL_SOURCES && showsLines && (
           <div className="text-caption text-text-muted mb-3">
-            Source filters this page only — the server cannot filter payments by source.
+            Source narrows the rows below and the CSV export. The page count includes both sources,
+            because the server cannot filter payments by source.
           </div>
         )}
         <TableShell
