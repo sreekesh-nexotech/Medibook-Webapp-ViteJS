@@ -13,7 +13,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "uat": "playwright test -c playwright.uat.config.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
