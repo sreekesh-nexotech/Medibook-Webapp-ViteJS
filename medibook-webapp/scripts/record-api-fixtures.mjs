@@ -583,6 +583,18 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-message-templates.messageTemplatePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/messaging/templates',
+    params: LIST,
+  },
+  {
+    key: 'ops-onboarding-documents.documentRequirementPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/onboarding/document-requirements',
+    params: LIST,
+  },
+  {
     key: 'ops-support.ticketPageResponseSchema',
     surface: 'platform',
     path: '/platform/support/tickets',

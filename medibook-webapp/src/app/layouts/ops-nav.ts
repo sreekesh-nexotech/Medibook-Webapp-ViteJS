@@ -58,6 +58,8 @@ export const OPS_NAV: readonly OpsNavSection[] = [
     items: [
       { id: 'settings', label: 'Platform Settings', icon: 'settings' },
       { id: 'content', label: 'Patient App Content', icon: 'book-open' },
+      { id: 'message-templates', label: 'Message Templates', icon: 'message-circle' },
+      { id: 'onboarding-documents', label: 'Onboarding Documents', icon: 'file-text' },
     ],
   },
 ];
@@ -108,6 +110,14 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
   ],
   reviews: ['Review Moderation', 'Patient reviews of doctors, approved before they are published'],
   support: ['Support Desk', 'Tickets from hospitals and patients: reply, assign and resolve'],
+  'message-templates': [
+    'Message Templates',
+    'The wording of every SMS, WhatsApp, push and staff email Medibook sends',
+  ],
+  'onboarding-documents': [
+    'Onboarding Documents',
+    'The documents collected from every new hospital during onboarding',
+  ],
   account: ['My Account', 'Your name, password and signed-in devices'],
 };
 

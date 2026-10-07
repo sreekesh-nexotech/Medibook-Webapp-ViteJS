@@ -297,6 +297,10 @@ export type OpsView =
   | 'reviews'
   /** Support Desk (UAT report §8). */
   | 'support'
+  /** Message Templates (UAT report §8). */
+  | 'message-templates'
+  /** Onboarding Documents (UAT report §8). */
+  | 'onboarding-documents'
   /** The signed-in user's own account: name, password, sessions. */
   | 'account';
 
@@ -330,6 +334,8 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   content: 'content',
   reviews: 'reviews',
   support: 'support',
+  'message-templates': 'message-templates',
+  'onboarding-documents': 'onboarding-documents',
   account: 'account',
 };
 
@@ -397,6 +403,8 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'content',
   'reviews',
   'support',
+  'message-templates',
+  'onboarding-documents',
   'account',
 ];
 

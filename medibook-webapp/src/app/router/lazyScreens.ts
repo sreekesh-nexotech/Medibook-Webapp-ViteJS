@@ -210,3 +210,17 @@ export const OpsSupportScreen = lazy(() =>
     default: m.OpsSupportScreen,
   })),
 );
+export const OpsMessageTemplatesScreen = lazy(() =>
+  import('@/features/ops-message-templates/presentation/screens/OpsMessageTemplatesScreen').then(
+    (m) => ({
+      default: m.OpsMessageTemplatesScreen,
+    }),
+  ),
+);
+export const OpsOnboardingDocumentsScreen = lazy(() =>
+  import('@/features/ops-onboarding-documents/presentation/screens/OpsOnboardingDocumentsScreen').then(
+    (m) => ({
+      default: m.OpsOnboardingDocumentsScreen,
+    }),
+  ),
+);

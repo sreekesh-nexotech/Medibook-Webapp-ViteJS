@@ -76,7 +76,13 @@ describe('view ids from paths', () => {
 
 describe('ops screens added for UAT report §8', () => {
   it('maps each new view to its own URL and back', () => {
-    for (const view of ['content', 'reviews', 'support'] as const) {
+    for (const view of [
+      'content',
+      'reviews',
+      'support',
+      'message-templates',
+      'onboarding-documents',
+    ] as const) {
       expect(opsViewFromPath(opsPath(view))).toBe(view);
     }
   });
