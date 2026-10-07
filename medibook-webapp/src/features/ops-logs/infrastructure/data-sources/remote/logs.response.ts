@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { paginatedSchema, toPage } from '@/core/api/pagination';
 import type { Page } from '@/core/api/pagination';
 
-import type { AuditLogEntry } from '@/features/ops-logs/domain/entities/logs.types';
+import type {
+  AuditFieldChange,
+  AuditLogEntry,
+  LogSeverity,
+} from '@/features/ops-logs/domain/entities/logs.types';
+
+const SEVERITIES: readonly LogSeverity[] = ['info', 'warning', 'critical'];
 
 /**
  * One `audit_log` row (backend `AuditLogSerializer`). `before` / `after` /
- * `diff` / `meta` are free-form JSON the screen does not show, so they are
- * left out and stripped by Zod.
+ * `diff` / `meta` are free-form JSON shown in the entry drawer. `module`,
+ * `severity` and the actor and hospital names are added by B6/B9: optional,
+ * so an older backend still parses and the screen falls back to ids.
  */
 const auditLogResponseSchema = z.object({
   id: z.string(),
@@ -24,6 +31,15 @@ const auditLogResponseSchema = z.object({
   resource_type: z.string(),
   resource_id: z.string().nullable(),
   status_code: z.number().int(),
+  before: z.unknown().optional(),
+  after: z.unknown().optional(),
+  diff: z.unknown().optional(),
+  meta: z.unknown().optional(),
+  module: z.string().nullable().optional(),
+  severity: z.string().nullable().optional(),
+  actor_name: z.string().nullable().optional(),
+  actor_email: z.string().nullable().optional(),
+  hospital_name: z.string().nullable().optional(),
 });
 
 /**
@@ -33,17 +49,51 @@ const auditLogResponseSchema = z.object({
  */
 export const logsPageResponseSchema = paginatedSchema(auditLogResponseSchema);
 
+/** `GET /platform/logs/export.csv` (B6) — the CSV body as text. */
+export const logsExportResponseSchema = z.string();
+
 export type AuditLogResponse = z.infer<typeof auditLogResponseSchema>;
 export type LogsPageResponse = z.infer<typeof logsPageResponseSchema>;
 
-function toAuditLogEntry(dto: AuditLogResponse): AuditLogEntry {
+/** A diff side as display text: strings as-is, nullish as `null`, the rest as JSON. */
+function toDisplayValue(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
+/**
+ * `diff` holds `{field: [before, after]}` pairs (backend `audit/services/record.py`);
+ * anything else is ignored rather than guessed at — the drawer still shows
+ * the raw before/after.
+ */
+export function toChanges(diff: unknown): readonly AuditFieldChange[] {
+  if (typeof diff !== 'object' || diff === null || Array.isArray(diff)) return [];
+  const out: AuditFieldChange[] = [];
+  for (const [field, pair] of Object.entries(diff)) {
+    if (!Array.isArray(pair) || pair.length !== 2) continue;
+    const [before, after] = pair as readonly unknown[];
+    out.push({ field, before: toDisplayValue(before), after: toDisplayValue(after) });
+  }
+  return out;
+}
+
+function toSeverity(value: string | null | undefined): LogSeverity | null {
+  const lower = value?.toLowerCase();
+  return SEVERITIES.find((s) => s === lower) ?? null;
+}
+
+export function toAuditLogEntry(dto: AuditLogResponse): AuditLogEntry {
   return {
     id: dto.id,
     occurredAt: dto.occurred_at,
     requestId: dto.request_id,
     principal: dto.principal,
     actorUserId: dto.actor_user_id,
+    actorName: dto.actor_name ?? null,
+    actorEmail: dto.actor_email ?? null,
     hospitalId: dto.hospital_id,
+    hospitalName: dto.hospital_name ?? null,
     ip: dto.ip,
     method: dto.method,
     path: dto.path,
@@ -51,6 +101,12 @@ function toAuditLogEntry(dto: AuditLogResponse): AuditLogEntry {
     resourceType: dto.resource_type,
     resourceId: dto.resource_id,
     statusCode: dto.status_code,
+    module: dto.module ?? null,
+    severity: toSeverity(dto.severity),
+    before: dto.before ?? null,
+    after: dto.after ?? null,
+    changes: toChanges(dto.diff),
+    meta: dto.meta ?? null,
   };
 }
 

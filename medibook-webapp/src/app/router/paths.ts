@@ -358,6 +358,17 @@ export function opsAccountPath(): string {
   return opsPath('account');
 }
 
+/** Query param carrying a hospital filter into Compliance Logs (hospital profile → logs). */
+export const OPS_LOGS_HOSPITAL_PARAM = 'hospital_id';
+
+/** Compliance Logs, optionally narrowed to one hospital's entries. */
+export function opsLogsPath(hospitalId?: string): string {
+  const base = opsPath('logs');
+  return hospitalId
+    ? `${base}?${new URLSearchParams({ [OPS_LOGS_HOSPITAL_PARAM]: hospitalId }).toString()}`
+    : base;
+}
+
 /** Ops list views resolvable 1:1 from their first URL segment. */
 const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'dashboard',
