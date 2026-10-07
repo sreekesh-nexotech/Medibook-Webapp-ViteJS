@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import type { SortState } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
@@ -22,13 +23,14 @@ import type { TableStateSpec } from '@/shared/ui/TableState';
 import { Tabs } from '@/shared/ui/Tabs';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { OPS_BASE_PATH, OPS_VIEW_SEGMENT } from '@/app/router/paths';
+import { BILLING_HOSPITAL_PARAM, OPS_BASE_PATH, OPS_VIEW_SEGMENT } from '@/app/router/paths';
 
 import {
   useExportInvoicesMutation,
   useInvoicePdfMutation,
   usePaymentsExportMutation,
 } from '@/features/ops-billing/application/queries/useInvoiceFileMutations';
+import { useBillingSummaryQuery } from '@/features/ops-billing/application/queries/useBillingSummaryQuery';
 import { useInvoicesQuery } from '@/features/ops-billing/application/queries/useInvoicesQuery';
 import { usePaymentsQuery } from '@/features/ops-billing/application/queries/usePaymentsQuery';
 import type {
@@ -39,6 +41,7 @@ import type {
   PaymentSortField,
 } from '@/features/ops-billing/domain/entities/billing.entities';
 import { BillingHospitalName } from '@/features/ops-billing/presentation/components/BillingHospitalName';
+import { DunningPanel } from '@/features/ops-billing/presentation/components/DunningPanel';
 import {
   INVOICE_STATUS_BADGES,
   METHOD_LABELS,
@@ -55,6 +58,7 @@ import {
 } from '@/features/ops-billing/presentation/components/billingView';
 import { PlanChangesPanel } from '@/features/ops-billing/presentation/components/PlanChangesPanel';
 import { SendReminderModal } from '@/features/ops-billing/presentation/components/SendReminderModal';
+import { SubscriptionsPanel } from '@/features/ops-billing/presentation/components/SubscriptionsPanel';
 import { useBillingDebouncedValue } from '@/features/ops-billing/presentation/components/useBillingDebouncedValue';
 
 /** Rows per page for the billing tables (design `OPS_BILL_PAGE`). */
@@ -66,7 +70,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** A count tile only needs the list's `total`. */
 const COUNT_PAGE_SIZE = 1;
 
-const TABS = ['Invoices', 'Payments', 'Plan Changes'] as const;
+const TABS = ['Invoices', 'Payments', 'Subscriptions', 'Dunning', 'Plan Changes'] as const;
 type BillTab = (typeof TABS)[number];
 
 const STATUS_ALL = 'Status: All';
@@ -131,14 +135,19 @@ function isTab(v: string | null): v is BillTab {
 }
 
 /**
- * Ops subscription billing (design `Ops.jsx` `OpsBilling`): count tiles, the
- * Invoices | Payments | Plan Changes tabs (preset through `?tab=`), and
- * server-side search, filters, sort and paging on the platform billing API.
+ * Ops subscription billing (design `Ops.jsx` `OpsBilling`): money tiles, the
+ * Invoices | Payments | Subscriptions | Dunning | Plan Changes tabs (preset
+ * through `?tab=`), and server-side search, filters, sort and paging on the
+ * platform billing API. `?hospital=<id>` narrows every tab to one hospital
+ * (11·R3, R8). Plan changes are readable with `billing.view` (decision 13);
+ * reminders need `billing.edit` (UAT-55).
  */
 export function OpsBillingScreen() {
   const navigate = useNavigate();
+  const canBill = useOpsPermission().can('billing.edit');
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('tab');
+  const hospitalId = searchParams.get(BILLING_HOSPITAL_PARAM);
   const [tab, setTabRaw] = useState<BillTab>(isTab(requested) ? requested : 'Invoices');
 
   const [q, setQ] = useState('');
@@ -164,6 +173,7 @@ export function OpsBillingScreen() {
     dueTo: dateT || null,
     sortField: invoiceSortField ?? 'issued_at',
     sortDirection: invoiceSortField ? sort.dir : 'desc',
+    ...(hospitalId && { hospitalId }),
   };
   const paymentSortField = sort.key ? PAYMENT_SORT_FIELDS[sort.key] : undefined;
   const paymentStatus = fromLabel(PAYMENT_STATUS_BADGES, statusF);
@@ -175,17 +185,25 @@ export function OpsBillingScreen() {
     method: fromLabel(METHOD_LABELS, methodF),
     sortField: paymentSortField ?? 'attempted_at',
     sortDirection: paymentSortField ? sort.dir : 'desc',
+    ...(hospitalId && { hospitalId }),
   };
 
   const invoicesQuery = useInvoicesQuery(invoiceParams);
   const paymentsQuery = usePaymentsQuery(paymentParams, tab === 'Payments');
 
-  /* Count tiles: the totals of filtered lists. The API has no amount sums,
-   * so the tiles count invoices instead of adding up rupees. */
-  const issuedCount = useInvoicesQuery(BASE_INVOICE_PARAMS);
-  const openCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, statuses: ['issued', 'overdue'] });
-  const overdueCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, overdue: true });
-  const failedCount = usePaymentsQuery({ ...BASE_PAYMENT_PARAMS, statuses: ['failed'] });
+  /* Money tiles from the billing summary (BE-28). A backend without it gets
+   * the count tiles: the totals of filtered lists. */
+  const summary = useBillingSummaryQuery();
+  const hasSummary = summary.data !== undefined && summary.data !== null && !hospitalId;
+  const scope = hospitalId ? { hospitalId } : {};
+  const issuedCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, ...scope });
+  const openCount = useInvoicesQuery({
+    ...BASE_INVOICE_PARAMS,
+    ...scope,
+    statuses: ['issued', 'overdue'],
+  });
+  const overdueCount = useInvoicesQuery({ ...BASE_INVOICE_PARAMS, ...scope, overdue: true });
+  const failedCount = usePaymentsQuery({ ...BASE_PAYMENT_PARAMS, ...scope, statuses: ['failed'] });
   const countOf = (query: { data?: { total: number }; isError: boolean }) =>
     query.data?.total ?? (query.isError ? '—' : '…');
 
@@ -193,7 +211,7 @@ export function OpsBillingScreen() {
   const exportInvoices = useExportInvoicesMutation();
   const exportPayments = usePaymentsExportMutation();
 
-  const KPIS: readonly StatCardData[] = [
+  const COUNT_KPIS: readonly StatCardData[] = [
     {
       icon: 'file-text',
       label: 'Invoices Issued',
@@ -231,6 +249,69 @@ export function OpsBillingScreen() {
       subClass: 'text-text-muted',
     },
   ];
+  const money = summary.data;
+  const KPIS: readonly StatCardData[] =
+    hasSummary && money
+      ? [
+          {
+            icon: 'trending-up',
+            label: 'MRR',
+            value: rupees(money.mrrPaise),
+            sub: 'Monthly recurring revenue',
+            iconClass: 'bg-blue-soft-bg text-text-navy',
+            valueClass: 'text-text-navy',
+            subClass: 'text-text-muted',
+          },
+          {
+            icon: 'hourglass',
+            label: 'Outstanding',
+            value: rupees(money.outstandingPaise),
+            sub: `${plural(money.unpaidInvoices, 'unpaid invoice')}`,
+            iconClass: 'bg-y-100 text-y-600',
+            valueClass: 'text-y-600',
+            subClass: 'text-text-muted',
+          },
+          {
+            icon: 'triangle-alert',
+            label: 'Overdue',
+            value: rupees(money.overduePaise),
+            sub: 'Past their due date',
+            iconClass: 'bg-d-100 text-d-500',
+            valueClass: 'text-d-500',
+            subClass: 'text-text-muted',
+          },
+          {
+            icon: 'circle-check',
+            label: 'Collected',
+            value: rupees(money.collectedPaise),
+            sub: 'Captured this month (IST)',
+            iconClass: 'bg-g-100 text-g-600',
+            valueClass: 'text-g-600',
+            subClass: 'text-text-muted',
+          },
+        ]
+      : COUNT_KPIS;
+
+  /** Refresh re-reads the tiles too (11·F7). */
+  const refreshTiles = (): Promise<unknown> =>
+    Promise.all([
+      summary.refetch(),
+      issuedCount.refetch(),
+      openCount.refetch(),
+      overdueCount.refetch(),
+      failedCount.refetch(),
+    ]);
+
+  const clearHospital = (): void => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(BILLING_HOSPITAL_PARAM);
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const clearAll = (): void => {
     setQ('');
@@ -301,7 +382,13 @@ export function OpsBillingScreen() {
       return;
     }
     exportPayments.mutate(paymentParams, {
-      onSuccess: (result) => {
+      onSuccess: (exported) => {
+        if (exported.kind === 'file') {
+          saveFile(exported.file);
+          toast(`Exported ${exported.file.filename}`, 'success');
+          return;
+        }
+        const result = exported.page;
         downloadCsv(PAYMENTS_CSV_FILENAME, [
           [
             'Payment',
@@ -392,12 +479,34 @@ export function OpsBillingScreen() {
   return (
     <div className="flex flex-col gap-5">
       <KpiStrip items={KPIS} />
-      <Card pad={14}>
-        <Tabs tabs={[...TABS]} value={tab} onChange={(v) => setTab(v as BillTab)} />
+      <Card pad={14} className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          tabs={[...TABS]}
+          value={tab}
+          onChange={(v) => setTab(isTab(v) ? v : 'Invoices')}
+          ariaLabel="Billing"
+        />
+        {hospitalId && (
+          <span className="text-caption text-text-navy bg-blue-soft-bg inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+            Hospital: <BillingHospitalName hospitalId={hospitalId} />
+            <button
+              type="button"
+              onClick={clearHospital}
+              className="text-blue cursor-pointer font-medium"
+              aria-label="Show every hospital"
+            >
+              Show all
+            </button>
+          </span>
+        )}
       </Card>
       <Card>
         {tab === 'Plan Changes' ? (
           <PlanChangesPanel />
+        ) : tab === 'Subscriptions' ? (
+          <SubscriptionsPanel hospitalId={hospitalId} />
+        ) : tab === 'Dunning' ? (
+          <DunningPanel hospitalId={hospitalId} />
         ) : (
           <>
             {tab === 'Invoices' && (
@@ -408,7 +517,7 @@ export function OpsBillingScreen() {
             <div className="mb-4.5 flex flex-wrap items-center gap-3">
               <RefreshBtn
                 onRefresh={async () => {
-                  await activeQuery.refetch();
+                  await Promise.all([activeQuery.refetch(), refreshTiles()]);
                 }}
                 title="Refresh billing"
               />
@@ -532,7 +641,7 @@ export function OpsBillingScreen() {
                               busy={pdf.isPending && pdf.variables?.id === v.id}
                               onClick={() => downloadPdf(v)}
                             />
-                            {isUnpaid(v) && (
+                            {isUnpaid(v) && canBill && (
                               <IconBtn
                                 name="bell-ring"
                                 label="Queue payment reminder"
@@ -580,7 +689,9 @@ export function OpsBillingScreen() {
                             icon="indian-rupee"
                             tint="success"
                             title={v.gatewayPaymentId ?? v.referenceNote ?? 'Manual payment'}
-                            sub={<BillingHospitalName hospitalId={v.hospitalId} />}
+                            sub={
+                              v.hospitalName ?? <BillingHospitalName hospitalId={v.hospitalId} />
+                            }
                           />
                         </td>
                         <td className={cn(tdClass, 'tabular-nums')}>{v.invoiceNo}</td>
