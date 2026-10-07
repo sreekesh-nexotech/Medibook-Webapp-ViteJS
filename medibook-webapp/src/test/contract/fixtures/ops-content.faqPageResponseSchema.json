@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "id": "01a1174e-13a4-7193-9ce2-2092a2f4abbc",
+      "category": "account",
+      "question": "Can I book for my family?",
+      "answer_md": "Yes — add family members under your account.",
+      "sort_order": 4,
+      "is_published": true,
+      "created_at": "2026-08-08T04:00:00.465027Z",
+      "updated_at": "2026-08-08T04:00:00.465044Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-134a-7110-92fd-48b0089b0a38",
+      "category": "booking",
+      "question": "How do I book an appointment?",
+      "answer_md": "Pick a hospital, doctor and slot, then pay.",
+      "sort_order": 0,
+      "is_published": true,
+      "created_at": "2026-08-08T04:00:00.374687Z",
+      "updated_at": "2026-08-08T04:00:00.374702Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-1360-7980-b233-170702269a5a",
+      "category": "booking",
+      "question": "Can I reschedule?",
+      "answer_md": "No. Cancel (refund per the hospital's policy) and rebook.",
+      "sort_order": 1,
+      "is_published": true,
+      "created_at": "2026-08-08T04:00:00.396801Z",
+      "updated_at": "2026-08-08T04:00:00.396815Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-1378-74c1-b2fa-2ba3a8b97605",
+      "category": "payments",
+      "question": "When do I get my refund?",
+      "answer_md": "Refunds go to the original method in 5–7 days.",
+      "sort_order": 2,
+      "is_published": true,
+      "created_at": "2026-08-08T04:00:00.420687Z",
+      "updated_at": "2026-08-08T04:00:00.420702Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-138c-74c2-bf10-d6f6e9cf8233",
+      "category": "tokens",
+      "question": "What is a token number?",
+      "answer_md": "Your place in the doctor's queue for that session.",
+      "sort_order": 3,
+      "is_published": true,
+      "created_at": "2026-08-08T04:00:00.441326Z",
+      "updated_at": "2026-08-08T04:00:00.441349Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 5,
+  "has_next": false
+}

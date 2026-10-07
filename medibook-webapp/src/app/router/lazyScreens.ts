@@ -195,3 +195,8 @@ export const UsersRolesScreen = lazy(() =>
     default: m.UsersRolesScreen,
   })),
 );
+export const OpsContentScreen = lazy(() =>
+  import('@/features/ops-content/presentation/screens/OpsContentScreen').then((m) => ({
+    default: m.OpsContentScreen,
+  })),
+);

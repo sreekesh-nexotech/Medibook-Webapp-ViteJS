@@ -52,6 +52,12 @@ import {
   subscriptionSchema,
 } from '@/features/ops-billing/infrastructure/data-sources/remote/billing.response';
 import {
+  ambulancePageResponseSchema,
+  faqPageResponseSchema,
+  legalDocumentPageResponseSchema,
+  locationPageResponseSchema,
+} from '@/features/ops-content/infrastructure/data-sources/remote/content.response';
+import {
   configChangePageSchema,
   dataRequestPageSchema,
   dataRequestResponseSchema,
@@ -202,6 +208,10 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-billing.planChangePageSchema': planChangePageSchema,
   'ops-billing.subscriptionSchema': subscriptionSchema,
   'ops-compliance.configChangePageSchema': configChangePageSchema,
+  'ops-content.ambulancePageResponseSchema': ambulancePageResponseSchema,
+  'ops-content.faqPageResponseSchema': faqPageResponseSchema,
+  'ops-content.legalDocumentPageResponseSchema': legalDocumentPageResponseSchema,
+  'ops-content.locationPageResponseSchema': locationPageResponseSchema,
   'ops-compliance.dataRequestPageSchema': dataRequestPageSchema,
   'ops-compliance.dataRequestResponseSchema': dataRequestResponseSchema,
   'ops-compliance.loginEventPageSchema': loginEventPageSchema,

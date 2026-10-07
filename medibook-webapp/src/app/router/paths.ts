@@ -291,6 +291,8 @@ export type OpsView =
   | 'onboarding'
   /** Document/regulatory compliance per hospital. */
   | 'compliance'
+  /** Patient App Content (UAT report §8). */
+  | 'content'
   /** The signed-in user's own account: name, password, sessions. */
   | 'account';
 
@@ -321,6 +323,7 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   settings: 'settings',
   onboarding: 'onboarding',
   compliance: 'compliance',
+  content: 'content',
   account: 'account',
 };
 
@@ -385,6 +388,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'settings',
   'onboarding',
   'compliance',
+  'content',
   'account',
 ];
 

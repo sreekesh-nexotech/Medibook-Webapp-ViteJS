@@ -66,3 +66,23 @@ describe('ops access without a platform session', () => {
     expect(opsHomePath(checks)).toBe('/ops/account');
   });
 });
+
+/** Backend `PLATFORM_ROLES.support` (`core/seeds/v1.py`). */
+const SUPPORT = [
+  'support.view',
+  'support.add',
+  'support.edit',
+  'support.del',
+  'hospitals.view',
+  'platform_users.view',
+  'logs.view',
+  'notifications.add',
+  'notifications.edit',
+];
+
+describe('ops access to the screens added for UAT report §8', () => {
+  it('keeps patient-app content behind settings.view', () => {
+    expect(canOpenOpsView('content', opsPermissionChecks(['settings.view']))).toBe(true);
+    expect(canOpenOpsView('content', opsPermissionChecks(SUPPORT))).toBe(false);
+  });
+});

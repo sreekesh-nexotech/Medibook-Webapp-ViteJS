@@ -4,6 +4,8 @@ import {
   hospitalViewFromPath,
   isOpsReturnPath,
   loginReturningTo,
+  opsLogsPath,
+  opsPath,
   opsViewFromPath,
   returnPathAfterLogin,
 } from '@/app/router/paths';
@@ -69,5 +71,18 @@ describe('view ids from paths', () => {
     expect(opsViewFromPath(`/ops/hospitals/${FILE_ID}`)).toBe('hospital-detail');
     expect(opsViewFromPath('/ops/billing/invoices/inv-1')).toBe('invoice-detail');
     expect(opsViewFromPath('/ops/nowhere')).toBe('dashboard');
+  });
+});
+
+describe('ops screens added for UAT report §8', () => {
+  it('maps each new view to its own URL and back', () => {
+    for (const view of ['content'] as const) {
+      expect(opsViewFromPath(opsPath(view))).toBe(view);
+    }
+  });
+
+  it('opens Compliance Logs filtered to one hospital', () => {
+    expect(opsLogsPath()).toBe('/ops/logs');
+    expect(opsLogsPath(FILE_ID)).toBe(`/ops/logs?hospital_id=${FILE_ID}`);
   });
 });

@@ -558,6 +558,30 @@ const SPEC = [
     path: '/platform/banners',
     params: LIST,
   },
+  {
+    key: 'ops-content.legalDocumentPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/legal-documents',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.faqPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/faqs',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.locationPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/locations',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.ambulancePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/ambulance-providers',
+    params: LIST,
+  },
   { key: 'ops-reports.reportListResponseSchema', surface: 'platform', path: '/platform/reports' },
   {
     key: 'ops-reports.reportResultResponseSchema',

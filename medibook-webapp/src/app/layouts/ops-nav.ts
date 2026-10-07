@@ -53,7 +53,10 @@ export const OPS_NAV: readonly OpsNavSection[] = [
   },
   {
     section: 'System',
-    items: [{ id: 'settings', label: 'Platform Settings', icon: 'settings' }],
+    items: [
+      { id: 'settings', label: 'Platform Settings', icon: 'settings' },
+      { id: 'content', label: 'Patient App Content', icon: 'book-open' },
+    ],
   },
 ];
 
@@ -97,6 +100,10 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Applications, KYC verification and go-live across the onboarding pipeline',
   ],
   compliance: ['Compliance', 'Sign-in history, configuration changes and data-subject requests'],
+  content: [
+    'Patient App Content',
+    'Legal documents, FAQs, locations and ambulance providers in the patient app',
+  ],
   account: ['My Account', 'Your name, password and signed-in devices'],
 };
 
