@@ -18,6 +18,10 @@ import {
   platformMeResponseSchema,
 } from '@/features/auth/infrastructure/data-sources/remote/auth.response';
 import {
+  supportTicketDetailSchema,
+  supportTicketPageSchema,
+} from '@/features/help/infrastructure/data-sources/remote/help.response';
+import {
   adminDashboardResponseSchema,
   receptionDashboardResponseSchema,
 } from '@/features/dashboard/infrastructure/data-sources/remote/dashboard.response';
@@ -177,6 +181,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'dashboard.adminDashboardResponseSchema': adminDashboardResponseSchema,
   'dashboard.receptionDashboardResponseSchema': receptionDashboardResponseSchema,
   'doctors.dateExceptionPageSchema': dateExceptionPageSchema,
+  'help.supportTicketDetailSchema': supportTicketDetailSchema,
+  'help.supportTicketPageSchema': supportTicketPageSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,

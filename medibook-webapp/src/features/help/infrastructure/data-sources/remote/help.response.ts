@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import type { SupportTicket } from '@/features/help/domain/entities/help.types';
+import { paginatedSchema } from '@/core/api/pagination';
+
+import type {
+  SupportTicket,
+  SupportTicketDetail,
+  SupportTicketMessage,
+} from '@/features/help/domain/entities/help.types';
 import { SUPPORT_TICKET_CATEGORIES } from '@/features/help/domain/entities/help.types';
 
 /**
@@ -42,4 +48,40 @@ export function toSupportTicket(dto: SupportTicketResponse): SupportTicket {
     closedAt: dto.closed_at,
     version: dto.version,
   };
+}
+
+/** `support/services/tickets.py::serialize_message` as the hospital sees it. */
+export const ticketMessageResponseSchema = z.object({
+  id: z.string(),
+  author_kind: z.enum(['requester', 'platform_staff']),
+  author_name: z.string().nullable(),
+  body: z.string(),
+  attachment_file_ids: z.array(z.string()),
+  occurred_at: z.string(),
+});
+
+export const supportTicketPageSchema = paginatedSchema(supportTicketResponseSchema);
+
+/** `GET …/support/tickets/{id}` — the ticket with its `messages`. */
+export const supportTicketDetailSchema = supportTicketResponseSchema.extend({
+  messages: z.array(ticketMessageResponseSchema),
+});
+
+export type TicketMessageResponse = z.infer<typeof ticketMessageResponseSchema>;
+
+export function toTicketMessage(dto: TicketMessageResponse): SupportTicketMessage {
+  return {
+    id: dto.id,
+    authorKind: dto.author_kind,
+    authorName: dto.author_name,
+    body: dto.body,
+    attachmentFileIds: dto.attachment_file_ids,
+    occurredAt: dto.occurred_at,
+  };
+}
+
+export function toSupportTicketDetail(
+  dto: z.infer<typeof supportTicketDetailSchema>,
+): SupportTicketDetail {
+  return { ...toSupportTicket(dto), messages: dto.messages.map(toTicketMessage) };
 }

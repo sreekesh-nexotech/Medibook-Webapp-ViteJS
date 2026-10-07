@@ -15,18 +15,11 @@ import type { SupportTicketCategory } from '@/features/help/domain/entities/help
 import {
   SUPPORT_TICKET_CATEGORIES,
   TICKET_DESCRIPTION_MAX,
+  TICKET_SUBJECT_MAX,
 } from '@/features/help/domain/entities/help.types';
 import { useRaiseSupportTicketMutation } from '@/features/help/application/queries/useRaiseSupportTicketMutation';
 
-/** Readable label for each backend ticket category, in the backend's order. */
-const CATEGORY_LABELS: Readonly<Record<SupportTicketCategory, string>> = {
-  billing: 'Billing & settlements',
-  technical: 'Technical issue',
-  onboarding: 'Onboarding & setup',
-  feature_request: 'Feature request',
-  complaint: 'Complaint',
-  other: 'Other',
-};
+import { CATEGORY_LABELS } from './help.view';
 
 /** Topic options offered on the ticket form — the backend's categories. */
 const TOPIC_OPTIONS = SUPPORT_TICKET_CATEGORIES.map((c) => CATEGORY_LABELS[c]);
@@ -58,6 +51,8 @@ const TICKET_VALIDATORS: FormValidators<TicketForm> = {
 interface RaiseTicketModalProps {
   open: boolean;
   onClose: () => void;
+  /** The new ticket's id, so the screen can open its thread. */
+  onRaised?: (ticketId: string) => void;
 }
 
 /**
@@ -70,10 +65,11 @@ interface RaiseTicketModalProps {
  * chosen, each error shown under its own control rather than as a toast.
  *
  * Sending raises a real ticket (`POST /hospital/support/tickets`); the success
- * toast carries its ticket number. Field errors the server returns show under
- * their own control; anything else is a toast and the modal stays open.
+ * toast carries its ticket number and the screen opens its thread. Field
+ * errors the server returns show under their own control; anything else is a
+ * toast and the modal stays open.
  */
-export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
+export function RaiseTicketModal({ open, onClose, onRaised }: RaiseTicketModalProps) {
   const raise = useRaiseSupportTicketMutation();
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
 
@@ -91,6 +87,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
             toast(`Ticket ${ticket.ticketNo} sent to Medibook`);
             form.reset({ subject: '', category: '', description: '' });
             onClose();
+            onRaised?.(ticket.id);
           },
           onError: (failure) => {
             setServerErrors(isFailure(failure) ? failure.fieldErrors : {});
@@ -128,7 +125,7 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
             onChange={(v) => form.setField('subject', v)}
             onBlur={() => form.blurField('subject')}
             placeholder="One line — e.g. Settlement MB-ST-2405 not received"
-            maxLength={120}
+            maxLength={TICKET_SUBJECT_MAX}
           />
         </Field>
         <Field label="Topic" required error={errorFor('category')}>
@@ -164,7 +161,8 @@ export function RaiseTicketModal({ open, onClose }: RaiseTicketModalProps) {
           )}
         </Field>
         <div className="text-caption text-text-muted">
-          Tickets go straight to the Medibook operations team — they reply to you by email.
+          Tickets go straight to the Medibook operations team. Their replies show under My tickets
+          and reach you by email.
         </div>
       </div>
     </FormModal>

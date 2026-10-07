@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
+import { SUPPORT_EMAIL_FALLBACK } from '@/core/config/support';
 import { useAppConfigQuery } from '@/shared/hooks/useAppConfigQuery';
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -9,15 +11,18 @@ import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
+import {
+  FAQS,
+  filterFaqs,
+  supportContacts,
+  type HelpTopic,
+} from '@/features/help/presentation/components/help.view';
 import { RaiseTicketModal } from '@/features/help/presentation/components/RaiseTicketModal';
-
-/** The four help topics — both a category tile and the FAQ grouping. */
-const CATEGORY_KEYS = ['Getting Started', 'Appointments', 'Billing', 'Settlements'] as const;
-
-type HelpCategoryKey = (typeof CATEGORY_KEYS)[number];
+import { SupportTicketDrawer } from '@/features/help/presentation/components/SupportTicketDrawer';
+import { SupportTicketsCard } from '@/features/help/presentation/components/SupportTicketsCard';
 
 interface HelpCategory {
-  readonly key: HelpCategoryKey;
+  readonly key: HelpTopic;
   readonly icon: IconName;
   readonly subtitle: string;
 }
@@ -26,110 +31,50 @@ interface HelpCategory {
 const CATEGORIES: readonly HelpCategory[] = [
   { key: 'Getting Started', icon: 'rocket', subtitle: 'Setup & first steps' },
   { key: 'Appointments', icon: 'calendar-days', subtitle: 'Booking & queue' },
-  { key: 'Billing', icon: 'wallet', subtitle: 'Payments & invoices' },
+  { key: 'Billing', icon: 'wallet', subtitle: 'Payments & receipts' },
   { key: 'Settlements', icon: 'scale', subtitle: 'Medibook transfers' },
 ];
-
-interface Faq {
-  readonly q: string;
-  readonly a: string;
-  readonly cat: HelpCategoryKey;
-}
-
-/** Frequently asked questions, tagged with the category tile that shows them. */
-const FAQS: readonly Faq[] = [
-  {
-    cat: 'Getting Started',
-    q: 'How do I give my staff access?',
-    a: 'Go to Users & Roles → Add User, pick the role that matches what they do, and choose how they get access (email invite, mobile OTP, or a password you set). The Access Preview tab shows exactly which screens and actions each role reaches before you assign it.',
-  },
-  {
-    cat: 'Appointments',
-    q: 'How do I add a walk-in appointment?',
-    a: 'Go to Appointments → New Appointment, set Appointment type to Walk-in, choose the department, doctor and time, then record the payment — the receipt and queue token are generated automatically.',
-  },
-  {
-    cat: 'Appointments',
-    q: 'How is the token queue updated?',
-    a: 'Tokens advance automatically when a doctor marks a patient Done, or manually via Call Next on the Token Management screen. Token numbers are issued as a hospital-wide running sequence (T-001, T-002 …).',
-  },
-  {
-    cat: 'Billing',
-    q: 'Where do I find a payment receipt?',
-    a: 'Open the appointment or the Payments screen and use the receipt action — receipts carry the financial-year series (MB/R/2026-27/000123) and show the 18% GST as its own line. Use Save as PDF to print or keep a copy.',
-  },
-  {
-    cat: 'Settlements',
-    q: 'How do settlements work?',
-    a: 'For online bookings, Medibook collects the fee, keeps a 10% commission, and transfers the net to the hospital by the expected date. Track and reconcile each transfer in Billing & Settlements — mark it Received once it reaches your account. Walk-in payments are collected at the desk and kept 100% by the hospital.',
-  },
-  {
-    cat: 'Billing',
-    q: 'Can I export reports?',
-    a: 'Yes — the Payments, Settlements and Reports screens export the rows you are looking at as a CSV file. Anything labelled Save as PDF opens your browser print dialog with just that document on the page.',
-  },
-];
-
-/** A contact channel as an `[icon, title, subtitle, href]` tuple. */
-type Contact = readonly [IconName, string, string, string | null];
-
-/**
- * The design's support line — shown until (or unless) the platform configures
- * its own in app-config's `support_contacts`.
- */
-const DEFAULT_PHONE: Contact = ['phone', 'Call Us', '1800 200 4567', 'tel:+918002004567'];
-
-/** Contact channels; the phone comes from the platform when it has one configured. */
-function contactsFor(phoneE164: string | null): readonly Contact[] {
-  return [
-    ['mail', 'Email Support', 'support@medibook.app', 'mailto:support@medibook.app'],
-    phoneE164 ? ['phone', 'Call Us', phoneE164, `tel:${phoneE164}`] : DEFAULT_PHONE,
-    ['message-circle', 'Live Chat', 'Mon–Sat, 9am–7pm', null],
-  ];
-}
 
 /**
  * Help & Support screen (design `Admin.jsx` `HelpSupport`): the navy hero with
  * a search field, four category tiles, the FAQ accordion, the contact cards,
- * and the "Raise a Ticket" flow.
+ * "Raise a Ticket", and the hospital's own tickets with Medibook's replies
+ * (UAT-30).
  *
- * The hero search and the category tiles are now wired to the FAQ list they
- * sit above — they were decorative controls before (audit 3.1: a control that
- * looks live and does nothing) — and a search that matches nothing gets an
- * empty state offering a way out.
- *
- * The FAQs are in-app copy: the hospital API has no FAQ endpoint (FAQs exist
- * only on the patient and platform surfaces). The support phone is the
- * platform's `support_contacts` from app-config; while that loads, fails, or
- * is unset, the design's number stands in, so the card never blanks out.
+ * The FAQs are in-app copy checked against what the product does (UAT-51);
+ * the hospital API has no FAQ endpoint. The support email and phone are the
+ * platform's `support_contacts` from app-config: the phone card only shows
+ * when one is set, and the email falls back to the address the rest of the
+ * app names. There is no live chat.
  */
 export function HelpSupportScreen() {
   const [open, setOpen] = useState(0);
-  const [ticket, setTicket] = useState(false);
+  const [raising, setRaising] = useState(false);
+  const [ticketId, setTicketId] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [cat, setCat] = useState<HelpCategoryKey | null>(null);
+  const [topic, setTopic] = useState<HelpTopic | null>(null);
+  const timeZone = useHospitalTimeZone();
   const appConfig = useAppConfigQuery();
-  const contacts = contactsFor(appConfig.data?.supportPhoneE164 ?? null);
+  const contacts = supportContacts(
+    appConfig.data?.supportPhoneE164 ?? null,
+    appConfig.data?.supportEmail ?? null,
+    SUPPORT_EMAIL_FALLBACK,
+  );
 
-  const needle = q.trim().toLowerCase();
-  const shown = FAQS.filter((f) => {
-    if (cat && f.cat !== cat) return false;
-    if (needle && !(f.q + f.a).toLowerCase().includes(needle)) return false;
-    return true;
-  });
-  const filtered = needle !== '' || cat !== null;
+  const shown = filterFaqs(FAQS, topic, q);
+  const filtered = q.trim() !== '' || topic !== null;
   const clear = (): void => {
     setQ('');
-    setCat(null);
+    setTopic(null);
     setOpen(0);
   };
 
   return (
     <div className="flex flex-col gap-5">
       <div className="shadow-card bg-p-500 rounded-xl p-9 text-center">
-        <div className="mb-2 text-[26px] font-bold text-white">How can we help?</div>
+        <div className="text-h1 mb-2 font-bold text-white">How can we help?</div>
         <div className="text-body mb-5.5 text-white/75">
-          Search our help center or browse common topics.
+          Search the answers below, or raise a ticket with the Medibook team.
         </div>
         <div className="text-text-muted mx-auto flex h-13 max-w-130 items-center gap-3 rounded-lg bg-white px-4.5">
           <Icon name="search" size={20} />
@@ -158,13 +103,13 @@ export function HelpSupportScreen() {
 
       <div className="grid grid-cols-4 gap-4">
         {CATEGORIES.map((c) => {
-          const on = cat === c.key;
+          const on = topic === c.key;
           return (
             <Card
               key={c.key}
               hover
               onClick={() => {
-                setCat(on ? null : c.key);
+                setTopic(on ? null : c.key);
                 setOpen(0);
               }}
               pad={22}
@@ -201,7 +146,7 @@ export function HelpSupportScreen() {
               actionLabel="Clear search"
               onAction={clear}
             >
-              <Button size="sm" icon="ticket" onClick={() => setTicket(true)}>
+              <Button size="sm" icon="ticket" onClick={() => setRaising(true)}>
                 Raise a Ticket
               </Button>
             </EmptyState>
@@ -226,7 +171,7 @@ export function HelpSupportScreen() {
                     />
                   </button>
                   {open === i && (
-                    <div className="text-body text-text-body px-4.5 pb-4.5 leading-[1.7]">
+                    <div className="text-body text-text-body px-4.5 pb-4.5 leading-relaxed">
                       {f.a}
                     </div>
                   )}
@@ -241,43 +186,44 @@ export function HelpSupportScreen() {
             Still need help?
           </SectionTitle>
           <div className="flex flex-col gap-3.5">
-            {contacts.map(([ic, t, s, href]) => {
-              const body = (
-                <>
-                  <div className="bg-blue-soft-bg text-blue flex size-10 flex-none items-center justify-center rounded-md">
-                    <Icon name={ic} size={19} />
-                  </div>
-                  <div>
-                    <div className="text-body text-text-strong font-medium">{t}</div>
-                    <div className="text-caption text-text-muted">{s}</div>
-                  </div>
-                </>
-              );
-              return href ? (
-                <a
-                  key={t}
-                  href={href}
-                  className="border-border-soft hover:bg-grey-200 flex items-center gap-3.5 rounded-md border p-3.5 no-underline transition-colors duration-150"
-                >
-                  {body}
-                </a>
-              ) : (
-                <div
-                  key={t}
-                  className="border-border-soft flex items-center gap-3.5 rounded-md border p-3.5"
-                >
-                  {body}
+            {contacts.map((c) => (
+              <a
+                key={c.title}
+                href={c.href}
+                className="border-border-soft hover:bg-grey-200 flex items-center gap-3.5 rounded-md border p-3.5 no-underline transition-colors duration-150"
+              >
+                <div className="bg-blue-soft-bg text-blue flex size-10 flex-none items-center justify-center rounded-md">
+                  <Icon name={c.icon} size={19} />
                 </div>
-              );
-            })}
-            <Button icon="ticket" className="mt-1 w-full" onClick={() => setTicket(true)}>
+                <div>
+                  <div className="text-body text-text-strong font-medium">{c.title}</div>
+                  <div className="text-caption text-text-muted">{c.detail}</div>
+                </div>
+              </a>
+            ))}
+            <Button icon="ticket" className="mt-1 w-full" onClick={() => setRaising(true)}>
               Raise a Ticket
             </Button>
           </div>
         </Card>
       </div>
 
-      <RaiseTicketModal open={ticket} onClose={() => setTicket(false)} />
+      <SupportTicketsCard
+        timeZone={timeZone}
+        onOpen={setTicketId}
+        onRaise={() => setRaising(true)}
+      />
+
+      <RaiseTicketModal
+        open={raising}
+        onClose={() => setRaising(false)}
+        onRaised={(id) => setTicketId(id)}
+      />
+      <SupportTicketDrawer
+        ticketId={ticketId}
+        timeZone={timeZone}
+        onClose={() => setTicketId(null)}
+      />
     </div>
   );
 }
