@@ -81,7 +81,20 @@ export interface AppointmentEvent {
   readonly occurredAt: string;
 }
 
+/** Who supplies a receipt line (D-22): the hospital, or Medibook for the convenience fee. */
+export type ReceiptSupplier = 'hospital' | 'platform';
+
+/** A supplier's legal block, as the receipt snapshotted it. */
+export interface ReceiptParty {
+  readonly legalName: string | null;
+  readonly gstin: string | null;
+  /** The structured address joined for print, or `null` when none was recorded. */
+  readonly address: string | null;
+}
+
 export interface ReceiptLine {
+  /** `null` on receipts issued before suppliers were recorded. */
+  readonly supplier: ReceiptSupplier | null;
   readonly description: string;
   readonly bookingRef: string;
   readonly amountRupees: number;
@@ -106,6 +119,14 @@ export interface DeskReceipt {
   readonly counterCode: string | null;
   readonly hospitalName: string;
   readonly hospitalGstin: string | null;
+  readonly hospitalLegalName: string | null;
+  readonly hospitalAddress: string | null;
+  readonly hospitalPhone: string | null;
+  /** Medibook's block, for lines it supplies (the convenience fee). */
+  readonly platform: ReceiptParty | null;
+  /** The patient the receipt is for (backend B3 adds it to the receipt body). */
+  readonly patientName: string | null;
+  readonly patientMrn: string | null;
   readonly lines: readonly ReceiptLine[];
   readonly payments: readonly ReceiptPayment[];
   readonly subtotalRupees: number;

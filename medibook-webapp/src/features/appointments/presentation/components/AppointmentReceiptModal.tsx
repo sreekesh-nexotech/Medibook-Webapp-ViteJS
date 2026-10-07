@@ -106,17 +106,36 @@ export function AppointmentReceiptModal({ appointmentId, onClose }: AppointmentR
 }
 
 function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
+  const platformLines = receipt.lines.filter((l) => l.supplier === 'platform');
   return (
     <div className="border-border overflow-hidden rounded-lg border">
       <div className="bg-bg-tint p-4.5">
         <div className="text-h3 text-text-navy">{receipt.hospitalName}</div>
-        <div className="text-caption text-text-muted">Tax Receipt</div>
+        {receipt.hospitalLegalName && receipt.hospitalLegalName !== receipt.hospitalName && (
+          <div className="text-caption text-text-body">{receipt.hospitalLegalName}</div>
+        )}
+        {receipt.hospitalAddress && (
+          <div className="text-caption text-text-muted">{receipt.hospitalAddress}</div>
+        )}
+        {receipt.hospitalPhone && (
+          <div className="text-caption text-text-muted">Phone {receipt.hospitalPhone}</div>
+        )}
         {receipt.hospitalGstin && (
           <div className="text-caption text-text-muted">GSTIN {receipt.hospitalGstin}</div>
         )}
+        <div className="text-caption text-text-strong mt-1 font-semibold">Tax Receipt</div>
       </div>
       <div className="p-4.5">
         <div className="text-body mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {receipt.patientName && (
+            <>
+              <span className="text-text-muted">Patient</span>
+              <span className="text-text-strong text-right font-medium">
+                {receipt.patientName}
+                {receipt.patientMrn ? ` · ${receipt.patientMrn}` : ''}
+              </span>
+            </>
+          )}
           <span className="text-text-muted">Receipt No.</span>
           <span className="text-text-strong text-right font-medium tabular-nums">
             {receipt.receiptNo}
@@ -149,7 +168,10 @@ function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
                 <tr key={`${l.bookingRef}-${l.description}-${i}`}>
                   <td className={rcTd}>
                     {l.description}
-                    <span className="text-caption text-text-muted block">{l.bookingRef}</span>
+                    <span className="text-caption text-text-muted block">
+                      {l.bookingRef}
+                      {l.supplier === 'platform' ? ' · supplied by Medibook' : ''}
+                    </span>
                   </td>
                   <td className={cn(rcTd, 'text-right tabular-nums')}>{money(l.amountRupees)}</td>
                   <td className={cn(rcTd, 'text-right tabular-nums')}>
@@ -181,6 +203,16 @@ function ReceiptBody({ receipt }: { receipt: DeskReceipt }) {
             .join(' + ') || '—'}
           . This is a computer-generated receipt.
         </div>
+        {platformLines.length > 0 && receipt.platform && (
+          <div className="border-border-soft text-caption text-text-muted mt-3.5 border-t pt-3">
+            {platformLines.map((l) => l.description).join(', ')} supplied by{' '}
+            <span className="text-text-strong font-medium">
+              {receipt.platform.legalName ?? 'Medibook'}
+            </span>
+            {receipt.platform.gstin ? `, GSTIN ${receipt.platform.gstin}` : ''}
+            {receipt.platform.address ? `, ${receipt.platform.address}` : ''}.
+          </div>
+        )}
       </div>
     </div>
   );

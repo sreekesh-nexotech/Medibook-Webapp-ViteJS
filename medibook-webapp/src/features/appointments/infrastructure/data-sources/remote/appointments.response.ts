@@ -81,6 +81,16 @@ export const appointmentEventSchema = z.object({
   occurred_at: z.string(),
 });
 
+/** A structured address as the receipt snapshots store it (`receipts.hospital_snapshot`). */
+const snapshotAddressFields = {
+  address_line1: z.string().nullable().optional(),
+  address_line2: z.string().nullable().optional(),
+  address_line3: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  pincode: z.string().nullable().optional(),
+};
+
 /** `HospitalReceiptSerializer`; `lines` / `payment_lines` per `payments/services/receipts.py`. */
 export const receiptResponseSchema = z.object({
   id: z.string(),
@@ -94,6 +104,7 @@ export const receiptResponseSchema = z.object({
   has_pdf: z.boolean(),
   lines: z.array(
     z.object({
+      supplier: z.enum(['hospital', 'platform']).optional(),
       description: z.string(),
       booking_ref: z.string(),
       amount_paise: z.number().int(),
@@ -109,7 +120,28 @@ export const receiptResponseSchema = z.object({
       reference: z.string().nullable(),
     }),
   ),
-  hospital_snapshot: z.object({ name: z.string(), gstin: z.string().nullable() }),
+  hospital_snapshot: z.object({
+    name: z.string(),
+    gstin: z.string().nullable(),
+    legal_name: z.string().nullable().optional(),
+    phone_e164: z.string().nullable().optional(),
+    ...snapshotAddressFields,
+  }),
+  platform_snapshot: z
+    .object({
+      legal_name: z.string().nullable().optional(),
+      gstin: z.string().nullable().optional(),
+      ...snapshotAddressFields,
+    })
+    .nullable()
+    .optional(),
+  // The patient on the receipt (backend B3 / BE-22): nested, or flat.
+  patient: z
+    .object({ full_name: z.string().nullable().optional(), mrn: z.string().nullable().optional() })
+    .nullable()
+    .optional(),
+  patient_name: z.string().nullable().optional(),
+  patient_mrn: z.string().nullable().optional(),
 });
 
 export const tokenSlipResponseSchema = z.object({
@@ -202,16 +234,47 @@ export function toEvent(dto: z.infer<typeof appointmentEventSchema>): Appointmen
   };
 }
 
+type SnapshotAddress = {
+  readonly address_line1?: string | null;
+  readonly address_line2?: string | null;
+  readonly address_line3?: string | null;
+  readonly city?: string | null;
+  readonly state?: string | null;
+  readonly pincode?: string | null;
+};
+
+/** The snapshot's address parts joined for print ("NH 66, Maradu, Kochi, Kerala 682040"). */
+export function snapshotAddress(a: SnapshotAddress): string | null {
+  const place = [a.state, a.pincode].filter((p) => p && p.trim()).join(' ');
+  const parts = [a.address_line1, a.address_line2, a.address_line3, a.city, place].filter(
+    (p): p is string => Boolean(p && p.trim()),
+  );
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
 export function toReceipt(dto: ReceiptResponse): DeskReceipt {
+  const hospital = dto.hospital_snapshot;
+  const platform = dto.platform_snapshot ?? null;
   return {
     id: dto.id,
     receiptNo: dto.receipt_no,
     issuedAt: dto.issued_at,
     issuedByName: dto.issued_by_name,
     counterCode: dto.counter_code,
-    hospitalName: dto.hospital_snapshot.name,
-    hospitalGstin: dto.hospital_snapshot.gstin,
+    hospitalName: hospital.name,
+    hospitalGstin: hospital.gstin,
+    hospitalLegalName: hospital.legal_name ?? null,
+    hospitalAddress: snapshotAddress(hospital),
+    hospitalPhone: hospital.phone_e164 ?? null,
+    platform: platform && {
+      legalName: platform.legal_name ?? null,
+      gstin: platform.gstin ?? null,
+      address: snapshotAddress(platform),
+    },
+    patientName: dto.patient?.full_name ?? dto.patient_name ?? null,
+    patientMrn: dto.patient?.mrn ?? dto.patient_mrn ?? null,
     lines: dto.lines.map((l) => ({
+      supplier: l.supplier ?? null,
       description: l.description,
       bookingRef: l.booking_ref,
       amountRupees: rupees(l.amount_paise),
