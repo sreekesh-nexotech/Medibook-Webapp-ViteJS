@@ -12,6 +12,7 @@ import type { TableStateSpec } from '@/shared/ui/TableState';
 
 import { isFailure } from '@/core/error/failure';
 
+import { useRefreshTickets } from '@/features/help/application/queries/useRefreshTickets';
 import { useSupportTicketsQuery } from '@/features/help/application/queries/useSupportTicketsQuery';
 
 import { CATEGORY_LABELS, STATUS_VIEW, TICKET_FILTERS } from './help.view';
@@ -35,6 +36,7 @@ export function SupportTicketsCard({ timeZone, onOpen, onRaise }: SupportTickets
   const [page, setPage] = useState(0);
   const status = TICKET_FILTERS.find((f) => f.label === filter)?.status ?? null;
   const tickets = useSupportTicketsQuery({ status, page: page + 1, pageSize: PAGE_SIZE });
+  const refresh = useRefreshTickets();
   const rows = tickets.data?.items ?? [];
 
   const state: TableStateSpec | undefined = tickets.isPending
@@ -83,12 +85,7 @@ export function SupportTicketsCard({ timeZone, onOpen, onRaise }: SupportTickets
             }}
             aria-label="Filter tickets by status"
           />
-          <RefreshBtn
-            onRefresh={async () => {
-              await tickets.refetch();
-            }}
-            title="Refresh your tickets"
-          />
+          <RefreshBtn onRefresh={refresh} title="Refresh your tickets" />
         </div>
       </div>
       <TableShell columns={COLUMNS} state={state} scrollLabel="Support tickets">
