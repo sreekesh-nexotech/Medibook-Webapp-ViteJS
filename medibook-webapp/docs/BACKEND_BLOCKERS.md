@@ -85,6 +85,8 @@ Paths under `backend:` are in the Django repository.
 | PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links         |
 | HSET-01   | A payout account can never become verified                                 | Medium   | Not shown on the screen                       |
 | HSET-02   | Removing a counter does not check who still uses it                        | Low      | Counters can be marked inactive instead       |
+| HSET-03   | The token policy's print layout is never used                              | Low      | Settings offers the choice; slips ignore it   |
+| HSET-04   | A display set to a counter hides sessions nobody has called yet            | Low      | Not explained on the screen                   |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1213,3 +1215,35 @@ default.
 
 **What the web app does meanwhile.** A counter can be marked inactive in its edit form,
 which keeps it for history; removing one is not checked.
+
+## HSET-03 — The token policy's print layout is never used
+
+**New finding (building Print Templates in Hospital Settings, 8 Oct 2026).**
+
+**What fails.** `token_policies.print_template_id` can be set (`PUT /hospital/token-policy`,
+Q22), and deleting that layout is refused while the policy points at it
+(`tokens/services/print_templates.remove`), but token slips are rendered from the
+hospital's **default** token-slip layout only (`payments/services/pdf.render_token_slip_html`
+calls `_template(hospital_id, "token_slip")` without a preferred layout). Setting the
+policy's layout changes nothing that prints.
+
+**What the backend needs.** Either render token slips with the policy's layout when one is
+set, or drop the field and use the default only.
+
+**What the web app does meanwhile.** Hospital Settings offers a slip template on the token
+policy and saves it, but slips still print with the default layout until this is fixed.
+
+## HSET-04 — A display set to a counter hides sessions nobody has called yet
+
+**New finding (building Display Screens in Hospital Settings, 8 Oct 2026).**
+
+**What fails.** `GET /display/queue` filters sessions by the counter of the **latest call**
+(`tokens/services/display_queue.snapshot`), and when both doctors and counters are chosen a
+session must match both. A screen limited to a counter therefore shows no session until a
+token from it has been called to that counter, and a doctor called to a different counter
+disappears from it.
+
+**What the backend needs.** Decide what a counter selection means (e.g. the counter a session
+is assigned to) and filter on that, or make doctors and counters either-or.
+
+**What the web app does meanwhile.** Nothing on the screen explains it yet.
