@@ -12,6 +12,7 @@ import {
 
 const ALERTS = {
   pendingApprovals: 2,
+  pendingApprovalsToday: null,
   pendingPatientChanges: 1,
   unpaidWalkInsToday: 0,
   cashSessionsToReconcile: 3,

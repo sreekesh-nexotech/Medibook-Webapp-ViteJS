@@ -299,7 +299,6 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   // New reads of fix wave 1 (fe/f3). Their recorder entries are in place;
   // record them against the merged backend and move them to CONTRACTS.
   approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
-  payoutPageResponseSchema: 'New in wave 1 — record against the merged backend.',
   creditNotePageResponseSchema: 'New in wave 1 — record against the merged backend.',
   statementPdfLinkSchema: 'Reading it renders and stores the statement PDF (SET-02).',
   // New to the web app in fe/f4 (shells, ops hospitals, billing, plans, settlements). The
