@@ -293,8 +293,13 @@ export function MessagingScreen() {
           setPendingSend(null);
         },
         onError: (error) => {
+          // A lost answer may still have queued it: keep the dialog (and its
+          // Idempotency-Key) so "Queue message" retries the same request. A
+          // refusal (wrong booking state, already sent today) closes it.
+          const outcomeUnknown =
+            !isFailure(error) || error.kind === 'network' || error.kind === 'server';
           toast(isFailure(error) ? error.message : 'The message could not be queued.', 'error');
-          setPendingSend(null);
+          if (!outcomeUnknown) setPendingSend(null);
         },
       },
     );
