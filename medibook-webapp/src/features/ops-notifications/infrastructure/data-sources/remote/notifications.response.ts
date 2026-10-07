@@ -12,6 +12,10 @@ import type { CampaignBanner } from '@/features/ops-notifications/domain/entitie
 export const bannerResponseSchema = z.object({
   id: z.string(),
   title: z.string(),
+  body: z.string().nullable().optional(),
+  cta_label: z.string().nullable().optional(),
+  cta_target: z.string().nullable().optional(),
+  audience: z.string().optional(),
   image_file: z.string().nullable(),
   starts_at: z.string().nullable(),
   ends_at: z.string().nullable(),
@@ -25,6 +29,9 @@ export const bannersPageResponseSchema = paginatedSchema(bannerResponseSchema);
 export type BannerResponse = z.infer<typeof bannerResponseSchema>;
 export type BannersPageResponse = z.infer<typeof bannersPageResponseSchema>;
 
+/** The model default (`HospitalBanner.audience`) when an older backend omits the field. */
+const DEFAULT_AUDIENCE = 'hospital_patients';
+
 /** A UTC timestamp as the local calendar day it falls on. */
 function toLocalDay(iso: string | null): string | null {
   return iso ? toLocalISO(new Date(iso)) : null;
@@ -34,6 +41,10 @@ export function toCampaignBanner(dto: BannerResponse): CampaignBanner {
   return {
     id: dto.id,
     title: dto.title,
+    body: dto.body ?? null,
+    ctaLabel: dto.cta_label ?? null,
+    ctaTarget: dto.cta_target ?? null,
+    audience: dto.audience ?? DEFAULT_AUDIENCE,
     imageFileId: dto.image_file,
     from: toLocalDay(dto.starts_at),
     to: toLocalDay(dto.ends_at),

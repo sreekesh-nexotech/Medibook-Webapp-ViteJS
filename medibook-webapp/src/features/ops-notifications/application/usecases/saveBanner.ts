@@ -35,6 +35,10 @@ export async function saveBanner(
   if (!image.ok) return err(image.failure);
   const fields = {
     title: draft.title.trim(),
+    body: draft.body,
+    ctaLabel: draft.ctaLabel,
+    ctaTarget: draft.ctaTarget,
+    audience: draft.audience,
     imageFileId: image.data,
     from: draft.from,
     to: draft.to,
