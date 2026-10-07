@@ -74,7 +74,7 @@ export function Modal({
           )}
         </div>
         <div className="p-6">{children}</div>
-        {footer && <div className="flex justify-end gap-3 px-6 pb-6">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-3 px-6 pb-6">{footer}</div>}
       </div>
     </div>
   );
