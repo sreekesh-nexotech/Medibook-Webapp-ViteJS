@@ -163,6 +163,8 @@ Paths under `backend:` are in the Django repository.
 | MSG-01    | An outbox delivery does not say which patient or booking it was for        | Medium   | Outbox shows the address only                       |
 | MSG-02    | Outbox search matches only an exact phone number or message ID             | Low      | Search is exact-match only                          |
 | MSG-03    | The test backend's gateways never confirm delivery                         | Low      | Test deliveries stay at Sent                        |
+| AUD-01    | Audit masking turns digit runs inside ids into `[phone]`                   | Medium   | Shows the values as stored                          |
+| AUD-02    | The audit CSV leaves out what changed, and stops at 10,000 rows            | Low      | The screen's detail view shows every change         |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1371,3 +1373,36 @@ value finds anything; date, status and channel filters narrow the list.
 
 **What the web app does meanwhile.** Shows the status the server reports, so test messages
 stay at **Sent**.
+
+## AUD-01 — Audit masking turns digit runs inside ids into `[phone]`
+
+**New finding (live check of System → Audit Trail, 8 Oct 2026).**
+
+**What fails.** Audit values are masked before they are stored, and the phone-number
+rule (backend: `core/logging.py:18`, `_PHONE.sub("[phone]", …)`) also matches runs of
+digits inside UUIDs. A display device's doctor list was logged
+as `["01a0ee28-85e5-7da3-9304-2a385af65a5a", "01a0ee[phone]f[phone]ef7f18cb"]` (row
+`display_device.selection_changed`, 8 Oct 2026), so the trail no longer says which doctor
+was added, and the stored value can never be recovered.
+
+**What the backend needs.** Mask only real phone numbers (an E.164 or 10-digit number
+standing alone), never inside ids, and leave UUID-shaped values untouched.
+
+**What the web app does meanwhile.** Shows the values exactly as stored; it cannot repair
+them.
+
+## AUD-02 — The audit CSV leaves out what changed, and stops at 10,000 rows
+
+**New finding (live check of System → Audit Trail, 8 Oct 2026).**
+
+**What fails.** `GET /hospital/audit/log/export.csv` writes request metadata only
+(`occurred_at, principal, actor_user_id, action, resource_type, resource_id, method, path,
+status_code, ip, request_id` — `audit/views/hospital_audit_log_export.py`): no `diff`,
+`before` or `after`, and actors as ids. It also stops at `EXPORT_LIMIT = 10_000` rows
+without saying so.
+
+**What the backend needs.** Add the changed fields (the masked `diff`) and the actor's name
+to the export, and mark a capped file (or page it).
+
+**What the web app does meanwhile.** The screen's detail drawer shows the before and after
+values; the export is the server's file as it is.
