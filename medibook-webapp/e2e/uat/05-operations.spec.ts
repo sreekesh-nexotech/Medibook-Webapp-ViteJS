@@ -910,7 +910,8 @@ test('4.5 Operations — owner', async ({ browser }) => {
         (r) =>
           r.request().method() === 'GET' &&
           new URL(r.url()).pathname === `/api/v1/platform/reports/${report.code}` &&
-          new URL(r.url()).searchParams.get('hospital') === lakeshoreId,
+          // The catalog's `hospital` filter is sent as its `hospital_id` param.
+          new URL(r.url()).searchParams.get('hospital_id') === lakeshoreId,
       ),
       page.getByRole('button', { name: 'Run report' }).click(),
     ]);

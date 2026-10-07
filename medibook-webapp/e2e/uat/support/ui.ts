@@ -220,15 +220,19 @@ export async function selectFirstReal(
   select: Locator,
   matching: (label: string) => boolean = () => true,
 ): Promise<string> {
-  const real = async () => {
-    const out: string[] = [];
-    for (const option of await select.locator('option').all()) {
-      const value = (await option.getAttribute('value')) ?? '';
-      const text = ((await option.textContent()) ?? '').trim();
-      if (value !== '' && matching(text)) out.push(text);
-    }
-    return out;
-  };
+  // One read of every option: the list re-renders while a search answers, and
+  // per-option reads would wait on an option that has just gone.
+  const real = async () =>
+    (
+      await select
+        .locator('option')
+        .evaluateAll((options) =>
+          options.map((o) => ({ value: o.getAttribute('value') ?? '', text: o.textContent ?? '' })),
+        )
+    )
+      .map((o) => ({ value: o.value, text: o.text.trim() }))
+      .filter((o) => o.value !== '' && matching(o.text))
+      .map((o) => o.text);
   await expect
     .poll(async () => (await real()).length, {
       timeout: OPTIONS_TIMEOUT_MS,
