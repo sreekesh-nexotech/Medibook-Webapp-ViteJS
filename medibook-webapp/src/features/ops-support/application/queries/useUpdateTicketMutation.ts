@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { isFailure, unwrap } from '@/core/error/failure';
+import { unwrap } from '@/core/error/failure';
 
 import { supportKeys } from '@/features/ops-support/application/queries/support.keys';
 import { updateTicket } from '@/features/ops-support/application/usecases/updateTicket';
@@ -13,10 +13,11 @@ interface UpdateTicketInput {
 }
 
 /**
- * Change a ticket's status, priority or assignee. The answer is the fresh
- * ticket, written straight into its detail cache; the lists refetch. On a
- * conflict (someone else changed it first) the detail is re-read so the next
- * attempt carries the current version.
+ * Change a ticket's status, priority or assignee. The answer is written
+ * straight into the detail cache (new version for the next change), then the
+ * detail is re-read anyway — a note posted while the change was in flight may
+ * be missing from that answer — and the lists refetch. On a conflict
+ * (someone else changed it first) the re-read brings the current version.
  */
 export function useUpdateTicketMutation() {
   const queryClient = useQueryClient();
@@ -26,12 +27,8 @@ export function useUpdateTicketMutation() {
     onSuccess: (ticket) => {
       queryClient.setQueryData(supportKeys.detail(ticket.id), ticket);
     },
-    onError: (error, { id }) => {
-      if (isFailure(error) && error.kind === 'conflict') {
-        void queryClient.invalidateQueries({ queryKey: supportKeys.detail(id) });
-      }
-    },
-    onSettled: () => {
+    onSettled: (_ticket, _error, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: supportKeys.detail(id) });
       void queryClient.invalidateQueries({ queryKey: supportKeys.lists() });
     },
   });
