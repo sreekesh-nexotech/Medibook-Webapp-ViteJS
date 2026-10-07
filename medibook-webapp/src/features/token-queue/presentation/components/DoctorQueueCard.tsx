@@ -30,14 +30,16 @@ import {
   closeSessionCopy,
   isLiveSession,
   isServing,
+  isStaleQueueRefusal,
   minutesSince,
   pillFor,
+  queueRefusalText,
   servingLabel,
   servingSince,
   servingTokenNo,
-  skippedFor,
-  upNextFor,
+  sessionQueue,
   type QueuePill,
+  type QueueTicket,
 } from './tokenQueue.view';
 
 /** Up-next chips shown before collapsing into "+N". */
@@ -66,8 +68,16 @@ const STATUS_PILL: Readonly<Record<QueuePill, string>> = {
   Closed: 'bg-grey-200 text-text-muted',
 };
 
+/** A chip's tooltip: the patient and, when the server estimates it, the wait. */
+function ticketTitle(t: QueueTicket): string | null {
+  const wait = t.estimatedWaitMinutes;
+  const parts = [t.patientName, wait != null && wait > 0 ? `about ${wait} min` : null];
+  const text = parts.filter(Boolean).join(' · ');
+  return text || null;
+}
+
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return isFailure(error) ? queueRefusalText(error.code, error.message) : fallback;
 }
 
 interface NoShowOffer {
@@ -80,7 +90,10 @@ interface DoctorQueueCardProps {
   doctorName: string;
   departmentName: string;
   room: string | null;
-  /** Today's appointments (H7) — the source of patient names and up-next tokens. */
+  /**
+   * Today's appointments (H7) — names and the queue lists when the backend
+   * does not send its own queue (B5 `queue`).
+   */
   appointments: readonly DeskAppointment[];
   /** Hospital-local today (`yyyy-mm-dd`); a no-show is only offered on the session's own day. */
   today: string;
@@ -132,20 +145,23 @@ export function DoctorQueueCard({
   const servingAppt = appointments.find((a) => a.id === session.currentAppointmentId) ?? null;
   const tokenLabel = servingLabel(session, servingAppt);
   const elapsed = minutesSince(servingSince(session, servingAppt), now);
-  const queue = upNextFor(session, appointments);
+  const lists = sessionQueue(session, appointments);
+  const queue = lists.upNext;
   const upNext = queue.slice(0, UP_NEXT_CHIPS);
-  const skipped = skippedFor(session, appointments);
+  const skipped = lists.skipped;
   const isOpen = session.status === 'open';
   const isPaused = session.status === 'paused';
   const isLive = isLiveSession(session);
   const busy = sessionCommand.isPending || tokenCommand.isPending || skip.isPending;
-  const callNext = callNextState(session, queue.length, skipped.length);
+  const callNext = callNextState(session, lists.upNextCount, skipped.length);
   // A specific token can be called (Q24) when the desk is free: open and
   // nobody called or with the doctor.
   const canCallToken = canRunQueue && isOpen && !serving && !busy;
 
   const onError = (fallback: string) => (error: unknown) => {
-    if (isFailure(error) && error.kind === NOT_FOUND) onStale();
+    if (isFailure(error) && (error.kind === NOT_FOUND || isStaleQueueRefusal(error.code))) {
+      onStale();
+    }
     toast(failureText(error, fallback), 'error');
   };
 
@@ -225,7 +241,7 @@ export function DoctorQueueCard({
                 {session.queueState === 'consulting' ? 'In consultation' : 'Called'}
               </div>
               <div className="text-body text-text-strong truncate font-medium">
-                {servingAppt?.patient?.fullName ?? '—'}
+                {lists.servingName ?? '—'}
               </div>
             </div>
             <span
@@ -245,7 +261,7 @@ export function DoctorQueueCard({
                 ? 'Session closed'
                 : isPaused
                   ? 'On a break'
-                  : queue.length
+                  : lists.upNextCount > 0
                     ? 'Ready to call next'
                     : skipped.length
                       ? 'Only skipped tokens are waiting'
@@ -265,16 +281,12 @@ export function DoctorQueueCard({
           {upNext.length === 0 ? (
             <span className="text-caption text-text-muted">nobody yet</span>
           ) : (
-            upNext.map((a) => (
+            upNext.map((t) => (
               <TokenChip
-                key={a.id}
-                label={a.tokenLabel ?? `#${a.tokenNo ?? ''}`}
-                patientName={a.patient?.fullName ?? null}
-                onCall={
-                  canCallToken && a.tokenNo !== null
-                    ? () => runToken('call', a.tokenNo ?? 0)
-                    : undefined
-                }
+                key={t.appointmentId}
+                label={t.label}
+                patientName={ticketTitle(t)}
+                onCall={canCallToken ? () => runToken('call', t.tokenNo) : undefined}
               />
             ))
           )}
@@ -292,6 +304,30 @@ export function DoctorQueueCard({
         </span>
       </div>
 
+      {lists.withDoctor.length > 0 && (
+        <div className="flex min-h-6 items-center gap-2">
+          <span
+            className="text-caption text-text-muted flex-none"
+            title="Still with the doctor — click one to mark the consultation done"
+          >
+            With doctor
+          </span>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {lists.withDoctor.map((t) => (
+              <TokenChip
+                key={t.appointmentId}
+                label={t.label}
+                patientName={t.patientName}
+                actionVerb="Mark done"
+                onCall={
+                  canRunQueue && isLive && !busy ? () => runToken('complete', t.tokenNo) : undefined
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {skipped.length > 0 && (
         <div className="flex min-h-6 items-center gap-2">
           <span
@@ -301,19 +337,27 @@ export function DoctorQueueCard({
             Skipped
           </span>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            {skipped.map((a) => (
-              <TokenChip
-                key={a.id}
-                label={a.tokenLabel ?? `#${a.tokenNo ?? ''}`}
-                patientName={a.patient?.fullName ?? null}
-                muted
-                actionVerb="Call again"
-                onCall={
-                  canCallToken && a.tokenNo !== null
-                    ? () => runToken('recall', a.tokenNo ?? 0)
-                    : undefined
-                }
-              />
+            {skipped.map((t) => (
+              <span key={t.appointmentId} className="inline-flex items-center gap-1">
+                <TokenChip
+                  label={t.label}
+                  patientName={ticketTitle(t)}
+                  muted
+                  actionVerb="Call again"
+                  onCall={canCallToken ? () => runToken('recall', t.tokenNo) : undefined}
+                />
+                {canRunQueue && t.offerNoShow && canOfferNoShow(session, today, true) && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setOfferNoShow({ tokenNo: t.tokenNo, label: t.label })}
+                    title={`Skipped ${t.skipCount} times — mark ${t.label} as a no-show`}
+                    className="text-caption text-d-700 cursor-pointer font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    No-show?
+                  </button>
+                )}
+              </span>
             ))}
           </div>
         </div>

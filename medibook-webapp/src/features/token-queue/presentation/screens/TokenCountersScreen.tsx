@@ -128,7 +128,7 @@ export function TokenCountersScreen() {
     s.departmentId ?? doctorsById.get(s.doctorId)?.departmentId ?? null;
   const deptNameOf = (s: QueueSession): string => {
     const id = deptIdOf(s);
-    return id ? (deptNameById.get(id) ?? '') : '';
+    return (id ? deptNameById.get(id) : undefined) ?? s.departmentName ?? '';
   };
   const doctorNameOf = (s: QueueSession): string => doctorsById.get(s.doctorId)?.name ?? 'Doctor';
 
@@ -313,7 +313,10 @@ export function TokenCountersScreen() {
               now={now}
               expectedMinutes={expectedFor(s)}
               onShowCalls={() => setCallsFor(s)}
-              onStale={() => void appointmentsQuery.refetch()}
+              onStale={() => {
+                void sessionsQuery.refetch();
+                void appointmentsQuery.refetch();
+              }}
             />
           ))}
         </div>

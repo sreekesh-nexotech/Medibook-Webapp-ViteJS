@@ -1,4 +1,5 @@
 import type {
+  QueueRow,
   QueueSession,
   QueueState,
   TokenCall,
@@ -142,6 +143,107 @@ export function skippedFor(
     .sort(byToken);
 }
 
+/* ----------------------------------------------------------- queue lists */
+
+/** One token as a queue card shows it, from the server's queue or the day's bookings. */
+export interface QueueTicket {
+  readonly appointmentId: string;
+  readonly tokenNo: number;
+  /** The hospital's label, else `#N` — never a made-up format. */
+  readonly label: string;
+  readonly patientName: string | null;
+  readonly skipCount: number;
+  /** The skip limit is reached: the desk may mark a no-show (Q27, never automatic). */
+  readonly offerNoShow: boolean;
+  readonly estimatedWaitMinutes: number | null;
+}
+
+/** What one session card lists. */
+export interface SessionQueue {
+  /** In the order Call Next calls them. */
+  readonly upNext: readonly QueueTicket[];
+  /** Called earlier and passed by; the desk calls them back one at a time. */
+  readonly skipped: readonly QueueTicket[];
+  /** With the doctor but no longer at the desk — Done still applies to them. */
+  readonly withDoctor: readonly QueueTicket[];
+  /** The patient at the desk, when known. */
+  readonly servingName: string | null;
+  /** How many tokens Call Next can still call (B5 `up_next_count` when sent). */
+  readonly upNextCount: number;
+}
+
+function ticketFromAppointment(session: QueueSession, a: DeskAppointment): QueueTicket {
+  const limit = session.noShowCallAttempts;
+  return {
+    appointmentId: a.id,
+    tokenNo: a.tokenNo ?? 0,
+    label: a.tokenLabel ?? `#${a.tokenNo ?? ''}`,
+    patientName: a.patient?.fullName ?? null,
+    skipCount: a.noShowAttempts,
+    offerNoShow: limit !== null && a.calledAt !== null && a.noShowAttempts >= limit,
+    estimatedWaitMinutes: null,
+  };
+}
+
+function ticketFromRow(row: QueueRow, appointment: DeskAppointment | undefined): QueueTicket {
+  return {
+    appointmentId: row.appointmentId,
+    tokenNo: row.tokenNo,
+    label: row.tokenLabel ?? appointment?.tokenLabel ?? `#${row.tokenNo}`,
+    patientName: row.patientName ?? appointment?.patient?.fullName ?? null,
+    skipCount: row.skipCount,
+    offerNoShow: row.offerNoShow,
+    estimatedWaitMinutes: row.estimatedWaitMinutes,
+  };
+}
+
+/**
+ * The session's lists. The server's own queue (B5 `queue`) is the truth when
+ * sent — exact Call Next order, skips and names; an older backend's
+ * snapshot has none, so the lists are derived from the day's bookings with
+ * the same rule (`upNextFor`, `skippedFor`).
+ */
+export function sessionQueue(
+  session: QueueSession,
+  appointments: readonly DeskAppointment[],
+): SessionQueue {
+  const byId = new Map(appointments.map((a) => [a.id, a]));
+  const serving = byId.get(session.currentAppointmentId ?? '');
+  if (session.queue) {
+    const rows = session.queue;
+    const of = (kind: QueueRow['kind']) =>
+      rows
+        .filter((r) => r.kind === kind && r.appointmentId !== session.currentAppointmentId)
+        .map((r) => ticketFromRow(r, byId.get(r.appointmentId)));
+    const upNext = of('up_next');
+    const current = rows.find((r) => r.appointmentId === session.currentAppointmentId);
+    return {
+      upNext,
+      skipped: of('called'),
+      withDoctor: of('in_consultation'),
+      servingName: current?.patientName ?? serving?.patient?.fullName ?? null,
+      upNextCount: session.upNextCount ?? upNext.length,
+    };
+  }
+  const upNext = upNextFor(session, appointments).map((a) => ticketFromAppointment(session, a));
+  return {
+    upNext,
+    skipped: skippedFor(session, appointments).map((a) => ticketFromAppointment(session, a)),
+    withDoctor: appointments
+      .filter(
+        (a) =>
+          a.sessionId === session.id &&
+          a.status === 'in_consultation' &&
+          a.id !== session.currentAppointmentId &&
+          a.tokenNo !== null,
+      )
+      .sort(byToken)
+      .map((a) => ticketFromAppointment(session, a)),
+    servingName: serving?.patient?.fullName ?? null,
+    upNextCount: session.upNextCount ?? upNext.length,
+  };
+}
+
 /** What the session's main button can do right now. */
 export type CallNextState =
   { readonly kind: 'ready' } | { readonly kind: 'blocked'; readonly reason: string };
@@ -194,6 +296,27 @@ export function closeSessionCopy(doctorName: string, label: string, waiting: num
   if (waiting <= 0) return base;
   const who = waiting === 1 ? '1 patient is' : `${waiting} patients are`;
   return `${base} ${who} still waiting — they stay booked; mark them as no-shows or cancel them from Appointments.`;
+}
+
+/* -------------------------------------------------------- queue refusals */
+
+/** Desk wording for the queue's refusals (B5); others keep the server's message. */
+const QUEUE_REFUSALS: Readonly<Record<string, string>> = {
+  SESSION_NOT_TODAY: 'This session is not today’s — its tokens can only be called on its own day.',
+  TOKEN_NOT_CALLED: 'Only a token that was called or skipped can be marked a no-show.',
+  TOKEN_NOT_CURRENT:
+    'That token is no longer at the desk or with the doctor — the queue has been refreshed.',
+};
+
+/** Refusals that mean this card's picture of the queue is out of date. */
+const STALE_CODES: ReadonlySet<string> = new Set(['TOKEN_NOT_CURRENT', 'TOKEN_NOT_CALLED']);
+
+export function queueRefusalText(code: string | null, message: string): string {
+  return (code && QUEUE_REFUSALS[code]) || message;
+}
+
+export function isStaleQueueRefusal(code: string | null): boolean {
+  return code !== null && STALE_CODES.has(code);
 }
 
 /* --------------------------------------------------------------- calls log */
