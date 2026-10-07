@@ -2,6 +2,8 @@ import type { Result } from '@/core/error/failure';
 
 import type {
   CouponInput,
+  CouponRedemption,
+  DoctorServiceLink,
   HospitalCoupon,
   PricedService,
   ServiceInput,
@@ -27,4 +29,7 @@ export interface ServicesRepository {
   createCoupon(input: CouponInput): Promise<Result<HospitalCoupon>>;
   updateCoupon(id: string, input: CouponInput, version: number): Promise<Result<HospitalCoupon>>;
   deleteCoupon(id: string, version: number): Promise<Result<null>>;
+  listCouponRedemptions(couponId: string): Promise<Result<readonly CouponRedemption[]>>;
+
+  listDoctorServices(): Promise<Result<readonly DoctorServiceLink[]>>;
 }

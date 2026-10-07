@@ -4,6 +4,7 @@ import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
   CashSession,
+  CashSummaryRow,
   PaymentLine,
   PaymentRefund,
   VisitReceipt,
@@ -89,6 +90,11 @@ const refundSchema = z.object({
 
 export const paymentDetailResponseSchema = z.object({ refunds: z.array(refundSchema) });
 
+/** `GET /refunds` — every refund in a date window (paginated). */
+export const refundPageResponseSchema = paginatedSchema(refundSchema);
+
+export type RefundPageResponse = z.infer<typeof refundPageResponseSchema>;
+
 export type PaymentDetailResponse = z.infer<typeof paymentDetailResponseSchema>;
 
 export function toPaymentRefunds(dto: PaymentDetailResponse): readonly PaymentRefund[] {
@@ -100,6 +106,10 @@ export function toPaymentRefunds(dto: PaymentDetailResponse): readonly PaymentRe
     reason: r.reason,
     processedAt: r.processed_at,
   }));
+}
+
+export function toRefundList(rows: RefundPageResponse['results']): readonly PaymentRefund[] {
+  return toPaymentRefunds({ refunds: rows });
 }
 
 const receiptSchema = z.object({
@@ -165,4 +175,42 @@ export function toCashSession(dto: CashSessionResponse): CashSession {
     status: dto.status,
     reconciledAt: dto.reconciled_at,
   };
+}
+
+/** `GET /cash-sessions/summary?date` — one row per staff member who held a drawer. */
+export const cashSummaryResponseSchema = z.object({
+  date: z.string(),
+  staff: z.array(
+    z.object({
+      staff_id: z.string(),
+      staff_name: z.string(),
+      counters: z.array(z.string()),
+      open_sessions: z.number().int(),
+      opening_float_paise: z.number().int(),
+      cash_in_paise: z.number().int(),
+      cash_refunds_paise: z.number().int(),
+      expected_cash_paise: z.number().int(),
+      counted_cash_paise: z.number().int().nullable(),
+      variance_paise: z.number().int().nullable(),
+      uncounted_sessions: z.number().int(),
+    }),
+  ),
+});
+
+export type CashSummaryResponse = z.infer<typeof cashSummaryResponseSchema>;
+
+export function toCashSummary(dto: CashSummaryResponse): readonly CashSummaryRow[] {
+  return dto.staff.map((s) => ({
+    staffId: s.staff_id,
+    staffName: s.staff_name,
+    counters: s.counters,
+    openSessions: s.open_sessions,
+    openingFloatPaise: s.opening_float_paise,
+    cashInPaise: s.cash_in_paise,
+    cashRefundsPaise: s.cash_refunds_paise,
+    expectedCashPaise: s.expected_cash_paise,
+    countedCashPaise: s.counted_cash_paise,
+    variancePaise: s.variance_paise,
+    uncountedSessions: s.uncounted_sessions,
+  }));
 }

@@ -8,6 +8,7 @@ import type {
   DoctorInput,
   DoctorProfile,
   DoctorScheduleData,
+  DoctorScheduleHistory,
   LeaveInput,
   ScheduleChange,
   WeeklySession,
@@ -45,6 +46,8 @@ export interface DoctorsRepository {
   getPhotoUrl(fileId: string): Promise<Result<string>>;
 
   getSchedule(doctorId: string): Promise<Result<DoctorScheduleData>>;
+  /** Every leave entry and date exception, past ones included. */
+  getScheduleHistory(doctorId: string): Promise<Result<DoctorScheduleHistory>>;
   replaceWeeklySessions(
     doctorId: string,
     sessions: readonly WeeklySession[],

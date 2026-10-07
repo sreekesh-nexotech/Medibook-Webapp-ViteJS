@@ -41,7 +41,7 @@ import {
   isInQueue,
   needsApproval,
   needsPayment,
-  PAYMENT_LABEL,
+  paymentBadge,
   PRIMARY_ACTION_PERMISSION,
   primaryAction,
   rangeFor,
@@ -188,7 +188,7 @@ export function AppointmentsScreen() {
   };
 
   const doPrimary = (a: DeskAppointment) => {
-    const p = primaryAction(a);
+    const p = primaryAction(a, today);
     if (!p) return;
     const fail = (fallback: string) => (error: unknown) =>
       toast(failureText(error, fallback), 'error', error);
@@ -270,9 +270,8 @@ export function AppointmentsScreen() {
           <input
             type="date"
             value={exact}
-            min={today}
             onChange={(e) => reset(setExact)(e.target.value)}
-            title="Pick a specific date"
+            title="Pick a specific date, past or future"
             aria-label="Filter by a specific date"
             className="rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3"
           />
@@ -314,7 +313,8 @@ export function AppointmentsScreen() {
           scrollLabel="Appointments"
         >
           {rows.map((a) => {
-            const p = primaryAction(a);
+            const p = primaryAction(a, today);
+            const payBadge = paymentBadge(a);
             return (
               <tr
                 key={a.id}
@@ -343,7 +343,7 @@ export function AppointmentsScreen() {
                 </td>
                 <td className={tdClass}>
                   <div className="flex flex-col items-start gap-0.75">
-                    <Badge status={PAYMENT_LABEL[a.paymentStatus]} />
+                    <Badge status={payBadge.status}>{payBadge.label}</Badge>
                     <span className="text-caption text-text-muted tabular-nums">
                       {money(a.totalRupees)}
                     </span>

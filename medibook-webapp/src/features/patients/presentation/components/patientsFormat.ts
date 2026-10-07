@@ -82,7 +82,13 @@ export const GENDER_LABELS: Readonly<Record<PatientGender, string>> = {
   undisclosed: 'Undisclosed',
 };
 
-export const GENDER_OPTIONS: readonly string[] = Object.values(GENDER_LABELS);
+/** The form's "no answer" option — saved as no gender, never as a guess. */
+export const GENDER_NOT_SPECIFIED = 'Not specified';
+
+export const GENDER_OPTIONS: readonly string[] = [
+  GENDER_NOT_SPECIFIED,
+  ...Object.values(GENDER_LABELS),
+];
 
 export function genderFromLabel(label: string): PatientGender | null {
   const hit = (Object.keys(GENDER_LABELS) as PatientGender[]).find(
@@ -145,8 +151,25 @@ const PAYMENT_BADGES: Readonly<Record<AppointmentPaymentStatus, BadgeSpec>> = {
   failed: { status: 'Failed', label: 'Failed' },
 };
 
-export function paymentBadge(status: AppointmentPaymentStatus): BadgeSpec {
+/**
+ * A booking cancelled (or missed) before anyone paid keeps `pending`/`unpaid`
+ * on the backend (BACKEND_BLOCKERS APPT-02); "Pending" there reads as money
+ * still owed, so it says "Not paid".
+ */
+export function paymentBadge(
+  status: AppointmentPaymentStatus,
+  appointmentStatus: AppointmentStatus,
+): BadgeSpec {
+  const unpaid = status === 'unpaid' || status === 'pending';
+  if (unpaid && (appointmentStatus === 'cancelled' || appointmentStatus === 'no_show')) {
+    return { status: 'Inactive', label: 'Not paid' };
+  }
   return PAYMENT_BADGES[status];
+}
+
+/** "34 yrs", or "—" when the date of birth is unknown. */
+export function ageText(age: number | null): string {
+  return age === null ? '—' : `${age} yrs`;
 }
 
 export function paiseToRupees(paise: number): number {

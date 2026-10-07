@@ -209,8 +209,8 @@ export function SettlementsScreen() {
         'Gross',
         'Refunds',
         'Gateway fees',
-        'Commission',
-        'Commission %',
+        'Commission incl. GST',
+        'Commission incl. GST %',
         'Adjustments',
         'TDS',
         'Net payable',
@@ -337,7 +337,7 @@ export function SettlementsScreen() {
                   <td className={cn(tdClass, 'text-right tabular-nums')}>
                     {rupees(r.commissionPaise)}
                     <div className="text-caption text-text-muted">
-                      {effectiveRate(r.commissionPaise, r.grossPaise)}
+                      {effectiveRate(r.commissionPaise, r.grossPaise)} incl. GST
                     </div>
                   </td>
                   <td

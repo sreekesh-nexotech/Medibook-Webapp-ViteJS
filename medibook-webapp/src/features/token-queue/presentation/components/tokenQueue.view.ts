@@ -37,11 +37,19 @@ export function isServing(session: QueueSession): boolean {
   return session.currentTokenNo !== null;
 }
 
+/** Statuses of a token still in the queue (backend `queue.WAITING`). */
+function isWaiting(a: DeskAppointment): boolean {
+  return a.status === 'scheduled' || a.status === 'checked_in';
+}
+
+function byToken(a: DeskAppointment, b: DeskAppointment): number {
+  return (a.tokenNo ?? Number.MAX_SAFE_INTEGER) - (b.tokenNo ?? Number.MAX_SAFE_INTEGER);
+}
+
 /**
- * Today's appointments in this session that are still waiting to be called
- * (scheduled or checked in), by booking order — the desk's view of "up next".
- * Appointments carry the doctor and session label, not the session id, so
- * that pair identifies the session.
+ * Who "Call Next" will call, in order: this session's waiting tokens that
+ * have not been called yet, by token number — the backend's own rule (queue
+ * order is strictly `token_no`, Q25; `call_next` skips called tokens).
  */
 export function upNextFor(
   session: QueueSession,
@@ -50,11 +58,29 @@ export function upNextFor(
   return appointments
     .filter(
       (a) =>
-        a.doctor.id === session.doctorId &&
-        a.sessionLabel === session.label &&
-        a.scheduledDate === session.date &&
-        (a.status === 'scheduled' || a.status === 'checked_in') &&
+        a.sessionId === session.id &&
+        isWaiting(a) &&
+        a.calledAt === null &&
         a.id !== session.currentAppointmentId,
     )
-    .sort((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
+    .sort(byToken);
+}
+
+/**
+ * Tokens called earlier and skipped: still waiting, but "Call Next" passes
+ * them by. The desk calls them back one at a time (`POST …/call`).
+ */
+export function skippedFor(
+  session: QueueSession,
+  appointments: readonly DeskAppointment[],
+): readonly DeskAppointment[] {
+  return appointments
+    .filter(
+      (a) =>
+        a.sessionId === session.id &&
+        isWaiting(a) &&
+        a.calledAt !== null &&
+        a.id !== session.currentAppointmentId,
+    )
+    .sort(byToken);
 }

@@ -22,8 +22,10 @@ import {
   receptionDashboardResponseSchema,
 } from '@/features/dashboard/infrastructure/data-sources/remote/dashboard.response';
 import {
+  dateExceptionPageSchema,
   departmentPageSchema,
   doctorPageSchema,
+  leavePageSchema,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.api';
 import {
   doctorResponseSchema,
@@ -101,8 +103,10 @@ import {
 } from '@/features/patients/infrastructure/data-sources/remote/patients.response';
 import {
   cashSessionPageResponseSchema,
+  cashSummaryResponseSchema,
   paymentDetailResponseSchema,
   paymentPageResponseSchema,
+  refundPageResponseSchema,
   visitReceiptPageResponseSchema,
 } from '@/features/payments/infrastructure/data-sources/remote/payments.response';
 import { activeSessionsPageResponseSchema } from '@/features/profile/infrastructure/data-sources/remote/profile.response';
@@ -116,6 +120,8 @@ import {
 } from '@/features/settings/infrastructure/data-sources/remote/profile.response';
 import {
   couponPageSchema,
+  couponRedemptionPageSchema,
+  doctorServicePageSchema,
   servicePageSchema,
   taxRatePageSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/services.api';
@@ -148,6 +154,8 @@ import { sessionPageSchema } from '@/features/token-queue/infrastructure/data-so
 import {
   invitationPageResponseSchema,
   rolePreviewResponseSchema,
+  counterPageResponseSchema as usersRolesCounterPageResponseSchema,
+  permissionCatalogueResponseSchema,
   rolePageResponseSchema as usersRolesRolePageResponseSchema,
   staffPageResponseSchema as usersRolesStaffPageResponseSchema,
 } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.response';
@@ -173,9 +181,11 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'core.storedFileResponseSchema': storedFileResponseSchema,
   'dashboard.adminDashboardResponseSchema': adminDashboardResponseSchema,
   'dashboard.receptionDashboardResponseSchema': receptionDashboardResponseSchema,
+  'doctors.dateExceptionPageSchema': dateExceptionPageSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,
+  'doctors.leavePageSchema': leavePageSchema,
   'doctors.scheduleResponseSchema': scheduleResponseSchema,
   'messaging.deliveryPageResponseSchema': deliveryPageResponseSchema,
   'messaging.templatePageResponseSchema': templatePageResponseSchema,
@@ -222,8 +232,10 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'patients.hospitalPatientResponseSchema': hospitalPatientResponseSchema,
   'patients.patientAppointmentPageResponseSchema': patientAppointmentPageResponseSchema,
   'payments.cashSessionPageResponseSchema': cashSessionPageResponseSchema,
+  'payments.cashSummaryResponseSchema': cashSummaryResponseSchema,
   'payments.paymentDetailResponseSchema': paymentDetailResponseSchema,
   'payments.paymentPageResponseSchema': paymentPageResponseSchema,
+  'payments.refundPageResponseSchema': refundPageResponseSchema,
   'payments.visitReceiptPageResponseSchema': visitReceiptPageResponseSchema,
   'profile.activeSessionsPageResponseSchema': activeSessionsPageResponseSchema,
   'reports.reportCatalogResponseSchema': reportCatalogResponseSchema,
@@ -231,6 +243,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'settings.bankAccountPageResponseSchema': bankAccountPageResponseSchema,
   'settings.bannerPageResponseSchema': bannerPageResponseSchema,
   'settings.couponPageSchema': couponPageSchema,
+  'settings.couponRedemptionPageSchema': couponRedemptionPageSchema,
+  'settings.doctorServicePageSchema': doctorServicePageSchema,
   'settings.holidayPageResponseSchema': holidayPageResponseSchema,
   'settings.hospitalProfileResponseSchema': hospitalProfileResponseSchema,
   'settings.hospitalSettingsResponseSchema': hospitalSettingsResponseSchema,
@@ -251,7 +265,9 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'slots.generationRunPageResponseSchema': generationRunPageResponseSchema,
   'slots.slotGridPageResponseSchema': slotGridPageResponseSchema,
   'token-queue.sessionPageSchema': sessionPageSchema,
+  'users-roles.counterPageResponseSchema': usersRolesCounterPageResponseSchema,
   'users-roles.invitationPageResponseSchema': invitationPageResponseSchema,
+  'users-roles.permissionCatalogueResponseSchema': permissionCatalogueResponseSchema,
   'users-roles.rolePageResponseSchema': usersRolesRolePageResponseSchema,
   'users-roles.rolePreviewResponseSchema': rolePreviewResponseSchema,
   'users-roles.staffPageResponseSchema': usersRolesStaffPageResponseSchema,

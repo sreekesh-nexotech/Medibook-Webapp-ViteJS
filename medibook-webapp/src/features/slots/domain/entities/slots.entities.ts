@@ -26,12 +26,19 @@ export interface ScheduledSlot {
   readonly endsAt: string;
   readonly state: SlotLiveState;
   readonly blockReason: string | null;
+  /** When a held slot is released if payment does not complete. */
+  readonly holdExpiresAt: string | null;
   readonly booking: SlotBooking | null;
 }
 
+/** `doctor_sessions.status`: `closed` / `cancelled` sessions take no new patients. */
+export type SessionStatus = 'scheduled' | 'open' | 'paused' | 'closed' | 'cancelled';
+
 export interface DoctorSessionSlots {
   readonly id: string;
+  readonly sessionCode: string;
   readonly label: string;
+  readonly status: SessionStatus | string;
   readonly startsAt: string;
   readonly endsAt: string;
   readonly slots: readonly ScheduledSlot[];
@@ -89,6 +96,8 @@ export interface BulkSlotScope {
 export interface BulkSlotRequest {
   readonly scope: BulkSlotScope;
   readonly action: BulkSlotAction;
+  /** Why the slots are blocked; shown on each slot in the grid. Ignored for `open`. */
+  readonly reason?: string;
 }
 
 export interface BulkSlotResult {
@@ -112,8 +121,14 @@ export interface SlotGenerationRun {
   readonly id: string;
   readonly doctorId: string | null;
   readonly trigger: string;
+  /** ISO dates the run covered, both ends inclusive. */
+  readonly horizonFrom: string | null;
+  readonly horizonTo: string | null;
   readonly startedAt: string;
   readonly finishedAt: string | null;
   readonly createdCount: number;
+  readonly updatedCount: number;
+  readonly closedCount: number;
+  readonly preservedCount: number;
   readonly error: string | null;
 }

@@ -44,4 +44,5 @@ export const appointmentsRepository: AppointmentsRepository = {
   receipt: (id) => attempt(async () => toReceipt(await api.getReceipt(id))),
   receiptPdfUrl: (id) => attempt(() => api.getReceiptPdfUrl(id)),
   tokenSlip: (id) => attempt(async () => toTokenSlip(await api.getTokenSlip(id))),
+  tokenSlipPdf: (id) => attempt(() => api.getTokenSlipPdf(id)),
 };

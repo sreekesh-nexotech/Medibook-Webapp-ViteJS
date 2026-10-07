@@ -1,5 +1,4 @@
 import type { Department, DoctorProfile } from '@/features/doctors/domain/entities/doctors.types';
-import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -7,6 +6,7 @@ import { Drawer } from '@/shared/ui/Drawer';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Icon } from '@/shared/ui/Icon';
 
+import { DoctorAvatar } from './DoctorAvatar';
 import { DOCTOR_STATUS_LABEL } from './doctors.view';
 
 interface DeptDrawerProps {
@@ -98,7 +98,7 @@ export function DeptDrawer({
               key={d.id}
               className="border-border-soft flex items-center gap-3 rounded-md border px-3 py-2.5"
             >
-              <Avatar name={d.name} size={32} />
+              <DoctorAvatar name={d.name} photoFileId={d.photoFileId} size={32} />
               <div className="flex-1">
                 <div className="text-body text-text-strong font-medium">{d.name}</div>
                 <div className="text-caption text-text-muted">{d.specialisation}</div>

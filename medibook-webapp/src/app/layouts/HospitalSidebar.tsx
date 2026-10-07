@@ -13,6 +13,8 @@ interface HospitalSidebarProps {
   onNavigate: (view: HospitalNavView) => void;
   role: HospitalRole;
   hospitalName: string;
+  /** Signed URL of the hospital's uploaded logo; `null` shows the Medibook mark. */
+  logoSrc?: string | null;
   /** Legacy icon-rail switch, kept for compatibility. Prefer `mode`. */
   collapsed?: boolean;
   /**
@@ -29,6 +31,7 @@ export function HospitalSidebar({
   onNavigate,
   role,
   hospitalName,
+  logoSrc = null,
   collapsed = false,
   mode,
 }: HospitalSidebarProps) {
@@ -54,7 +57,7 @@ export function HospitalSidebar({
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <HospitalLogo className="size-8.5 flex-none rounded-md object-contain" />
+        <HospitalLogo src={logoSrc} className="size-8.5 flex-none rounded-md object-contain" />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg truncate font-bold text-black">{hospitalName}</div>

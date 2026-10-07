@@ -53,7 +53,9 @@ const DEPT_SHORT: Readonly<Record<string, string>> = {
   'General Medicine': 'Gen Med',
   Cardiology: 'Cardio',
   Orthopedics: 'Ortho',
+  Orthopaedics: 'Ortho',
   Pediatrics: 'Pedia',
+  Paediatrics: 'Paeds',
   Neurology: 'Neuro',
   ENT: 'ENT',
   Dermatology: 'Derma',
@@ -92,6 +94,9 @@ const ALL_PERIODS: SettlementPeriodFilters = {};
 
 const PAISE_PER_RUPEE = 100;
 
+/** `appointments.by_status` key for cancelled bookings. */
+const CANCELLED_STATUS = 'cancelled';
+
 /** Sum of the periods' net payable, in rupees. */
 function netRupees(periods: readonly SettlementPeriod[]): number {
   return periods.reduce((sum, p) => sum + p.netPayablePaise, 0) / PAISE_PER_RUPEE;
@@ -125,7 +130,13 @@ export function AdminDashboardScreen() {
   const periods = periodsQuery.data?.items ?? [];
 
   const refresh = async (): Promise<void> => {
-    await Promise.all([dashboard.refetch(), doctors.refetch(), departments.refetch()]);
+    await Promise.all([
+      dashboard.refetch(),
+      doctors.refetch(),
+      departments.refetch(),
+      patientsQuery.refetch(),
+      periodsQuery.refetch(),
+    ]);
   };
 
   const loading = dashboard.isLoading;
@@ -156,20 +167,33 @@ export function AdminDashboardScreen() {
     };
   });
 
+  // The backend's `appointments.total` still counts cancelled bookings
+  // (BACKEND_BLOCKERS DASH-01); the front desk's count and this screen's
+  // charts leave them out, so the tile does too.
+  const cancelled = data?.appointmentsByStatus[CANCELLED_STATUS] ?? 0;
+  const bookedCount = Math.max(0, (data?.appointmentsTotal ?? 0) - cancelled);
+
   const KPIS: readonly StatCardData[] = [
     {
       icon: 'calendar-check',
       label: period === 'Today' ? 'Appointments Today' : 'Appointments',
-      value: data?.appointmentsTotal ?? 0,
-      sub: 'Online + walk-in',
+      value: bookedCount,
+      sub:
+        cancelled > 0
+          ? `Online + walk-in · ${cancelled} cancelled not counted`
+          : 'Online + walk-in',
       iconClass: 'bg-g-100 text-g-800',
       valueClass: 'text-g-800',
     },
     {
       icon: 'stethoscope',
       label: 'Active Doctors',
-      value: doctors.isLoadingError ? '—' : String(activeDocs),
-      sub: doctors.isLoadingError ? 'Doctor roster unavailable' : `of ${roster.length} on roster`,
+      value: doctors.isLoadingError ? '—' : doctors.isPending ? '…' : String(activeDocs),
+      sub: doctors.isLoadingError
+        ? 'Doctor roster unavailable'
+        : doctors.isPending
+          ? 'Loading the roster'
+          : `of ${roster.length} on roster`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
     },
@@ -242,6 +266,16 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-y-100 text-y-800',
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
+      go: 'settlements',
+    });
+  }
+  if (periodsQuery.isError) {
+    // Without this row a failed read would look like "no settlement alerts".
+    ALERTS.push({
+      icon: 'triangle-alert',
+      iconClass: 'bg-d-100 text-d-600',
+      t: 'Settlements could not be checked',
+      s: 'Open Settlements to see held or pending payouts',
       go: 'settlements',
     });
   }

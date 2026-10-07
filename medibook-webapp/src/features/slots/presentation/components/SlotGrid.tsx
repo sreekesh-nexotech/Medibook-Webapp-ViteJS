@@ -71,6 +71,20 @@ export function SlotGrid({
                   {row.dept}
                   {row.room ? ` · Room ${row.room}` : ''}
                 </div>
+                {row.sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="text-caption text-text-muted flex items-center gap-1.5"
+                    title={session.label}
+                  >
+                    <span className="truncate">{session.label}</span>
+                    {session.statusLabel && (
+                      <span className="text-d-700 bg-d-100 flex-none rounded-full px-1.5">
+                        {session.statusLabel}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
               {onBulkForDoctor && (
                 <IconBtn

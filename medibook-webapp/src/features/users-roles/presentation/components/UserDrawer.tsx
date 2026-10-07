@@ -12,12 +12,14 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useReactivateStaffMutation } from '@/features/users-roles/application/queries/useReactivateStaffMutation';
 import { useResendInvitationMutation } from '@/features/users-roles/application/queries/useResendInvitationMutation';
 import { useRevokeInvitationMutation } from '@/features/users-roles/application/queries/useRevokeInvitationMutation';
+import { useStaffCountersQuery } from '@/features/users-roles/application/queries/useStaffCountersQuery';
 import { useUnlockStaffMutation } from '@/features/users-roles/application/queries/useUnlockStaffMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
 import {
   failureText,
   isLockedOut,
   lastActiveLabel,
+  NO_VALUE,
   type RoleView,
   type UserRow,
 } from '@/features/users-roles/presentation/components/usersRoles.viewModel';
@@ -66,8 +68,20 @@ export function UserDrawer({
   const role = roles.find((r) => r.id === user.roleId);
   const active = user.status === 'Active';
   const isInvitation = user.kind === 'invitation';
+  const countersQuery = useStaffCountersQuery();
+  const counterName = countersQuery.data?.find((c) => c.id === user.counterId)?.name;
   const locked = isLockedOut(user, now);
 
+  const when = (iso: string | null): string =>
+    iso
+      ? new Date(iso).toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : NO_VALUE;
   const row = (k: string, v: ReactNode) => (
     <div className="border-border-soft flex justify-between border-b py-3">
       <span className="text-body text-text-muted">{k}</span>
@@ -176,7 +190,9 @@ export function UserDrawer({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="text-h3 text-text-strong">{user.name}</span>
-            <Badge status={user.status} />
+            <Badge status={user.status === 'Expired' ? 'Cancelled' : user.status}>
+              {user.status === 'Expired' ? 'Invite expired' : user.status}
+            </Badge>
           </div>
           {role && (
             <div
@@ -196,13 +212,35 @@ export function UserDrawer({
         </div>
       )}
       <Card pad={16} className="mb-4">
-        {row('Username', user.username)}
         {row('Email', user.email)}
         {row('Phone', user.phone)}
-        {row('Role', role ? role.name : '—')}
-        {row(
-          'Invite status',
-          <Badge status={user.invite === 'Accepted' ? 'Active' : 'Pending'}>{user.invite}</Badge>,
+        {row('Role', role ? role.name : NO_VALUE)}
+        {isInvitation ? (
+          <>
+            {row(
+              'Invite status',
+              <Badge status={user.status === 'Expired' ? 'Cancelled' : 'Pending'}>
+                {user.status === 'Expired' ? 'Link expired' : 'Waiting for them to accept'}
+              </Badge>,
+            )}
+            {row('Invited on', when(user.invitedAt))}
+            {row(
+              'Last sent',
+              `${when(user.lastSentAt)}${user.resendCount > 0 ? ` · resent ${user.resendCount}×` : ''}`,
+            )}
+            {row(
+              user.status === 'Expired' ? 'Link expired on' : 'Link expires',
+              when(user.expiresAt),
+            )}
+          </>
+        ) : (
+          <>
+            {row('Employee code', user.employeeCode ?? NO_VALUE)}
+            {row('Designation', user.designation ?? NO_VALUE)}
+            {row('Default counter', counterName ?? NO_VALUE)}
+            {row('Joined', when(user.joinedAt))}
+            {user.deactivatedAt && row('Deactivated on', when(user.deactivatedAt))}
+          </>
         )}
         <div className="flex justify-between py-3">
           <span className="text-body text-text-muted">Last active</span>
@@ -240,10 +278,12 @@ export function UserDrawer({
       )}
       <div className="text-caption text-grey-900 mt-2.5">
         {isInvitation
-          ? 'They become a user once they accept the emailed link. Resending issues a new link; revoking cancels it.'
+          ? user.status === 'Expired'
+            ? 'This link no longer works. Resend to issue a new one, or revoke it.'
+            : 'They become a user once they accept the emailed link. Resending issues a new link; revoking cancels it.'
           : locked
             ? 'Locked out after too many failed sign-ins. Unlock lets them try again now.'
-            : 'Edit Details changes their role. Name, email and phone belong to their own account.'}
+            : 'Edit Details changes their role, employee code, designation and default counter. Name, email and phone belong to their own account.'}
       </div>
     </Drawer>
   );

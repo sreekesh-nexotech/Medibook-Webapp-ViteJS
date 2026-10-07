@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { isFailure } from '@/core/error/failure';
 
 import { cn } from '@/shared/lib/cn';
-import { downloadTextFile } from '@/shared/lib/download';
+import { downloadFromUrl } from '@/shared/lib/download';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -28,9 +28,12 @@ import { useAppointmentsQuery } from '@/features/appointments/application/querie
 import { AppointmentPaymentModal } from '@/features/appointments/presentation/components/AppointmentPaymentModal';
 import { AppointmentReasonModal } from '@/features/appointments/presentation/components/AppointmentReasonModal';
 import { AppointmentReceiptModal } from '@/features/appointments/presentation/components/AppointmentReceiptModal';
+import { needsPayment } from '@/features/appointments/presentation/components/appointments.view';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
+  PaymentExportFile,
+  PaymentExportFormat,
   PaymentFilters,
   PaymentLine,
   PaymentLineStatus,
@@ -41,8 +44,10 @@ import { useInvalidatePayments } from '@/features/payments/application/queries/u
 import { usePaymentRefundsQuery } from '@/features/payments/application/queries/usePaymentRefundsQuery';
 import { usePaymentsQuery } from '@/features/payments/application/queries/usePaymentsQuery';
 import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
+import { useRefundsQuery } from '@/features/payments/application/queries/useRefundsQuery';
 import { PaymentsCashDrawer } from '@/features/payments/presentation/components/PaymentsCashDrawer';
 import { PaymentsCashReconcile } from '@/features/payments/presentation/components/PaymentsCashReconcile';
+import { PaymentsCashSummary } from '@/features/payments/presentation/components/PaymentsCashSummary';
 import { PaymentsVisitReceiptsModal } from '@/features/payments/presentation/components/PaymentsVisitReceiptsModal';
 import {
   LINE_STATUS_LABEL,
@@ -80,8 +85,24 @@ const ALL_DOCTORS = 'All Doctors';
 const SOURCE_WALK_IN = 'Walk-in';
 const SOURCE_ONLINE = 'Online';
 
-const CSV_FILENAME = 'medibook-payments.csv';
-const CSV_MIME = 'text/csv';
+/** The three server-built exports, in the order offered. */
+const EXPORT_FORMATS: readonly { readonly format: PaymentExportFormat; readonly label: string }[] =
+  [
+    { format: 'csv', label: 'CSV' },
+    { format: 'xlsx', label: 'Excel' },
+    { format: 'pdf', label: 'PDF' },
+  ];
+
+/** Revoking an object URL in the same tick can cancel the download. */
+const REVOKE_DELAY_MS = 10_000;
+
+const PAISE_PER_RUPEE = 100;
+
+function saveExport(file: PaymentExportFile): void {
+  const url = URL.createObjectURL(file.blob);
+  downloadFromUrl(url, file.filename);
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+}
 
 /** The backend's answer when a cash refund has no open cash drawer (D-28). */
 const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
@@ -170,8 +191,15 @@ export function PaymentsScreen() {
   const partial = totalsQuery.data?.truncated
     ? ` · first ${totalsQuery.data.lines.length} payments only`
     : '';
-  const isUnpaid = (a: DeskAppointment): boolean =>
-    a.paymentStatus === 'unpaid' && a.status !== 'cancelled' && a.status !== 'no_show';
+  // Refunds processed today, desk and online (`GET /refunds`), added up in paise.
+  const refundsQuery = useRefundsQuery(today.dateFrom, today.dateTo);
+  const refundedToday =
+    (refundsQuery.data ?? [])
+      .filter((r) => r.status === 'processed')
+      .reduce((sum, r) => sum + Math.round(r.amountRupees * PAISE_PER_RUPEE), 0) / PAISE_PER_RUPEE;
+  // The desk's own rule: never collected, or refunded while the visit is
+  // still on (BACKEND_BLOCKERS APPT-01) — both are due at the counter.
+  const isUnpaid = (a: DeskAppointment): boolean => needsPayment(a);
   const pendingToday = (todayApptsQuery.data?.items ?? []).filter(isUnpaid).length;
 
   const ql = q.trim().toLowerCase();
@@ -216,7 +244,10 @@ export function PaymentsScreen() {
       icon: 'indian-rupee',
       label: 'Collected at Desk',
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
-      sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} today · as collected${partial}`,
+      // Lines refunded in full drop out of the captured total.
+      sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} still held today${
+        refundedToday > 0 ? ` · ${money(refundedToday)} refunded today` : ''
+      }${partial}`,
       iconClass: 'bg-g-100 text-g-800',
       valueClass: 'text-g-800',
     },
@@ -279,28 +310,31 @@ export function PaymentsScreen() {
       showsLines ? linesQuery.refetch() : Promise.resolve(),
       apptsQuery.refetch(),
       totalsQuery.refetch(),
+      refundsQuery.refetch(),
       todayApptsQuery.refetch(),
     ]);
   };
 
-  const runExport = (): void => {
+  const runExport = (format: PaymentExportFormat): void => {
     const channel =
       sourceF === SOURCE_ONLINE ? 'online' : sourceF === SOURCE_WALK_IN ? 'desk' : null;
     exportCsv.mutate(
-      { filters, channel },
+      { filters, format, channel },
       {
-        onSuccess: (file) => {
-          downloadTextFile(CSV_FILENAME, file.csv, CSV_MIME);
-          if (file.capped) {
+        onSuccess: ({ file, rows, capped }) => {
+          saveExport(file);
+          if (capped) {
             toast(
-              `Exported ${CSV_FILENAME}. Exports stop at ${SERVER_EXPORT_MAX_ROWS.toLocaleString('en-IN')} payments, so some are missing — narrow the dates and export again.`,
+              `Exported ${file.filename}. Exports stop at ${SERVER_EXPORT_MAX_ROWS.toLocaleString('en-IN')} payments, so some are missing — narrow the dates and export again.`,
               'info',
             );
-          } else {
+          } else if (rows !== null) {
             toast(
-              `Exported ${file.rows} payment${file.rows === 1 ? '' : 's'} to ${CSV_FILENAME}`,
+              `Exported ${rows} payment${rows === 1 ? '' : 's'} to ${file.filename}`,
               'success',
             );
+          } else {
+            toast(`Exported ${file.filename}`, 'success');
           }
         },
         onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error', error),
@@ -390,24 +424,36 @@ export function PaymentsScreen() {
       <KpiStrip items={KPIS} />
       <PaymentsCashDrawer />
       <PaymentsCashReconcile />
+      <PaymentsCashSummary />
       <Card pad={14} className="flex flex-wrap items-center justify-between gap-4">
         <Tabs tabs={PAY_TABS.map(tabLabel)} value={tabLabel(tab)} onChange={onTab} />
         <span
+          className="flex flex-wrap gap-2"
           title={
             tab === 'Pending'
               ? 'Unpaid walk-ins are not payment lines — nothing to export'
-              : 'Export every payment line matching these filters as CSV'
+              : sourceF !== ALL_SOURCES
+                ? 'Only CSV can be narrowed to one source; Excel and PDF need All Sources'
+                : 'Export every payment line matching these filters'
           }
         >
-          <Button
-            variant="secondary"
-            icon="download"
-            onClick={runExport}
-            busy={exportCsv.isPending}
-            disabled={tab === 'Pending' || total === 0}
-          >
-            Export CSV
-          </Button>
+          {EXPORT_FORMATS.map(({ format, label }) => (
+            <Button
+              key={format}
+              variant="secondary"
+              icon="download"
+              onClick={() => runExport(format)}
+              busy={exportCsv.isPending && exportCsv.variables.format === format}
+              disabled={
+                tab === 'Pending' ||
+                total === 0 ||
+                exportCsv.isPending ||
+                (format !== 'csv' && sourceF !== ALL_SOURCES)
+              }
+            >
+              Export {label}
+            </Button>
+          ))}
         </span>
       </Card>
       <Card pad={20}>
@@ -505,7 +551,11 @@ export function PaymentsScreen() {
                     <div className="text-caption text-text-muted">due</div>
                   </td>
                   <td className={tdClass}>
-                    <Badge status="Pending" />
+                    {appt.paymentStatus === 'refunded' ? (
+                      <Badge status="Pending">Refunded · due again</Badge>
+                    ) : (
+                      <Badge status="Pending" />
+                    )}
                   </td>
                   <td className={tdClass}>
                     <Can perm="Payments.add">

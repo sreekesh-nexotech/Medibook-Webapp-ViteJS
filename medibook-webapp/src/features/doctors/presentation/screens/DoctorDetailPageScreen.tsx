@@ -23,6 +23,12 @@ import { useDoctorQuery } from '@/features/doctors/application/queries/useDoctor
 import { useDoctorScheduleQuery } from '@/features/doctors/application/queries/useDoctorScheduleQuery';
 import { useReplaceWeeklySessionsMutation } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
+import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
+import {
+  useDoctorServicesQuery,
+  useServicesQuery,
+} from '@/features/settings/application/queries/services.queries';
+import { money } from '@/shared/lib/format';
 import { useFileUploadMutation } from '@/shared/hooks/useFileUploadMutation';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { positiveAmount, required } from '@/shared/lib/validate';
@@ -52,6 +58,7 @@ import {
   DOCTOR_STATUS_OPTIONS,
   doctorStatusFromLabel,
   gridToSessions,
+  ratingView,
   sameSessions,
   sessionsToGrid,
   type DoctorStatusLabel,
@@ -60,13 +67,32 @@ import {
 import { LeavePanel } from '../components/LeavePanel';
 import { PhotoButton } from '../components/PhotoButton';
 import { ScheduleChangeModal } from '../components/ScheduleChangeModal';
+import { ScheduleHistory } from '../components/ScheduleHistory';
 import { ShiftPatternsPanel } from '../components/ShiftPatternsPanel';
 import { Stars } from '../components/Stars';
+import { UpcomingDays } from '../components/UpcomingDays';
 import { useScheduleConfirm } from '../components/useScheduleConfirm';
 import { WeeklyHours } from '../components/WeeklyHours';
 
 /** Backend bound on `experience_years`. */
 const MAX_EXPERIENCE_YEARS = 80;
+
+/** Backend bounds on `expected_consult_minutes`. */
+const MIN_CONSULT_MINUTES = 1;
+const MAX_CONSULT_MINUTES = 240;
+
+/** Slot lengths offered (backend accepts 5–60 minutes, Q70). */
+const SLOT_LENGTHS: readonly string[] = ['5', '10', '15', '20', '25', '30', '40', '45', '60'];
+
+/** The backend's default slot length for a new doctor. */
+const DEFAULT_SLOT_LENGTH = '15';
+
+/** `SLOT_LENGTHS` plus the stored value when it is outside the list. */
+function slotLengthOptions(current: string): readonly string[] {
+  return SLOT_LENGTHS.includes(current)
+    ? SLOT_LENGTHS
+    : [...SLOT_LENGTHS, current].sort((a, b) => Number(a) - Number(b));
+}
 
 /** The backend's answer for an unknown doctor id. */
 const NOT_FOUND_KIND = 'notFound';
@@ -82,9 +108,10 @@ const NEW_DOCTOR_WEEK: WeekGrid = sessionsToGrid(
   })),
 );
 
-/** Editable draft — the fees and `exp` are digits-only text until parsed on save. */
+/** Editable draft — fees and numbers are digits-only text until parsed on save. */
 interface DoctorForm {
   name: string;
+  title: string;
   departmentId: string;
   spec: string;
   room: string;
@@ -92,8 +119,11 @@ interface DoctorForm {
   exp: string;
   reg: string;
   fee: string;
-  /** Empty = follow-ups cost the consultation fee. */
+  /** Empty = a follow-up costs the consultation fee. */
   followUpFee: string;
+  /** Empty = the hospital's default consultation time. */
+  consultMinutes: string;
+  slotLength: string;
   bookableOnline: boolean;
   status: DoctorStatusLabel;
   photoFileId: string | null;
@@ -110,6 +140,10 @@ const DOCTOR_VALIDATORS: FormValidators<DoctorForm> = {
     v === '' || Number(v) <= MAX_EXPERIENCE_YEARS
       ? undefined
       : `Experience can be at most ${MAX_EXPERIENCE_YEARS} years.`,
+  consultMinutes: (v) =>
+    v === '' || (Number(v) >= MIN_CONSULT_MINUTES && Number(v) <= MAX_CONSULT_MINUTES)
+      ? undefined
+      : `Consultation time must be ${MIN_CONSULT_MINUTES}–${MAX_CONSULT_MINUTES} minutes.`,
 };
 
 /** Keep only digits, so the ₹ prefix the input shows never reaches the value. */
@@ -124,6 +158,7 @@ function failureText(error: unknown, fallback: string): string {
 function blankDoctorForm(): DoctorForm {
   return {
     name: '',
+    title: '',
     departmentId: '',
     spec: '',
     room: '',
@@ -132,6 +167,8 @@ function blankDoctorForm(): DoctorForm {
     reg: '',
     fee: '',
     followUpFee: '',
+    consultMinutes: '',
+    slotLength: DEFAULT_SLOT_LENGTH,
     bookableOnline: true,
     status: 'Active',
     photoFileId: null,
@@ -142,6 +179,7 @@ function blankDoctorForm(): DoctorForm {
 function toForm(d: DoctorProfile): DoctorForm {
   return {
     name: d.name,
+    title: d.title,
     departmentId: d.departmentId,
     spec: d.specialisation,
     room: d.room,
@@ -150,6 +188,8 @@ function toForm(d: DoctorProfile): DoctorForm {
     reg: d.registrationNo,
     fee: d.feeRupees ? String(d.feeRupees) : '',
     followUpFee: d.followUpFeeRupees === null ? '' : String(d.followUpFeeRupees),
+    consultMinutes: d.expectedConsultMinutes === null ? '' : String(d.expectedConsultMinutes),
+    slotLength: String(d.slotLengthMin),
     bookableOnline: d.isBookableOnline,
     status: DOCTOR_STATUS_LABEL[d.status],
     photoFileId: d.photoFileId,
@@ -160,6 +200,7 @@ function toForm(d: DoctorProfile): DoctorForm {
 function toInput(values: DoctorForm): DoctorInput {
   return {
     name: values.name.trim(),
+    title: values.title.trim(),
     departmentId: values.departmentId,
     specialisation: values.spec.trim(),
     qualification: values.qual.trim(),
@@ -169,6 +210,8 @@ function toInput(values: DoctorForm): DoctorInput {
     room: values.room.trim(),
     feeRupees: Number(digits(values.fee)) || 0,
     followUpFeeRupees: values.followUpFee === '' ? null : Number(values.followUpFee),
+    expectedConsultMinutes: values.consultMinutes === '' ? null : Number(values.consultMinutes),
+    slotLengthMin: Number(values.slotLength),
     isBookableOnline: values.bookableOnline,
     status: doctorStatusFromLabel(values.status),
     photoFileId: values.photoFileId,
@@ -206,6 +249,11 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
   const { data: session } = useSessionQuery('hospital');
   const profileQuery = useHospitalProfileQuery();
   const onlineBooking = profileQuery.data?.onlineBookingEnabled;
+  const rulesQuery = useHospitalRuleSettingsQuery();
+  const hospitalConsultMinutes = rulesQuery.data?.expectedConsultMinutes ?? null;
+  const followUpWindowDays = rulesQuery.data?.followUpWindowDays ?? null;
+  const doctorServicesQuery = useDoctorServicesQuery();
+  const servicesQuery = useServicesQuery();
   const [tab, setTab] = useState('Profile');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -299,8 +347,9 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
   };
 
   const setWeek = (week: readonly WeekDay[]): void => setGrid((g) => ({ ...g, week }));
+  // Keeps `codes`, so saved sessions keep their backend codes.
   const setPatterns = (patterns: readonly ShiftPattern[], week: readonly WeekDay[]): void =>
-    setGrid({ patterns, week });
+    setGrid((g) => ({ ...g, patterns, week }));
 
   const deptName = departments.find((d) => d.id === values.departmentId)?.name ?? '';
   const statusCaption =
@@ -308,11 +357,32 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
       ? 'Disabled — hidden from the patient app'
       : values.status === 'On Leave'
         ? 'Visible, booking paused'
-        : 'Live & bookable in the app';
+        : !values.bookableOnline
+          ? 'Visible, online booking off for this doctor'
+          : onlineBooking === false
+            ? 'Visible, online booking off for the hospital'
+            : 'Live & bookable in the app';
+  // Services this doctor offers (doctor-service links), with any price of their own.
+  const offered =
+    doctor && doctorServicesQuery.data && servicesQuery.data
+      ? doctorServicesQuery.data
+          .filter((l) => l.doctorId === doctor.id)
+          .map((l) => {
+            const service = servicesQuery.data.find((x) => x.id === l.serviceId);
+            return {
+              id: l.id,
+              name: service?.name ?? 'A service',
+              price: l.priceOverrideRupees ?? service?.priceRupees ?? null,
+              ownPrice: l.priceOverrideRupees !== null,
+            };
+          })
+      : null;
   const deptError = form.errorFor('departmentId');
   const weekSummary = summariseWeekHours(grid.week);
   const hospitalName = session?.surface === 'hospital' ? session.hospital.name : '';
   const isSaving = form.submitting || scheduleConfirm.modal.isApplying;
+  const rating = doctor ? ratingView(doctor) : null;
+  const bookable = values.status === 'Active' && values.bookableOnline && onlineBooking !== false;
 
   return (
     <div className="flex max-w-260 flex-col gap-5">
@@ -326,6 +396,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
             <Badge status={values.status} />
           </div>
           <div className="text-body text-text-muted mt-1.25 flex flex-wrap items-center gap-3">
+            {values.title && <span>{values.title} ·</span>}
             {values.spec && <span>{values.spec}</span>}
             {deptName && (
               <span>
@@ -333,7 +404,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                 {deptName}
               </span>
             )}
-            {!isNew && doctor && (
+            {rating && (
               <span>
                 ·{' '}
                 <span className="inline-flex items-center gap-1">
@@ -343,8 +414,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     className="text-y-500"
                     style={{ fill: 'var(--color-y-500)' }}
                   />{' '}
-                  {doctor.ratingAvg === null ? '—' : doctor.ratingAvg.toFixed(1)} (
-                  {doctor.ratingCount})
+                  {rating.value} {rating.note}
                 </span>
               </span>
             )}
@@ -397,6 +467,13 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     onBlur={() => form.blurField('name')}
                   />
                 </Field>
+                <Field label="Title" hint="Shown under the name in the patient app.">
+                  <TextInput
+                    value={values.title}
+                    placeholder="e.g. Senior Consultant"
+                    onChange={(v) => form.setField('title', v)}
+                  />
+                </Field>
                 <Field label="Specialization" required error={form.errorFor('spec')}>
                   <TextInput
                     value={values.spec}
@@ -447,14 +524,9 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                 <Field label="Hospital">
                   <TextInput value={hospitalName} readOnly />
                 </Field>
-                <Field
-                  label="Consultation Fee"
-                  required
-                  error={form.errorFor('fee')}
-                  className="col-span-full"
-                >
+                <Field label="Consultation Fee" required error={form.errorFor('fee')}>
                   <div className="flex items-center gap-2">
-                    <div className="max-w-90 flex-1">
+                    <div className="flex-1">
                       <TextInput
                         value={values.fee ? `₹ ${values.fee}` : ''}
                         placeholder="₹ 0"
@@ -466,35 +538,21 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                     <InfoDot text="What patients pay & see in the app for a consultation with this doctor." />
                   </div>
                 </Field>
-                <Field label="Follow-up Fee" className="col-span-full">
-                  <div className="flex items-center gap-2">
-                    <div className="max-w-90 flex-1">
-                      <TextInput
-                        value={values.followUpFee ? `₹ ${values.followUpFee}` : ''}
-                        placeholder="Same as the consultation fee"
-                        inputMode="numeric"
-                        onChange={(v) => form.setField('followUpFee', digits(v))}
-                      />
-                    </div>
-                    <InfoDot text="Charged instead of the consultation fee when a patient comes back within your hospital's follow-up window. Leave empty to charge the consultation fee." />
-                  </div>
-                </Field>
-                <div className="col-span-full flex items-center gap-3">
-                  <Toggle
-                    value={values.bookableOnline}
-                    onChange={(v) => form.setField('bookableOnline', v)}
-                    aria-labelledby="doctor-bookable-online"
+                <Field
+                  label="Follow-up Fee"
+                  hint={`Charged for a follow-up within ${
+                    followUpWindowDays === null
+                      ? "the hospital's follow-up window"
+                      : `${followUpWindowDays} days of the last visit (Hospital Settings)`
+                  }. Leave empty to charge the consultation fee.`}
+                >
+                  <TextInput
+                    value={values.followUpFee ? `₹ ${values.followUpFee}` : ''}
+                    placeholder="Same as consultation"
+                    inputMode="numeric"
+                    onChange={(v) => form.setField('followUpFee', digits(v))}
                   />
-                  <div>
-                    <div id="doctor-bookable-online" className="text-label text-text-strong">
-                      Bookable in the Medibook app
-                    </div>
-                    <div className="text-caption text-text-muted">
-                      Off: patients can't book this doctor in the app. The front desk can still book
-                      them.
-                    </div>
-                  </div>
-                </div>
+                </Field>
               </div>
               <div>
                 <div className="mb-2 flex items-center gap-2">
@@ -508,7 +566,7 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                   </span>
                 )}
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Department">
-                  {departments.map(({ id, name }) => {
+                  {departments.map(({ id, name, isActive }) => {
                     const on = values.departmentId === id;
                     return (
                       <button
@@ -525,6 +583,9 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                       >
                         {on && <Icon name="check" size={14} />}
                         {name}
+                        {!isActive && (
+                          <span className="text-caption text-text-muted">(inactive)</span>
+                        )}
                       </button>
                     );
                   })}
@@ -535,6 +596,43 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
                   </span>
                 )}
               </div>
+              {doctor && (
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-label font-ui text-text-strong">Services offered</span>
+                    <InfoDot text="Procedures and tests booked with this doctor. Managed in Services & Pricing." />
+                  </div>
+                  {doctorServicesQuery.isLoadingError || servicesQuery.isLoadingError ? (
+                    <span className="text-caption text-text-muted">
+                      Services could not be loaded.
+                    </span>
+                  ) : offered === null ? (
+                    <span className="text-caption text-text-muted">Loading…</span>
+                  ) : offered.length === 0 ? (
+                    <span className="text-caption text-text-muted">
+                      None — this doctor takes consultations only.
+                    </span>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {offered.map((o) => (
+                        <span
+                          key={o.id}
+                          className="text-body border-border text-text-body rounded-full border bg-white px-3.5 py-1.75"
+                        >
+                          {o.name}
+                          {o.price !== null && (
+                            <span className="text-caption text-text-muted">
+                              {' '}
+                              · {money(o.price)}
+                              {o.ownPrice ? ' (this doctor)' : ''}
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <Field label="About">
                 {(field) => (
                   <textarea
@@ -554,35 +652,84 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
               <div>
                 <div className="text-body text-text-strong mb-2.5 flex flex-wrap items-center gap-2 font-medium">
                   Consultation Settings
-                  <InfoDot text="Slot length is this doctor's own, set per session in the weekly hours below. Online booking is a hospital-wide switch in Hospital Settings." />
-                  <span className="flex-1" />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    icon="settings"
-                    onClick={() => navigate(hospitalPath(role, 'settings'))}
-                  >
-                    Change in Hospital Settings
-                  </Button>
+                  <InfoDot text="This doctor's own settings, saved with Save Changes. Changing the slot length regenerates future slots; you are shown any bookings it affects before it applies." />
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  <div className="border-border-soft flex items-center justify-between border-b py-2.5">
-                    <span className="text-body text-text-body">Consultation duration</span>
-                    <span className="text-body text-text-strong font-medium">
-                      {schedule ? `${schedule.slotLengthMin} min` : 'Set when the doctor is added'}
-                    </span>
+                  <div className="border-border-soft flex flex-wrap items-center justify-between gap-3 border-b py-2.5">
+                    <span className="text-body text-text-body">Slot length</span>
+                    <div className="w-32">
+                      <Select
+                        value={values.slotLength}
+                        options={slotLengthOptions(values.slotLength)}
+                        onChange={(v) => form.setField('slotLength', v)}
+                        height={40}
+                        aria-label="Slot length in minutes"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between py-2.5">
-                    <span className="text-body text-text-body">Online appointment booking</span>
-                    {onlineBooking === undefined ? (
-                      <span className="text-body text-text-muted">
-                        {profileQuery.isLoadingError ? 'Unavailable' : 'Loading…'}
+                  <div className="border-border-soft flex flex-wrap items-center justify-between gap-3 border-b py-2.5">
+                    <span className="text-body text-text-body">
+                      Expected consultation time
+                      <span className="text-caption text-text-muted block">
+                        Used for patients' wait estimates. Empty ={' '}
+                        {hospitalConsultMinutes === null
+                          ? 'the hospital default'
+                          : `the hospital default, ${hospitalConsultMinutes} min`}
+                        .
                       </span>
-                    ) : (
-                      <Badge status={onlineBooking ? 'Enabled' : 'Blocked'}>
-                        {onlineBooking ? 'Enabled' : 'Off'}
-                      </Badge>
-                    )}
+                    </span>
+                    <div className="w-32">
+                      <TextInput
+                        value={values.consultMinutes}
+                        placeholder={
+                          hospitalConsultMinutes === null
+                            ? 'Default'
+                            : `${hospitalConsultMinutes} min`
+                        }
+                        inputMode="numeric"
+                        aria-label="Expected consultation time in minutes"
+                        onChange={(v) => form.setField('consultMinutes', digits(v))}
+                        onBlur={() => form.blurField('consultMinutes')}
+                      />
+                    </div>
+                  </div>
+                  {form.errorFor('consultMinutes') && (
+                    <span className="text-caption text-d-700">
+                      {form.errorFor('consultMinutes')}
+                    </span>
+                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                    <span className="text-body text-text-body">
+                      Online booking for this doctor
+                      <span className="text-caption text-text-muted block">
+                        {onlineBooking === undefined
+                          ? profileQuery.isLoadingError
+                            ? 'Hospital-wide setting unavailable.'
+                            : 'Checking the hospital-wide setting…'
+                          : onlineBooking
+                            ? bookable
+                              ? 'Patients can book this doctor in the Medibook app.'
+                              : 'Patients cannot book this doctor in the app.'
+                            : 'Online booking is off for the whole hospital, so patients cannot book this doctor in the app.'}
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {onlineBooking === false && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon="settings"
+                          onClick={() => navigate(hospitalPath(role, 'settings'))}
+                        >
+                          Hospital Settings
+                        </Button>
+                      )}
+                      <Toggle
+                        value={values.bookableOnline}
+                        onChange={(v) => form.setField('bookableOnline', v)}
+                        label="Online booking for this doctor"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -603,8 +750,10 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
               />
               {doctor && schedule ? (
                 <>
+                  <UpcomingDays days={schedule.upcoming} />
                   <LeavePanel doctorId={doctor.id} leave={schedule.leaves} />
                   <DateExceptionsPanel doctorId={doctor.id} exceptions={schedule.dateExceptions} />
+                  <ScheduleHistory doctorId={doctor.id} />
                 </>
               ) : (
                 <EmptyState
@@ -628,14 +777,16 @@ function DoctorEditor({ role, doctor, schedule, departments }: DoctorEditorProps
               <Card pad={16} className="mb-3.5 flex items-center gap-4">
                 <div className="text-center">
                   <div className="text-text-strong text-h1 font-bold">
-                    {doctor.ratingAvg === null ? '—' : doctor.ratingAvg.toFixed(1)}
+                    {ratingView(doctor).value}
                   </div>
-                  <Stars r={doctor.ratingAvg ?? 0} />
+                  <Stars r={ratingView(doctor).sortValue} />
                 </div>
                 <div className="text-body text-text-muted">
-                  {doctor.ratingCount === 0
-                    ? 'No patient ratings yet'
-                    : `Based on ${doctor.ratingCount} patient rating${doctor.ratingCount === 1 ? '' : 's'}`}
+                  {doctor.ratingCount > 0
+                    ? `Based on ${doctor.ratingCount} approved patient review${doctor.ratingCount === 1 ? '' : 's'}`
+                    : doctor.ratingBase !== null
+                      ? 'No approved reviews yet — the app shows this starting rating until there are.'
+                      : 'No patient ratings yet'}
                 </div>
               </Card>
               <EmptyState

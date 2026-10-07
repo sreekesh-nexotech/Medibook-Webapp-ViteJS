@@ -11,7 +11,6 @@ import { useDoctorsQuery } from '@/features/doctors/application/queries/useDocto
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
-import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -34,7 +33,8 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { DeptDrawer } from '../components/DeptDrawer';
 import { DeptModal } from '../components/DeptModal';
-import { departmentColor, DOCTOR_STATUS_LABEL } from '../components/doctors.view';
+import { DoctorAvatar } from '../components/DoctorAvatar';
+import { departmentColor, DOCTOR_STATUS_LABEL, ratingView } from '../components/doctors.view';
 import { ScheduleChangeModal } from '../components/ScheduleChangeModal';
 import { useScheduleConfirm } from '../components/useScheduleConfirm';
 
@@ -135,7 +135,7 @@ export function DoctorsDepartmentsScreen() {
     name: (d) => d.name,
     dept: nameOf,
     fee: (d) => d.feeRupees,
-    rating: (d) => d.ratingAvg ?? 0,
+    rating: (d) => ratingView(d).sortValue,
     status: (d) => DOCTOR_STATUS_LABEL[d.status],
   });
 
@@ -234,63 +234,71 @@ export function DoctorsDepartmentsScreen() {
             state={docTableState}
             scrollLabel="Doctors"
           >
-            {orderedDocs.map((d) => (
-              <tr
-                key={d.id}
-                onClick={() => openDoctor(d.id)}
-                className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
-              >
-                <td className={tdClass}>
-                  <div className="flex items-center gap-2.5">
-                    <Avatar name={d.name} size={34} />
-                    <span className="text-body text-text-strong font-medium">{d.name}</span>
-                  </div>
-                </td>
-                <td className={tdClass}>{nameOf(d) || '—'}</td>
-                <td className={cn(tdClass, 'font-semibold tabular-nums')}>{money(d.feeRupees)}</td>
-                <td className={cn(tdClass, 'text-text-muted')}>{d.specialisation || '—'}</td>
-                <td className={tdClass}>
-                  <span className="inline-flex items-center gap-1.25">
-                    <Icon
-                      name="star"
-                      size={14}
-                      className="text-y-500"
-                      style={{ fill: 'var(--color-y-500)' }}
-                    />{' '}
-                    {d.ratingAvg === null ? '—' : d.ratingAvg.toFixed(1)}{' '}
-                    <span className="text-text-muted text-caption">({d.ratingCount})</span>
-                  </span>
-                </td>
-                <td className={tdClass}>
-                  <Badge status={DOCTOR_STATUS_LABEL[d.status]} />
-                </td>
-                <td className={tdClass} onClick={(e) => e.stopPropagation()}>
-                  <div className="flex gap-2">
-                    <Can perm={'Doctors & Departments.edit'}>
-                      <IconBtn
-                        name="pencil"
-                        label="Edit doctor profile"
-                        title={`Edit ${d.name}`}
-                        box={34}
-                        size={15}
-                        onClick={() => openDoctor(d.id)}
-                      />
-                    </Can>
-                    <Can perm={'Doctors & Departments.del'}>
-                      <IconBtn
-                        name="trash-2"
-                        label="Remove doctor"
-                        title={`Remove ${d.name}`}
-                        box={34}
-                        size={15}
-                        color="var(--color-d-600)"
-                        onClick={() => setConfirm({ kind: 'doc', item: d })}
-                      />
-                    </Can>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {orderedDocs.map((d) => {
+              const rating = ratingView(d);
+              return (
+                <tr
+                  key={d.id}
+                  onClick={() => openDoctor(d.id)}
+                  className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+                >
+                  <td className={tdClass}>
+                    <div className="flex items-center gap-2.5">
+                      <DoctorAvatar name={d.name} photoFileId={d.photoFileId} size={34} />
+                      <div>
+                        <div className="text-body text-text-strong font-medium">{d.name}</div>
+                        {d.title && <div className="text-caption text-text-muted">{d.title}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className={tdClass}>{nameOf(d) || '—'}</td>
+                  <td className={cn(tdClass, 'font-semibold tabular-nums')}>
+                    {money(d.feeRupees)}
+                  </td>
+                  <td className={cn(tdClass, 'text-text-muted')}>{d.specialisation || '—'}</td>
+                  <td className={tdClass}>
+                    <span className="inline-flex items-center gap-1.25">
+                      <Icon
+                        name="star"
+                        size={14}
+                        className="text-y-500"
+                        style={{ fill: 'var(--color-y-500)' }}
+                      />{' '}
+                      {rating.value}{' '}
+                      <span className="text-text-muted text-caption">{rating.note}</span>
+                    </span>
+                  </td>
+                  <td className={tdClass}>
+                    <Badge status={DOCTOR_STATUS_LABEL[d.status]} />
+                  </td>
+                  <td className={tdClass} onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-2">
+                      <Can perm={'Doctors & Departments.edit'}>
+                        <IconBtn
+                          name="pencil"
+                          label="Edit doctor profile"
+                          title={`Edit ${d.name}`}
+                          box={34}
+                          size={15}
+                          onClick={() => openDoctor(d.id)}
+                        />
+                      </Can>
+                      <Can perm={'Doctors & Departments.del'}>
+                        <IconBtn
+                          name="trash-2"
+                          label="Remove doctor"
+                          title={`Remove ${d.name}`}
+                          box={34}
+                          size={15}
+                          color="var(--color-d-600)"
+                          onClick={() => setConfirm({ kind: 'doc', item: d })}
+                        />
+                      </Can>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </TableShell>
         </Card>
       ) : departmentsQuery.isPending ? (

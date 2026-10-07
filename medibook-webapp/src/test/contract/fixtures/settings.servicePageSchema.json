@@ -32,7 +32,7 @@
     }
   ],
   "page": 1,
-  "page_size": 5,
+  "page_size": 100,
   "total": 2,
   "has_next": false
 }

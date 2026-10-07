@@ -27,6 +27,7 @@ import { useDoctorsQuery } from '@/features/doctors/application/queries/useDocto
 import { useReceptionDashboardQuery } from '@/features/dashboard/application/queries/useReceptionDashboardQuery';
 import { useAppointmentCountQuery } from '@/features/appointments/application/queries/useAppointmentCountQuery';
 import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
+import { useRefundsQuery } from '@/features/payments/application/queries/useRefundsQuery';
 import {
   rangeForWindow,
   totalsOf,
@@ -47,6 +48,8 @@ interface ReceptionKpi extends StatCardData {
 
 /** Rows the needs-action card shows before "View All". */
 const ACTION_ROWS = 5;
+
+const PAISE_PER_RUPEE = 100;
 
 /**
  * Receptionist (front desk) dashboard — design `Dashboard.jsx`
@@ -82,6 +85,7 @@ export function ReceptionistDashboardScreen() {
     departmentId: null,
     q: '',
   });
+  const refunds = useRefundsQuery(todayRange.dateFrom, todayRange.dateTo);
   const doctors = useDoctorsQuery();
   const departments = useDepartmentsQuery();
 
@@ -90,6 +94,7 @@ export function ReceptionistDashboardScreen() {
       reception.refetch(),
       walkIns.refetch(),
       collected.refetch(),
+      refunds.refetch(),
       doctors.refetch(),
       departments.refetch(),
     ]);
@@ -173,17 +178,29 @@ export function ReceptionistDashboardScreen() {
       icon: 'footprints',
       label: 'Walk-ins Today',
       value: walkIns.isLoadingError ? '—' : (walkIns.data ?? 0),
-      sub: 'Booked at the desk',
+      // The count covers every status; the dashboard's by-source figure has no
+      // cancelled split either (BACKEND_BLOCKERS DASH-01).
+      sub: 'Booked at the desk, cancellations included',
       iconClass: 'bg-badge-noshow-bg text-orange-strong',
       valueClass: 'text-orange-strong',
       go: 'appointments',
     },
   ];
 
+  // Collections are gross: the backend reports refunds as one hospital-wide
+  // total, not per channel or method (BACKEND_BLOCKERS DASH-02), so refunds
+  // get their own tile instead of being netted out of desk figures.
+  // Refunds processed today, desk and online (`GET /refunds`), as the
+  // Payments screen counts them — added up in paise so the total is exact.
+  const refundedToday =
+    (refunds.data ?? [])
+      .filter((r) => r.status === 'processed')
+      .reduce((sum, r) => sum + Math.round(r.amountRupees * PAISE_PER_RUPEE), 0) / PAISE_PER_RUPEE;
   const collections: readonly { label: string; value: number; cls: string }[] = [
     { label: 'Desk Cash', value: deskCash, cls: 'text-blue' },
-    { label: 'Desk UPI / Card', value: deskOther, cls: 'text-y-800' },
+    { label: 'Desk UPI / Card / Other', value: deskOther, cls: 'text-y-800' },
     { label: 'Collected at Desk', value: totals.deskTotal, cls: 'text-g-800' },
+    { label: 'Refunded Today', value: refundedToday, cls: 'text-d-600' },
   ];
 
   return (
@@ -345,12 +362,15 @@ export function ReceptionistDashboardScreen() {
             Open Payments
           </button>
         </div>
-        {collected.isLoadingError ? (
+        {collected.isLoadingError || refunds.isLoadingError ? (
           <ErrorState
-            error={collected.error}
+            error={collected.error ?? refunds.error}
             inline
             title="Today's collection could not be loaded"
-            onRetry={() => void collected.refetch()}
+            onRetry={() => {
+              void collected.refetch();
+              void refunds.refetch();
+            }}
           />
         ) : (
           <div className="flex gap-4">
@@ -358,7 +378,7 @@ export function ReceptionistDashboardScreen() {
               <div key={c.label} className="bg-blue-soft-bg flex-1 rounded-lg p-4.5 text-center">
                 <div className="text-body text-text-body">{c.label}</div>
                 <div className={cn('text-h2 mt-1.5 tabular-nums', c.cls)}>
-                  {collected.isLoading ? '…' : money(c.value)}
+                  {collected.isLoading || refunds.isLoading ? '…' : money(c.value)}
                 </div>
               </div>
             ))}
@@ -369,6 +389,10 @@ export function ReceptionistDashboardScreen() {
           (collected by Medibook):{' '}
           <b className="text-text-strong tabular-nums">{money(onlinePrepaid)}</b> — settled to the
           hospital later, not handled at the desk.
+        </div>
+        <div className="text-caption text-text-muted mt-2">
+          Desk figures are before refunds. Refunded Today covers every refund processed today, at
+          the desk and online.
         </div>
       </Card>
     </div>

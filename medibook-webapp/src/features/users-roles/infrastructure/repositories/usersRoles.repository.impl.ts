@@ -3,6 +3,8 @@ import { attempt } from '@/core/error/attempt';
 import type { UsersRolesRepository } from '@/features/users-roles/domain/repositories/usersRoles.repository';
 import {
   deleteInvitation,
+  getCounters,
+  getPermissionCatalogue,
   getPendingInvitations,
   getRolePreview,
   getRoles,
@@ -13,9 +15,14 @@ import {
   postInvitationResend,
   postStaffAction,
 } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.api';
-import { toInvitationCreateRequest } from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.request';
 import {
+  toInvitationCreateRequest,
+  toStaffPatchRequest,
+} from '@/features/users-roles/infrastructure/data-sources/remote/usersRoles.request';
+import {
+  toPermissionModules,
   toRolePreview,
+  toStaffCounter,
   toStaffInvitation,
   toStaffMember,
   toStaffRole,
@@ -50,8 +57,15 @@ export const usersRolesRepository: UsersRolesRepository = {
   unlockStaff: (staffId) =>
     attempt(async () => toStaffMember(await postStaffAction(staffId, 'unlock'))),
 
-  changeStaffRole: (staffId, roleCode, version) =>
-    attempt(async () => toStaffMember(await patchStaff(staffId, { role_code: roleCode }, version))),
+  updateStaffDetails: (staffId, details, version) =>
+    attempt(async () =>
+      toStaffMember(await patchStaff(staffId, toStaffPatchRequest(details), version)),
+    ),
+
+  listCounters: () => attempt(async () => (await getCounters()).map(toStaffCounter)),
+
+  listPermissionModules: () =>
+    attempt(async () => toPermissionModules(await getPermissionCatalogue())),
 
   listRoles: () => attempt(async () => (await getRoles()).map(toStaffRole)),
 

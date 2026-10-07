@@ -38,6 +38,7 @@ import { PatientChangeNotice } from '@/features/patients/presentation/components
 import { PatientModal } from '@/features/patients/presentation/components/PatientModal';
 import {
   ageFromDob,
+  ageText,
   appointmentSourceBadge,
   appointmentStatusBadge,
   displayPhone,
@@ -135,7 +136,9 @@ export function PatientDetailScreen() {
 
   const p = patientQuery.data;
   const list = historyQuery.data?.items ?? [];
-  const totalVisits = historyQuery.data?.total ?? 0;
+  const totalBookings = historyQuery.data?.total ?? 0;
+  // Cancelled, no-show and upcoming bookings are not visits.
+  const completedVisits = list.filter((a) => a.status === 'completed').length;
   const age = ageFromDob(p.dateOfBirth);
   const phone = displayPhone(p.phone);
   const gender = genderLabel(p.gender);
@@ -188,7 +191,7 @@ export function PatientDetailScreen() {
             <span>MR: {p.mrn}</span>
             <span>·</span>
             <span>
-              {age ?? '—'} yrs · {gender || '—'}
+              {ageText(age)} · {gender || '—'}
             </span>
             <span>·</span>
             <span className="inline-flex items-center gap-1.25">
@@ -229,7 +232,7 @@ export function PatientDetailScreen() {
               <TableShell columns={HISTORY_COLUMNS} state={historyState}>
                 {list.map((a) => {
                   const src = appointmentSourceBadge(a.source);
-                  const pay = paymentBadge(a.paymentStatus);
+                  const pay = paymentBadge(a.paymentStatus, a.status);
                   const st = appointmentStatusBadge(a.status);
                   return (
                     <tr key={a.id}>
@@ -249,7 +252,11 @@ export function PatientDetailScreen() {
                       <td className={tdClass}>
                         <Badge status={pay.status}>{pay.label}</Badge>
                       </td>
-                      <td className={tdClass}>{a.tokenLabel || '—'}</td>
+                      <td className={tdClass}>
+                        {/* A cancelled booking's token is released and reused
+                            (BACKEND_BLOCKERS APPT-07), so it is not shown. */}
+                        {a.status === 'cancelled' ? '—' : a.tokenLabel || '—'}
+                      </td>
                       <td className={tdClass}>
                         <Badge status={st.status}>{st.label}</Badge>
                       </td>
@@ -268,7 +275,7 @@ export function PatientDetailScreen() {
             {infoRow('Phone', phone || '—')}
             {infoRow('Email', p.email || '—')}
             {infoRow('Gender', gender || '—')}
-            {infoRow('Age', (age ?? '—') + ' yrs')}
+            {infoRow('Age', ageText(age))}
             <div className="flex justify-between gap-4 py-2.75">
               <span className="text-body text-text-muted">Address</span>
               <span className="text-body text-text-strong max-w-45 text-right font-medium">
@@ -280,7 +287,8 @@ export function PatientDetailScreen() {
             <SectionTitle size={16} className="mb-2">
               Billing Summary
             </SectionTitle>
-            {infoRow('Total Visits', historyQuery.isSuccess ? totalVisits : '—')}
+            {infoRow('Completed Visits', historyQuery.isSuccess ? completedVisits : '—')}
+            {infoRow('Bookings', historyQuery.isSuccess ? totalBookings : '—')}
             {infoRow(
               'Total Paid',
               <span className="tabular-nums">
@@ -295,7 +303,7 @@ export function PatientDetailScreen() {
             )}
             <div className="text-caption text-text-muted pt-2">
               Figures include GST, as shown on the receipts
-              {totalVisits > list.length ? `, for the latest ${list.length} visits` : ''}.
+              {totalBookings > list.length ? `, for the latest ${list.length} bookings` : ''}.
             </div>
           </Card>
         </div>

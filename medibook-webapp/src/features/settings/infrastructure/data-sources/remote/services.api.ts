@@ -8,13 +8,17 @@ import type {
   TaxRateInput,
 } from '@/features/settings/domain/entities/services.entities';
 import type {
+  CouponRedemptionResponse,
   CouponResponse,
+  DoctorServiceResponse,
   ServiceResponse,
   TaxRateResponse,
 } from '@/features/settings/infrastructure/data-sources/remote/services.response';
 import {
   BP_PER_PERCENT,
+  couponRedemptionResponseSchema,
   couponResponseSchema,
+  doctorServiceResponseSchema,
   PAISE_PER_RUPEE,
   serviceResponseSchema,
   taxRateResponseSchema,
@@ -29,6 +33,8 @@ import {
 export const servicePageSchema = paginatedSchema(serviceResponseSchema);
 export const taxRatePageSchema = paginatedSchema(taxRateResponseSchema);
 export const couponPageSchema = paginatedSchema(couponResponseSchema);
+export const doctorServicePageSchema = paginatedSchema(doctorServiceResponseSchema);
+export const couponRedemptionPageSchema = paginatedSchema(couponRedemptionResponseSchema);
 
 const CODE_SEPARATOR_PATTERN = /[^a-z0-9]+/g;
 const CODE_TRIM_PATTERN = /^-+|-+$/g;
@@ -70,7 +76,9 @@ function serviceBody(input: ServiceInput) {
     description: input.description || null,
     duration_min: input.durationMinutes,
     price_paise: paise(input.priceRupees),
-    tax_rate_id: input.taxRateId,
+    // Omitted = unchanged; re-sending a since-deactivated rate is refused.
+    ...(input.taxRateId === undefined ? {} : { tax_rate_id: input.taxRateId }),
+    requires_doctor: input.requiresDoctor,
     is_active: input.isActive,
   };
 }
@@ -162,10 +170,6 @@ export function getCoupons(): Promise<CouponResponse[]> {
   });
 }
 
-/**
- * Only the fields the screen edits; `max_discount_paise`, `per_user_cap` and
- * `applies_to_online_only` are left as they are on PATCH.
- */
 function couponBody(input: CouponInput) {
   return {
     code: input.code,
@@ -175,6 +179,12 @@ function couponBody(input: CouponInput) {
     valid_from: input.validFrom,
     valid_to: input.validTo,
     usage_cap: input.usageCap,
+    per_user_cap: input.perUserCap,
+    max_discount_paise:
+      input.kind === 'percent' && input.maxDiscountRupees !== null
+        ? paise(input.maxDiscountRupees)
+        : null,
+    applies_to_online_only: input.onlineOnly,
     min_order_paise: paise(input.minOrderRupees),
     is_active: input.isActive,
     scopes: [
@@ -207,4 +217,26 @@ export async function patchCoupon(
 /** With the version shown, so a coupon a colleague just changed is not removed (DATA-05). */
 export async function deleteCoupon(id: string, version: number): Promise<void> {
   await hospitalApi.delete(`/coupons/${encodeURIComponent(id)}`, { headers: ifMatch(version) });
+}
+
+/* --------------------------------------------- doctor links and redemptions */
+
+/** Which doctors offer which services (`GET /doctor-services`), every page. */
+export function getDoctorServices(): Promise<DoctorServiceResponse[]> {
+  return fetchAllPages(async (page) => {
+    const response = await hospitalApi.get('/doctor-services', {
+      params: { page, page_size: MAX_PAGE_SIZE },
+    });
+    return doctorServicePageSchema.parse(response.data);
+  });
+}
+
+/** The bookings a coupon was used on, newest first, every page. */
+export function getCouponRedemptions(couponId: string): Promise<CouponRedemptionResponse[]> {
+  return fetchAllPages(async (page) => {
+    const response = await hospitalApi.get(`/coupons/${encodeURIComponent(couponId)}/redemptions`, {
+      params: { page, page_size: MAX_PAGE_SIZE, sort: '-redeemed_at' },
+    });
+    return couponRedemptionPageSchema.parse(response.data);
+  });
 }

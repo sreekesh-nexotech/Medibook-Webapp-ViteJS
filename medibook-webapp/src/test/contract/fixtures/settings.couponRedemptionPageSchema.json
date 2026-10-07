@@ -1,0 +1,72 @@
+{
+  "results": [
+    {
+      "id": "01a0ee2e-ee6c-7263-a3f4-b61723bcfa77",
+      "appointment_id": "01a0ee2e-ee4b-78d1-8011-fa6b4d617a4f",
+      "booking_ref": "EXMB-2609-00160",
+      "discount_paise": 4000,
+      "redeemed_at": "2026-09-27T02:27:00.058920Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee2b-6240-7262-b92b-ea5587a069c0",
+      "appointment_id": "01a0ee2b-622a-7b62-8d70-b6e4d0b8098a",
+      "booking_ref": "EXMB-2609-00073",
+      "discount_paise": 2000,
+      "redeemed_at": "2026-09-09T02:27:00.038202Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee2b-4437-7df0-84bb-ae0d58359147",
+      "appointment_id": "01a0ee2b-442d-7cb2-be30-406f00f753f1",
+      "booking_ref": "EXMB-2609-00069",
+      "discount_paise": 4000,
+      "redeemed_at": "2026-09-08T02:10:00.046126Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee2b-2f1c-74f0-9526-45ae8ec96d46",
+      "appointment_id": "01a0ee2b-2f11-7710-9e3c-c8f018ab8f89",
+      "booking_ref": "EXMB-2609-00066",
+      "discount_paise": 5000,
+      "redeemed_at": "2026-09-07T05:40:00.024819Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee2b-1acf-72f2-9cfe-e489a99bcbce",
+      "appointment_id": "01a0ee2b-1ac6-75c2-b63b-6aeb25a6bc90",
+      "booking_ref": "EXMB-2609-00062",
+      "discount_paise": 5000,
+      "redeemed_at": "2026-09-07T02:11:00.036517Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee2a-a2e0-7d22-b6e9-8768c090020d",
+      "appointment_id": "01a0ee2a-a2d3-72f1-a09d-9f300a19cd00",
+      "booking_ref": "EXMB-2609-00048",
+      "discount_paise": 5000,
+      "redeemed_at": "2026-09-03T05:17:00.055754Z",
+      "reversed_at": "2026-09-03T05:24:00.273070Z"
+    },
+    {
+      "id": "01a0ee2a-90d9-7b93-87c3-f54056e547fd",
+      "appointment_id": "01a0ee2a-90d1-7750-81e0-97076069311b",
+      "booking_ref": "EXMB-2609-00045",
+      "discount_paise": 2000,
+      "redeemed_at": "2026-09-03T02:23:00.346114Z",
+      "reversed_at": null
+    },
+    {
+      "id": "01a0ee29-98cd-7070-8579-732c1b49e25d",
+      "appointment_id": "01a0ee29-98c3-7c92-913e-0c47d348282e",
+      "booking_ref": "EXMB-2608-00028",
+      "discount_paise": 4000,
+      "redeemed_at": "2026-08-31T02:32:00.033390Z",
+      "reversed_at": null
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total": 8,
+  "has_next": false
+}

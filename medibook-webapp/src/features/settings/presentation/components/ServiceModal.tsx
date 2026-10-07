@@ -27,6 +27,7 @@ interface ServiceForm {
   price: string;
   taxRateId: string;
   description: string;
+  requiresDoctor: boolean;
   active: boolean;
 }
 
@@ -45,6 +46,8 @@ interface ServiceModalProps {
   departments: readonly Department[];
   /** Rates a service may be billed with (active, for services or everything). */
   taxOptions: readonly ServiceTaxRate[];
+  /** Every rate, to price a service still linked to one that was switched off. */
+  taxRates: readonly ServiceTaxRate[];
   onClose: () => void;
   /** Persist; resolves `true` when saved (the caller reports failures). */
   onSave: (input: ServiceInput) => Promise<boolean>;
@@ -63,6 +66,7 @@ export function ServiceModal({
   service,
   departments,
   taxOptions,
+  taxRates,
   onClose,
   onSave,
 }: ServiceModalProps) {
@@ -74,6 +78,7 @@ export function ServiceModal({
       price: service ? String(service.priceRupees) : '',
       taxRateId: service?.taxRateId ?? '',
       description: service?.description ?? '',
+      requiresDoctor: service?.requiresDoctor ?? true,
       active: service?.isActive ?? true,
     },
     validate: VALIDATORS,
@@ -83,8 +88,11 @@ export function ServiceModal({
         departmentId: v.departmentId || null,
         durationMinutes: Number(v.durationMinutes),
         priceRupees: Number(v.price),
-        taxRateId: v.taxRateId || null,
+        // Unchanged → not sent, so a since-deactivated rate does not block the save.
+        taxRateId:
+          service && (v.taxRateId || null) === service.taxRateId ? undefined : v.taxRateId || null,
         description: v.description.trim(),
+        requiresDoctor: v.requiresDoctor,
         isActive: v.active,
       });
       if (saved) onClose();
@@ -92,15 +100,18 @@ export function ServiceModal({
   });
 
   const price = Number(form.values.price);
-  const tax = taxOptions.find((t) => t.id === form.values.taxRateId) ?? null;
+  const tax = taxRates.find((t) => t.id === form.values.taxRateId) ?? null;
+  const taxSwitchedOff = tax !== null && !tax.isActive;
   const priced = priceService(Number.isFinite(price) ? price : 0, tax);
   const deptName = departments.find((d) => d.id === form.values.departmentId)?.name ?? '';
   const taxNames = [NO_TAX_LABEL, ...taxOptions.map(taxLabel)];
   // A service may point at a rate that is no longer offered (inactive) — keep it visible.
   const currentTax = tax
-    ? taxLabel(tax)
+    ? taxSwitchedOff
+      ? `${taxLabel(tax)} — switched off`
+      : taxLabel(tax)
     : form.values.taxRateId
-      ? 'Current rate (inactive)'
+      ? 'Current rate (unknown)'
       : NO_TAX_LABEL;
 
   return (
@@ -182,7 +193,11 @@ export function ServiceModal({
               Number.isFinite(price) && price > 0
                 ? priced.isInclusive
                   ? `Patient pays ${money(priced.total)} (includes ${money(priced.tax)} tax).`
-                  : `Patient pays ${money(priced.total)}${priced.tax ? ` (${money(priced.tax)} tax)` : ''}.`
+                  : `Patient pays ${money(priced.total)}${priced.tax ? ` (${money(priced.tax)} tax)` : ''}.${
+                      taxSwitchedOff
+                        ? ' This rate is switched off but is still charged on this service until you pick another.'
+                        : ''
+                    }`
                 : 'The one tax this service is billed with.'
             }
           >
@@ -209,6 +224,19 @@ export function ServiceModal({
             />
           )}
         </Field>
+        <div className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3">
+          <Toggle
+            value={form.values.requiresDoctor}
+            onChange={(v) => form.setField('requiresDoctor', v)}
+            label="Needs a doctor"
+          />
+          <div className="flex flex-col">
+            <span className="text-body text-text-strong font-medium">Needs a doctor</span>
+            <span className="text-caption text-text-muted">
+              Booked into a doctor&apos;s slot. Turn off for a standalone test or procedure.
+            </span>
+          </div>
+        </div>
         <div className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3">
           <Toggle
             value={form.values.active}

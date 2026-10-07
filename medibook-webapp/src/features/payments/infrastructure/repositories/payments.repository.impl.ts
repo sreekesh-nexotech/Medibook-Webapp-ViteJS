@@ -3,12 +3,14 @@ import { attempt } from '@/core/error/attempt';
 
 import type { PaymentsRepository } from '@/features/payments/domain/repositories/payments.repository';
 import {
-  exportPaymentsCsv,
+  exportPayments,
+  getCashSummary,
   getOpenCashSession,
   getPaymentDetail,
   listAllPayments,
   listClosedCashSessions,
   listPayments,
+  listRefunds,
   listVisitReceipts,
   postCashSession,
   postCloseCashSession,
@@ -16,10 +18,15 @@ import {
 } from '@/features/payments/infrastructure/data-sources/remote/payments.api';
 import {
   toCashSession,
+  toCashSummary,
   toPaymentLine,
   toPaymentRefunds,
+  toRefundList,
   toVisitReceipts,
 } from '@/features/payments/infrastructure/data-sources/remote/payments.response';
+
+/** Downloaded exports are named `medibook-payments.<format>`. */
+const EXPORT_BASENAME = 'medibook-payments';
 
 export const paymentsRepository: PaymentsRepository = {
   listPayments: (query) => attempt(async () => toPage(await listPayments(query), toPaymentLine)),
@@ -36,7 +43,16 @@ export const paymentsRepository: PaymentsRepository = {
   listVisitReceipts: (visitId) =>
     attempt(async () => toVisitReceipts(await listVisitReceipts(visitId))),
 
-  exportCsv: (filters) => attempt(() => exportPaymentsCsv(filters)),
+  exportPayments: (filters, format) =>
+    attempt(async () => ({
+      blob: await exportPayments(filters, format),
+      filename: `${EXPORT_BASENAME}.${format}`,
+    })),
+
+  listRefunds: (dateFrom, dateTo) =>
+    attempt(async () => toRefundList(await listRefunds(dateFrom, dateTo))),
+
+  getCashSummary: (date) => attempt(async () => toCashSummary(await getCashSummary(date))),
 
   getOpenCashSession: (staffId) =>
     attempt(async () => {

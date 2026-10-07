@@ -69,6 +69,11 @@ interface CouponForm {
   from: string;
   to: string;
   usageCap: string;
+  /** Uses per patient; empty or 0 = unlimited. */
+  perUserCap: string;
+  /** Percent coupons only; empty = no ceiling. */
+  maxDiscount: string;
+  onlineOnly: boolean;
   minOrder: string;
   departmentIds: readonly string[];
   serviceIds: readonly string[];
@@ -149,6 +154,9 @@ export function CouponModal({
       from: coupon ? localDay(coupon.validFrom) : '',
       to: coupon ? lastValidDay(coupon.validTo) : '',
       usageCap: String(coupon?.usageCap ?? 0),
+      perUserCap: String(coupon?.perUserCap ?? 0),
+      maxDiscount: coupon?.maxDiscountRupees == null ? '' : String(coupon.maxDiscountRupees),
+      onlineOnly: coupon?.onlineOnly ?? false,
       minOrder: String(coupon?.minOrderRupees ?? 0),
       departmentIds: coupon?.departmentIds ?? [],
       serviceIds: coupon?.serviceIds ?? [],
@@ -157,6 +165,7 @@ export function CouponModal({
     validate: validators,
     onSubmit: async (v) => {
       const cap = Number(v.usageCap || 0);
+      const perUser = Number(v.perUserCap || 0);
       const saved = await onSave({
         code: normaliseCouponCode(v.code),
         kind: v.type === 'Flat' ? 'flat' : 'percent',
@@ -164,6 +173,10 @@ export function CouponModal({
         validFrom: dayStartIso(v.from),
         validTo: dayEndExclusiveIso(v.to),
         usageCap: cap > 0 ? cap : null,
+        perUserCap: perUser > 0 ? perUser : null,
+        maxDiscountRupees:
+          v.type === 'Percent' && v.maxDiscount !== '' ? Number(v.maxDiscount) : null,
+        onlineOnly: v.onlineOnly,
         minOrderRupees: Number(v.minOrder || 0),
         departmentIds: v.departmentIds,
         serviceIds: v.serviceIds,
@@ -190,8 +203,10 @@ export function CouponModal({
             kind: form.values.type === 'Flat' ? 'flat' : 'percent',
             value,
             minOrderRupees: Number(form.values.minOrder || 0),
-            // The form does not edit the cap, so an edited coupon keeps its own.
-            maxDiscountRupees: coupon?.maxDiscountRupees ?? null,
+            maxDiscountRupees:
+              form.values.type === 'Percent' && form.values.maxDiscount !== ''
+                ? Number(form.values.maxDiscount)
+                : null,
           },
           sampleOrder,
         );
@@ -290,6 +305,17 @@ export function CouponModal({
               height={48}
             />
           </Field>
+          <Field label="Uses per Patient" hint="How often one patient may use it. 0 = unlimited.">
+            <TextInput
+              value={form.values.perUserCap}
+              onChange={(v) => form.setField('perUserCap', v.replace(/[^0-9]/g, ''))}
+              inputMode="numeric"
+              height={48}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <Field label="Minimum Order Value (₹)" hint="The code does nothing below this amount.">
             <TextInput
               value={form.values.minOrder}
@@ -298,6 +324,34 @@ export function CouponModal({
               height={48}
             />
           </Field>
+          {form.values.type === 'Percent' ? (
+            <Field label="Maximum Discount (₹)" hint="Caps the percent discount. Empty = no cap.">
+              <TextInput
+                value={form.values.maxDiscount}
+                onChange={(v) => form.setField('maxDiscount', v.replace(/[^0-9]/g, ''))}
+                placeholder="No cap"
+                inputMode="numeric"
+                height={48}
+              />
+            </Field>
+          ) : (
+            <span />
+          )}
+        </div>
+
+        <div className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3">
+          <Toggle
+            value={form.values.onlineOnly}
+            onChange={(v) => form.setField('onlineOnly', v)}
+            label="Online bookings only"
+          />
+          <div className="flex flex-col">
+            <span className="text-body text-text-strong font-medium">Online bookings only</span>
+            <span className="text-caption text-text-muted">
+              When on, the front desk cannot apply this code — only patients booking in the Medibook
+              app.
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

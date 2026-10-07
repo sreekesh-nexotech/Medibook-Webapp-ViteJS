@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "id": "01a0ee28-8790-7d21-8292-3c19caebcd20",
+      "doctor_id": "01a0ee28-8720-70f1-8043-0215ef7f18cb",
+      "service_id": "01a0ee28-8782-77b1-80ed-2a4f4f232ce8",
+      "price_override_paise": null,
+      "created_at": "2026-08-06T04:30:01.046135Z",
+      "updated_at": "2026-08-06T04:30:01.046156Z"
+    },
+    {
+      "id": "01a0ee28-87ac-72d1-8ecc-29a87e4256c5",
+      "doctor_id": "01a0ee28-86bf-7ce0-91fb-9c66da9bd3bd",
+      "service_id": "01a0ee28-879f-7d30-94c1-86554948dec2",
+      "price_override_paise": null,
+      "created_at": "2026-08-06T04:30:01.074110Z",
+      "updated_at": "2026-08-06T04:30:01.074146Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 100,
+  "total": 2,
+  "has_next": false
+}

@@ -37,6 +37,8 @@ export interface DeskAppointment {
   readonly patient: ApptPatient | null;
   readonly doctor: { readonly id: string; readonly name: string; readonly room: string | null };
   readonly department: { readonly id: string; readonly name: string };
+  /** The doctor session (the queue) the booking sits in. */
+  readonly sessionId: string;
   readonly sessionLabel: string;
   readonly visitId: string | null;
   /** ISO `yyyy-mm-dd` (hospital-local). */
@@ -44,6 +46,10 @@ export interface DeskAppointment {
   readonly scheduledStartAt: string;
   readonly scheduledEndAt: string;
   readonly tokenLabel: string | null;
+  /** Queue position: the backend calls strictly by token number (Q25). */
+  readonly tokenNo: number | null;
+  /** Set once the token has been called (a skipped token keeps it). */
+  readonly calledAt: string | null;
   readonly isFollowUp: boolean;
   readonly patientNotes: string;
   readonly remark: string;
@@ -133,7 +139,7 @@ export interface NewWalkInPatient {
   readonly lastName: string;
   /** E.164. */
   readonly phone: string;
-  readonly gender: 'female' | 'male' | 'other' | null;
+  readonly gender: 'female' | 'male' | 'other' | 'undisclosed' | null;
   /** ISO `yyyy-mm-dd`, optional. */
   readonly dateOfBirth: string | null;
 }

@@ -13,7 +13,10 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
-import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
+import type {
+  AppointmentEvent,
+  DeskAppointment,
+} from '@/features/appointments/domain/entities/appointments.entities';
 import {
   useApproveMutation,
   useCancelMutation,
@@ -32,14 +35,19 @@ import { AppointmentReceiptModal } from '@/features/appointments/presentation/co
 import { AppointmentRemarkModal } from '@/features/appointments/presentation/components/AppointmentRemarkModal';
 import { AppointmentTokenModal } from '@/features/appointments/presentation/components/AppointmentTokenModal';
 import {
+  actorLabel,
+  canCheckIn,
   dateTimeOf,
   dayOf,
+  eventLabel,
   isInQueue,
+  localIso,
   needsApproval,
   needsPayment,
-  PAYMENT_LABEL,
+  paymentBadge,
   SOURCE_LABEL,
   STATUS_LABEL,
+  statusLabelOf,
   timeOf,
 } from '@/features/appointments/presentation/components/appointments.view';
 
@@ -140,22 +148,20 @@ function Row({ k, v }: { k: ReactNode; v: ReactNode }) {
 
 interface DrawerBodyProps {
   appt: DeskAppointment;
-  history: readonly {
-    readonly id: string;
-    readonly eventType: string;
-    readonly occurredAt: string;
-  }[];
+  history: readonly AppointmentEvent[];
   isHistoryLoading: boolean;
   onViewPatient: () => void;
 }
 
 function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBodyProps) {
+  const payBadge = paymentBadge(appt);
+  const refundedButLive = needsPayment(appt) && appt.paymentStatus === 'refunded';
   return (
     <>
       <div className="mb-4.5 flex flex-wrap gap-2">
         <Badge status={SOURCE_LABEL[appt.source]} />
         <Badge status={STATUS_LABEL[appt.status]} />
-        <Badge status={PAYMENT_LABEL[appt.paymentStatus]} />
+        <Badge status={payBadge.status}>{payBadge.label}</Badge>
         {needsApproval(appt) && <Badge status="Pending verification">Needs approval</Badge>}
       </div>
       {needsApproval(appt) && (
@@ -164,6 +170,15 @@ function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBo
           <div className="text-body text-text-body">
             This booking needs the hospital's approval. Approve it to confirm the slot, or reject it
             — the patient is refunded in full.
+          </div>
+        </Card>
+      )}
+      {refundedButLive && (
+        <Card pad={16} className="mb-4">
+          <div className="text-caption text-text-muted mb-1">Payment refunded</div>
+          <div className="text-body text-text-body">
+            This walk-in's fee was refunded but the visit is still on. Collect the fee again before
+            checking the patient in, or cancel the appointment.
           </div>
         </Card>
       )}
@@ -240,7 +255,15 @@ function DrawerBody({ appt, history, isHistoryLoading, onViewPatient }: DrawerBo
           <ul className="flex flex-col gap-1.5">
             {history.map((e) => (
               <li key={e.id} className="text-caption text-text-body flex justify-between gap-3">
-                <span className="capitalize">{e.eventType.replace(/_/g, ' ')}</span>
+                <span>
+                  {eventLabel(e.eventType)}
+                  <span className="text-text-muted"> · {actorLabel(e.actorKind)}</span>
+                  {e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus && (
+                    <span className="text-text-muted block">
+                      {statusLabelOf(e.fromStatus)} → {statusLabelOf(e.toStatus)}
+                    </span>
+                  )}
+                </span>
                 <span className="text-text-muted tabular-nums">{dateTimeOf(e.occurredAt)}</span>
               </li>
             ))}
@@ -336,7 +359,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
             </Button>
           </Can>
         )}
-        {appt.status === 'scheduled' && (
+        {canCheckIn(appt, localIso(new Date())) && !needsPayment(appt) && (
           <Can perm="Appointments.edit">
             <Button
               icon="log-in"

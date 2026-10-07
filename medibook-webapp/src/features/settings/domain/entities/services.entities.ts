@@ -17,8 +17,31 @@ export interface PricedService {
   readonly priceRupees: number;
   /** The one tax this service is billed with; `null` = exempt. */
   readonly taxRateId: string | null;
+  /** Booked with a doctor (their slot), rather than as a standalone test. */
+  readonly requiresDoctor: boolean;
   readonly isActive: boolean;
   readonly version: number;
+}
+
+/** A doctor who offers a service, optionally at their own price. */
+export interface DoctorServiceLink {
+  readonly id: string;
+  readonly doctorId: string;
+  readonly serviceId: string;
+  /** Whole rupees; `null` = the service's own price. */
+  readonly priceOverrideRupees: number | null;
+}
+
+/** One booking a coupon was used on. */
+export interface CouponRedemption {
+  readonly id: string;
+  readonly appointmentId: string;
+  readonly bookingRef: string;
+  /** Whole rupees (may carry paise). */
+  readonly discountRupees: number;
+  readonly redeemedAt: string;
+  /** Set when the booking was cancelled and the use given back. */
+  readonly reversedAt: string | null;
 }
 
 /** What a tax rate may be applied to (`convenience_fee` belongs to the platform). */
@@ -53,11 +76,15 @@ export interface HospitalCoupon {
   readonly validTo: string;
   /** Total redemptions allowed; `null` = unlimited. */
   readonly usageCap: number | null;
+  /** Uses allowed per patient; `null` = unlimited. */
+  readonly perUserCap: number | null;
   readonly usedCount: number;
+  /** Ceiling on a percent discount, whole rupees; `null` = none. */
+  readonly maxDiscountRupees: number | null;
+  /** Only redeemable on bookings made in the patient app. */
+  readonly onlineOnly: boolean;
   /** Minimum order value in whole rupees. */
   readonly minOrderRupees: number;
-  /** Most a percent coupon takes off one booking, in rupees; `null` = no cap. */
-  readonly maxDiscountRupees: number | null;
   /** Department scope (empty = every department). */
   readonly departmentIds: readonly string[];
   /** Service scope (empty = every service). */
@@ -72,7 +99,12 @@ export interface ServiceInput {
   readonly description: string;
   readonly durationMinutes: number;
   readonly priceRupees: number;
-  readonly taxRateId: string | null;
+  /**
+   * `undefined` leaves the stored rate as it is — the backend refuses to
+   * (re)save a rate that has since been switched off.
+   */
+  readonly taxRateId?: string | null;
+  readonly requiresDoctor: boolean;
   readonly isActive: boolean;
 }
 
@@ -91,6 +123,9 @@ export interface CouponInput {
   readonly validFrom: string;
   readonly validTo: string;
   readonly usageCap: number | null;
+  readonly perUserCap: number | null;
+  readonly maxDiscountRupees: number | null;
+  readonly onlineOnly: boolean;
   readonly minOrderRupees: number;
   readonly departmentIds: readonly string[];
   readonly serviceIds: readonly string[];

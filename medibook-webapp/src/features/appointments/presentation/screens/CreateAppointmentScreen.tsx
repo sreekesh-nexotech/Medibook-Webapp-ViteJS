@@ -40,14 +40,37 @@ import { usePatientQuery } from '@/features/patients/application/queries/usePati
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import type { PatientRecord } from '@/features/patients/domain/entities/patients.entities';
 
-const GENDERS = ['Male', 'Female', 'Other'] as const;
+/**
+ * Gender starts unset, so a desk that skips the field records nothing
+ * rather than a wrong value; "Prefer not to say" is the backend's
+ * `undisclosed`.
+ */
+const GENDERS = ['Not specified', 'Male', 'Female', 'Other', 'Prefer not to say'] as const;
 type GenderLabel = (typeof GENDERS)[number];
 
 const GENDER_VALUE: Readonly<Record<GenderLabel, NewWalkInPatient['gender']>> = {
+  'Not specified': null,
   Male: 'male',
   Female: 'female',
   Other: 'other',
+  'Prefer not to say': 'undisclosed',
 };
+
+/** A stored patient's gender code as the desk reads it. */
+const GENDER_DISPLAY: Readonly<Record<string, string>> = {
+  male: 'Male',
+  female: 'Female',
+  other: 'Other',
+  undisclosed: 'Gender not disclosed',
+};
+
+/** Desk phones are Indian mobiles; show them without the country code. */
+const INDIA_PREFIX = '+91';
+
+function displayPhone(e164: string | null): string | null {
+  if (!e164) return null;
+  return e164.startsWith(INDIA_PREFIX) ? e164.slice(INDIA_PREFIX.length) : e164;
+}
 
 /** Native date-input styling — the design's `dateField`. */
 const dateInputClass =
@@ -157,7 +180,10 @@ export function CreateAppointmentScreen() {
     { id: 1, departmentId: '', doctorId: '', slotId: '' },
   ]);
   const [consultsTouched, setConsultsTouched] = useState(false);
-  const [booked, setBooked] = useState<readonly DeskAppointment[] | null>(null);
+  const [booked, setBooked] = useState<{
+    readonly visitId: string;
+    readonly appointments: readonly DeskAppointment[];
+  } | null>(null);
 
   const form = useForm<BookingForm>({
     initial: {
@@ -167,7 +193,7 @@ export function CreateAppointmentScreen() {
       lastName: '',
       phone: '',
       dob: '',
-      gender: 'Male',
+      gender: 'Not specified',
       hasPicked: false,
     },
     validate: VALIDATORS,
@@ -198,7 +224,7 @@ export function CreateAppointmentScreen() {
           `${result.appointments.length} appointment${result.appointments.length === 1 ? '' : 's'} booked`,
           'success',
         );
-        setBooked(result.appointments);
+        setBooked({ visitId: result.visitId, appointments: result.appointments });
       } catch (error) {
         toast(
           isFailure(error) && error.code === SLOT_UNAVAILABLE
@@ -250,8 +276,13 @@ export function CreateAppointmentScreen() {
         ? 'Finish or remove the consultation without a slot.'
         : undefined;
   const showConsultsError = consultsTouched ? consultsError : undefined;
-  const feeTotal = ready.reduce(
-    (sum, c) => sum + (doctors.find((d) => d.id === c.doctorId)?.feeRupees ?? 0),
+  const readyDoctors = ready.map((c) => doctors.find((d) => d.id === c.doctorId));
+  const feeTotal = readyDoctors.reduce((sum, d) => sum + (d?.feeRupees ?? 0), 0);
+  // The backend charges a doctor's follow-up fee when the patient saw them
+  // recently; it cannot be previewed (BACKEND_BLOCKERS APPT-05), so the
+  // lower figure is shown beside the standard one.
+  const followUpTotal = readyDoctors.reduce(
+    (sum, d) => sum + (d?.followUpFeeRupees ?? d?.feeRupees ?? 0),
     0,
   );
   const patientName = picked
@@ -286,7 +317,13 @@ export function CreateAppointmentScreen() {
             <div className="flex-1">
               <div className="text-body text-text-strong font-medium">{picked.fullName}</div>
               <div className="text-caption text-text-muted">
-                {[picked.mrn, picked.gender, picked.phone].filter(Boolean).join(' · ')}
+                {[
+                  picked.mrn,
+                  picked.gender ? (GENDER_DISPLAY[picked.gender] ?? picked.gender) : null,
+                  displayPhone(picked.phone),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={clearPatient}>
@@ -400,7 +437,7 @@ export function CreateAppointmentScreen() {
                               {p.fullName}
                             </div>
                             <div className="text-caption text-text-muted">
-                              {[p.mrn, p.phone].filter(Boolean).join(' · ')}
+                              {[p.mrn, displayPhone(p.phone)].filter(Boolean).join(' · ')}
                             </div>
                           </div>
                         </button>
@@ -569,8 +606,10 @@ export function CreateAppointmentScreen() {
               <span className="tabular-nums">{money(feeTotal)}</span>
             </div>
             <div className="text-caption text-text-muted px-3.5 py-2">
-              Tax, any follow-up pricing and the final total are worked out by the booking and shown
-              before you collect.
+              {followUpTotal < feeTotal
+                ? `Standard fee. If this counts as a follow-up with the same doctor, it is ${money(followUpTotal)}. `
+                : ''}
+              Tax and the final total are worked out by the booking and shown before you collect.
             </div>
           </div>
         )}
@@ -583,7 +622,11 @@ export function CreateAppointmentScreen() {
           Book & Collect Payment
         </Button>
       </div>
-      <AppointmentBookedModal appointments={booked} patientName={patientName} onDone={onDone} />
+      <AppointmentBookedModal
+        appointments={booked?.appointments ?? null}
+        patientName={patientName}
+        onDone={onDone}
+      />
     </Form>
   );
 }

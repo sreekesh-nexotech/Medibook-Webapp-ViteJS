@@ -7,14 +7,42 @@ import { addDaysISO, calendarDate, calendarInstant } from '@/shared/lib/format';
 
 /**
  * Pure pricing rules, mirroring the backend's fee engine
- * (`catalog/services/fees.py`) so the screen shows what a receipt will:
- * a service is taxed only by its **own** tax rate (none = exempt), each tax
- * line is rounded half-up to the rupee, and inclusive tax is informational —
- * already inside the price, not added on top.
+ * (`catalog/services/fees.py`, `core/money.py`) so the screen shows what a
+ * receipt will. Worked in paise, like the backend:
+ * - a service is taxed only by its **own** tax rate (none = exempt) — and the
+ *   backend charges that rate even after it is switched off (BACKEND_BLOCKERS
+ *   SVC-01), so this does too;
+ * - an added-on tax line is rounded half-up to the rupee (`round_tax_paise`);
+ * - inclusive tax is informational, broken out to the paisa, already inside
+ *   the price;
+ * - a percent coupon is rounded half-up to the paisa (`apply_bp`) and capped
+ *   at its maximum discount.
  */
 
-const PERCENT = 100;
-const HALF = 0.5;
+const PAISE_PER_RUPEE = 100;
+/** Basis points in 100% (the backend's `BP_DENOMINATOR`). */
+const BP = 10_000;
+const BP_PER_PERCENT = 100;
+
+function toPaise(rupees: number): number {
+  return Math.round(rupees * PAISE_PER_RUPEE);
+}
+
+function toBp(percent: number): number {
+  return Math.round(percent * BP_PER_PERCENT);
+}
+
+/** `round_tax_paise`: amount × rate, half-up to the whole rupee, in paise. */
+function roundTaxPaise(amountPaise: number, rateBp: number): number {
+  if (rateBp === 0 || amountPaise === 0) return 0;
+  const unit = PAISE_PER_RUPEE * BP;
+  return Math.floor((amountPaise * rateBp + unit / 2) / unit) * PAISE_PER_RUPEE;
+}
+
+/** `apply_bp`: a basis-point share, half-up to the paisa. */
+function applyBp(amountPaise: number, rateBp: number): number {
+  return Math.floor((amountPaise * rateBp + BP / 2) / BP);
+}
 
 /** Highest discount a percent coupon may carry. */
 export const MAX_PERCENT_COUPON = 100;
@@ -29,16 +57,18 @@ export interface ServicePrice {
   readonly total: number;
 }
 
-/** Price a service with its own tax rate (or none). */
+/** Price a service with its own tax rate (or none), as the receipt line will. */
 export function priceService(base: number, tax: ServiceTaxRate | null): ServicePrice {
-  if (!tax || !tax.isActive || tax.percent <= 0) {
+  const rateBp = tax ? toBp(tax.percent) : 0;
+  if (!tax || rateBp <= 0) {
     return { base, tax: 0, isInclusive: false, total: base };
   }
+  const basePaise = toPaise(base);
   if (tax.isInclusive) {
-    const preTax = Math.floor((base * PERCENT) / (PERCENT + tax.percent) + HALF);
-    return { base, tax: base - preTax, isInclusive: true, total: base };
+    const preTax = Math.floor((basePaise * BP + Math.floor((BP + rateBp) / 2)) / (BP + rateBp));
+    return { base, tax: (basePaise - preTax) / PAISE_PER_RUPEE, isInclusive: true, total: base };
   }
-  const amount = Math.floor((base * tax.percent) / PERCENT + HALF);
+  const amount = roundTaxPaise(basePaise, rateBp) / PAISE_PER_RUPEE;
   return { base, tax: amount, isInclusive: false, total: base + amount };
 }
 
@@ -83,14 +113,6 @@ export function couponState(coupon: HospitalCoupon, today: string): CouponState 
   return 'Active';
 }
 
-const PAISE_PER_RUPEE = 100;
-const BP_PER_PERCENT = 100;
-const BP_DENOMINATOR = 10_000;
-
-function toPaise(rupees: number): number {
-  return Math.round(rupees * PAISE_PER_RUPEE);
-}
-
 /**
  * Discount a coupon takes off `orderValue` (rupees), worked out in paise exactly
  * as the bill is (backend `catalog/services/fees.py`, `core/money.apply_bp`): a
@@ -106,8 +128,7 @@ export function couponDiscount(
   if (orderPaise < toPaise(coupon.minOrderRupees)) return 0;
   let discount: number;
   if (coupon.kind === 'percent') {
-    const rateBp = Math.round(Math.min(coupon.value, MAX_PERCENT_COUPON) * BP_PER_PERCENT);
-    discount = Math.floor((orderPaise * rateBp + BP_DENOMINATOR / 2) / BP_DENOMINATOR);
+    discount = applyBp(orderPaise, toBp(Math.min(coupon.value, MAX_PERCENT_COUPON)));
     const cap = coupon.maxDiscountRupees;
     if (cap != null) discount = Math.min(discount, toPaise(cap));
   } else {

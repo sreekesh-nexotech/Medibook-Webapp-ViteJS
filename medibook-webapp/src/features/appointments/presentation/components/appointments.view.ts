@@ -21,7 +21,7 @@ import type {
 /** Badge text (keys of the shared status map) for each backend status. */
 export const STATUS_LABEL: Readonly<Record<ApptStatus, string>> = {
   pending_payment: 'Awaiting payment',
-  pending_approval: 'Scheduled',
+  pending_approval: 'Awaiting approval',
   scheduled: 'Scheduled',
   checked_in: 'In Queue',
   in_consultation: 'In Queue',
@@ -30,8 +30,17 @@ export const STATUS_LABEL: Readonly<Record<ApptStatus, string>> = {
   no_show: 'No-show',
 };
 
+/** Widened view for labelling a status that arrives as a plain string (history events). */
+const STATUS_LOOKUP: Readonly<Record<string, string | undefined>> = STATUS_LABEL;
+
+/** The label for any status code, e.g. from an event's from/to status. */
+export function statusLabelOf(code: string): string {
+  return STATUS_LOOKUP[code] ?? code.replace(/_/g, ' ');
+}
+
 /** The status filter's options, in desk order. */
 export const STATUS_FILTER_OPTIONS = [
+  'Awaiting approval',
   'Scheduled',
   'In Queue',
   'Completed',
@@ -48,13 +57,37 @@ export const PAYMENT_LABEL: Readonly<Record<ApptPaymentStatus, string>> = {
   failed: 'Failed',
 };
 
+/** A badge: which palette entry to use (`status-map.ts`) and what it says. */
+export interface BadgeSpec {
+  readonly status: string;
+  readonly label: string;
+}
+
+/**
+ * The payment badge for a row. A booking cancelled before anyone paid keeps
+ * `payment_status` pending/unpaid on the backend; showing "Pending" there
+ * reads as money still owed, so it says "Not paid" instead.
+ */
+export function paymentBadge(a: DeskAppointment): BadgeSpec {
+  const unpaid = a.paymentStatus === 'unpaid' || a.paymentStatus === 'pending';
+  if (unpaid && (a.status === 'cancelled' || a.status === 'no_show')) {
+    return { status: 'Inactive', label: 'Not paid' };
+  }
+  const label = PAYMENT_LABEL[a.paymentStatus];
+  return { status: label, label };
+}
+
 export const SOURCE_LABEL: Readonly<Record<ApptSource, string>> = {
   online: 'Online',
   walk_in: 'Walk-in',
 };
 
-/** Desk payment methods offered, in order (the backend accepts more). */
-export const DESK_METHODS: readonly PaymentMethod[] = ['cash', 'upi', 'card'];
+/**
+ * Desk payment methods offered, in order. The backend accepts any method and
+ * has no per-hospital list (BACKEND_BLOCKERS APPT-03), so the desk gets the
+ * ones a counter actually takes: cash, UPI, card, the card machine and other.
+ */
+export const DESK_METHODS: readonly PaymentMethod[] = ['cash', 'upi', 'card', 'pos', 'other'];
 
 export const METHOD_LABEL: Readonly<Record<string, string>> = {
   cash: 'Cash',
@@ -77,13 +110,28 @@ export function needsApproval(a: DeskAppointment): boolean {
   return a.status === 'pending_approval';
 }
 
-/** A walk-in whose fee has not been collected yet (online bookings are prepaid, Q89). */
+/** Statuses after which nothing more is collected. */
+const CLOSED_STATUSES: ReadonlySet<ApptStatus> = new Set(['cancelled', 'no_show', 'completed']);
+
+/**
+ * A walk-in whose fee is not (or no longer) held: never collected, or
+ * refunded while the visit is still on (online bookings are prepaid, Q89).
+ * The backend lets a refunded walk-in check in without paying again
+ * (BACKEND_BLOCKERS APPT-01), so the desk collects first.
+ */
 export function needsPayment(a: DeskAppointment): boolean {
   return (
     a.source === 'walk_in' &&
-    (a.paymentStatus === 'unpaid' || a.paymentStatus === 'pending') &&
-    a.status !== 'cancelled'
+    (a.paymentStatus === 'unpaid' ||
+      a.paymentStatus === 'pending' ||
+      a.paymentStatus === 'refunded') &&
+    !CLOSED_STATUSES.has(a.status)
   );
+}
+
+/** Check-in is only possible on the appointment's own date (backend rule). */
+export function canCheckIn(a: DeskAppointment, today: string): boolean {
+  return a.status === 'scheduled' && a.scheduledDate === today;
 }
 
 export function isInQueue(a: DeskAppointment): boolean {
@@ -140,9 +188,15 @@ export function addDays(iso: string, days: number): string {
   return localIso(new Date(y, m - 1, d + days));
 }
 
-export type DateWindow = 'Today' | 'Tomorrow' | 'This Week';
+export type DateWindow = 'Today' | 'Tomorrow' | 'This Week' | 'Yesterday' | 'Last 7 Days';
 
-export const DATE_WINDOWS: readonly DateWindow[] = ['Today', 'Tomorrow', 'This Week'];
+export const DATE_WINDOWS: readonly DateWindow[] = [
+  'Today',
+  'Tomorrow',
+  'This Week',
+  'Yesterday',
+  'Last 7 Days',
+];
 
 /** The server window for a quick filter or an exact date (exact wins). */
 export function rangeFor(window: DateWindow, exact: string, today: string): AppointmentRange {
@@ -152,6 +206,12 @@ export function rangeFor(window: DateWindow, exact: string, today: string): Appo
     return { dateFrom: tomorrow, dateTo: tomorrow };
   }
   if (window === 'This Week') return { dateFrom: today, dateTo: addDays(today, WEEK_DAYS - 1) };
+  if (window === 'Yesterday') {
+    const yesterday = addDays(today, -1);
+    return { dateFrom: yesterday, dateTo: yesterday };
+  }
+  if (window === 'Last 7 Days')
+    return { dateFrom: addDays(today, -WEEK_DAYS), dateTo: addDays(today, -1) };
   return { dateFrom: today, dateTo: today };
 }
 
@@ -179,14 +239,14 @@ export const PRIMARY_ACTION_PERMISSION: Readonly<Record<PrimaryKey, PermissionKe
 };
 
 /** The one next step for an appointment, in the order the desk works. */
-export function primaryAction(a: DeskAppointment): PrimaryAction | null {
+export function primaryAction(a: DeskAppointment, today: string): PrimaryAction | null {
   if (needsApproval(a)) {
     return { key: 'approve', label: 'Approve', icon: 'check-check', variant: 'primary' };
   }
   if (needsPayment(a)) {
     return { key: 'pay', label: 'Collect', icon: 'indian-rupee', variant: 'primary' };
   }
-  if (a.status === 'scheduled') {
+  if (canCheckIn(a, today)) {
     return { key: 'checkin', label: 'Check in', icon: 'log-in', variant: 'primary' };
   }
   if (isInQueue(a)) {
@@ -209,4 +269,39 @@ export function toE164(phone: string): string {
   if (!digits) return '';
   if (digits.startsWith('+')) return digits;
   return digits.length === LOCAL_MOBILE_DIGITS ? `${INDIA_COUNTRY_CODE}${digits}` : `+${digits}`;
+}
+
+/* ----------------------------------------------------------------- history */
+
+/** Readable wording for `AppointmentEvent.EventType` (backend `appointment_event.py`). */
+const EVENT_LABEL: Readonly<Record<string, string>> = {
+  created: 'Booked',
+  approval_requested: 'Sent for approval',
+  approved: 'Approved',
+  checked_in: 'Checked in',
+  called: 'Token called',
+  started: 'Consultation started',
+  completed: 'Consultation completed',
+  cancelled: 'Cancelled',
+  no_show: 'Marked no-show',
+  payment_updated: 'Payment updated',
+  refund_updated: 'Refund updated',
+  note_added: 'Remark updated',
+  reminder_sent: 'Reminder sent',
+  token_reassigned: 'Token reassigned',
+};
+
+/** Who did it (`AppointmentEvent.ActorKind`). */
+const ACTOR_LABEL: Readonly<Record<string, string>> = {
+  patient: 'Patient',
+  staff: 'Hospital staff',
+  system: 'System',
+};
+
+export function eventLabel(eventType: string): string {
+  return EVENT_LABEL[eventType] ?? eventType.replace(/_/g, ' ');
+}
+
+export function actorLabel(actorKind: string): string {
+  return ACTOR_LABEL[actorKind] ?? actorKind;
 }

@@ -25,6 +25,7 @@ export const slotResponseSchema = z.object({
   ends_at: z.string(),
   state: z.enum(['open', 'held', 'booked', 'blocked', 'past']),
   block_reason: z.string().nullable(),
+  hold_expires_at: z.string().nullable().optional(),
   booking: z
     .object({
       appointment_id: z.string(),
@@ -47,7 +48,10 @@ const doctorDayResponseSchema = z.object({
   sessions: z.array(
     z.object({
       id: z.string(),
+      // Optional so an older backend without them still parses.
+      session_code: z.string().optional(),
       label: z.string(),
+      status: z.string().optional(),
       starts_at: z.string(),
       ends_at: z.string(),
       slots: z.array(slotResponseSchema),
@@ -100,9 +104,14 @@ const generationRunResponseSchema = z.object({
   id: z.string(),
   doctor_id: z.string().nullable(),
   trigger: z.string(),
+  horizon_from: z.string().nullable().optional(),
+  horizon_to: z.string().nullable().optional(),
   started_at: z.string(),
   finished_at: z.string().nullable(),
   created_count: z.number().int(),
+  updated_count: z.number().int().optional(),
+  closed_count: z.number().int().optional(),
+  preserved_count: z.number().int().optional(),
   error: z.string().nullable(),
 });
 
@@ -115,6 +124,7 @@ export function toScheduledSlot(dto: SlotResponse): ScheduledSlot {
     endsAt: dto.ends_at,
     state: dto.state,
     blockReason: dto.block_reason,
+    holdExpiresAt: dto.hold_expires_at ?? null,
     booking: dto.booking
       ? {
           appointmentId: dto.booking.appointment_id,
@@ -134,7 +144,9 @@ export function toDoctorSlotDay(dto: DoctorDayResponse): DoctorSlotDay {
     slotLengthMin: dto.doctor.slot_length_min,
     sessions: dto.sessions.map((s) => ({
       id: s.id,
+      sessionCode: s.session_code ?? '',
       label: s.label,
+      status: s.status ?? 'scheduled',
       startsAt: s.starts_at,
       endsAt: s.ends_at,
       slots: s.slots.map(toScheduledSlot),
@@ -181,9 +193,14 @@ export function toGenerationRun(
     id: dto.id,
     doctorId: dto.doctor_id,
     trigger: dto.trigger,
+    horizonFrom: dto.horizon_from ?? null,
+    horizonTo: dto.horizon_to ?? null,
     startedAt: dto.started_at,
     finishedAt: dto.finished_at,
     createdCount: dto.created_count,
+    updatedCount: dto.updated_count ?? 0,
+    closedCount: dto.closed_count ?? 0,
+    preservedCount: dto.preserved_count ?? 0,
     error: dto.error,
   };
 }

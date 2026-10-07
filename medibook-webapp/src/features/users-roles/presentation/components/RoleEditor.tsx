@@ -12,6 +12,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import type { HospitalRole } from '@/app/router/paths';
 
 import { useUpdateRolePermissionsMutation } from '@/features/users-roles/application/queries/useUpdateRolePermissionsMutation';
+import type { PermissionModule } from '@/features/users-roles/domain/entities/usersRoles.types';
 import {
   PERM_ACTIONS,
   RBAC_MODULES,
@@ -28,6 +29,7 @@ import {
 import { PermCheck } from '@/features/users-roles/presentation/components/PermCheck';
 import { RoleAccessPreview } from '@/features/users-roles/presentation/components/RoleAccessPreview';
 import {
+  extraPermissionModules,
   failureText,
   gridToPermissionCodes,
   type RoleView,
@@ -40,6 +42,8 @@ const PERM_COLS: readonly (readonly [PermAction, string])[] = PERM_ACTIONS.map((
 
 interface RoleEditorProps {
   role: RoleView;
+  /** The backend permission catalogue; modules outside the grid are listed under it. */
+  catalogue: readonly PermissionModule[];
   onClose: () => void;
 }
 
@@ -59,17 +63,42 @@ interface RoleEditorProps {
  * so its grid starts from the role it was opened with — no prop-into-state
  * effect, and none of the cascading renders that pattern causes.
  */
-export function RoleEditor({ role, onClose }: RoleEditorProps) {
+export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
   const savePermissions = useUpdateRolePermissionsMutation();
 
   const locked = !role.editable;
 
   const [perms, setPerms] = useState<PermsGrid>(role.perms);
+  const extraModules = extraPermissionModules(catalogue);
+  // Codes for the modules outside the grid (e.g. `cash_desk.view`), editable below it.
+  const [extra, setExtra] = useState<ReadonlySet<string>>(
+    () =>
+      new Set(
+        role.permissionCodes.filter((c) => extraModules.some((m) => c.startsWith(`${m.module}.`))),
+      ),
+  );
+  const toggleExtra = (code: string): void => {
+    if (locked) return;
+    setExtra((current) => {
+      const next = new Set(current);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
   const [signInAs, setSignInAs] = useState<HospitalRole>(defaultSignInAs(role));
 
   const handleSave = (): void =>
     savePermissions.mutate(
-      { roleCode: role.code, permissions: gridToPermissionCodes(perms, role.permissionCodes) },
+      {
+        roleCode: role.code,
+        // The grid's codes plus the extra modules as edited; any module the
+        // catalogue did not list (catalogue unavailable) is carried over.
+        permissions: gridToPermissionCodes(
+          perms,
+          extraModules.length > 0 ? [...extra] : role.permissionCodes,
+        ),
+      },
       {
         onSuccess: () => {
           toast(`${role.name} permissions updated`, 'success');
@@ -191,6 +220,31 @@ export function RoleEditor({ role, onClose }: RoleEditorProps) {
                       />
                     </td>
                   ))}
+                </tr>
+              ))}
+              {extraModules.map((m) => (
+                <tr key={m.module}>
+                  <td className="border-border-soft text-text-strong text-body border-b px-3 py-2.5 align-middle font-medium whitespace-nowrap">
+                    {m.label}
+                  </td>
+                  {PERM_ACTIONS.map((a) => {
+                    const code = `${m.module}.${a}`;
+                    return (
+                      <td
+                        key={a}
+                        className="border-border-soft border-b px-2 py-2.5 text-center align-middle"
+                      >
+                        {m.actions.includes(a) ? (
+                          <PermCheck
+                            on={extra.has(code)}
+                            label={`${ACTION_LABEL[a]} on ${m.label}`}
+                            disabled={locked}
+                            onClick={() => toggleExtra(code)}
+                          />
+                        ) : null}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

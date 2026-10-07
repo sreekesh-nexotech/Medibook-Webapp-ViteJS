@@ -111,3 +111,27 @@ export interface PaymentLineSet {
   /** The page walk stopped before the end: the totals cover the first lines only. */
   readonly truncated: boolean;
 }
+
+/** One staff member's cash for a day (`GET /cash-sessions/summary`, v2 §5.6). */
+export interface CashSummaryRow {
+  readonly staffId: string;
+  readonly staffName: string;
+  readonly counters: readonly string[];
+  readonly openSessions: number;
+  readonly openingFloatPaise: number;
+  readonly cashInPaise: number;
+  readonly cashRefundsPaise: number;
+  readonly expectedCashPaise: number;
+  /** `null` while a drawer of the day is still uncounted. */
+  readonly countedCashPaise: number | null;
+  readonly variancePaise: number | null;
+  readonly uncountedSessions: number;
+}
+
+/** The server-built exports of the payment list. */
+export type PaymentExportFormat = 'csv' | 'xlsx' | 'pdf';
+
+export interface PaymentExportFile {
+  readonly blob: Blob;
+  readonly filename: string;
+}

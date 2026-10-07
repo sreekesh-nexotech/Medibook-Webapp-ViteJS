@@ -4,4 +4,6 @@ export const servicesKeys = {
   services: () => [...servicesKeys.all, 'services'] as const,
   taxRates: () => [...servicesKeys.all, 'tax-rates'] as const,
   coupons: () => [...servicesKeys.all, 'coupons'] as const,
+  redemptions: (couponId: string) => [...servicesKeys.coupons(), couponId, 'redemptions'] as const,
+  doctorServices: () => [...servicesKeys.all, 'doctor-services'] as const,
 };

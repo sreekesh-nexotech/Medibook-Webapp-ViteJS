@@ -20,6 +20,12 @@ export interface ShiftPattern {
   readonly from: string;
   /** End time label from `TIME_OPTS`, e.g. "1:00 pm". */
   readonly to: string;
+  /**
+   * The backend session code this window was loaded with (`morning`, …).
+   * Saving keeps it, so the session — and the bookings and token queue tied
+   * to it — survive an edit; absent for patterns added in the editor.
+   */
+  readonly sessionCode?: string;
 }
 
 /**

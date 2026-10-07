@@ -32,6 +32,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { Toggle } from '@/shared/ui/Toggle';
 
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import {
   useDeleteCouponMutation,
   useDeleteServiceMutation,
@@ -42,6 +43,7 @@ import {
 } from '@/features/settings/application/queries/services.mutations';
 import {
   useCouponsQuery,
+  useDoctorServicesQuery,
   useServicesQuery,
   useTaxRatesQuery,
 } from '@/features/settings/application/queries/services.queries';
@@ -62,6 +64,7 @@ import {
   serviceTaxOptions,
 } from '@/features/settings/domain/services.pricing';
 import { CouponModal } from '@/features/settings/presentation/components/CouponModal';
+import { CouponRedemptionsModal } from '@/features/settings/presentation/components/CouponRedemptionsModal';
 import { ServiceModal } from '@/features/settings/presentation/components/ServiceModal';
 import {
   appliesToLabel,
@@ -76,10 +79,10 @@ const TABS: readonly PricingTab[] = ['Services', 'Taxes', 'Coupons'];
 const SERVICE_PAGE_SIZE = 8;
 const COUPON_PAGE_SIZE = 6;
 
-/** A sample order the coupon table prices a percent discount against. */
+/** Illustration only: the order value the coupon table prices a percent discount on. */
 const SAMPLE_ORDER = 2000;
 
-/** The amount the tax list previews each rate on. */
+/** Illustration only: the amount the tax list previews each rate on. */
 const TAX_PREVIEW_AMOUNT = 1000;
 
 /** How many services the receipt preview shows. */
@@ -89,7 +92,11 @@ function failureText(error: unknown, fallback: string): string {
   return isFailure(error) ? error.message : fallback;
 }
 
-/** The input that re-saves a service unchanged except for `isActive`. */
+/**
+ * The input that re-saves a service unchanged except for `isActive`. The tax
+ * rate is left out (unchanged): re-sending one that has since been switched
+ * off is refused, which used to make such a service impossible to toggle.
+ */
 function serviceInputOf(s: PricedService, isActive: boolean): ServiceInput {
   return {
     name: s.name,
@@ -97,7 +104,7 @@ function serviceInputOf(s: PricedService, isActive: boolean): ServiceInput {
     description: s.description,
     durationMinutes: s.durationMinutes,
     priceRupees: s.priceRupees,
-    taxRateId: s.taxRateId,
+    requiresDoctor: s.requiresDoctor,
     isActive,
   };
 }
@@ -120,6 +127,9 @@ function couponInputOf(c: HospitalCoupon, isActive: boolean): CouponInput {
     validFrom: c.validFrom,
     validTo: c.validTo,
     usageCap: c.usageCap,
+    perUserCap: c.perUserCap,
+    maxDiscountRupees: c.maxDiscountRupees,
+    onlineOnly: c.onlineOnly,
     minOrderRupees: c.minOrderRupees,
     departmentIds: c.departmentIds,
     serviceIds: c.serviceIds,
@@ -136,6 +146,7 @@ const SERVICE_COLUMNS = [
   'Duration',
   'Price',
   'With tax',
+  'Offered by',
   'Bookable',
   '',
 ] as const;
@@ -192,6 +203,8 @@ export function ServicesPricingScreen() {
   const taxRatesQuery = useTaxRatesQuery();
   const couponsQuery = useCouponsQuery();
   const departmentsQuery = useDepartmentsQuery();
+  const doctorsQuery = useDoctorsQuery();
+  const doctorServicesQuery = useDoctorServicesQuery();
   const saveService = useSaveServiceMutation();
   const deleteService = useDeleteServiceMutation();
   const saveTax = useSaveTaxRateMutation();
@@ -218,6 +231,25 @@ export function ServicesPricingScreen() {
   const [taxEdit, setTaxEdit] = useState<{ tax: ServiceTaxRate | null } | null>(null);
   const [couponEdit, setCouponEdit] = useState<{ coupon: HospitalCoupon | null } | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
+  const [redemptionsOf, setRedemptionsOf] = useState<HospitalCoupon | null>(null);
+
+  const doctorName = useMemo(
+    () => new Map((doctorsQuery.data ?? []).map((d) => [d.id, d.name])),
+    [doctorsQuery.data],
+  );
+  /** "Dr. Harish Menon" / "Dr. A (₹ 400), Dr. B" — who offers a service, at what price. */
+  const offeredBy = (serviceId: string): string => {
+    if (doctorServicesQuery.isError) return 'Unavailable';
+    if (!doctorServicesQuery.data) return '…';
+    const links = doctorServicesQuery.data.filter((l) => l.serviceId === serviceId);
+    if (links.length === 0) return 'No doctor linked';
+    return links
+      .map((l) => {
+        const name = doctorName.get(l.doctorId) ?? 'A doctor';
+        return l.priceOverrideRupees === null ? name : `${name} (${money(l.priceOverrideRupees)})`;
+      })
+      .join(', ');
+  };
 
   const departmentNames = useMemo(() => departments.map((d) => d.name), [departments]);
   const deptNameById = useMemo(
@@ -339,6 +371,8 @@ export function ServicesPricingScreen() {
       taxRatesQuery.refetch(),
       couponsQuery.refetch(),
       departmentsQuery.refetch(),
+      doctorsQuery.refetch(),
+      doctorServicesQuery.refetch(),
     ]);
   };
 
@@ -436,13 +470,25 @@ export function ServicesPricingScreen() {
 
   const exportServicesCsv = (): void => {
     downloadCsv('medibook-services-pricing.csv', [
-      ['Service', 'Department', 'Duration (min)', 'Price', 'With tax', 'Bookable', 'Description'],
+      [
+        'Service',
+        'Department',
+        'Duration (min)',
+        'Price',
+        'With tax',
+        'Needs a doctor',
+        'Offered by',
+        'Bookable',
+        'Description',
+      ],
       ...orderedServices.map((s) => [
         s.name,
         deptName(s.departmentId),
         s.durationMinutes,
         rupeesFixed(s.priceRupees),
         rupeesFixed(priceService(s.priceRupees, taxOf(s)).total),
+        s.requiresDoctor ? 'Yes' : 'No',
+        offeredBy(s.id),
         s.isActive ? 'Yes' : 'No',
         s.description,
       ]),
@@ -458,9 +504,12 @@ export function ServicesPricingScreen() {
         'Value',
         'Valid from',
         'Valid until',
+        'Max discount',
         'Usage cap',
+        'Per patient',
         'Used',
         'Min order',
+        'Online only',
         'Departments',
         'Services',
         'Status',
@@ -471,9 +520,12 @@ export function ServicesPricingScreen() {
         c.kind === 'percent' ? c.value : rupeesFixed(c.value),
         localDay(c.validFrom),
         lastValidDay(c.validTo),
+        c.maxDiscountRupees ?? '',
         c.usageCap ?? 'Unlimited',
+        c.perUserCap ?? 'Unlimited',
         c.usedCount,
         rupeesFixed(c.minOrderRupees),
+        c.onlineOnly ? 'Yes' : 'No',
         c.departmentIds.map((id) => deptName(id)).join(' | '),
         c.serviceIds.map((id) => services.find((x) => x.id === id)?.name ?? id).join(' | '),
         couponState(c, today),
@@ -678,6 +730,11 @@ export function ServicesPricingScreen() {
                           <span className="text-caption text-text-muted truncate">
                             {s.description || 'No description yet'}
                           </span>
+                          {!s.requiresDoctor && (
+                            <span className="text-caption text-text-muted">
+                              Standalone — no doctor needed
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className={tdClass}>{deptName(s.departmentId)}</td>
@@ -692,6 +749,14 @@ export function ServicesPricingScreen() {
                             ? 'tax exempt'
                             : `${priced.isInclusive ? 'incl.' : '+'} ${money(priced.tax)} tax`}
                         </span>
+                        {taxOf(s)?.isActive === false && (
+                          <span className="text-caption text-d-700 block">
+                            rate switched off, still charged
+                          </span>
+                        )}
+                      </td>
+                      <td className={cn(tdClass, 'text-caption max-w-50')}>
+                        {s.requiresDoctor ? offeredBy(s.id) : '—'}
                       </td>
                       <td className={tdClass}>
                         <Can
@@ -782,16 +847,34 @@ export function ServicesPricingScreen() {
                           {c.kind === 'percent'
                             ? `${money(couponDiscount(c, SAMPLE_ORDER))} on a ${money(SAMPLE_ORDER)} order`
                             : 'flat'}
+                          {c.kind === 'percent' && c.maxDiscountRupees !== null
+                            ? ` · max ${money(c.maxDiscountRupees)}`
+                            : ''}
                         </span>
                       </td>
-                      <td className={cn(tdClass, 'max-w-60')}>{scopeCopy(c)}</td>
+                      <td className={cn(tdClass, 'max-w-60')}>
+                        {scopeCopy(c)}
+                        {c.onlineOnly && (
+                          <span className="text-caption text-text-muted block">
+                            Patient app only
+                          </span>
+                        )}
+                      </td>
                       <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
                         {fmtDate(localDay(c.validFrom))} – {fmtDate(lastValidDay(c.validTo))}
                       </td>
                       <td className={tdClass}>
-                        {c.usedCount} used
+                        <button
+                          type="button"
+                          onClick={() => setRedemptionsOf(c)}
+                          className="text-body text-blue cursor-pointer border-none bg-transparent p-0 underline"
+                          title={`See the bookings ${c.code} was used on`}
+                        >
+                          {c.usedCount} used
+                        </button>
                         <span className="text-caption text-text-muted block">
                           {remaining == null ? 'unlimited' : `${remaining} left`}
+                          {c.perUserCap !== null ? ` · ${c.perUserCap} per patient` : ''}
                         </span>
                       </td>
                       <td className={cn(tdClass, 'text-right tabular-nums')}>
@@ -929,8 +1012,14 @@ export function ServicesPricingScreen() {
                     </div>
                     <div className="flex-1" />
                     <Badge status={t.isActive ? 'Enabled' : 'Inactive'}>
-                      {t.isActive ? 'On receipts' : 'Not applied'}
+                      {t.isActive ? 'On receipts' : 'Switched off'}
                     </Badge>
+                    {!t.isActive && services.some((s) => s.taxRateId === t.id) && (
+                      <span className="text-caption text-d-700">
+                        Still charged on {services.filter((s) => s.taxRateId === t.id).length}{' '}
+                        service(s) that use it
+                      </span>
+                    )}
                     {t.isPlatformDefault ? (
                       <span className="text-caption text-text-muted inline-flex items-center gap-1.5">
                         <Icon name="lock" size={13} /> Platform default
@@ -1038,6 +1127,7 @@ export function ServicesPricingScreen() {
           service={serviceEdit.service}
           departments={departments}
           taxOptions={taxOptions}
+          taxRates={taxes}
           onClose={() => setServiceEdit(null)}
           onSave={(input) => {
             const existing = serviceEdit.service;
@@ -1092,6 +1182,8 @@ export function ServicesPricingScreen() {
           }}
         />
       )}
+
+      <CouponRedemptionsModal coupon={redemptionsOf} onClose={() => setRedemptionsOf(null)} />
 
       <ConfirmModal
         open={toDelete != null}

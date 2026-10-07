@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-06",
+  "staff": [
+    {
+      "staff_id": "01a0ee28-8a44-76d3-a982-9eb698c80124",
+      "staff_name": "Vineeth Kumar",
+      "session_ids": ["01a10fd1-2acc-7213-9be2-a84a3c8a5075"],
+      "counters": ["C1"],
+      "open_sessions": 0,
+      "opening_float_paise": 50000,
+      "cash_in_paise": 50000,
+      "cash_refunds_paise": 0,
+      "expected_cash_paise": 100000,
+      "counted_cash_paise": 95000,
+      "variance_paise": -5000,
+      "uncounted_sessions": 0
+    },
+    {
+      "staff_id": "01a0ee28-83d8-7233-a222-01481ae6b5cf",
+      "staff_name": "Anita Menon",
+      "session_ids": ["01a11010-79da-7741-95be-9597fb474fc1"],
+      "counters": ["C1"],
+      "open_sessions": 0,
+      "opening_float_paise": 50000,
+      "cash_in_paise": 0,
+      "cash_refunds_paise": 50000,
+      "expected_cash_paise": 0,
+      "counted_cash_paise": 0,
+      "variance_paise": 0,
+      "uncounted_sessions": 0
+    }
+  ],
+  "totals": {
+    "opening_float_paise": 100000,
+    "cash_in_paise": 50000,
+    "cash_refunds_paise": 50000,
+    "expected_cash_paise": 100000
+  }
+}

@@ -36,6 +36,7 @@ export const doctorResponseSchema = z.object({
   department_id: z.string(),
   slug: z.string(),
   name: z.string(),
+  title: z.string().nullable().optional(),
   qualification: z.string().nullable(),
   specialisation: z.string(),
   registration_no: z.string().nullable(),
@@ -43,13 +44,17 @@ export const doctorResponseSchema = z.object({
   bio: z.string().nullable(),
   photo_file_id: z.string().nullable(),
   consultation_fee_paise: z.number().int(),
-  follow_up_fee_paise: z.number().int().nullable(),
+  // Optional so an older backend without it still parses.
+  follow_up_fee_paise: z.number().int().nullable().optional(),
+  expected_consult_minutes: z.number().int().nullable().optional(),
   slot_length_min: z.number().int(),
   room: z.string().nullable(),
   status: z.enum(['active', 'on_leave', 'inactive']),
   is_bookable_online: z.boolean(),
   rating_avg: z.number().nullable(),
   rating_count: z.number().int(),
+  // DRF decimal → string ("4.20"); optional so an older backend still parses.
+  rating_base: z.union([z.string(), z.number()]).nullable().optional(),
   version: z.number().int(),
 });
 
@@ -62,7 +67,7 @@ const weeklySessionSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-const leaveSchema = z.object({
+export const leaveSchema = z.object({
   id: z.string(),
   leave_type: z.enum(['casual', 'sick', 'conference', 'other']),
   date_from: z.string(),
@@ -78,7 +83,7 @@ const exceptionSessionSchema = z.object({
   ends_at: z.string(),
 });
 
-const dateExceptionSchema = z.object({
+export const dateExceptionSchema = z.object({
   id: z.string(),
   date: z.string(),
   kind: z.enum(['closed', 'custom_sessions']),
@@ -94,6 +99,15 @@ export const scheduleResponseSchema = z.object({
   weekly_sessions: z.array(weeklySessionSchema),
   leaves: z.array(leaveSchema),
   date_exceptions: z.array(dateExceptionSchema),
+  resolved: z
+    .array(
+      z.object({
+        date: z.string(),
+        source: z.string(),
+        sessions: z.array(exceptionSessionSchema),
+      }),
+    )
+    .optional(),
 });
 
 const affectedBookingSchema = z.object({
@@ -135,6 +149,7 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     departmentId: dto.department_id,
     slug: dto.slug,
     name: dto.name,
+    title: dto.title ?? '',
     qualification: dto.qualification ?? '',
     specialisation: dto.specialisation,
     registrationNo: dto.registration_no ?? '',
@@ -142,14 +157,16 @@ export function toDoctor(dto: DoctorResponse): DoctorProfile {
     bio: dto.bio ?? '',
     photoFileId: dto.photo_file_id,
     feeRupees: dto.consultation_fee_paise / PAISE_PER_RUPEE,
+    expectedConsultMinutes: dto.expected_consult_minutes ?? null,
     followUpFeeRupees:
-      dto.follow_up_fee_paise === null ? null : dto.follow_up_fee_paise / PAISE_PER_RUPEE,
+      dto.follow_up_fee_paise == null ? null : dto.follow_up_fee_paise / PAISE_PER_RUPEE,
     slotLengthMin: dto.slot_length_min,
     room: dto.room ?? '',
     status: dto.status,
     isBookableOnline: dto.is_bookable_online,
     ratingAvg: dto.rating_avg,
     ratingCount: dto.rating_count,
+    ratingBase: dto.rating_base == null ? null : Number(dto.rating_base),
     version: dto.version,
   };
 }
@@ -173,7 +190,7 @@ function toWeeklySession(dto: z.infer<typeof weeklySessionSchema>): WeeklySessio
   };
 }
 
-function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
+export function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
   return {
     id: dto.id,
     kind: dto.leave_type,
@@ -184,7 +201,7 @@ function toLeave(dto: z.infer<typeof leaveSchema>): DoctorLeaveEntry {
   };
 }
 
-function toDateException(dto: z.infer<typeof dateExceptionSchema>): DoctorDateException {
+export function toDateException(dto: z.infer<typeof dateExceptionSchema>): DoctorDateException {
   return {
     id: dto.id,
     date: dto.date,
@@ -204,6 +221,11 @@ export function toSchedule(dto: ScheduleResponse): DoctorScheduleData {
     weeklySessions: dto.weekly_sessions.filter((s) => s.is_active !== false).map(toWeeklySession),
     leaves: dto.leaves.map(toLeave),
     dateExceptions: dto.date_exceptions.map(toDateException),
+    upcoming: (dto.resolved ?? []).map((day) => ({
+      date: day.date,
+      source: day.source,
+      sessions: day.sessions.map(toExceptionSession),
+    })),
   };
 }
 

@@ -3,6 +3,7 @@ import { formatUpdatedAt, todayISO } from '@/shared/lib/format';
 import { useSearchParams } from 'react-router-dom';
 
 import { useNow } from '@/shared/hooks/useNow';
+import { useCan } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { Card } from '@/shared/ui/Card';
 import { EmptyState } from '@/shared/ui/EmptyState';
@@ -19,6 +20,7 @@ import { TOKEN_DEPT_PARAM } from '@/app/router/paths';
 import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
+import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
 import { useQueueSessionsQuery } from '@/features/token-queue/application/queries/tokenQueue.queries';
 import { useQueueLive } from '@/features/token-queue/application/queries/useQueueLive';
 import { DoctorQueueCard } from '@/features/token-queue/presentation/components/DoctorQueueCard';
@@ -33,8 +35,11 @@ const CARD_COLUMNS = 2;
 /** Elapsed timers tick every 30 s (design behaviour). */
 const TICK_MS = 30_000;
 
-/** Minutes after which the longest open call turns red (design threshold). */
-const LONG_WAIT_MINUTES = 20;
+/**
+ * Used only when neither the doctor nor the hospital default can be read
+ * (desk roles cannot read hospital settings — BACKEND_BLOCKERS TOK-01).
+ */
+const FALLBACK_CONSULT_MINUTES = 20;
 
 const ALL_DEPTS = 'All Departments';
 const ALL_DOCTORS = 'All Doctors';
@@ -54,6 +59,13 @@ export function TokenCountersScreen() {
   const appointmentsQuery = useAppointmentsQuery({ dateFrom: today, dateTo: today });
   const socketStatus = useQueueLive();
   const now = useNow(TICK_MS);
+  // The backend's expected consultation time: the doctor's own, else the
+  // hospital default (`expected_minutes`, Q29). Settings need
+  // `hospital_settings.view`, so other roles fall back.
+  const canReadSettings = useCan('Hospital Settings.view');
+  const rulesQuery = useHospitalRuleSettingsQuery(canReadSettings);
+  const hospitalConsultMinutes = rulesQuery.data?.expectedConsultMinutes ?? null;
+  const defaultConsultMinutes = hospitalConsultMinutes ?? FALLBACK_CONSULT_MINUTES;
 
   const [q, setQ] = useState('');
   // Opened from the front desk's department list with `?dept=`.
@@ -108,7 +120,7 @@ export function TokenCountersScreen() {
     {
       label: 'Longest',
       val: longest ? `${longest}m` : '—',
-      color: longest > LONG_WAIT_MINUTES ? 'text-d-600' : 'text-g-800',
+      color: longest > defaultConsultMinutes ? 'text-d-600' : 'text-g-800',
     },
   ];
 
@@ -120,7 +132,12 @@ export function TokenCountersScreen() {
   };
 
   const refresh = async (): Promise<void> => {
-    await Promise.all([sessionsQuery.refetch(), appointmentsQuery.refetch()]);
+    await Promise.all([
+      sessionsQuery.refetch(),
+      appointmentsQuery.refetch(),
+      doctorsQuery.refetch(),
+      departmentsQuery.refetch(),
+    ]);
   };
 
   // RUN-07: say when live updates are off, not "Reconnecting" for ever.
@@ -234,6 +251,7 @@ export function TokenCountersScreen() {
                 room={doc?.room ?? null}
                 appointments={appointments}
                 now={now}
+                expectedMinutes={doc?.expectedConsultMinutes ?? defaultConsultMinutes}
               />
             );
           })}

@@ -58,6 +58,34 @@ export const LEAVE_KIND_LABEL: Readonly<Record<LeaveKind, string>> = {
   other: 'Other',
 };
 
+/** What the patient app shows as a doctor's rating, and whether it is real reviews. */
+export interface RatingView {
+  /** "4.4", or "—" when there is nothing to show. */
+  readonly value: string;
+  /** Sort key (0 when unrated). */
+  readonly sortValue: number;
+  /** "(7)" for approved reviews; "starting rating" before the first review. */
+  readonly note: string;
+}
+
+/**
+ * The approved-review average, else the starting rating the patient app falls
+ * back to (Q76), else nothing.
+ */
+export function ratingView(d: {
+  readonly ratingAvg: number | null;
+  readonly ratingCount: number;
+  readonly ratingBase: number | null;
+}): RatingView {
+  if (d.ratingAvg !== null) {
+    return { value: d.ratingAvg.toFixed(1), sortValue: d.ratingAvg, note: `(${d.ratingCount})` };
+  }
+  if (d.ratingBase !== null) {
+    return { value: d.ratingBase.toFixed(1), sortValue: d.ratingBase, note: 'starting rating' };
+  }
+  return { value: '—', sortValue: 0, note: '(0)' };
+}
+
 /** Card colour for a department, cycled by position (the backend stores none). */
 export function departmentColor(index: number): string {
   return DEPT_COLORS[index % DEPT_COLORS.length];
@@ -119,6 +147,18 @@ export interface WeekGrid {
   readonly week: readonly WeekDay[];
   /** This doctor's named sessions, offered as patterns in the weekly editor. */
   readonly patterns: readonly ShiftPattern[];
+  /**
+   * The backend session code each loaded window had, keyed `weekday|patternId`
+   * (`weekday|plain` for a plain day). Saving reuses these codes: the backend
+   * keys a session by weekday + code, so a new code would retire the session
+   * (and its bookings' queue) instead of editing it.
+   */
+  readonly codes?: Readonly<Record<string, string>>;
+}
+
+/** `codes` key for one window of a weekday. */
+function codeKey(weekday: number, patternId: string | null): string {
+  return `${weekday}|${patternId ?? 'plain'}`;
 }
 
 /**
@@ -128,6 +168,7 @@ export interface WeekGrid {
  */
 export function sessionsToGrid(sessions: readonly WeeklySession[]): WeekGrid {
   const patterns = new Map<string, ShiftPattern>();
+  const codes: Record<string, string> = {};
   const week = WEEK_DAYS.map((day, weekday): WeekDay => {
     const today = sessions
       .filter((s) => s.weekday === weekday)
@@ -137,6 +178,7 @@ export function sessionsToGrid(sessions: readonly WeeklySession[]): WeekGrid {
     }
     const only = today[0];
     if (today.length === 1 && isPlainSession(only)) {
+      codes[codeKey(weekday, null)] = only.sessionCode;
       return {
         day,
         on: true,
@@ -153,26 +195,45 @@ export function sessionsToGrid(sessions: readonly WeeklySession[]): WeekGrid {
           name: s.label,
           from: hhmmToLabel(s.startsAt),
           to: hhmmToLabel(s.endsAt),
+          sessionCode: s.sessionCode,
         });
       }
+      codes[codeKey(weekday, key)] = s.sessionCode;
       return key;
     });
     return { day, on: true, from: DEFAULT_FROM, to: DEFAULT_TO, patternIds: ids };
   });
-  return { week, patterns: [...patterns.values()] };
+  return { week, patterns: [...patterns.values()], codes };
+}
+
+/** The first `custom-N` code not yet taken on the day. */
+function nextCustomCode(used: ReadonlySet<string>): string {
+  for (let n = 1; ; n += 1) {
+    const code = `${CUSTOM_CODE_PREFIX}${n}`;
+    if (!used.has(code)) return code;
+  }
 }
 
 /**
- * The weekly editor's grid → the full replacement set of sessions. Plain days
- * become one standard session (code by start time); pattern days become one
- * session per pattern, coded `custom-N` (unique per weekday, as the backend
- * requires). Unreadable windows are skipped — the editor validates them.
+ * The weekly editor's grid → the full replacement set of sessions. Each
+ * window keeps the code it was loaded with on that day, else its pattern's
+ * code, else a standard code by start time (plain days) or the first free
+ * `custom-N` — always unique per weekday, as the backend requires. Unreadable
+ * windows are skipped — the editor validates them.
  */
 export function gridToSessions(grid: WeekGrid): WeeklySession[] {
   const byId = new Map(grid.patterns.map((p) => [p.id, p]));
+  const codes = grid.codes ?? {};
   const sessions: WeeklySession[] = [];
   grid.week.forEach((d, weekday) => {
     if (!d.on) return;
+    const used = new Set<string>();
+    const claim = (preferred: readonly (string | undefined)[]): string => {
+      const code = preferred.find((c): c is string => c !== undefined && !used.has(c));
+      const chosen = code ?? nextCustomCode(used);
+      used.add(chosen);
+      return chosen;
+    };
     const patternIds = (d.patternIds ?? []).filter((id) => byId.has(id));
     if (patternIds.length === 0) {
       const startsAt = labelToHhmm(d.from);
@@ -180,17 +241,24 @@ export function gridToSessions(grid: WeekGrid): WeeklySession[] {
       const start = timeLabelToMinutes(d.from);
       if (!startsAt || !endsAt || start == null) return;
       const std = standardFor(start);
-      sessions.push({ weekday, sessionCode: std.code, label: std.label, startsAt, endsAt });
+      const sessionCode = claim([codes[codeKey(weekday, null)], std.code]);
+      sessions.push({ weekday, sessionCode, label: std.label, startsAt, endsAt });
       return;
     }
-    patternIds.forEach((id, index) => {
+    // Windows that already had a code on this day claim it first.
+    const ordered = [...patternIds].sort(
+      (a, b) =>
+        Number(codes[codeKey(weekday, b)] !== undefined) -
+        Number(codes[codeKey(weekday, a)] !== undefined),
+    );
+    ordered.forEach((id) => {
       const p = byId.get(id);
       const startsAt = p ? labelToHhmm(p.from) : null;
       const endsAt = p ? labelToHhmm(p.to) : null;
       if (!p || !startsAt || !endsAt) return;
       sessions.push({
         weekday,
-        sessionCode: `${CUSTOM_CODE_PREFIX}${index + 1}`,
+        sessionCode: claim([codes[codeKey(weekday, id)], p.sessionCode]),
         label: p.name,
         startsAt,
         endsAt,
