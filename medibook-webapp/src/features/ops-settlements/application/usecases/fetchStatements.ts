@@ -1,14 +1,14 @@
+import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
-  PayoutRunCreated,
-  PayoutRunDraft,
+  PlatformStatement,
+  StatementListParams,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 import { opsSettlementsRepository } from '@/features/ops-settlements/infrastructure/repositories/opsSettlements.repository.impl';
 
-export function createPayoutRun(
-  draft: PayoutRunDraft,
-  idempotencyKey: string,
-): Promise<Result<PayoutRunCreated>> {
-  return opsSettlementsRepository.createPayoutRun(draft, idempotencyKey);
+export function fetchStatements(
+  params: StatementListParams,
+): Promise<Result<Page<PlatformStatement>>> {
+  return opsSettlementsRepository.listStatements(params);
 }

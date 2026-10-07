@@ -9,7 +9,9 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useReleasePayoutRunMutation } from '@/features/ops-settlements/application/queries/useReleasePayoutRunMutation';
 import {
   bankLabel,
+  canReleaseTo,
   failureText,
+  releaseBlocker,
   type RunGroup,
 } from '@/features/ops-settlements/presentation/components/opsSettlements.viewModel';
 
@@ -22,13 +24,14 @@ interface RecordRunReleaseModalProps {
 /**
  * Record Run Release — `POST /platform/settlements/payout-runs/{id}/release`
  * with one transfer reference per payout, since each hospital's money moves
- * as its own bank transfer. Payouts without a payout account are skipped.
+ * as its own bank transfer. Payouts without a verified payout account are
+ * skipped (M-45): hold or fail them and pay them in a new run.
  * On `FormModal`, so Enter records the run (audit 3.4.5).
  */
 export function RecordRunReleaseModal({ group, onClose }: RecordRunReleaseModalProps) {
   const release = useReleasePayoutRunMutation();
-  const runRel = group.rows.filter((r) => r.releasable && r.payout?.hasBankAccount);
-  const runSkip = group.rows.filter((r) => r.releasable && !r.payout?.hasBankAccount);
+  const runRel = group.rows.filter((r) => r.releasable && canReleaseTo(r.payout));
+  const runSkip = group.rows.filter((r) => r.releasable && !canReleaseTo(r.payout));
   const [utrs, setUtrs] = useState<Readonly<Record<string, string>>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -126,9 +129,12 @@ export function RecordRunReleaseModal({ group, onClose }: RecordRunReleaseModalP
         )}
         {runSkip.length > 0 && (
           <div className="text-caption text-y-700 bg-y-100 flex items-start gap-2 rounded-sm px-3 py-2.5">
-            <Icon name="triangle-alert" size={14} className="mt-px flex-none" /> Skipped — no payout
-            account on file: {runSkip.map((r) => r.hospitalName).join(', ')}. Release them
-            individually once the hospital adds bank details.
+            <Icon name="triangle-alert" size={14} className="mt-px flex-none" /> Skipped:{' '}
+            {runSkip
+              .map((r) => `${r.hospitalName} (${releaseBlocker(r.payout) ?? 'not payable'})`)
+              .join(', ')}
+            . Hold or fail those payouts from the statement, then pay them in a new run once the
+            account is verified.
           </div>
         )}
       </div>

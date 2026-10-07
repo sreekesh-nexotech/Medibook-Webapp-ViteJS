@@ -4,18 +4,35 @@ import { idempotencyKey } from '@/core/api/headers';
 import { platformApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
 
-import type { PeriodFilter } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 import type {
+  PayoutCommand,
+  PayoutFilter,
+  PeriodFilter,
+  SettlementExportFormat,
+  StatementListParams,
+} from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
+import type {
+  AdjustmentCreateRequest,
+  PayoutReasonRequest,
   PayoutReleaseRequest,
   PayoutRunCreateRequest,
   PayoutRunReleaseRequest,
+  PeriodCloseBody,
+  StatementIssueRequest,
 } from '@/features/ops-settlements/infrastructure/data-sources/remote/opsSettlements.request';
 import {
+  adjustmentResponseSchema,
+  payoutPageResponseSchema,
   payoutResponseSchema,
+  payoutRunCreatedResponseSchema,
   payoutRunDetailResponseSchema,
   payoutRunPageResponseSchema,
-  payoutRunResponseSchema,
+  periodCloseResponseSchema,
+  periodDetailResponseSchema,
   periodPageResponseSchema,
+  statementIssueResponseSchema,
+  statementPageResponseSchema,
+  statementPdfLinkSchema,
   type PayoutResponse,
   type PayoutRunDetailResponse,
   type PayoutRunResponse,
@@ -47,12 +64,42 @@ async function getAllPages<T extends z.ZodType>(
   return rows;
 }
 
-export function getPeriods(filter: PeriodFilter): Promise<PeriodResponse[]> {
+/** The period list's filters, shared by the list and its export. */
+function periodParams(filter: PeriodFilter): Record<string, string> {
   const params: Record<string, string> = { status: filter.statuses.join(',') };
   if (filter.dateFrom) params.date_from = filter.dateFrom;
   if (filter.dateTo) params.date_to = filter.dateTo;
   if (filter.hospitalId) params.hospital_id = filter.hospitalId;
-  return getAllPages('/settlements/periods', periodPageResponseSchema, params);
+  return params;
+}
+
+export function getPeriods(filter: PeriodFilter): Promise<PeriodResponse[]> {
+  return getAllPages('/settlements/periods', periodPageResponseSchema, periodParams(filter));
+}
+
+/** `GET /platform/settlements/periods/{id}` — breakdown, adjustments, payout, statements. */
+export async function getPeriod(periodId: string) {
+  const response = await platformApi.get(`/settlements/periods/${encodeURIComponent(periodId)}`);
+  return periodDetailResponseSchema.parse(response.data);
+}
+
+/**
+ * `POST /platform/settlements/periods/close`. `confirm: false` is the dry run
+ * (`?dry_run=true`); `confirm: true` closes (`?dry_run=false`).
+ */
+export async function postPeriodClose(body: PeriodCloseBody, confirm: boolean) {
+  const response = await platformApi.post('/settlements/periods/close', body, {
+    params: { dry_run: confirm ? 'false' : 'true' },
+  });
+  return periodCloseResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/settlements/adjustments` · Idempotency-Key. */
+export async function postAdjustment(body: AdjustmentCreateRequest, replayKey: string) {
+  const response = await platformApi.post('/settlements/adjustments', body, {
+    headers: idempotencyKey(replayKey),
+  });
+  return adjustmentResponseSchema.parse(response.data);
 }
 
 export function getPayoutRuns(): Promise<PayoutRunResponse[]> {
@@ -64,14 +111,18 @@ export async function getPayoutRun(runId: string): Promise<PayoutRunDetailRespon
   return payoutRunDetailResponseSchema.parse(response.data);
 }
 
-export async function postPayoutRun(
-  body: PayoutRunCreateRequest,
-  replayKey: string,
-): Promise<PayoutRunResponse> {
+/** `GET /platform/settlements/payouts` — every payout across runs in one list (BE-27). */
+export function getPayouts(filter: PayoutFilter): Promise<PayoutResponse[]> {
+  const params: Record<string, string> = {};
+  if (filter.hospitalId) params.hospital_id = filter.hospitalId;
+  return getAllPages('/settlements/payouts', payoutPageResponseSchema, params);
+}
+
+export async function postPayoutRun(body: PayoutRunCreateRequest, replayKey: string) {
   const response = await platformApi.post('/settlements/payout-runs', body, {
     headers: idempotencyKey(replayKey),
   });
-  return payoutRunResponseSchema.parse(response.data);
+  return payoutRunCreatedResponseSchema.parse(response.data);
 }
 
 export async function postPayoutRunApprove(runId: string): Promise<PayoutRunDetailResponse> {
@@ -109,4 +160,73 @@ export async function postPayoutRelease(
     },
   );
   return payoutResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/settlements/payouts/{id}/hold|fail {reason}` · Idempotency-Key. */
+export async function postPayoutCommand(
+  payoutId: string,
+  command: PayoutCommand,
+  body: PayoutReasonRequest,
+  replayKey: string,
+): Promise<PayoutResponse> {
+  const response = await platformApi.post(
+    `/settlements/payouts/${encodeURIComponent(payoutId)}/${command}`,
+    body,
+    { headers: idempotencyKey(replayKey) },
+  );
+  return payoutResponseSchema.parse(response.data);
+}
+
+/** `GET /platform/statements` (billing.view), newest month first. */
+export async function getStatements(params: StatementListParams) {
+  const response = await platformApi.get('/statements', {
+    params: {
+      page: params.page,
+      page_size: params.pageSize,
+      ...(params.hospitalId ? { hospital_id: params.hospitalId } : {}),
+      ...(params.dateFrom ? { date_from: params.dateFrom } : {}),
+      ...(params.dateTo ? { date_to: params.dateTo } : {}),
+    },
+  });
+  return statementPageResponseSchema.parse(response.data);
+}
+
+/** `POST /platform/statements/issue {period: 'YYYY-MM'}` · Idempotency-Key (billing.edit). */
+export async function postStatementIssue(body: StatementIssueRequest, replayKey: string) {
+  const response = await platformApi.post('/statements/issue', body, {
+    headers: idempotencyKey(replayKey),
+  });
+  return statementIssueResponseSchema.parse(response.data);
+}
+
+/**
+ * `GET /platform/statements/{id}.pdf`. SET-02 answers JSON `{url, …}` (a
+ * signed link); an older backend sends the PDF itself. Read as a blob and
+ * tell the two apart by type.
+ */
+export async function getStatementPdf(
+  statementId: string,
+): Promise<{ readonly url: string } | { readonly blob: Blob }> {
+  const response = await platformApi.get<Blob>(
+    `/statements/${encodeURIComponent(statementId)}.pdf`,
+    { responseType: 'blob' },
+  );
+  const blob = response.data;
+  if (blob.type.includes('json')) {
+    const link = statementPdfLinkSchema.parse(JSON.parse(await blob.text()));
+    return { url: link.url };
+  }
+  return { blob };
+}
+
+/** `GET /platform/settlements/export.{csv|xlsx|pdf}` — the period list's filters. */
+export async function getSettlementsExport(
+  format: SettlementExportFormat,
+  filter: PeriodFilter,
+): Promise<Blob> {
+  const response = await platformApi.get<Blob>(`/settlements/export.${format}`, {
+    params: periodParams(filter),
+    responseType: 'blob',
+  });
+  return response.data;
 }

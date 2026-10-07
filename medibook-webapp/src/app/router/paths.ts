@@ -389,6 +389,14 @@ export function opsBillingForHospitalPath(hospitalId: string): string {
   return `${opsPath('billing')}?${new URLSearchParams({ [BILLING_HOSPITAL_PARAM]: hospitalId }).toString()}`;
 }
 
+/** `?hospital=<id>` on Settlements: the queue for one hospital. */
+export const SETTLEMENTS_HOSPITAL_PARAM = 'hospital';
+
+/** The Settlements screen filtered to one hospital. */
+export function opsSettlementsForHospitalPath(hospitalId: string): string {
+  return `${opsPath('settlements')}?${new URLSearchParams({ [SETTLEMENTS_HOSPITAL_PARAM]: hospitalId }).toString()}`;
+}
+
 export function opsCompliancePath(): string {
   return opsPath('compliance');
 }

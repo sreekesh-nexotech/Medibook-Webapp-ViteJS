@@ -1,14 +1,12 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
-  PayoutRunCreated,
-  PayoutRunDraft,
+  Payout,
+  PayoutFilter,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 import { opsSettlementsRepository } from '@/features/ops-settlements/infrastructure/repositories/opsSettlements.repository.impl';
 
-export function createPayoutRun(
-  draft: PayoutRunDraft,
-  idempotencyKey: string,
-): Promise<Result<PayoutRunCreated>> {
-  return opsSettlementsRepository.createPayoutRun(draft, idempotencyKey);
+/** `null` when the backend has no flat payout list. */
+export function fetchPayouts(filter: PayoutFilter): Promise<Result<readonly Payout[] | null>> {
+  return opsSettlementsRepository.listPayouts(filter);
 }

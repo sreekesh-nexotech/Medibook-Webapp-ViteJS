@@ -8,8 +8,10 @@ import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { tdClass } from '@/shared/ui/TableShell';
 
 import {
+  canReleaseTo,
   datePart,
   opsTintOf,
+  releaseBlocker,
   type LedgerRow,
 } from '@/features/ops-settlements/presentation/components/opsSettlements.viewModel';
 
@@ -17,7 +19,8 @@ interface SettlementQueueRowProps {
   s: LedgerRow;
   /** Flat list shows an Expected column; payout-run cards do not. */
   showDate: boolean;
-  onOpenHosp: (hospitalId: string) => void;
+  /** Open the statement's details (breakdown, adjustments, payout actions). */
+  onOpen: (row: LedgerRow) => void;
   /** Release / Retry — parent guards the missing-bank case. */
   onRelease: (row: LedgerRow) => void;
 }
@@ -31,26 +34,26 @@ function waitingOn(s: LedgerRow): string {
 }
 
 /** One statement (settlement period) row of the settlement queue (design `settleRow`). */
-export function SettlementQueueRow({
-  s,
-  showDate,
-  onOpenHosp,
-  onRelease,
-}: SettlementQueueRowProps) {
+export function SettlementQueueRow({ s, showDate, onOpen, onRelease }: SettlementQueueRowProps) {
+  const blocker = s.releasable ? releaseBlocker(s.payout) : null;
   const note = s.payout?.failureReason ?? s.payout?.notes ?? null;
   return (
     <tr>
-      <td
-        onClick={() => onOpenHosp(s.hospitalId)}
-        title="Open hospital profile"
-        className={cn(tdClass, 'cursor-pointer')}
-      >
-        <OpsEntity
-          icon="landmark"
-          tint={opsTintOf(Math.round(s.grossRupees) % 5)}
-          title={s.hospitalName}
-          sub={s.periodLabel}
-        />
+      <td className={tdClass}>
+        <button
+          type="button"
+          onClick={() => onOpen(s)}
+          title="Open statement details"
+          aria-label={`Open the statement for ${s.hospitalName}, ${s.periodLabel}`}
+          className="cursor-pointer border-none bg-transparent p-0 text-left"
+        >
+          <OpsEntity
+            icon="landmark"
+            tint={opsTintOf(Math.round(s.grossRupees) % 5)}
+            title={s.hospitalName}
+            sub={s.periodLabel}
+          />
+        </button>
         {note && <div className="text-caption text-blue mt-1 ml-11">“{note}”</div>}
       </td>
       <td className={cn(tdClass, 'text-right tabular-nums')}>{money(s.grossRupees)}</td>
@@ -66,7 +69,9 @@ export function SettlementQueueRow({
         )}
       </td>
       <td className={tdClass}>
-        {s.releasable ? (
+        {s.releasable && !canReleaseTo(s.payout) ? (
+          <span className="text-caption text-y-700">Can't release: {blocker}</span>
+        ) : s.releasable ? (
           // SEC-05: releasing money needs settlements.edit.
           <CanOps perm="settlements.edit">
             {s.status === 'Payout failed' ? (

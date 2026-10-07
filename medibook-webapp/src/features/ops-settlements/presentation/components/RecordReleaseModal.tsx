@@ -26,8 +26,8 @@ interface RecordReleaseModalProps {
  * `POST /platform/settlements/payouts/{id}/release {utr_ref}`.
  *
  * The backend records the payout's full amount, so the amount is shown, not
- * edited; corrections are settlement adjustments, which this screen does not
- * create. On `FormModal`, so Enter records the release (audit 3.4.5).
+ * edited; corrections are settlement adjustments, posted from the statement's
+ * drawer. On `FormModal`, so Enter records the release (audit 3.4.5).
  */
 export function RecordReleaseModal({ rel, onClose }: RecordReleaseModalProps) {
   const release = useReleasePayoutMutation();
@@ -85,8 +85,8 @@ export function RecordReleaseModal({ rel, onClose }: RecordReleaseModalProps) {
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
           <Icon name="info" size={14} className="mt-px flex-none" /> The transfer itself happens
           outside Medibook (bank / NEFT / UPI). This records it on the shared ledger — the reference
-          is visible to the hospital. The full net payable is recorded; amount corrections go
-          through settlement adjustments.
+          is visible to the hospital. The full net payable is recorded; to correct the amount, post
+          an adjustment from the statement&apos;s details first.
         </div>
         <OpsField label="Transfer Reference (UTR)" required error={error}>
           <TextInput

@@ -6,6 +6,8 @@ import {
   isOpsReturnPath,
   loginPathFor,
   loginReturningTo,
+  opsBillingForHospitalPath,
+  opsSettlementsForHospitalPath,
   opsViewFromPath,
   returnPathAfterLogin,
   surfaceFromParam,
@@ -87,5 +89,12 @@ describe('loginPathFor (UAT-44)', () => {
     expect(surfaceFromParam('ops')).toBe('platform');
     expect(surfaceFromParam(null)).toBe('hospital');
     expect(surfaceFromParam('hospital')).toBe('hospital');
+  });
+});
+
+describe('hospital-scoped ops links (11·R8, 09·R7)', () => {
+  it('opens Billing and Settlements filtered to one hospital', () => {
+    expect(opsBillingForHospitalPath(FILE_ID)).toBe(`/ops/billing?hospital=${FILE_ID}`);
+    expect(opsSettlementsForHospitalPath(FILE_ID)).toBe(`/ops/settlements?hospital=${FILE_ID}`);
   });
 });
