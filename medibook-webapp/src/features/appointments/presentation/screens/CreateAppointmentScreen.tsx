@@ -1,6 +1,7 @@
 import { useDeferredValue, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { useActionKeys } from '@/shared/hooks/useActionKeys';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { money } from '@/shared/lib/format';
 import { phoneIN, required } from '@/shared/lib/validate';
@@ -85,6 +86,9 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SEARCH_RESULTS = 6;
 const SEARCH_MIN_CHARS = 2;
 
+/** One booking per form submit, replayed (not repeated) on retry (UAT-16). */
+const BOOK_ACTION = 'book';
+
 /** Error code when a slot was taken between picking and booking. */
 const SLOT_UNAVAILABLE = 'SLOT_UNAVAILABLE';
 
@@ -157,6 +161,7 @@ export function CreateAppointmentScreen() {
   const departmentsQuery = useDepartmentsQuery();
   const doctorsQuery = useDoctorsQuery();
   const book = useBookWalkInMutation();
+  const actionKeys = useActionKeys();
 
   /** The MRN handed over by "Book Appointment" on the patients screens (`?mrn=`). */
   const [searchParams] = useSearchParams();
@@ -204,25 +209,30 @@ export function CreateAppointmentScreen() {
       if (ready.length === 0) return;
       try {
         const result = await book.mutateAsync({
-          patient: picked
-            ? { kind: 'existing', hospitalPatientId: picked.id }
-            : {
-                kind: 'new',
-                patient: {
-                  firstName: v.firstName.trim(),
-                  lastName: v.lastName.trim(),
-                  phone: toE164(v.phone),
-                  gender: GENDER_VALUE[v.gender],
-                  dateOfBirth: v.dob || null,
+          idempotencyKey: actionKeys.keyFor(BOOK_ACTION),
+          input: {
+            patient: picked
+              ? { kind: 'existing', hospitalPatientId: picked.id }
+              : {
+                  kind: 'new',
+                  patient: {
+                    firstName: v.firstName.trim(),
+                    lastName: v.lastName.trim(),
+                    phone: toE164(v.phone),
+                    gender: GENDER_VALUE[v.gender],
+                    dateOfBirth: v.dob || null,
+                  },
                 },
-              },
-          consultations: ready.map((c) => ({
-            departmentId: c.departmentId,
-            doctorId: c.doctorId,
-            slotId: c.slotId,
-          })),
-          remark: v.remark.trim(),
+            consultations: ready.map((c) => ({
+              departmentId: c.departmentId,
+              doctorId: c.doctorId,
+              slotId: c.slotId,
+              serviceId: null,
+            })),
+            remark: v.remark.trim(),
+          },
         });
+        actionKeys.settle(BOOK_ACTION);
         toast(
           `${result.appointments.length} appointment${result.appointments.length === 1 ? '' : 's'} booked`,
           'success',

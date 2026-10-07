@@ -9,6 +9,7 @@ import { appointmentsRepository } from '@/features/appointments/infrastructure/r
 export function collectPayment(
   id: string,
   lines: readonly PaymentLineInput[],
+  idempotencyKey: string,
 ): Promise<Result<DeskReceipt>> {
-  return appointmentsRepository.collectPayment(id, lines);
+  return appointmentsRepository.collectPayment(id, lines, idempotencyKey);
 }

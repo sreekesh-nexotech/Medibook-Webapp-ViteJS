@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
+import { newIdempotencyKey } from '@/core/api/headers';
 import { unwrap } from '@/core/error/failure';
 
 import type {
   DeskAppointment,
   PaymentLineInput,
+  RefundOutcome,
   WalkInInput,
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { appointmentsKeys } from '@/features/appointments/application/queries/appointments.keys';
@@ -19,35 +21,57 @@ import { markNoShow } from '@/features/appointments/application/usecases/appoint
 import { refundAppointment } from '@/features/appointments/application/usecases/appointments.refundAppointment';
 import { rejectAppointment } from '@/features/appointments/application/usecases/appointments.rejectAppointment';
 import { updateRemark } from '@/features/appointments/application/usecases/appointments.updateRemark';
+import { dashboardKeys } from '@/features/dashboard/application/queries/dashboard.keys';
 import { patientsKeys } from '@/features/patients/application/queries/patients.keys';
+import { paymentsKeys } from '@/features/payments/application/queries/payments.keys';
 import { slotsKeys } from '@/features/slots/application/queries/slots.keys';
+import { tokenQueueKeys } from '@/features/token-queue/application/queries/tokenQueue.keys';
 
 /**
- * After any desk action on one appointment: the lists, its detail and
- * history move; a booking or a cancellation also frees or takes a slot and
- * changes the patient's visit history.
+ * Every desk view a booking-side change can move (UAT-17): the appointment
+ * lists and counts, the live queue, the dashboards, Payments with the cash
+ * drawer's expected cash, the slot grid and the patient's visit history.
  */
-function invalidateAppointment(queryClient: QueryClient, id: string, touchesSlots = false): void {
+export function invalidateDeskViews(queryClient: QueryClient, appointmentId?: string): void {
   void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
-  void queryClient.invalidateQueries({ queryKey: appointmentsKeys.detail(id) });
-  void queryClient.invalidateQueries({ queryKey: appointmentsKeys.events(id) });
-  if (touchesSlots) {
-    void queryClient.invalidateQueries({ queryKey: slotsKeys.all });
-    void queryClient.invalidateQueries({ queryKey: patientsKeys.all });
+  if (appointmentId) {
+    void queryClient.invalidateQueries({ queryKey: appointmentsKeys.detail(appointmentId) });
+    void queryClient.invalidateQueries({ queryKey: appointmentsKeys.events(appointmentId) });
   }
+  void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.all });
+  void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+  void queryClient.invalidateQueries({ queryKey: paymentsKeys.all });
+  void queryClient.invalidateQueries({ queryKey: slotsKeys.all });
+  void queryClient.invalidateQueries({ queryKey: patientsKeys.all });
 }
 
 /** An action that returns the updated appointment: cache it, then refresh the rest. */
 function useAppointmentAction<V extends { readonly id: string }>(
   run: (variables: V) => Promise<DeskAppointment>,
-  touchesSlots = false,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: run,
     onSuccess: (appt) => {
       queryClient.setQueryData(appointmentsKeys.detail(appt.id), appt);
-      invalidateAppointment(queryClient, appt.id, touchesSlots);
+      invalidateDeskViews(queryClient, appt.id);
+    },
+  });
+}
+
+/** A cancel or reject: cache the booking as it now stands, then refresh the rest. */
+function useRefundingAction<V extends { readonly id: string }>(
+  run: (variables: V) => Promise<RefundOutcome>,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: (outcome) => {
+      queryClient.setQueryData(
+        appointmentsKeys.detail(outcome.appointment.id),
+        outcome.appointment,
+      );
+      invalidateDeskViews(queryClient, outcome.appointment.id);
     },
   });
 }
@@ -56,7 +80,16 @@ interface IdOnly {
   readonly id: string;
 }
 
-interface WithReason extends IdOnly {
+/**
+ * Money and booking writes carry the key the screen minted once for this
+ * user action and reuses on retry (UAT-16). A caller that does not pass one
+ * gets a key per `mutate` call — one per click, never per HTTP attempt.
+ */
+interface Keyed {
+  readonly idempotencyKey?: string;
+}
+
+interface WithReason extends IdOnly, Keyed {
   readonly reason: string;
 }
 
@@ -65,14 +98,15 @@ export function useApproveMutation() {
 }
 
 export function useRejectMutation() {
-  return useAppointmentAction(
-    async ({ id, reason }: WithReason) => unwrap(await rejectAppointment(id, reason)),
-    true,
+  return useRefundingAction(async ({ id, reason, idempotencyKey }: WithReason) =>
+    unwrap(await rejectAppointment(id, reason, idempotencyKey ?? newIdempotencyKey())),
   );
 }
 
 export function useCheckInMutation() {
-  return useAppointmentAction(async ({ id }: IdOnly) => unwrap(await checkInAppointment(id)));
+  return useAppointmentAction(async ({ id, idempotencyKey }: IdOnly & Keyed) =>
+    unwrap(await checkInAppointment(id, idempotencyKey ?? newIdempotencyKey())),
+  );
 }
 
 export function useNoShowMutation() {
@@ -80,9 +114,8 @@ export function useNoShowMutation() {
 }
 
 export function useCancelMutation() {
-  return useAppointmentAction(
-    async ({ id, reason }: WithReason) => unwrap(await cancelAppointment(id, reason)),
-    true,
+  return useRefundingAction(async ({ id, reason, idempotencyKey }: WithReason) =>
+    unwrap(await cancelAppointment(id, reason, idempotencyKey ?? newIdempotencyKey())),
   );
 }
 
@@ -91,26 +124,44 @@ interface RemarkInput extends IdOnly {
   readonly version: number;
 }
 
+/**
+ * Save the desk remark under `If-Match`. On a version conflict the detail is
+ * re-read so the next try carries the current version (03 F10).
+ */
 export function useRemarkMutation() {
-  return useAppointmentAction(async ({ id, remark, version }: RemarkInput) =>
-    unwrap(await updateRemark(id, remark, version)),
-  );
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, remark, version }: RemarkInput) =>
+      unwrap(await updateRemark(id, remark, version)),
+    onSuccess: (appt) => {
+      queryClient.setQueryData(appointmentsKeys.detail(appt.id), appt);
+      void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: appointmentsKeys.events(appt.id) });
+    },
+    onError: (_error, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: appointmentsKeys.detail(id) });
+    },
+  });
+}
+
+interface WalkInVariables {
+  readonly input: WalkInInput;
+  readonly idempotencyKey: string;
 }
 
 /** Book a walk-in visit; every booked appointment and its slot change. */
 export function useBookWalkInMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: WalkInInput) => unwrap(await bookWalkIn(input)),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
-      void queryClient.invalidateQueries({ queryKey: slotsKeys.all });
-      void queryClient.invalidateQueries({ queryKey: patientsKeys.all });
-    },
+    mutationFn: async ({ input, idempotencyKey }: WalkInVariables) =>
+      unwrap(await bookWalkIn(input, idempotencyKey)),
+    onSuccess: () => invalidateDeskViews(queryClient),
+    // A refused slot (taken, ended, session closed) must leave the picker.
+    onError: () => void queryClient.invalidateQueries({ queryKey: slotsKeys.all }),
   });
 }
 
-interface PaymentInput extends IdOnly {
+interface PaymentInput extends IdOnly, Keyed {
   readonly lines: readonly PaymentLineInput[];
 }
 
@@ -118,10 +169,11 @@ interface PaymentInput extends IdOnly {
 export function useCollectPaymentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, lines }: PaymentInput) => unwrap(await collectPayment(id, lines)),
+    mutationFn: async ({ id, lines, idempotencyKey }: PaymentInput) =>
+      unwrap(await collectPayment(id, lines, idempotencyKey ?? newIdempotencyKey())),
     onSuccess: (receipt, { id }) => {
       queryClient.setQueryData(appointmentsKeys.receipt(id), receipt);
-      invalidateAppointment(queryClient, id);
+      invalidateDeskViews(queryClient, id);
     },
   });
 }
@@ -129,8 +181,9 @@ export function useCollectPaymentMutation() {
 export function useRefundMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, reason }: WithReason) => unwrap(await refundAppointment(id, reason)),
-    onSuccess: (_data, { id }) => invalidateAppointment(queryClient, id),
+    mutationFn: async ({ id, reason, idempotencyKey }: WithReason) =>
+      unwrap(await refundAppointment(id, reason, idempotencyKey ?? newIdempotencyKey())),
+    onSuccess: (_refunds, { id }) => invalidateDeskViews(queryClient, id),
   });
 }
 

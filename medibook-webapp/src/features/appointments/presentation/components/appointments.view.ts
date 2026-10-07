@@ -54,6 +54,7 @@ export const PAYMENT_LABEL: Readonly<Record<ApptPaymentStatus, string>> = {
   paid: 'Paid',
   refunded: 'Refunded',
   failed: 'Failed',
+  not_required: 'Nothing due',
 };
 
 /** A badge: which palette entry to use (`status-map.ts`) and what it says. */

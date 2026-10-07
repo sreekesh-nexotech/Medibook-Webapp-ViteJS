@@ -4,6 +4,8 @@ import type {
   AppointmentEvent,
   DeskAppointment,
   DeskReceipt,
+  DeskRefund,
+  RefundOutcome,
   TokenSlipData,
 } from '@/features/appointments/domain/entities/appointments.entities';
 
@@ -44,7 +46,12 @@ export const appointmentResponseSchema = z.object({
     .nullable(),
   doctor: z.object({ id: z.string(), name: z.string(), room: z.string().nullable() }),
   department: z.object({ id: z.string(), name: z.string() }),
-  session: z.object({ id: z.string(), label: z.string() }),
+  session: z.object({
+    id: z.string(),
+    label: z.string(),
+    status: z.string().optional(),
+  }),
+  service_id: z.string().nullable().optional(),
   visit_id: z.string().nullable(),
   scheduled_date: z.string(),
   scheduled_start_at: z.string(),
@@ -52,10 +59,13 @@ export const appointmentResponseSchema = z.object({
   token_label: z.string().nullable(),
   token_no: z.number().int().nullable(),
   called_at: z.string().nullable(),
+  consultation_started_at: z.string().nullable().optional(),
+  no_show_attempts: z.number().int().optional(),
   is_follow_up: z.boolean(),
   patient_notes: z.string().nullable(),
   remark: z.string().nullable(),
-  payment_status: z.enum(['unpaid', 'pending', 'paid', 'refunded', 'failed']),
+  // `not_required` (BE-07): a ₹0 walk-in; older backends leave it `unpaid`.
+  payment_status: z.enum(['unpaid', 'pending', 'paid', 'refunded', 'failed', 'not_required']),
   consultation_fee_paise: z.number().int(),
   service_fee_paise: z.number().int(),
   discount_paise: z.number().int(),
@@ -125,8 +135,22 @@ export const tokenSlipResponseSchema = z.object({
   scheduled_start_at: z.string(),
 });
 
+/** One refund row as the cancel / reject / refund answers carry it (`Refund.Status`). */
+const refundBriefSchema = z.object({
+  id: z.string(),
+  amount_paise: z.number().int(),
+  status: z.enum(['requested', 'processing', 'processed', 'failed']),
+  method: z.string().nullable().optional(),
+});
+
 /** Cancel / reject answer `{appointment, refunds}`. */
-export const cancellationResponseSchema = z.object({ appointment: appointmentResponseSchema });
+export const cancellationResponseSchema = z.object({
+  appointment: appointmentResponseSchema,
+  refunds: z.array(refundBriefSchema).optional(),
+});
+
+/** Refund answers `{results: [refund]}` — one per payment line (`HospitalRefundSerializer`). */
+export const refundListResponseSchema = z.object({ results: z.array(refundBriefSchema) });
 
 /** Walk-in create answers `{visit, appointments}`. */
 export const walkInResponseSchema = z.object({
@@ -163,6 +187,8 @@ export function toAppointment(dto: AppointmentResponse): DeskAppointment {
     department: dto.department,
     sessionId: dto.session.id,
     sessionLabel: dto.session.label,
+    sessionStatus: dto.session.status ?? null,
+    serviceId: dto.service_id ?? null,
     visitId: dto.visit_id,
     scheduledDate: dto.scheduled_date,
     scheduledStartAt: dto.scheduled_start_at,
@@ -170,6 +196,8 @@ export function toAppointment(dto: AppointmentResponse): DeskAppointment {
     tokenLabel: dto.token_label,
     tokenNo: dto.token_no,
     calledAt: dto.called_at,
+    noShowAttempts: dto.no_show_attempts ?? 0,
+    consultationStartedAt: dto.consultation_started_at ?? null,
     isFollowUp: dto.is_follow_up,
     patientNotes: dto.patient_notes ?? '',
     remark: dto.remark ?? '',
@@ -243,5 +271,21 @@ export function toTokenSlip(dto: z.infer<typeof tokenSlipResponseSchema>): Token
     departmentName: dto.department_name,
     sessionLabel: dto.session_label,
     scheduledStartAt: dto.scheduled_start_at,
+  };
+}
+
+export function toRefund(dto: z.infer<typeof refundBriefSchema>): DeskRefund {
+  return {
+    id: dto.id,
+    amountRupees: rupees(dto.amount_paise),
+    status: dto.status,
+    method: dto.method ?? null,
+  };
+}
+
+export function toRefundOutcome(dto: z.infer<typeof cancellationResponseSchema>): RefundOutcome {
+  return {
+    appointment: toAppointment(dto.appointment),
+    refunds: (dto.refunds ?? []).map(toRefund),
   };
 }
