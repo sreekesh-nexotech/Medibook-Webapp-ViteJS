@@ -14,79 +14,155 @@ Paths under `backend:` are in the Django repository.
 
 ## Summary
 
-| ID        | Problem                                                                    | Severity | Web app status                                |
-| --------- | -------------------------------------------------------------------------- | -------- | --------------------------------------------- |
-| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)              | Blocker  | Needs backend; admin stopgap available        |
-| ENV-03    | No resettable staging backend for end-to-end tests and UAT                 | High     | Read-only smoke tests only                    |
-| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)                         | High     | Needs backend and a product decision          |
-| SEC-07-B  | Token refresh shares the per-address sign-in limit                         | High     | App retries once after `Retry-After`          |
-| SEC-01-B  | Background polls keep a server session from going idle                     | Medium   | App signs idle tabs out itself                |
-| SEC-06-B  | Reusing a just-rotated refresh token revokes the session                   | Medium   | App coordinates refresh across tabs           |
-| CORE-04   | No platform endpoint to re-send the first-admin invitation                 | High     | Needs backend                                 |
-| ROLE-01   | Only admins can refund cash at the desk                                    | Medium   | Product decision on role templates            |
-| CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)             |
-| ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                            |
-| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                       |
-| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads       |
-| API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible              |
-| DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't        |
-| DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately           |
-| DASH-03   | No server-side read state for hospital notifications                       | Low      | Items stay highlighted until the work is done |
-| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid                 | High     | Desk must collect again before check-in       |
-| APPT-02   | Cancelled unpaid bookings keep payment status "pending"                    | Low      | Shown as "Not paid"                           |
-| APPT-03   | No per-hospital list of accepted desk payment methods                      | Low      | Fixed list: cash, UPI, card, POS, other       |
-| APPT-04   | Appointment history names no actor                                         | Low      | Shows patient / staff / system only           |
-| APPT-05   | The desk cannot preview a walk-in's real fee before booking                | Medium   | Shows standard and follow-up fee              |
-| APPT-06   | Desk staff cannot read services, so no service can be booked               | Medium   | Bookings use the doctor's fee only            |
-| APPT-07   | A cancelled appointment keeps the token it gave up                         | Medium   | Patients history hides it on cancelled rows   |
-| PAT-01    | The patient list carries no visit count                                    | Low      | One extra request per row                     |
-| TOK-01    | Desk roles cannot read the expected consultation time                      | Low      | Falls back to 20 minutes for them             |
-| TOK-02    | A session snapshot does not list its queue                                 | Medium   | Queue rebuilt from the appointment list       |
-| PAY-02    | Refunding one consultation of a visit refunds the whole visit              | High     | Desk collects per consultation                |
-| PAY-01    | Payments cannot be filtered by source (desk / online)                      | Low      | Source filters the visible page only          |
-| SET-01    | A paid period's net payable differs from its own ledger                    | High     | Drawer flags the gap                          |
-| SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS          |
-| DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                        |
-| SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings                |
-| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged              |
-| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                    |
-| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                        |
-| PHI-01-B  | Reads, exports and downloads are not audited; nothing expires              | High     | Needs backend and a DPDP assessment           |
-| PHI-06-B  | SMS and WhatsApp templates are not registered                              | High     | Needs DLT and WhatsApp approval               |
-| PHI-03-B  | The message outbox export is built in the browser, unaudited               | Medium   | Admin-only; needs a server export             |
-| PHI-05-B  | Seeded test hospitals copy real hospitals' names and places                | Medium   | Committed fixtures scrubbed                   |
-| PHI-07-B  | Patient search terms travel in the URL (`?q=`)                             | Low      | MRNs out of URLs; search needs backend        |
-| DATA-01-B | The server's invoice document prints the UTC issue date                    | Medium   | App shows the IST date                        |
-| DATA-05-B | `schema.yml` omits the required `If-Match` on department edits             | Low      | App now sends it                              |
-| RUN-07-B  | Live-update sockets check sign-in only when they connect                   | Medium   | App closes sockets on sign-out                |
-| RUN-09-B  | Token-queue load at peak is untested                                       | Medium   | App refetches less; test needs ENV-03         |
-| DEP-01-B  | Hosting is not set up or checked on staging                                | Blocker  | Guide, nginx config and checker ready         |
-| DEP-02-B  | The browser cannot call the API from another origin                        | Blocker  | Same-origin layout ready; or set CORS         |
-| DEP-03-B  | File storage has no public HTTPS host                                      | Blocker  | Needs DevOps; CSP takes the host              |
-| DEP-04-B  | The bucket does not allow browser uploads (CORS)                           | High     | Rule in `docs/DEPLOYMENT.md`                  |
-| DEP-06-B  | Production providers and settings are unconfirmed                          | High     | Needs backend and DevOps                      |
-| DEP-07-B  | Nothing checks that email can be sent                                      | High     | Needs backend; link bases are ENV-01          |
-| DEP-09-B  | Backups and restores are unconfirmed                                       | High     | Needs DevOps                                  |
-| DEP-12-B  | Rate limits may see the proxy's address, not the client's                  | Medium   | Proxy settings documented                     |
-| OBS-01-B  | No error monitor receives the app's reports yet                            | High     | Reports ready; needs an endpoint              |
-| OBS-05-B  | Nothing alerts when the web app or its WebSocket route is down             | Medium   | Probes and rules in `deploy/monitoring`       |
-| OBS-02-B  | Tickets lack the requester's name; staff cannot self-assign                | Medium   | Inbox works around both                       |
-| OBS-06-B  | App config has a support phone but no support email                        | Low      | App shows only what is configured             |
-| PRD-08-B  | Audit rows carry no actor name; one resource type per filter               | Medium   | Names looked up where the role allows         |
-| PRD-02-B  | Resolved: `/hospital/me` already carries the logo                          | Low      | Every role sees the hospital's logo           |
-| PRD-05-B  | Ops lists lack plan, bookings, city, activity and payout data              | Low      | Columns and tiles left out                    |
-| PRD-06-B  | Two receipt settings and the series separator are never used               | Low      | Left out; needs a decision                    |
-| PRD-07-B  | The desk cannot get a fee quote before booking                             | Low      | Screen says the booking prices it             |
-| REP-01    | User Activity's Last Active is sent and exported in UTC                    | Medium   | Screen shows the UTC time too                 |
-| REP-02    | Sorting a report high-to-low puts empty values first                       | Low      | Screen shows what the server returns          |
-| REP-03    | System reasons are exported as codes (`patient_cancellation`)              | Low      | Screen shows the codes too                    |
-| PROF-01   | A banner's audience is stored but never used                               | Low      | Audience choice removed from the form         |
-| PROF-02   | Banner order ties sort differently for staff and patients                  | Low      | Reordering always saves distinct positions    |
-| PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links         |
-| HSET-01   | A payout account can never become verified                                 | Medium   | Not shown on the screen                       |
-| HSET-02   | Removing a counter does not check who still uses it                        | Low      | Counters can be marked inactive instead       |
-| HSET-03   | The token policy's print layout is never used                              | Low      | Settings offers the choice; slips ignore it   |
-| HSET-04   | A display set to a counter hides sessions nobody has called yet            | Low      | Not explained on the screen                   |
+| ID        | Problem                                                                    | Severity | Web app status                                      |
+| --------- | -------------------------------------------------------------------------- | -------- | --------------------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)              | Blocker  | Needs backend; admin stopgap available              |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT                 | High     | Read-only smoke tests only                          |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)                         | High     | Needs backend and a product decision                |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit                         | High     | App retries once after `Retry-After`                |
+| SEC-01-B  | Background polls keep a server session from going idle                     | Medium   | App signs idle tabs out itself                      |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session                   | Medium   | App coordinates refresh across tabs                 |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation                 | High     | Needs backend                                       |
+| ROLE-01   | Only admins can refund cash at the desk                                    | Medium   | Product decision on role templates                  |
+| CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)                   |
+| ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                                  |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                             |
+| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads             |
+| API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible                    |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't              |
+| DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately                 |
+| DASH-03   | No server-side read state for hospital notifications                       | Low      | Items stay highlighted until the work is done       |
+| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid                 | High     | Desk must collect again before check-in             |
+| APPT-02   | Cancelled unpaid bookings keep payment status "pending"                    | Low      | Shown as "Not paid"                                 |
+| APPT-03   | No per-hospital list of accepted desk payment methods                      | Low      | Fixed list: cash, UPI, card, POS, other             |
+| APPT-04   | Appointment history names no actor                                         | Low      | Shows patient / staff / system only                 |
+| APPT-05   | The desk cannot preview a walk-in's real fee before booking                | Medium   | Shows standard and follow-up fee                    |
+| APPT-06   | Desk staff cannot read services, so no service can be booked               | Medium   | Bookings use the doctor's fee only                  |
+| APPT-07   | A cancelled appointment keeps the token it gave up                         | Medium   | Patients history hides it on cancelled rows         |
+| PAT-01    | The patient list carries no visit count                                    | Low      | One extra request per row                           |
+| TOK-01    | Desk roles cannot read the expected consultation time                      | Low      | Falls back to 20 minutes for them                   |
+| TOK-02    | A session snapshot does not list its queue                                 | Medium   | Queue rebuilt from the appointment list             |
+| PAY-02    | Refunding one consultation of a visit refunds the whole visit              | High     | Desk collects per consultation                      |
+| PAY-01    | Payments cannot be filtered by source (desk / online)                      | Low      | Source filters the visible page only                |
+| SET-01    | A paid period's net payable differs from its own ledger                    | High     | Drawer flags the gap                                |
+| SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS                |
+| DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                              |
+| SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings                      |
+| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged                    |
+| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                          |
+| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                              |
+| PHI-01-B  | Reads, exports and downloads are not audited; nothing expires              | High     | Needs backend and a DPDP assessment                 |
+| PHI-06-B  | SMS and WhatsApp templates are not registered                              | High     | Needs DLT and WhatsApp approval                     |
+| PHI-03-B  | The message outbox export is built in the browser, unaudited               | Medium   | Admin-only; needs a server export                   |
+| PHI-05-B  | Seeded test hospitals copy real hospitals' names and places                | Medium   | Committed fixtures scrubbed                         |
+| PHI-07-B  | Patient search terms travel in the URL (`?q=`)                             | Low      | MRNs out of URLs; search needs backend              |
+| DATA-01-B | The server's invoice document prints the UTC issue date                    | Medium   | App shows the IST date                              |
+| DATA-05-B | `schema.yml` omits the required `If-Match` on department edits             | Low      | App now sends it                                    |
+| RUN-07-B  | Live-update sockets check sign-in only when they connect                   | Medium   | App closes sockets on sign-out                      |
+| RUN-09-B  | Token-queue load at peak is untested                                       | Medium   | App refetches less; test needs ENV-03               |
+| DEP-01-B  | Hosting is not set up or checked on staging                                | Blocker  | Guide, nginx config and checker ready               |
+| DEP-02-B  | The browser cannot call the API from another origin                        | Blocker  | Same-origin layout ready; or set CORS               |
+| DEP-03-B  | File storage has no public HTTPS host                                      | Blocker  | Needs DevOps; CSP takes the host                    |
+| DEP-04-B  | The bucket does not allow browser uploads (CORS)                           | High     | Rule in `docs/DEPLOYMENT.md`                        |
+| DEP-06-B  | Production providers and settings are unconfirmed                          | High     | Needs backend and DevOps                            |
+| DEP-07-B  | Nothing checks that email can be sent                                      | High     | Needs backend; link bases are ENV-01                |
+| DEP-09-B  | Backups and restores are unconfirmed                                       | High     | Needs DevOps                                        |
+| DEP-12-B  | Rate limits may see the proxy's address, not the client's                  | Medium   | Proxy settings documented                           |
+| OBS-01-B  | No error monitor receives the app's reports yet                            | High     | Reports ready; needs an endpoint                    |
+| OBS-05-B  | Nothing alerts when the web app or its WebSocket route is down             | Medium   | Probes and rules in `deploy/monitoring`             |
+| OBS-02-B  | Tickets lack the requester's name; staff cannot self-assign                | Medium   | Inbox works around both                             |
+| OBS-06-B  | App config has a support phone but no support email                        | Low      | App shows only what is configured                   |
+| PRD-08-B  | Audit rows carry no actor name; one resource type per filter               | Medium   | Names looked up where the role allows               |
+| PRD-02-B  | Resolved: `/hospital/me` already carries the logo                          | Low      | Every role sees the hospital's logo                 |
+| PRD-05-B  | Ops lists lack plan, bookings, city, activity and payout data              | Low      | Columns and tiles left out                          |
+| PRD-06-B  | Two receipt settings and the series separator are never used               | Low      | Left out; needs a decision                          |
+| PRD-07-B  | The desk cannot get a fee quote before booking                             | Low      | Screen says the booking prices it                   |
+| REP-01    | User Activity's Last Active is sent and exported in UTC                    | Medium   | Screen shows the UTC time too                       |
+| REP-02    | Sorting a report high-to-low puts empty values first                       | Low      | Screen shows what the server returns                |
+| REP-03    | System reasons are exported as codes (`patient_cancellation`)              | Low      | Screen shows the codes too                          |
+| PROF-01   | A banner's audience is stored but never used                               | Low      | Audience choice removed from the form               |
+| PROF-02   | Banner order ties sort differently for staff and patients                  | Low      | Reordering always saves distinct positions          |
+| PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links               |
+| HSET-01   | A payout account can never become verified                                 | Medium   | Not shown on the screen                             |
+| HSET-02   | Removing a counter does not check who still uses it                        | Low      | Counters can be marked inactive instead             |
+| HSET-03   | The token policy's print layout is never used                              | Low      | Settings offers the choice; slips ignore it         |
+| HSET-04   | A display set to a counter hides sessions nobody has called yet            | Low      | Not explained on the screen                         |
+| ID        | Problem                                                                    | Severity | Web app status                                      |
+| --------- | -------------------------------------------------------------------------- | -------- | --------------------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)              | Blocker  | Needs backend; admin stopgap available              |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT                 | High     | Read-only smoke tests only                          |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)                         | High     | Needs backend and a product decision                |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit                         | High     | App retries once after `Retry-After`                |
+| SEC-01-B  | Background polls keep a server session from going idle                     | Medium   | App signs idle tabs out itself                      |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session                   | Medium   | App coordinates refresh across tabs                 |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation                 | High     | Needs backend                                       |
+| ROLE-01   | Only admins can refund cash at the desk                                    | Medium   | Product decision on role templates                  |
+| CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)                   |
+| ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                                  |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                             |
+| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads             |
+| API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible                    |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't              |
+| DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately                 |
+| DASH-03   | No server-side read state for hospital notifications                       | Low      | Items stay highlighted until the work is done       |
+| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid                 | High     | Desk must collect again before check-in             |
+| APPT-02   | Cancelled unpaid bookings keep payment status "pending"                    | Low      | Shown as "Not paid"                                 |
+| APPT-03   | No per-hospital list of accepted desk payment methods                      | Low      | Fixed list: cash, UPI, card, POS, other             |
+| APPT-04   | Appointment history names no actor                                         | Low      | Shows patient / staff / system only                 |
+| APPT-05   | The desk cannot preview a walk-in's real fee before booking                | Medium   | Shows standard and follow-up fee                    |
+| APPT-06   | Desk staff cannot read services, so no service can be booked               | Medium   | Bookings use the doctor's fee only                  |
+| APPT-07   | A cancelled appointment keeps the token it gave up                         | Medium   | Patients history hides it on cancelled rows         |
+| PAT-01    | The patient list carries no visit count                                    | Low      | One extra request per row                           |
+| TOK-01    | Desk roles cannot read the expected consultation time                      | Low      | Falls back to 20 minutes for them                   |
+| TOK-02    | A session snapshot does not list its queue                                 | Medium   | Queue rebuilt from the appointment list             |
+| PAY-02    | Refunding one consultation of a visit refunds the whole visit              | High     | Desk collects per consultation                      |
+| PAY-01    | Payments cannot be filtered by source (desk / online)                      | Low      | Source filters the visible page only                |
+| SET-01    | A paid period's net payable differs from its own ledger                    | High     | Drawer flags the gap                                |
+| SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS                |
+| DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                              |
+| SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings                      |
+| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged                    |
+| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                          |
+| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                              |
+| PHI-01-B  | Reads, exports and downloads are not audited; nothing expires              | High     | Needs backend and a DPDP assessment                 |
+| PHI-06-B  | SMS and WhatsApp templates are not registered                              | High     | Needs DLT and WhatsApp approval                     |
+| PHI-03-B  | The message outbox export is built in the browser, unaudited               | Medium   | Admin-only; needs a server export                   |
+| PHI-05-B  | Seeded test hospitals copy real hospitals' names and places                | Medium   | Committed fixtures scrubbed                         |
+| PHI-07-B  | Patient search terms travel in the URL (`?q=`)                             | Low      | MRNs out of URLs; search needs backend              |
+| DATA-01-B | The server's invoice document prints the UTC issue date                    | Medium   | App shows the IST date                              |
+| DATA-05-B | `schema.yml` omits the required `If-Match` on department edits             | Low      | App now sends it                                    |
+| RUN-07-B  | Live-update sockets check sign-in only when they connect                   | Medium   | App closes sockets on sign-out                      |
+| RUN-09-B  | Token-queue load at peak is untested                                       | Medium   | App refetches less; test needs ENV-03               |
+| DEP-01-B  | Hosting is not set up or checked on staging                                | Blocker  | Guide, nginx config and checker ready               |
+| DEP-02-B  | The browser cannot call the API from another origin                        | Blocker  | Same-origin layout ready; or set CORS               |
+| DEP-03-B  | File storage has no public HTTPS host                                      | Blocker  | Needs DevOps; CSP takes the host                    |
+| DEP-04-B  | The bucket does not allow browser uploads (CORS)                           | High     | Rule in `docs/DEPLOYMENT.md`                        |
+| DEP-06-B  | Production providers and settings are unconfirmed                          | High     | Needs backend and DevOps                            |
+| DEP-07-B  | Nothing checks that email can be sent                                      | High     | Needs backend; link bases are ENV-01                |
+| DEP-09-B  | Backups and restores are unconfirmed                                       | High     | Needs DevOps                                        |
+| DEP-12-B  | Rate limits may see the proxy's address, not the client's                  | Medium   | Proxy settings documented                           |
+| OBS-01-B  | No error monitor receives the app's reports yet                            | High     | Reports ready; needs an endpoint                    |
+| OBS-05-B  | Nothing alerts when the web app or its WebSocket route is down             | Medium   | Probes and rules in `deploy/monitoring`             |
+| OBS-02-B  | Tickets lack the requester's name; staff cannot self-assign                | Medium   | Inbox works around both                             |
+| OBS-06-B  | App config has a support phone but no support email                        | Low      | App shows only what is configured                   |
+| PRD-08-B  | Audit rows carry no actor name; one resource type per filter               | Medium   | Names looked up where the role allows               |
+| PRD-02-B  | Resolved: `/hospital/me` already carries the logo                          | Low      | Every role sees the hospital's logo                 |
+| PRD-05-B  | Ops lists lack plan, bookings, city, activity and payout data              | Low      | Columns and tiles left out                          |
+| PRD-06-B  | Two receipt settings and the series separator are never used               | Low      | Left out; needs a decision                          |
+| PRD-07-B  | The desk cannot get a fee quote before booking                             | Low      | Screen says the booking prices it                   |
+| REP-01    | User Activity's Last Active is sent and exported in UTC                    | Medium   | Screen shows the hospital's time                    |
+| REP-02    | Sorting a report high-to-low puts empty values first                       | Low      | Screen shows what the server returns                |
+| REP-03    | System reasons are exported as codes (`patient_cancellation`)              | Low      | Screen shows readable wording                       |
+| PROF-01   | A banner's audience is stored but never used                               | Low      | Audience choice removed from the form               |
+| PROF-02   | Banner order ties sort differently for staff and patients                  | Low      | Reordering always saves distinct positions          |
+| PROF-03   | A banner's button link is not checked                                      | Low      | Form only builds or accepts app links               |
+| HSET-01   | A payout account can never become verified                                 | Medium   | Screen shows "Pending verification"                 |
+| HSET-02   | Removing a counter does not check who still uses it                        | Low      | Screen steers to Deactivate instead                 |
+| HSET-03   | The token policy's print layout is never used                              | Low      | Settings controls the default layout instead        |
+| HSET-04   | A display set to a counter hides sessions nobody has called yet            | Low      | The display settings say so                         |
+| MSG-01    | An outbox delivery does not say which patient or booking it was for        | Medium   | Outbox shows the address only                       |
+| MSG-02    | Outbox search matches only an exact phone number or message ID             | Low      | Search is exact-match only                          |
+| MSG-03    | The test backend's gateways never confirm delivery                         | Low      | Test deliveries stay at Sent                        |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -1247,3 +1323,51 @@ disappears from it.
 is assigned to) and filter on that, or make doctors and counters either-or.
 
 **What the web app does meanwhile.** Nothing on the screen explains it yet.
+
+## MSG-01 — An outbox delivery does not say which patient or booking it was for
+
+**New finding (live check of System → Messaging, 8 Oct 2026).**
+
+**What fails.** `GET /hospital/messaging/deliveries` returns the recipient's address
+(a phone number, an email, or `user:<id>` for push) and the event code
+(`messaging/serializers/hospital_delivery_serializer.py`), but no patient name, MRN or
+booking reference, and the outbox event that holds the appointment is not exposed. Staff
+cannot tell which visit a reminder was about, and a push delivery names only an account
+id, which the app must not show (Q43).
+
+**What the backend needs.** Add the patient's display name and the booking reference
+(or `appointment_id`) to each delivery, and let `q` match them.
+
+**What the web app does meanwhile.** The outbox shows the recipient's address and the message
+type; it cannot say which visit a message was about.
+
+## MSG-02 — Outbox search matches only an exact phone number or message ID
+
+**New finding (live check of System → Messaging, 8 Oct 2026).**
+
+**What fails.** `q` on the deliveries list is an exact match on the address (a bare
+10-digit number is also tried with +91), the gateway message ID or the event code
+(`messaging/views/hospital_delivery_list._q`) — no partial number and no patient name,
+because `recipient_address` has no search index.
+
+**What the backend needs.** A partial or name search (with an index), once MSG-01 adds
+the patient to the row.
+
+**What the web app does meanwhile.** The outbox search sends `q` as typed, so only an exact
+value finds anything; date, status and channel filters narrow the list.
+
+## MSG-03 — The test backend's gateways never confirm delivery
+
+**New finding (live check of System → Messaging, 8 Oct 2026).**
+
+**What fails.** Delivery is confirmed by the gateways' webhooks
+(`/webhooks/sms/msg91`, `/webhooks/whatsapp`, `/webhooks/email/ses`, handled in
+`webhooks/services/process.py`), but the test backend uses fake gateways
+(`msg91_fake…`, `ses-fake-…`) that never call back: all 845 test deliveries stay at
+**Sent**, so **Delivered**, **Failed** and **Bounced** cannot be checked end to end.
+
+**What the backend needs.** Real gateway credentials and webhook URLs on staging
+(ENV-03), or a fake that also posts delivery receipts.
+
+**What the web app does meanwhile.** Shows the status the server reports, so test messages
+stay at **Sent**.
