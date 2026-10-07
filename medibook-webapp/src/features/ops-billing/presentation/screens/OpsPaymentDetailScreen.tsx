@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { isFailure } from '@/core/error/failure';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -11,10 +14,13 @@ import { Icon } from '@/shared/ui/Icon';
 import { InfoGrid } from '@/shared/ui/InfoGrid';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
+import { toast } from '@/shared/ui/toast/toast.store';
 
 import { OPS_BASE_PATH, OPS_VIEW_SEGMENT, opsPath } from '@/app/router/paths';
 
+import { usePaymentQuery } from '@/features/ops-billing/application/queries/usePaymentQuery';
 import { usePaymentsQuery } from '@/features/ops-billing/application/queries/usePaymentsQuery';
+import { useRetryPaymentMutation } from '@/features/ops-billing/application/queries/useRetryPaymentMutation';
 import type {
   PaymentListParams,
   SubscriptionPayment,
@@ -25,8 +31,13 @@ import {
   PAYMENT_STATUS_BADGES,
   failureText,
   fmtDateTime,
+  isNotImplemented,
   rupees,
 } from '@/features/ops-billing/presentation/components/billingView';
+
+const RETRY_FAILED = 'The payment could not be retried. Please try again.';
+const RETRY_UNAVAILABLE =
+  'Gateway retries are not available while subscription billing is manual. If the hospital paid another way, record it with Mark as Paid on the invoice.';
 
 /** One status-history row: label, timestamp, and the dot's token bg class. */
 type HistoryStep = readonly [string, string, string];
@@ -62,15 +73,22 @@ function historyOf(pay: SubscriptionPayment): readonly HistoryStep[] {
 }
 
 /**
- * Ops payment detail (design `Ops.jsx` `OpsPaymentDetail`). The API has no
- * single-payment read, so the payment is found among its invoice's payments
- * (the billing screens pass the invoice id in router state); a bare link
- * searches the newest 100 payments instead.
+ * Ops payment detail (design `Ops.jsx` `OpsPaymentDetail`), read by id
+ * (`GET /platform/billing/payments/{id}`, BE-28) so a shared link opens any
+ * payment (11·F17). A backend without that read answers 404: the payment is
+ * then found among its invoice's payments (the billing screens pass the
+ * invoice id in router state), or the newest 100 payments for a bare link.
  */
 export function OpsPaymentDetailScreen() {
   const navigate = useNavigate();
   const { id = '' } = useParams();
   const invoiceId = invoiceIdFrom(useLocation().state);
+  const canBill = useOpsPermission().can('billing.edit');
+  const retry = useRetryPaymentMutation();
+  const [retryUnavailable, setRetryUnavailable] = useState(false);
+
+  const single = usePaymentQuery(id);
+  const scan = single.isError && isFailure(single.error) && single.error.kind === 'notFound';
 
   const params: PaymentListParams = {
     page: 1,
@@ -81,18 +99,19 @@ export function OpsPaymentDetailScreen() {
     sortField: 'attempted_at',
     sortDirection: 'desc',
   };
-  const paymentsQuery = usePaymentsQuery(params);
-  const pay = paymentsQuery.data?.items.find((p) => p.id === id);
+  const paymentsQuery = usePaymentsQuery(params, scan);
+  const pay = single.data ?? paymentsQuery.data?.items.find((p) => p.id === id);
+  const active = scan ? paymentsQuery : single;
 
-  if (paymentsQuery.isPending) return <SkeletonCards count={1} lines={4} pad={24} />;
-  if (paymentsQuery.isError) {
+  if (active.isPending) return <SkeletonCards count={1} lines={4} pad={24} />;
+  if (active.isError) {
     return (
       <Card pad={32}>
         <ErrorState
           inline
           title="This payment didn't load"
-          message={failureText(paymentsQuery.error, 'Please try again.')}
-          onRetry={() => void paymentsQuery.refetch()}
+          message={failureText(active.error, 'Please try again.')}
+          onRetry={() => void active.refetch()}
         />
       </Card>
     );
@@ -104,9 +123,11 @@ export function OpsPaymentDetailScreen() {
           icon="indian-rupee"
           title="Payment not found."
           message={
-            invoiceId
-              ? 'It is no longer recorded against its invoice.'
-              : 'Only the newest payments can be opened from a link. Open it from the Payments tab or its invoice.'
+            !scan
+              ? 'There is no payment with this link.'
+              : invoiceId
+                ? 'It is no longer recorded against its invoice.'
+                : 'Only the newest payments can be opened from a link. Open it from the Payments tab or its invoice.'
           }
           actionLabel="Back to payments"
           onAction={() => navigate(`${opsPath('billing')}?tab=Payments`)}
@@ -118,6 +139,21 @@ export function OpsPaymentDetailScreen() {
   const badge = PAYMENT_STATUS_BADGES[pay.status];
   const history = historyOf(pay);
   const reference = pay.gatewayPaymentId ?? pay.referenceNote ?? 'Manual payment';
+  const canRetry = canBill && pay.status === 'failed' && !retryUnavailable;
+
+  const retryPayment = (): void => {
+    // One key per click: the backend replays a repeated key instead of charging twice.
+    retry.mutate(
+      { id: pay.id, idempotencyKey: crypto.randomUUID() },
+      {
+        onSuccess: () => toast('A new charge attempt was started.', 'success'),
+        onError: (error) => {
+          if (isNotImplemented(error)) setRetryUnavailable(true);
+          else toast(failureText(error, RETRY_FAILED), 'error');
+        },
+      },
+    );
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -134,8 +170,8 @@ export function OpsPaymentDetailScreen() {
               <Badge status={badge.status}>{badge.label}</Badge>
             </div>
             <span className="text-caption text-text-muted">
-              <BillingHospitalName hospitalId={pay.hospitalId} /> · {METHOD_LABELS[pay.method]} ·{' '}
-              {fmtDateTime(pay.attemptedAt)}
+              {pay.hospitalName ?? <BillingHospitalName hospitalId={pay.hospitalId} />} ·{' '}
+              {METHOD_LABELS[pay.method]} · {fmtDateTime(pay.attemptedAt)}
             </span>
           </div>
           <div className="flex-1"></div>
@@ -158,15 +194,17 @@ export function OpsPaymentDetailScreen() {
           >
             View Invoice
           </Button>
+          {canRetry && (
+            <Button icon="refresh-cw" busy={retry.isPending} onClick={retryPayment}>
+              Retry Payment
+            </Button>
+          )}
         </div>
       </Card>
-      {pay.status === 'failed' && (
+      {pay.status === 'failed' && retryUnavailable && (
         <Card pad={14} className="flex flex-wrap items-center gap-2">
           <Icon name="triangle-alert" size={16} className="text-y-700" />
-          <span className="text-body text-text-body">
-            Gateway retries aren&apos;t available yet. If the hospital paid another way, record it
-            with Mark as Paid on the invoice.
-          </span>
+          <span className="text-body text-text-body">{RETRY_UNAVAILABLE}</span>
         </Card>
       )}
       <InfoGrid
@@ -178,7 +216,9 @@ export function OpsPaymentDetailScreen() {
           { k: 'Attempted', v: fmtDateTime(pay.attemptedAt) },
           { k: 'Received', v: fmtDateTime(pay.capturedAt) },
           { k: 'Linked Invoice', v: pay.invoiceNo, num: true },
+          { k: 'Plan', v: pay.planName ?? '—' },
           { k: 'Attempt', v: pay.attemptNo, num: true },
+          ...(pay.recordedByName ? [{ k: 'Recorded By', v: pay.recordedByName }] : []),
         ]}
       />
       <Card>

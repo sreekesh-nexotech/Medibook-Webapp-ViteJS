@@ -21,9 +21,10 @@ interface SendReminderModalProps {
 
 /**
  * Queue a payment reminder against an unpaid invoice (audit SA-03: "no
- * reminder"). The backend picks the channel and recipient from the hospital's
- * billing contact and delivers it, so ops only confirms; the reminder then
- * shows in the invoice's history as Queued, and as Sent once delivered.
+ * reminder"). The backend emails the billing contact captured on the invoice,
+ * or the hospital's admins when it has none (BE-28, 11·F10), so ops only
+ * confirms; the reminder then shows in the invoice's history as Queued, and as
+ * Sent once the mail provider has accepted it (UAT-56).
  */
 export function SendReminderModal({ invoice, hospitalEmail, onClose }: SendReminderModalProps) {
   const queue = useQueueReminderMutation();
@@ -52,7 +53,7 @@ export function SendReminderModal({ invoice, hospitalEmail, onClose }: SendRemin
       }`}
       summary={[
         { k: 'Hospital', v: invoice.hospitalName },
-        { k: 'Billing contact', v: hospitalEmail ?? 'On the hospital record' },
+        { k: 'Emailed to', v: hospitalEmail ?? "The hospital's admins (no billing contact)" },
         { k: 'Amount due', v: rupees(outstandingPaise(invoice)), num: true },
       ]}
       confirmLabel={queue.isPending ? 'Queuing…' : 'Queue Reminder'}
