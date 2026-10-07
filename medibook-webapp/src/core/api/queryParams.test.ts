@@ -2,7 +2,12 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it, vi } from 'vitest';
 
 import { isUnknownQueryParam, withQueryParamFallback } from '@/core/api/queryParams';
-import { exportTruncation, readFileOrUrl, withJsonErrorBody } from '@/core/api/blobResponses';
+import {
+  exportTruncation,
+  isNotImplemented,
+  readFileOrUrl,
+  withJsonErrorBody,
+} from '@/core/api/blobResponses';
 
 function httpError(status: number, data: unknown): AxiosError {
   const config = { headers: new AxiosHeaders() };
@@ -100,5 +105,13 @@ describe('withJsonErrorBody', () => {
     const error = httpError(403, body);
     await withJsonErrorBody(error);
     expect(error.response?.data).toEqual({ code: 'PERMISSION_DENIED', message: 'No.' });
+  });
+});
+
+describe('isNotImplemented', () => {
+  it('recognises a 501 only', () => {
+    expect(isNotImplemented(httpError(501, { code: 'NOT_IMPLEMENTED_YET' }))).toBe(true);
+    expect(isNotImplemented(httpError(500, {}))).toBe(false);
+    expect(isNotImplemented(new Error('x'))).toBe(false);
   });
 });

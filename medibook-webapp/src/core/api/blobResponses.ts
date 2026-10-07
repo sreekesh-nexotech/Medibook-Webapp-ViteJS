@@ -30,6 +30,17 @@ export async function withJsonErrorBody(error: unknown): Promise<unknown> {
   return error;
 }
 
+const HTTP_NOT_IMPLEMENTED = 501;
+
+/**
+ * Whether a request failed because this server cannot do it yet — `501
+ * NOT_IMPLEMENTED_YET`, e.g. no PDF renderer installed. `toFailure` hides
+ * every 5xx message, so callers say it themselves.
+ */
+export function isNotImplemented(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === HTTP_NOT_IMPLEMENTED;
+}
+
 /** Header a server-built export sets when it stopped at its row cap. */
 export const EXPORT_TRUNCATED_HEADER = 'x-export-truncated';
 

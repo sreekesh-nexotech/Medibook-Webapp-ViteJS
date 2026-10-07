@@ -1,4 +1,9 @@
-import { readFileOrUrl, withJsonErrorBody, type FileOrUrl } from '@/core/api/blobResponses';
+import {
+  isNotImplemented,
+  readFileOrUrl,
+  withJsonErrorBody,
+  type FileOrUrl,
+} from '@/core/api/blobResponses';
 import { isFileStoreUrl } from '@/core/api/fileUrls';
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
@@ -21,6 +26,10 @@ const PERIODS_SORT = '-period_start';
 
 /** Statements are monthly: the newest month first, one row is enough. */
 const STATEMENT_LOOKUP_SORT = '-period_start';
+
+const NOT_IMPLEMENTED_CODE = 'NOT_IMPLEMENTED_YET';
+const STATEMENT_PDF_UNAVAILABLE =
+  'Statement PDFs cannot be produced on this server yet. Ask Medibook for a copy.';
 
 const OFF_STORE_LINK = 'The statement link does not point to the file store, so it was not opened.';
 
@@ -102,6 +111,9 @@ export async function getStatementPdf(statementId: string): Promise<FileOrUrl> {
     }
     return answer;
   } catch (error) {
+    if (isNotImplemented(error)) {
+      throw clientFailure('server', STATEMENT_PDF_UNAVAILABLE, NOT_IMPLEMENTED_CODE);
+    }
     throw await withJsonErrorBody(error);
   }
 }

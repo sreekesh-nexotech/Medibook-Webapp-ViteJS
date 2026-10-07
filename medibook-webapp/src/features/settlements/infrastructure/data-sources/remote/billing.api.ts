@@ -1,8 +1,9 @@
 import { isAxiosError } from 'axios';
 
-import { withJsonErrorBody } from '@/core/api/blobResponses';
+import { isNotImplemented, withJsonErrorBody } from '@/core/api/blobResponses';
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { clientFailure } from '@/core/error/toFailure';
 
 import type { PlanChangeInput } from '@/features/settlements/domain/entities/billing.entities';
 import {
@@ -42,10 +43,13 @@ export async function getInvoice(invoiceId: string) {
   return invoiceDetailResponseSchema.parse(response.data);
 }
 
+const INVOICE_PDF_UNAVAILABLE =
+  'Invoice PDFs cannot be produced on this server yet. Download the CSV instead, or ask Medibook for a copy.';
+
 /**
- * `GET /hospital/billing/invoices/{id}.pdf` — the bytes; 501 when this server
- * cannot render PDFs, whose JSON message is decoded from the blob body
- * (appendix 09 F8).
+ * `GET /hospital/billing/invoices/{id}.pdf` — the bytes. A 501 (no PDF
+ * renderer on this server) says so; any other error's JSON message is
+ * decoded from the blob body (appendix 09 F8).
  */
 export async function getInvoicePdf(invoiceId: string): Promise<Blob> {
   try {
@@ -55,6 +59,9 @@ export async function getInvoicePdf(invoiceId: string): Promise<Blob> {
     );
     return response.data;
   } catch (error) {
+    if (isNotImplemented(error)) {
+      throw clientFailure('server', INVOICE_PDF_UNAVAILABLE, 'NOT_IMPLEMENTED_YET');
+    }
     throw await withJsonErrorBody(error);
   }
 }
