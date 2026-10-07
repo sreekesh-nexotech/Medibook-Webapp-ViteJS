@@ -8,9 +8,13 @@ import { fetchOpsDashboard } from '@/features/ops-dashboard/application/usecases
 /** Counts and alerts move with onboarding and dunning; a minute is fresh enough for a landing page. */
 const OPS_DASHBOARD_STALE_TIME_MS = 60_000;
 
-/** The platform dashboard: KPIs, computed alerts and recent onboarding cases. */
-export function useOpsDashboardQuery() {
+/**
+ * The platform dashboard: KPIs, computed alerts and recent onboarding cases.
+ * `enabled` lets the shell skip it for roles without `dashboard.view` (UAT-35).
+ */
+export function useOpsDashboardQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: opsDashboardKeys.summary(),
     queryFn: async () => unwrap(await fetchOpsDashboard()),
     staleTime: OPS_DASHBOARD_STALE_TIME_MS,

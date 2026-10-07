@@ -131,6 +131,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           subtitle={subFor(role, view, user.firstName)}
           onBack={onBack}
           role={role}
+          readScope={`${session.hospital.id}:${user.id}`}
           userName={userName}
           roleName={session.role.name}
           onAccount={handleAccount}

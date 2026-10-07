@@ -21,3 +21,10 @@ export const STORAGE_KEY_LAST_ACTIVITY = {
   hospital: 'medibook.activity.hospital',
   platform: 'medibook.activity.platform',
 } as const;
+
+/**
+ * Bell items the user marked read, per signed-in user (`<prefix><scope>`).
+ * The fallback while the backend keeps no notification read state (DASH-03):
+ * it survives reloads and is shared by this browser's tabs (UAT-68).
+ */
+export const STORAGE_KEY_BELL_SEEN_PREFIX = 'medibook.bell.seen.';

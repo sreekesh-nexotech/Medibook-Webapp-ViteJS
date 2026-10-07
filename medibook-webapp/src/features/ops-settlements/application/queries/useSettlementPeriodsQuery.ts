@@ -7,8 +7,9 @@ import { fetchSettlementPeriods } from '@/features/ops-settlements/application/u
 import type { PeriodFilter } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 
 /** Settlement periods matching `filter` (every page). Keeps the last result while a new filter loads. */
-export function useSettlementPeriodsQuery(filter: PeriodFilter) {
+export function useSettlementPeriodsQuery(filter: PeriodFilter, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: opsSettlementsKeys.periods(filter),
     queryFn: async () => unwrap(await fetchSettlementPeriods(filter)),
     placeholderData: keepPreviousData,
