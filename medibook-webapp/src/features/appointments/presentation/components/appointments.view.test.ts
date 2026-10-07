@@ -4,6 +4,7 @@ import type { Failure } from '@/core/error/failure';
 
 import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
 import {
+  acceptedMethodsOf,
   canCheckIn,
   canMarkNoShow,
   deskErrorText,
@@ -181,6 +182,13 @@ describe('desk refusal wording (UAT-18)', () => {
       ),
     ).toBe('This hospital takes Cash, UPI at the desk.');
     expect(deskErrorText(failure({ code: 'CASH_SESSION_REQUIRED' }), 'x')).toMatch(/cash drawer/);
+  });
+
+  it('narrows Collect to the methods the hospital accepts (APPT-03)', () => {
+    expect(
+      acceptedMethodsOf(failure({ meta: { accepted_methods: ['upi', 'emi', 'cash'] } })),
+    ).toEqual(['upi', 'cash']);
+    expect(acceptedMethodsOf(failure())).toBeNull();
   });
 
   it('falls back to the first field message, then the server message', () => {

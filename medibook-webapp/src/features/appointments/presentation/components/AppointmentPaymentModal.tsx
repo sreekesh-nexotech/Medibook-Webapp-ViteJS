@@ -19,6 +19,7 @@ import type {
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { useCollectPaymentMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import {
+  acceptedMethodsOf,
   deskErrorText,
   DESK_METHODS,
   methodLabel,
@@ -76,6 +77,8 @@ function PaymentForm({
     { key: 1, method: 'cash', amount: String(due), reference: '' },
   ]);
   const [error, setError] = useState<string | null>(null);
+  // Narrowed to what the hospital accepts once the backend says (APPT-03).
+  const [methods, setMethods] = useState<readonly PaymentMethod[]>(DESK_METHODS);
 
   const entered = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
   const remaining = Math.round((due - entered) * PAISE_PER_RUPEE) / PAISE_PER_RUPEE;
@@ -88,7 +91,7 @@ function PaymentForm({
       ...ls,
       {
         key: Math.max(...ls.map((l) => l.key)) + 1,
-        method: 'upi',
+        method: methods.find((m) => m !== 'cash') ?? methods[0] ?? 'upi',
         amount: remaining > 0 ? String(remaining) : '',
         reference: '',
       },
@@ -123,11 +126,18 @@ function PaymentForm({
           onPaid(receipt);
         },
         onError: (failure) => {
-          setError(
-            isFailure(failure)
-              ? deskErrorText(failure, 'Could not record the payment.')
-              : 'Could not record the payment.',
-          );
+          if (!isFailure(failure)) {
+            setError('Could not record the payment.');
+            return;
+          }
+          const accepted = acceptedMethodsOf(failure);
+          if (accepted) {
+            setMethods(accepted);
+            setLines((ls) =>
+              ls.map((l) => (accepted.includes(l.method) ? l : { ...l, method: accepted[0] })),
+            );
+          }
+          setError(deskErrorText(failure, 'Could not record the payment.'));
         },
       },
     );
@@ -159,10 +169,10 @@ function PaymentForm({
             <Field label="Method" className="flex-1">
               <Select
                 value={methodLabel(l.method)}
-                options={DESK_METHODS.map(methodLabel)}
+                options={methods.map(methodLabel)}
                 onChange={(label) =>
                   update(l.key, {
-                    method: DESK_METHODS.find((m) => methodLabel(m) === label) ?? 'cash',
+                    method: methods.find((m) => methodLabel(m) === label) ?? l.method,
                   })
                 }
               />

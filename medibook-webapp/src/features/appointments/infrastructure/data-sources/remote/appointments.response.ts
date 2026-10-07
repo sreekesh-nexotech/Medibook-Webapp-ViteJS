@@ -96,6 +96,8 @@ export const appointmentEventSchema = z.object({
   id: z.string(),
   event_type: z.string(),
   actor_kind: z.string(),
+  /** The staff member's name, "Patient" or "System" (B5 APPT-04). */
+  actor_name: z.string().nullable().optional(),
   from_status: z.string().nullable(),
   to_status: z.string().nullable(),
   occurred_at: z.string(),
@@ -234,6 +236,7 @@ export function toEvent(dto: z.infer<typeof appointmentEventSchema>): Appointmen
     id: dto.id,
     eventType: dto.event_type,
     actorKind: dto.actor_kind,
+    actorName: dto.actor_name ?? null,
     fromStatus: dto.from_status,
     toStatus: dto.to_status,
     occurredAt: dto.occurred_at,

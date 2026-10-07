@@ -98,6 +98,32 @@ export function sourceBadge(source: ApptSource): BadgeSpec {
  */
 export const DESK_METHODS: readonly PaymentMethod[] = ['cash', 'upi', 'card', 'pos', 'other'];
 
+const KNOWN_METHODS: ReadonlySet<string> = new Set<PaymentMethod>([
+  'cash',
+  'upi',
+  'card',
+  'pos',
+  'netbanking',
+  'wallet',
+  'other',
+]);
+
+function isPaymentMethod(value: unknown): value is PaymentMethod {
+  return typeof value === 'string' && KNOWN_METHODS.has(value);
+}
+
+/**
+ * The desk methods a refusal says the hospital accepts (B3
+ * `meta.accepted_methods`), so Collect can offer only those; `null` when the
+ * refusal does not say.
+ */
+export function acceptedMethodsOf(failure: Failure): readonly PaymentMethod[] | null {
+  const accepted = failure.meta.accepted_methods;
+  if (!Array.isArray(accepted)) return null;
+  const methods = accepted.filter(isPaymentMethod);
+  return methods.length > 0 ? methods : null;
+}
+
 export const METHOD_LABEL: Readonly<Record<string, string>> = {
   cash: 'Cash',
   upi: 'UPI',

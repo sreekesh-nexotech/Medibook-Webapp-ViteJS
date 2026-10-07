@@ -89,6 +89,8 @@ export interface AppointmentEvent {
   readonly id: string;
   readonly eventType: string;
   readonly actorKind: string;
+  /** Who did it by name, when the backend sends it (APPT-04). */
+  readonly actorName: string | null;
   readonly fromStatus: string | null;
   readonly toStatus: string | null;
   readonly occurredAt: string;

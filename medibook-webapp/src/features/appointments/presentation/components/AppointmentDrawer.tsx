@@ -280,7 +280,10 @@ function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }
               <li key={e.id} className="text-caption text-text-body flex justify-between gap-3">
                 <span>
                   {eventLabel(e.eventType)}
-                  <span className="text-text-muted"> · {actorLabel(e.actorKind)}</span>
+                  <span className="text-text-muted">
+                    {' '}
+                    · {e.actorName ?? actorLabel(e.actorKind)}
+                  </span>
                   {e.fromStatus && e.toStatus && e.fromStatus !== e.toStatus && (
                     <span className="text-text-muted block">
                       {statusLabelOf(e.fromStatus)} → {statusLabelOf(e.toStatus)}
