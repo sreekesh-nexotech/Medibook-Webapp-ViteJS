@@ -9,10 +9,21 @@ import type { HospitalRole } from '@/app/router/paths';
 
 import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
 import { useDashboardAlertsLive } from '@/features/dashboard/application/queries/useDashboardAlertsLive';
+import { useHospitalNotificationsQuery } from '@/features/notifications/application/queries/useHospitalNotificationsQuery';
+import { useMarkNotificationsReadMutation } from '@/features/notifications/application/queries/useMarkNotificationsReadMutation';
 import { useSettlementPeriodsQuery } from '@/features/settlements/application/queries/useSettlementPeriodsQuery';
 
 import type { HospitalNavView } from './hospital-nav';
-import { buildHospitalNotifs, LATEST_PERIODS, type HospitalBellAccess } from './hospitalBell';
+import {
+  buildHospitalNotifs,
+  isBellEntryUnread,
+  LATEST_PERIODS,
+  localBellEntries,
+  localReadKey,
+  serverBellEntries,
+  type HospitalBellAccess,
+  type HospitalBellEntry,
+} from './hospitalBell';
 import { TopbarAccountMenu, type TopbarMenuItem } from './TopbarAccountMenu';
 import { TopbarBell, type TopbarBellItem } from './TopbarBell';
 
@@ -62,28 +73,51 @@ export function HospitalTopbar({
     isAdmin: role === 'admin',
     canSeeSettlements: canViewModule('Billing & Settlements'),
   };
-  // Live counts: today's dashboard alerts (H10), refreshed on every booking
-  // push, and — for roles that may open Settlements — the latest periods (H11).
+  // Every booking push on ws/hospital/alerts invalidates the dashboard keys,
+  // the bell's included, so its counts stay live.
   useDashboardAlertsLive();
-  const dashboard = useAdminDashboardQuery('today');
-  const periodsQuery = useSettlementPeriodsQuery(LATEST_PERIODS, access.canSeeSettlements);
-  const notifs = buildHospitalNotifs(
-    access,
-    dashboard.data?.alerts,
-    periodsQuery.data?.items ?? [],
+  // DASH-03: the server computes the bell per role and keeps read state per
+  // staff member. `null` = an older backend without it: the bell then builds
+  // itself from today's dashboard alerts and — for roles that may open
+  // Settlements — the latest periods (UAT-68), with read state in the browser.
+  const serverQuery = useHospitalNotificationsQuery();
+  const isFallback = serverQuery.data === null;
+  const dashboard = useAdminDashboardQuery('today', isFallback);
+  const periodsQuery = useSettlementPeriodsQuery(
+    LATEST_PERIODS,
+    isFallback && access.canSeeSettlements,
   );
-  const isError = dashboard.isError || (access.canSeeSettlements && periodsQuery.isError);
-  // Read state lives in this browser per user until the backend keeps it
-  // (DASH-03): it survives reloads and every tab agrees (UAT-68).
-  const { seen, markAllRead } = useSeenNotifications(readScope);
-  const items: TopbarBellItem[] = notifs.map((n) => ({
-    key: n.t,
-    icon: n.icon,
-    boxClass: n.boxClass,
-    title: n.t,
-    sub: n.s,
-    unread: !seen.has(n.t),
+  const entries: HospitalBellEntry[] = serverQuery.data
+    ? serverBellEntries(serverQuery.data)
+    : isFallback
+      ? localBellEntries(
+          buildHospitalNotifs(access, dashboard.data?.alerts, periodsQuery.data?.items ?? []),
+        )
+      : [];
+  const isError = isFallback
+    ? dashboard.isError || (access.canSeeSettlements && periodsQuery.isError)
+    : serverQuery.isError;
+  const markRead = useMarkNotificationsReadMutation();
+  const { seen, markAllRead: markLocal } = useSeenNotifications(readScope);
+  const items: TopbarBellItem[] = entries.map((entry) => ({
+    key: entry.key,
+    icon: entry.icon,
+    boxClass: entry.boxClass,
+    title: entry.title,
+    sub: entry.sub,
+    unread: isBellEntryUnread(entry, seen),
   }));
+
+  /** Mark read on the server; where it cannot (fallback, read-only hospital), in this browser. */
+  const markEntries = (targets: readonly HospitalBellEntry[], key: string | null) => {
+    const keepLocally = () => markLocal([...seen, ...targets.map(localReadKey)]);
+    if (isFallback) {
+      keepLocally();
+      return;
+    }
+    markRead.mutate(key, { onError: keepLocally });
+  };
+
   const menuItems: TopbarMenuItem[] = [
     { key: 'account', icon: 'user', label: 'My Account', onSelect: onAccount },
     { key: 'logout', icon: 'log-out', label: 'Log Out', isDanger: true, onSelect: onLogout },
@@ -131,16 +165,22 @@ export function HospitalTopbar({
           items={items}
           isError={isError}
           onRetry={() => {
+            if (!isFallback) {
+              void serverQuery.refetch();
+              return;
+            }
             void dashboard.refetch();
             if (access.canSeeSettlements) void periodsQuery.refetch();
           }}
           onSelect={(item) => {
-            const target = notifs.find((n) => n.t === item.key);
+            const target = entries.find((entry) => entry.key === item.key);
             setNotif(false);
-            if (target) onNavigate(target.go);
+            if (!target) return;
+            if (item.unread) markEntries([target], target.key);
+            onNavigate(target.go);
           }}
           onMarkAllRead={() => {
-            markAllRead(notifs.map((n) => n.t));
+            markEntries(entries, null);
             toast('All caught up', 'success');
             setNotif(false);
           }}
