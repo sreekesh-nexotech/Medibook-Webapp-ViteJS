@@ -5,10 +5,14 @@ import type {
   SessionCommand,
   TokenCommand,
 } from '@/features/token-queue/domain/entities/tokenQueue.entities';
-import type { SessionSnapshotResponse } from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.response';
+import type {
+  SessionSnapshotResponse,
+  TokenCallResponse,
+} from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.response';
 import {
   sessionSnapshotSchema,
   skipResponseSchema,
+  tokenCallPageSchema,
 } from '@/features/token-queue/infrastructure/data-sources/remote/tokenQueue.response';
 
 /**
@@ -61,4 +65,15 @@ export async function postSkip(sessionId: string, tokenNo: number) {
     token_no: tokenNo,
   });
   return skipResponseSchema.parse(response.data);
+}
+
+/**
+ * `GET /hospital/sessions/{id}/calls` — the session's call history, newest
+ * first (`token_management.view`). The latest page is enough for the desk.
+ */
+export async function getSessionCalls(sessionId: string): Promise<TokenCallResponse[]> {
+  const response = await hospitalApi.get(`/sessions/${encodeURIComponent(sessionId)}/calls`, {
+    params: { page: 1, page_size: MAX_PAGE_SIZE },
+  });
+  return tokenCallPageSchema.parse(response.data).results;
 }

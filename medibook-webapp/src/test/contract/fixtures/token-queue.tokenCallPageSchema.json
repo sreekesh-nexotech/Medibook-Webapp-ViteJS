@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "id": "01a11765-85ea-7803-9402-c280dc8f917d",
+      "session_id": "01a11762-faa9-75a1-8f50-b17020574072",
+      "appointment_id": "01a11765-8445-74c1-a9d3-21150c5cb9cd",
+      "token_no": 1,
+      "event": "served",
+      "attempt_no": 1,
+      "actor_user_id": "01a11762-5610-74e2-8872-b6535fdc669e",
+      "counter_id": null,
+      "occurred_at": "2026-10-07T03:39:00.071626Z"
+    },
+    {
+      "id": "01a11765-85d8-7a51-9797-50c2252a4479",
+      "session_id": "01a11762-faa9-75a1-8f50-b17020574072",
+      "appointment_id": "01a11765-8445-74c1-a9d3-21150c5cb9cd",
+      "token_no": 1,
+      "event": "called",
+      "attempt_no": 1,
+      "actor_user_id": "01a11762-5610-74e2-8872-b6535fdc669e",
+      "counter_id": "01a11762-4a3d-7873-9b9c-6c386bcf944b",
+      "occurred_at": "2026-10-07T03:39:00.053399Z"
+    },
+    {
+      "id": "01a11765-638d-7311-8991-140b14bda932",
+      "session_id": "01a11762-faa9-75a1-8f50-b17020574072",
+      "appointment_id": "01a11765-636a-7961-84d3-72678765e31b",
+      "token_no": 1,
+      "event": "cancelled",
+      "attempt_no": 0,
+      "actor_user_id": null,
+      "counter_id": null,
+      "occurred_at": "2026-10-05T08:53:00.111799Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 3,
+  "has_next": false
+}

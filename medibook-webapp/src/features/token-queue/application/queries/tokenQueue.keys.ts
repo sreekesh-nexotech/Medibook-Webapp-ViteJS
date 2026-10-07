@@ -3,4 +3,5 @@ export const tokenQueueKeys = {
   all: ['token-queue'] as const,
   sessions: () => [...tokenQueueKeys.all, 'sessions'] as const,
   sessionsOn: (date: string) => [...tokenQueueKeys.sessions(), date] as const,
+  calls: (sessionId: string) => [...tokenQueueKeys.all, 'calls', sessionId] as const,
 };
