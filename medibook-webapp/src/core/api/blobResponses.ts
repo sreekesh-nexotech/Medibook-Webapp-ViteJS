@@ -9,7 +9,8 @@ import { z } from 'zod';
  *   backend's `{code, message}` envelope. `withJsonErrorBody` decodes it back
  *   to JSON in place, so a 403 or 501 keeps its own message.
  * - A server-built export that stopped at its row cap says so in a header
- *   (`X-Export-Truncated`); `exportTruncation` reads it.
+ *   (`X-Export-Truncated: true`, with `X-Export-Row-Count`); `exportTruncation`
+ *   reads them.
  * - A PDF route may answer with the bytes, or with JSON `{url}` pointing at
  *   the stored file (backend SET-02); `readFileOrUrl` tells them apart.
  */
@@ -32,7 +33,10 @@ export async function withJsonErrorBody(error: unknown): Promise<unknown> {
 /** Header a server-built export sets when it stopped at its row cap. */
 export const EXPORT_TRUNCATED_HEADER = 'x-export-truncated';
 
-/** Header carrying the cap itself, when the server sends it. */
+/** Header carrying how many rows the file holds — the cap, when truncated (backend B3). */
+export const EXPORT_ROW_COUNT_HEADER = 'x-export-row-count';
+
+/** Older name for the same figure. */
 export const EXPORT_ROW_LIMIT_HEADER = 'x-export-row-limit';
 
 const FALSE_VALUES: ReadonlySet<string> = new Set(['', '0', 'false', 'no']);
@@ -62,7 +66,11 @@ export function exportTruncation(headers: unknown): ExportTruncation {
   const flag = headerValue(headers, EXPORT_TRUNCATED_HEADER);
   const truncated = flag !== null && !FALSE_VALUES.has(flag.trim().toLowerCase());
   if (!truncated) return { truncated, rowLimit: null };
-  const explicit = Number(headerValue(headers, EXPORT_ROW_LIMIT_HEADER) ?? '');
+  const explicit = Number(
+    headerValue(headers, EXPORT_ROW_COUNT_HEADER) ??
+      headerValue(headers, EXPORT_ROW_LIMIT_HEADER) ??
+      '',
+  );
   // A flag of `1` means "yes"; a larger number is the cap itself.
   const fromFlag = Number(flag);
   const limit = Number.isInteger(explicit) && explicit > 0 ? explicit : fromFlag;

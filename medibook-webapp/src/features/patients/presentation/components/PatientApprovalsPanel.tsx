@@ -67,6 +67,7 @@ function DecisionCell({ row }: { row: PatientApproval }) {
         requestId={row.id}
         kind={row.kind}
         requestedByUserId={row.requestedByUserId}
+        requestedByName={row.requestedByName}
       />
     );
   }

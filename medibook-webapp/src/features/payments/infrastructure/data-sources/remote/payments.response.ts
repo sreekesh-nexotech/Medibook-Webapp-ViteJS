@@ -179,6 +179,7 @@ const refundSchema = z.object({
   processed_at: z.string().nullable(),
   failure_reason: z.string().nullable().optional(),
   cash_session_id: z.string().nullable().optional(),
+  channel: z.enum(['desk', 'online']).nullable().optional(),
 });
 
 export type RefundResponse = z.infer<typeof refundSchema>;
@@ -197,6 +198,7 @@ export function toPaymentRefund(r: RefundResponse): PaymentRefund {
     processedAt: r.processed_at,
     failureReason: r.failure_reason ?? null,
     cashSessionId: r.cash_session_id ?? null,
+    channel: r.channel ?? null,
   };
 }
 

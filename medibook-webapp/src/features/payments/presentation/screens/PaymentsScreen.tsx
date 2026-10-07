@@ -241,10 +241,13 @@ export function PaymentsScreen() {
   const appts = apptsQuery.data ?? [];
   const apptById = new Map(appts.map((a) => [a.id, a]));
   const totals = totalsOf(totalsQuery.data ?? []);
-  // Refunds asked for today, desk and online (`GET /refunds`, by request date).
+  // Refunds asked for today (`GET /refunds`, by request date). With the
+  // refund's channel on the row (B3) the desk tile counts desk refunds only.
   const refundsQuery = useRefundsQuery(today.dateFrom, today.dateTo);
-  const refundedToday = (refundsQuery.data ?? [])
-    .filter((r) => r.status === 'processed')
+  const processedToday = (refundsQuery.data ?? []).filter((r) => r.status === 'processed');
+  const hasRefundChannel = processedToday.every((r) => r.channel !== null);
+  const refundedToday = processedToday
+    .filter((r) => !hasRefundChannel || r.channel === 'desk')
     .reduce((sum, r) => sum + r.amountRupees, 0);
   // The desk's own rule: never collected, or refunded while the visit is
   // still on (BACKEND_BLOCKERS APPT-01) — both are due at the counter.
@@ -298,7 +301,9 @@ export function PaymentsScreen() {
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
       // Lines refunded in full drop out of the captured total.
       sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} still held today${
-        refundedToday > 0 ? ` · ${money(refundedToday)} refunded today (desk and online)` : ''
+        refundedToday > 0
+          ? ` · ${money(refundedToday)} refunded today${hasRefundChannel ? '' : ' (desk and online)'}`
+          : ''
       }`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',

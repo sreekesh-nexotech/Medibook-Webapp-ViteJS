@@ -45,6 +45,7 @@ export function PatientChangeNotice({ change, onDecided }: PatientChangeNoticePr
           requestId={change.id}
           kind={change.kind}
           requestedByUserId={change.requestedByUserId}
+          requestedByName={change.requestedByName}
           onDecided={onDecided}
         />
       </div>

@@ -69,6 +69,7 @@ export const hospitalPatientResponseSchema = z.object({
   link_method: z.string().nullable().optional(),
   linked_at: z.string().nullable().optional(),
   pending_request: pendingRequestSchema.nullable(),
+  completed_visits: z.number().int().nullable().optional(),
   created_at: z.string(),
   version: z.number().int(),
 });
@@ -103,7 +104,15 @@ export const patientAppointmentResponseSchema = z.object({
   scheduled_date: z.string(),
   scheduled_start_at: z.string(),
   token_label: z.string().nullable(),
-  payment_status: z.enum(['unpaid', 'pending', 'paid', 'refunded', 'failed']),
+  payment_status: z.enum([
+    'unpaid',
+    'pending',
+    'paid',
+    'refunded',
+    'failed',
+    'not_required',
+    'cancelled',
+  ]),
   total_paise: z.number().int(),
 });
 
@@ -202,6 +211,7 @@ export function toPatientRecord(dto: HospitalPatientResponse): PatientRecord {
     linkMethod: dto.link_method ?? null,
     linkedAt: dto.linked_at ?? null,
     pendingChange: toPendingChange(dto.pending_request),
+    completedVisits: dto.completed_visits ?? null,
     createdAt: dto.created_at,
     version: dto.version,
   };

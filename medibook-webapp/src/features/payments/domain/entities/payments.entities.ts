@@ -94,6 +94,8 @@ export interface PaymentRefund {
   readonly processedAt: string | null;
   readonly failureReason: string | null;
   readonly cashSessionId: string | null;
+  /** Where the refunded money was taken (B3); `null` on an older backend. */
+  readonly channel: PaymentChannel | null;
 }
 
 /** `GET /payments/{id}` — the line plus every refund against it. */

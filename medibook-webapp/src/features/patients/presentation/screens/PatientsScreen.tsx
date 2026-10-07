@@ -166,7 +166,10 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
   const patientsQuery = usePatientsQuery(params);
   const rows = patientsQuery.data?.items ?? [];
   const total = patientsQuery.data?.total ?? 0;
-  const visits = usePatientVisitCountsQuery(rows.map((p) => p.id));
+  // Rows carry their completed-visit count (B6); only older rows are counted one by one (PAT-01).
+  const visits = usePatientVisitCountsQuery(
+    rows.filter((p) => p.completedVisits === null).map((p) => p.id),
+  );
 
   const open = onOpenPatient;
   const book = (mrn: string) => {
@@ -307,7 +310,7 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
                 <td className={tdClass}>{ageFromDob(p.dateOfBirth) ?? '—'}</td>
                 <td className={tdClass}>{genderLabel(p.gender) || '—'}</td>
                 <td className={tdClass}>{displayPhone(p.phone) || '—'}</td>
-                <td className={tdClass}>{visits.get(p.id) ?? '—'}</td>
+                <td className={tdClass}>{p.completedVisits ?? visits.get(p.id) ?? '—'}</td>
                 <td className={tdClass}>
                   <Badge status={source.status}>{source.label}</Badge>
                 </td>

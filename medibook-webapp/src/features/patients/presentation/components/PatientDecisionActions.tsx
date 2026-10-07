@@ -13,7 +13,10 @@ import type {
   PatientChangeDecision,
   PatientChangeKind,
 } from '@/features/patients/domain/entities/patients.entities';
-import { saveErrorMessage } from '@/features/patients/presentation/components/patientsFormat';
+import {
+  isOwnChangeRequest,
+  saveErrorMessage,
+} from '@/features/patients/presentation/components/patientsFormat';
 
 /**
  * Backend permission that may decide change requests. It is not one of the
@@ -31,6 +34,8 @@ interface PatientDecisionActionsProps {
   kind: PatientChangeKind;
   /** The requester's user id, when the server sends it. */
   requestedByUserId: string | null;
+  /** The requester's name — the fallback when the row carries no id. */
+  requestedByName: string | null;
   /** After a successful decision (e.g. leave a record that was just deleted). */
   onDecided?: (decision: PatientChangeDecision) => void;
   size?: 'sm';
@@ -39,19 +44,24 @@ interface PatientDecisionActionsProps {
 /**
  * Approve / Reject for one patient change request (D-29). Shown only to a
  * user who may decide; reject needs a note. The person who asked for the
- * change cannot approve it (the backend refuses that too, L-09), so their own
- * request shows who has to decide instead of buttons.
+ * change cannot approve it (the backend refuses that too, L-09); they may
+ * still withdraw it, which the backend records as a rejection.
  */
 export function PatientDecisionActions({
   requestId,
   kind,
   requestedByUserId,
+  requestedByName,
   onDecided,
   size,
 }: PatientDecisionActionsProps) {
   const session = useSessionQuery('hospital');
   const canDecide = session.data?.permissions.includes(DECIDE_PERMISSION) ?? false;
-  const isOwnRequest = requestedByUserId !== null && requestedByUserId === session.data?.user.id;
+  const isOwnRequest = isOwnChangeRequest(
+    requestedByUserId,
+    requestedByName,
+    session.data?.user ?? null,
+  );
 
   const approve = useApprovePatientChangeMutation();
   const reject = useRejectPatientChangeMutation();
@@ -62,14 +72,6 @@ export function PatientDecisionActions({
   const isBusy = approve.isPending || reject.isPending;
 
   if (!canDecide) return null;
-
-  if (isOwnRequest) {
-    return (
-      <span className="text-caption text-text-muted">
-        Your request — another administrator must decide it.
-      </span>
-    );
-  }
 
   const handleApprove = (): void => {
     approve.mutate(requestId, {
@@ -88,7 +90,7 @@ export function PatientDecisionActions({
       { requestId, note: note.trim() },
       {
         onSuccess: (decision) => {
-          toast('Request rejected', 'success');
+          toast(isOwnRequest ? 'Request withdrawn' : 'Request rejected', 'success');
           setIsRejecting(false);
           onDecided?.(decision);
         },
@@ -98,25 +100,32 @@ export function PatientDecisionActions({
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {isOwnRequest && (
+        <span className="text-caption text-text-muted">
+          Your request — another administrator approves it.
+        </span>
+      )}
       <Button
         size={size}
         variant="secondary"
         disabled={isBusy}
         onClick={() => setIsRejecting(true)}
       >
-        Reject
+        {isOwnRequest ? 'Withdraw' : 'Reject'}
       </Button>
-      <Button size={size} busy={approve.isPending} disabled={isBusy} onClick={handleApprove}>
-        Approve
-      </Button>
+      {!isOwnRequest && (
+        <Button size={size} busy={approve.isPending} disabled={isBusy} onClick={handleApprove}>
+          Approve
+        </Button>
+      )}
       <FormModal
         open={isRejecting}
         onClose={() => setIsRejecting(false)}
-        title="Reject request"
+        title={isOwnRequest ? 'Withdraw your request' : 'Reject request'}
         width={440}
         onSubmit={handleReject}
-        submitLabel="Reject"
+        submitLabel={isOwnRequest ? 'Withdraw' : 'Reject'}
         submitVariant="danger"
         busy={reject.isPending}
       >
@@ -126,7 +135,9 @@ export function PatientDecisionActions({
             onChange={setNote}
             onBlur={() => setIsNoteTouched(true)}
             maxLength={NOTE_MAX_LENGTH}
-            placeholder="Why is this change being turned down?"
+            placeholder={
+              isOwnRequest ? 'Why are you withdrawing it?' : 'Why is this change being turned down?'
+            }
           />
         </Field>
       </FormModal>

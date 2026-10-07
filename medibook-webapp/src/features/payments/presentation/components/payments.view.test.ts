@@ -134,6 +134,7 @@ describe('refundAvailability (UAT-10, UAT-41)', () => {
       processedAt: null,
       failureReason: null,
       cashSessionId: null,
+      channel: 'online',
     };
     expect(lineRefundOf(unknown, [{ ...refund, id: 'r-1', status: 'superseded' }, refund])).toEqual(
       { id: 'r-2', status: 'processing', amountRupees: 500, failureReason: null },

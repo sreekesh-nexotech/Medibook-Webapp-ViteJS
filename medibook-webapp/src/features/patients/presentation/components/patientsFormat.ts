@@ -183,6 +183,8 @@ const PAYMENT_BADGES: Readonly<Record<AppointmentPaymentStatus, BadgeSpec>> = {
   paid: { status: 'Paid', label: 'Paid' },
   refunded: { status: 'Refunded', label: 'Refunded' },
   failed: { status: 'Failed', label: 'Failed' },
+  not_required: { status: 'Inactive', label: 'No charge' },
+  cancelled: { status: 'Inactive', label: 'Not paid' },
 };
 
 /**
@@ -325,6 +327,22 @@ export function diffDemographics(
     if (next[key] !== current[key]) changes[key] = next[key];
   }
   return changes as Partial<PatientDemographics>;
+}
+
+/**
+ * Whether the signed-in user asked for this change: by id when the server
+ * sends it (the record's pending request, B6), else by name (the queue's rows
+ * carry only the requester's name).
+ */
+export function isOwnChangeRequest(
+  requestedByUserId: string | null,
+  requestedByName: string | null,
+  me: { readonly id: string; readonly firstName: string; readonly lastName: string | null } | null,
+): boolean {
+  if (!me) return false;
+  if (requestedByUserId !== null) return requestedByUserId === me.id;
+  const myName = [me.firstName, me.lastName].filter(Boolean).join(' ').trim();
+  return requestedByName !== null && myName !== '' && requestedByName.trim() === myName;
 }
 
 /** A user-safe sentence for a failed save: the first field message, else the failure's own. */

@@ -62,6 +62,15 @@ describe('exportTruncation', () => {
     });
   });
 
+  it('reads the row count the payments export sends (B3)', () => {
+    expect(
+      exportTruncation({ 'x-export-truncated': 'true', 'x-export-row-count': '10000' }),
+    ).toEqual({ truncated: true, rowLimit: 10000 });
+    expect(exportTruncation({ 'x-export-truncated': 'false', 'x-export-row-count': '42' })).toEqual(
+      { truncated: false, rowLimit: null },
+    );
+  });
+
   it('is not truncated without the header, or when it says false', () => {
     expect(exportTruncation({})).toEqual({ truncated: false, rowLimit: null });
     expect(exportTruncation({ 'x-export-truncated': 'false' }).truncated).toBe(false);

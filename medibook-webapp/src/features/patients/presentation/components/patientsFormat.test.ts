@@ -7,6 +7,7 @@ import {
   demographicsOf,
   diffDemographics,
   displayPhone,
+  isOwnChangeRequest,
   phoneError,
   pincodeError,
   toE164,
@@ -34,6 +35,7 @@ const RECORD: PatientRecord = {
   linkMethod: null,
   linkedAt: null,
   pendingChange: null,
+  completedVisits: 2,
   createdAt: '2026-10-01T09:00:00Z',
   version: 3,
 };
@@ -131,5 +133,21 @@ describe('change values', () => {
     expect(
       changeSummary([{ field: 'phone_e164', before: '+919876543210', after: '+919999999999' }]),
     ).toBe('phone: +919876543210 → +919999999999');
+  });
+});
+
+describe('isOwnChangeRequest (L-09)', () => {
+  const me = { id: 'u-1', firstName: 'Anita', lastName: 'Menon' };
+
+  it('matches by id when the server sends one', () => {
+    expect(isOwnChangeRequest('u-1', 'Someone Else', me)).toBe(true);
+    expect(isOwnChangeRequest('u-2', 'Anita Menon', me)).toBe(false);
+  });
+
+  it('falls back to the name on queue rows that carry no id', () => {
+    expect(isOwnChangeRequest(null, 'Anita Menon', me)).toBe(true);
+    expect(isOwnChangeRequest(null, 'Vineeth Kumar', me)).toBe(false);
+    expect(isOwnChangeRequest(null, null, me)).toBe(false);
+    expect(isOwnChangeRequest('u-1', null, null)).toBe(false);
   });
 });

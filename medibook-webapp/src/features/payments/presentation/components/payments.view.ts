@@ -167,8 +167,10 @@ export function refundAvailability(
 export const REFUND_STATUS_BADGE: Readonly<
   Record<RefundStatus, { readonly status: string; readonly label: string }>
 > = {
-  requested: { status: 'Pending', label: 'Refund requested' },
-  processing: { status: 'Pending', label: 'Refund processing' },
+  // Both are "with the gateway" to the desk (B3: processing may also mean
+  // the outcome is being reconciled).
+  requested: { status: 'Pending', label: 'Refund pending' },
+  processing: { status: 'Pending', label: 'Refund pending' },
   processed: { status: 'Refunded', label: 'Refunded' },
   failed: { status: 'Failed', label: 'Refund failed' },
   superseded: { status: 'Inactive', label: 'Replaced' },

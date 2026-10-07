@@ -68,6 +68,8 @@ export interface PatientRecord {
   readonly linkMethod: string | null;
   readonly linkedAt: string | null;
   readonly pendingChange: PendingPatientChange | null;
+  /** Completed consultations here, when the list row carries it (B6); `null` otherwise. */
+  readonly completedVisits: number | null;
   readonly createdAt: string;
   /** Row version for `If-Match`. */
   readonly version: number;
@@ -134,7 +136,12 @@ export type AppointmentStatus =
 
 export type AppointmentSource = 'online' | 'walk_in';
 
-export type AppointmentPaymentStatus = 'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed';
+/**
+ * `not_required` = a free (₹0) booking; `cancelled` = called off before any
+ * money was taken (backend B3).
+ */
+export type AppointmentPaymentStatus =
+  'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed' | 'not_required' | 'cancelled';
 
 /** One row of a patient's booking history at this hospital. */
 export interface PatientAppointment {
