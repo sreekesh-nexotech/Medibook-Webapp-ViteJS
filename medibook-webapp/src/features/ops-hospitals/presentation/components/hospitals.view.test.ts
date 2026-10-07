@@ -32,8 +32,15 @@ function hospital(overrides: Partial<PlatformHospital> = {}): PlatformHospital {
     convenienceFeeKind: 'flat',
     convenienceFeeValue: 2000,
     goLiveAt: '2026-08-01T00:00:00Z',
+    timezone: 'Asia/Kolkata',
     createdAt: '2026-07-01T00:00:00Z',
     version: 1,
+    planName: null,
+    planCode: null,
+    subscriptionStatus: null,
+    bookings30d: null,
+    onboardingStage: null,
+    suspensionReason: null,
     ...overrides,
   };
 }
@@ -79,5 +86,14 @@ describe('bookabilityGaps', () => {
       'Online booking is switched off.',
     ]);
     expect(bookabilityGaps(hospital({ status: 'suspended' }))).toEqual(['It is suspended.']);
+  });
+});
+
+describe('bookabilityGaps for a read-only subscription (10·F11)', () => {
+  it('says a lapsed subscription blocks booking', () => {
+    expect(bookabilityGaps(hospital(), 'read_only')).toEqual([
+      'It is read-only: its Medibook subscription is unpaid.',
+    ]);
+    expect(bookabilityGaps(hospital(), 'active')).toEqual([]);
   });
 });

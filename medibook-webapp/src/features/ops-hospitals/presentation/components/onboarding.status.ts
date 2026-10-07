@@ -110,6 +110,8 @@ export const NO_ADMIN_BLOCKER = 'no_admin_accepted';
 export function blockerCopy(blocker: GoLiveBlocker, checklist: readonly ChecklistItem[]): string {
   const names = blocker.details.map((code) => checklist.find((i) => i.code === code)?.name ?? code);
   switch (blocker.code) {
+    case 'not_approved':
+      return 'The application has not been approved yet (L-29): approve it first.';
     case 'checklist_incomplete':
       return `${names.length} checklist document${names.length === 1 ? '' : 's'} not verified or waived: ${names.join(', ')}.`;
     case NO_ADMIN_BLOCKER:

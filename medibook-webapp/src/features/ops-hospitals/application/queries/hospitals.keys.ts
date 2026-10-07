@@ -14,6 +14,10 @@ export const hospitalsKeys = {
   counts: () => [...hospitalsKeys.all, 'counts'] as const,
   details: () => [...hospitalsKeys.all, 'detail'] as const,
   detail: (id: string) => [...hospitalsKeys.details(), id] as const,
+  numbering: (id: string, kind: string) => [...hospitalsKeys.all, 'numbering', id, kind] as const,
+  tokenPolicy: (id: string) => [...hospitalsKeys.all, 'token-policy', id] as const,
+  commissionHistory: (id: string) => [...hospitalsKeys.all, 'commission-history', id] as const,
+  bankAccounts: (id: string) => [...hospitalsKeys.all, 'bank-accounts', id] as const,
 };
 
 /**
