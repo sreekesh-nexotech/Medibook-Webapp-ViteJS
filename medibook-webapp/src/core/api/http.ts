@@ -2,6 +2,7 @@ import axios, { isAxiosError } from 'axios';
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { z } from 'zod';
 
+import { isBackgroundTraffic } from '@/core/api/activity';
 import { announceRotation, announceSessionEnd } from '@/core/api/sessionSync';
 import { activeSurface } from '@/core/api/surface';
 import type { ApiSurface } from '@/core/api/surface';
@@ -15,6 +16,8 @@ import {
 } from '@/core/api/tokens';
 import { toTokenGrant, tokensResponseSchema } from '@/core/api/tokens.response';
 import {
+  ACTIVITY_BACKGROUND,
+  ACTIVITY_HEADER,
   API_PREFIX,
   API_TIMEOUT_MS,
   AUTH_HEADER,
@@ -36,7 +39,9 @@ import { API_BASE_URL } from '@/core/config/env';
  *   expired (`onSessionExpired` listeners fire) and the 401 propagates.
  *
  * Refreshes are serialised across this browser's tabs, and every rotation
- * and sign-out is shared with the other tabs (`sessionSync.ts`).
+ * and sign-out is shared with the other tabs (`sessionSync.ts`). A read sent
+ * while the user is idle in every tab carries `X-Medibook-Activity:
+ * background` (`activity.ts`).
  *
  * Clients resolve to raw Axios responses; `*.api.ts` files validate bodies
  * with Zod and repositories wrap calls in `attempt()` to get a `Result`.
@@ -221,6 +226,11 @@ function bearer(token: string): string {
   return `${AUTH_SCHEME} ${token}`;
 }
 
+/** GET (Axios's default method) — the only verb a background poll uses. */
+function isReadRequest(config: InternalAxiosRequestConfig): boolean {
+  return (config.method ?? 'get').toLowerCase() === 'get';
+}
+
 function createClient(basePath: string, resolveSurface: () => ApiSurface): AxiosInstance {
   const client = axios.create({ baseURL: `${API_ROOT}${basePath}`, timeout: API_TIMEOUT_MS });
 
@@ -231,6 +241,12 @@ function createClient(basePath: string, resolveSurface: () => ApiSurface): Axios
       getAccessToken(surface) ??
       (getRefreshToken(surface) ? await refreshAccessToken(surface) : null);
     if (token) config.headers.set(AUTH_HEADER, bearer(token));
+    // A read made while the user is idle in every tab is a poll: tell the
+    // server so it does not keep the idle session alive (BE-21). Writes are
+    // always user actions.
+    if (isReadRequest(config) && isBackgroundTraffic(surface)) {
+      config.headers.set(ACTIVITY_HEADER, ACTIVITY_BACKGROUND);
+    }
     return config;
   });
 

@@ -22,6 +22,16 @@ export const IF_MATCH_HEADER = 'If-Match';
 /** Replay-safe writes: the backend dedupes a declared method by this key (D-21). */
 export const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 
+/**
+ * Marks a request the user did not make (a poll while they are idle), so the
+ * server does not count it as activity for the idle session limit (BE-21,
+ * SEC-01-B). The backend's CORS allowlist must accept this header.
+ */
+export const ACTIVITY_HEADER = 'X-Medibook-Activity';
+
+/** `ACTIVITY_HEADER` value for background traffic. */
+export const ACTIVITY_BACKGROUND = 'background';
+
 /** Echoed in every error envelope's `request_id`; the backend also reads it. */
 export const REQUEST_ID_HEADER = 'X-Request-Id';
 

@@ -27,6 +27,13 @@ const userSchema = z.object({
 
 const roleSchema = z.object({ code: z.string(), name: z.string() });
 
+/**
+ * The idle limit the server applies to this session (BE-21,
+ * `platform_settings.session_timeout_min`). Optional and nullable so a
+ * backend without it still signs in; the client then uses its default.
+ */
+const sessionTimeoutSchema = z.number().int().positive().nullable().optional();
+
 export const hospitalMeResponseSchema = z.object({
   user: userSchema,
   staff: z.object({ id: z.string() }),
@@ -41,12 +48,14 @@ export const hospitalMeResponseSchema = z.object({
     logo_file_id: z.string().nullable().optional(),
   }),
   default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
+  session_timeout_min: sessionTimeoutSchema,
 });
 
 export const platformMeResponseSchema = z.object({
   user: userSchema,
   role: roleSchema,
   permissions: z.array(z.string()),
+  session_timeout_min: sessionTimeoutSchema,
 });
 
 export const invitationPreviewResponseSchema = z.object({
@@ -84,6 +93,7 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
     defaultCounter: dto.default_counter,
     role: dto.role,
     permissions: dto.permissions,
+    sessionTimeoutMin: dto.session_timeout_min ?? null,
     hospital: {
       id: dto.hospital.id,
       name: dto.hospital.name,
@@ -100,6 +110,7 @@ export function toPlatformSession(dto: PlatformMeResponse): PlatformSession {
     user: toStaffUser(dto.user),
     role: dto.role,
     permissions: dto.permissions,
+    sessionTimeoutMin: dto.session_timeout_min ?? null,
   };
 }
 

@@ -17,10 +17,12 @@ class FakeSocket {
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onclose: ((event: { code: number }) => void) | null = null;
 
-  constructor(
-    readonly url: string,
-    readonly protocols: readonly string[],
-  ) {
+  readonly url: string;
+  readonly protocols: readonly string[];
+
+  constructor(url: string, protocols: readonly string[]) {
+    this.url = url;
+    this.protocols = protocols;
     FakeSocket.instances.push(this);
   }
 

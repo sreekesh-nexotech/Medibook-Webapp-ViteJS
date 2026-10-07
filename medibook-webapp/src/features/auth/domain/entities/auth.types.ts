@@ -45,6 +45,8 @@ export interface HospitalSession {
   readonly role: StaffRole;
   /** Short permission codes, e.g. `appointments.view`. */
   readonly permissions: readonly string[];
+  /** Server-side idle limit in minutes, when the backend reports it (BE-21). */
+  readonly sessionTimeoutMin: number | null;
   readonly hospital: {
     readonly id: string;
     readonly name: string;
@@ -62,6 +64,8 @@ export interface PlatformSession {
   readonly user: StaffUser;
   readonly role: StaffRole;
   readonly permissions: readonly string[];
+  /** Server-side idle limit in minutes, when the backend reports it (BE-21). */
+  readonly sessionTimeoutMin: number | null;
 }
 
 export type StaffSession = HospitalSession | PlatformSession;

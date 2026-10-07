@@ -52,9 +52,11 @@ interface HospitalShellProps {
 
 /** Hospital app frame: sidebar + topbar + per-view error boundary (design `AppShell`). */
 export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
-  // SEC-01: background polls keep the server session alive, so the tab signs
-  // itself out after the idle limit with no keyboard, mouse or touch input.
-  const idle = useIdleTimeout({ minutes: DEFAULT_IDLE_MINUTES, onTimeout: onLogout });
+  // SEC-01: the shell signs out after the idle limit with no keyboard, mouse
+  // or touch input in any hospital tab (UAT-04). The limit is the server's
+  // (`/hospital/me` `session_timeout_min`, BE-21) when it reports one.
+  const idleMinutes = session.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES;
+  const idle = useIdleTimeout({ minutes: idleMinutes, surface: 'hospital', onTimeout: onLogout });
   const location = useLocation();
   const navigate = useNavigate();
   const { canViewModule } = usePermission();
@@ -158,7 +160,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
       <IdleWarningModal
         open={idle.warning}
         secondsLeft={idle.secondsLeft}
-        minutes={DEFAULT_IDLE_MINUTES}
+        minutes={idleMinutes}
         onStay={idle.stayActive}
         onSignOut={onLogout}
       />
