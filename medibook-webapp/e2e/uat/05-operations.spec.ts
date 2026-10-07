@@ -734,7 +734,7 @@ test('4.5 Operations — owner', async ({ browser }) => {
     ).toBeVisible();
 
     // Paid in full; the hospital is no longer read-only.
-    await page.getByRole('button', { name: 'Mark as Paid' }).click();
+    await page.getByRole('button', { name: 'Mark as Paid', exact: true }).click();
     const paid = dialog(page, `Mark ${inv.invoice_no} as paid`);
     await paid.getByLabel(/^Reference/).fill(`NEFT-UAT-${tag}`);
     await paid.getByRole('button', { name: 'Record Payment' }).click();
@@ -860,7 +860,11 @@ test('4.5 Operations — owner', async ({ browser }) => {
     // Analytics follows the reporting period.
     await openNav(page, 'Usage Analytics');
     const [overview] = await Promise.all([
-      page.waitForResponse(isCall('GET', /^\/api\/v1\/platform\/analytics\/overview$/)),
+      page.waitForResponse(
+        (r) =>
+          isCall('GET', /^\/api\/v1\/platform\/analytics\/overview$/)(r) &&
+          new URL(r.url()).searchParams.get('period') === '7d',
+      ),
       page.getByRole('combobox', { name: 'Reporting period' }).selectOption('Last 7 days'),
     ]);
     expect(overview.status()).toBe(200);

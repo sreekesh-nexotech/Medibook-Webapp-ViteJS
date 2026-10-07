@@ -259,6 +259,7 @@ test('4.6 Other operations roles', async ({ browser }) => {
     await page.keyboard.press('Escape');
     // Log rows carry hospital and actor names, not ids (appendix 12 F17).
     await openNav(page, 'Compliance Logs');
+    await expect(dataRows(page, 'Compliance log entries').first()).toBeVisible();
     await s.watch.settled();
     const hospitals = await dataRows(page, 'Compliance log entries')
       .locator('td:nth-child(3)')
