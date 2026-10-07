@@ -9,8 +9,15 @@
 export const PLATFORM_USER_STATUSES = ['active', 'blocked', 'pending_deletion', 'deleted'] as const;
 export type PlatformUserStatus = (typeof PLATFORM_USER_STATUSES)[number];
 
-/** Server-side sort for the accounts list — the only sortable column is registration. */
-export type PlatformUserSort = 'created_at' | '-created_at';
+/** Server-side sorts: registration, and booking count once B2 adds it (BE-31). */
+export type PlatformUserSort = 'created_at' | '-created_at' | 'booking_count' | '-booking_count';
+
+/** What a KPI tile counts: accounts in one status, and/or registered since a day. */
+export interface PlatformUserCountFilter {
+  readonly status: PlatformUserStatus | null;
+  /** Inclusive `yyyy-mm-dd` (IST) — B2's `created_from` (BE-31). */
+  readonly createdFrom: string | null;
+}
 
 /** Filters, sort and page for `GET /platform/users`. */
 export interface PlatformUserListParams {

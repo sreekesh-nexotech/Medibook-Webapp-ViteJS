@@ -26,12 +26,13 @@ export const platformUsersRepository: PlatformUsersRepository = {
   listUsers: (params) =>
     attempt(async () => toPage(await getPlatformUsers(toListQuery(params)), toPlatformUserSummary)),
 
-  countUsers: (status) =>
+  countUsers: ({ status, createdFrom }) =>
     attempt(async () => {
       const page = await getPlatformUsers({
         page: 1,
         page_size: COUNT_PAGE_SIZE,
         ...(status ? { status } : {}),
+        ...(createdFrom ? { created_from: createdFrom } : {}),
       });
       return page.total;
     }),

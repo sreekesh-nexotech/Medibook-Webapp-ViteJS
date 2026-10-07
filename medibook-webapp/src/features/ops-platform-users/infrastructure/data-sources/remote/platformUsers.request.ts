@@ -15,6 +15,8 @@ export interface PlatformUsersListQuery {
   readonly q?: string;
   readonly status?: string;
   readonly sort?: string;
+  /** B2 (BE-31): registered on or after this `yyyy-mm-dd`. */
+  readonly created_from?: string;
 }
 
 export function toListQuery(params: PlatformUserListParams): PlatformUsersListQuery {

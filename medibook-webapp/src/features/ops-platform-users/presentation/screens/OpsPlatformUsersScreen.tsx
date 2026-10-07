@@ -19,6 +19,7 @@ import {
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { useSort } from '@/shared/hooks/useSort';
+import { addDaysISO, todayISO } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
@@ -40,8 +41,12 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** No City column: the backend holds no city for a patient account (13·Platform Users F1). */
 const PU_COLUMNS = ['User', 'Phone', 'Bookings', 'Joined', 'Status', 'Action'] as const;
 
-/** The one column the server can sort — registration date. */
+/** Columns the server sorts: registration date, and booking count (B2, BE-31). */
 const JOINED_SORT_KEY = 'joined';
+const BOOKINGS_SORT_KEY = 'bookings';
+
+/** Days counted as "this week" for the New This Week tile. */
+const NEW_WINDOW_DAYS = 7;
 
 const ALL_STATUSES_LABEL = 'Status: All';
 
@@ -81,13 +86,27 @@ export function OpsPlatformUsersScreen() {
   const params: PlatformUserListParams = {
     q: searchQ,
     statuses: status ? [status] : [],
-    sort: sort.key === JOINED_SORT_KEY ? (sort.dir === 'asc' ? 'created_at' : '-created_at') : null,
+    sort:
+      sort.key === JOINED_SORT_KEY
+        ? sort.dir === 'asc'
+          ? 'created_at'
+          : '-created_at'
+        : sort.key === BOOKINGS_SORT_KEY
+          ? sort.dir === 'asc'
+            ? 'booking_count'
+            : '-booking_count'
+          : null,
     page: page + 1,
     pageSize: OPS_PU_PAGE,
   };
   const list = usePlatformUsersQuery(params);
-  const registered = usePlatformUserCountQuery(null);
-  const blockedCount = usePlatformUserCountQuery('blocked');
+  const registered = usePlatformUserCountQuery({ status: null, createdFrom: null });
+  const blockedCount = usePlatformUserCountQuery({ status: 'blocked', createdFrom: null });
+  // B2's `created_from` (BE-31); an older backend answers 400 and the tile says so.
+  const newThisWeek = usePlatformUserCountQuery({
+    status: null,
+    createdFrom: addDaysISO(todayISO(), -NEW_WINDOW_DAYS),
+  });
 
   const kpis: readonly StatCardData[] = [
     {
@@ -111,8 +130,10 @@ export function OpsPlatformUsersScreen() {
     {
       icon: 'user-plus',
       label: 'New This Week',
-      value: NO_VALUE,
-      sub: NOT_AVAILABLE_SUB,
+      value: countValue(newThisWeek.data),
+      sub: newThisWeek.isError
+        ? NOT_AVAILABLE_SUB
+        : `Registered in the last ${NEW_WINDOW_DAYS} days`,
       iconClass: 'bg-blue-soft-bg text-blue',
       valueClass: 'text-blue',
       subClass: 'text-text-muted',
@@ -156,7 +177,12 @@ export function OpsPlatformUsersScreen() {
   };
 
   const handleRefresh = async (): Promise<void> => {
-    await Promise.all([list.refetch(), registered.refetch(), blockedCount.refetch()]);
+    await Promise.all([
+      list.refetch(),
+      registered.refetch(),
+      blockedCount.refetch(),
+      newThisWeek.refetch(),
+    ]);
   };
 
   const tableState: TableStateSpec | undefined = list.isPending
@@ -219,7 +245,7 @@ export function OpsPlatformUsersScreen() {
           columns={PU_COLUMNS}
           scrollLabel="Patient accounts"
           rightCols={['Bookings']}
-          sortKeys={{ Joined: JOINED_SORT_KEY }}
+          sortKeys={{ Joined: JOINED_SORT_KEY, Bookings: BOOKINGS_SORT_KEY }}
           sort={sort}
           onSort={handleSort}
           state={tableState}
