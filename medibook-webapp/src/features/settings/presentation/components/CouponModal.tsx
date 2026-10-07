@@ -1,27 +1,27 @@
-import { useMemo } from 'react';
-
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { dateRange, minLen, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
+import { toast } from '@/shared/ui/toast/toast.store';
 import { Toggle } from '@/shared/ui/Toggle';
 
 import type { Department } from '@/features/doctors/domain/entities/doctors.types';
 import type {
   CouponInput,
   HospitalCoupon,
-  PricedService,
 } from '@/features/settings/domain/entities/services.entities';
 import {
+  cheapestConsultationRupees,
   couponDiscount,
+  type CouponDoctor,
   dayEndExclusiveIso,
   dayStartIso,
-  flatCouponCeiling,
   lastValidDay,
   localDay,
   MAX_PERCENT_COUPON,
@@ -36,28 +36,18 @@ function normaliseCouponCode(code: string): string {
 }
 
 /** A message under the value field, or `undefined` when acceptable. */
-function validateCouponValue(
-  type: CouponType,
-  value: number,
-  ceiling: number | null,
-): string | undefined {
+function validateCouponValue(type: CouponType, value: number): string | undefined {
   if (!Number.isFinite(value) || value <= 0) return 'Enter a discount greater than zero.';
-  if (type === 'Percent') {
-    return value > MAX_PERCENT_COUPON
-      ? `A percent coupon cannot exceed ${MAX_PERCENT_COUPON}%.`
-      : undefined;
-  }
-  if (ceiling != null && value > ceiling) {
-    return `A flat coupon cannot exceed the service price — the cheapest applicable service is ${money(ceiling)}.`;
-  }
-  return undefined;
+  return type === 'Percent' && value > MAX_PERCENT_COUPON
+    ? `A percent coupon cannot exceed ${MAX_PERCENT_COUPON}%.`
+    : undefined;
 }
 
 /** Shortest usable code, e.g. "MB20". */
 const MIN_CODE_LENGTH = 4;
 
-/** Order value the discount preview uses when no service is in scope. */
-const PREVIEW_ORDER_VALUE = 1000;
+/** Consultation fee the discount preview uses when no doctor is in scope. */
+const PREVIEW_ORDER_VALUE = 500;
 
 const DATE_INPUT_CLASS =
   'rounded-input border-border text-body text-text-body h-12 w-full border bg-white px-3';
@@ -73,15 +63,14 @@ interface CouponForm {
   perUserCap: string;
   /** Percent coupons only; empty = no ceiling. */
   maxDiscount: string;
-  onlineOnly: boolean;
   minOrder: string;
   departmentIds: readonly string[];
-  serviceIds: readonly string[];
   active: boolean;
 }
 
-const BASE_VALIDATORS: FormValidators<CouponForm> = {
+const VALIDATORS: FormValidators<CouponForm> = {
   code: (v) => minLen(normaliseCouponCode(v), MIN_CODE_LENGTH, 'Coupon code'),
+  value: (v, values) => validateCouponValue(values.type, Number(v)),
   from: (v) => required(v, 'Start date'),
   to: (v, values) => dateRange(values.from, v),
   usageCap: (v) => {
@@ -93,59 +82,58 @@ const BASE_VALIDATORS: FormValidators<CouponForm> = {
   },
 };
 
+/** Server field → form field (UAT-48); `scopes[0].department_id` lands on the picker. */
+function serverField(key: string): keyof CouponForm | undefined {
+  if (key.startsWith('scopes')) return 'departmentIds';
+  const map: Readonly<Record<string, keyof CouponForm>> = {
+    code: 'code',
+    kind: 'type',
+    value: 'value',
+    valid_from: 'from',
+    valid_to: 'to',
+    usage_cap: 'usageCap',
+    per_user_cap: 'perUserCap',
+    max_discount_paise: 'maxDiscount',
+    min_order_paise: 'minOrder',
+  };
+  return map[key];
+}
+
 interface CouponModalProps {
   open: boolean;
   /** The coupon being edited, or null to create one. */
   coupon: HospitalCoupon | null;
-  /** The whole catalogue, for the scope pickers and the flat-value ceiling. */
-  services: readonly PricedService[];
+  /** Doctors' departments and fees — what an app booking's discount is taken from. */
+  doctors: readonly CouponDoctor[];
   /** The hospital's departments (H1). */
   departments: readonly Department[];
   onClose: () => void;
-  /** Persist; resolves `true` when saved (the caller reports failures). */
-  onSave: (input: CouponInput) => Promise<boolean>;
+  /** Persist; rejects with the server's failure so its field errors land on the form. */
+  onSave: (input: CouponInput) => Promise<void>;
 }
 
 /**
- * Create / edit a discount coupon (audit HA-04), including the two guards the
- * audit asks for: a percent coupon may not exceed 100%, and a flat coupon may
- * not exceed the cheapest service it applies to. Both are inline `Field`
- * errors — never a toast.
+ * Create / edit a discount coupon (audit HA-04).
+ *
+ * Decision 7: coupons are applied by patients booking in the Medibook app —
+ * the front desk takes no coupon codes — and can be limited to departments
+ * only (service scopes could never match an app booking, BE-25). The discount
+ * comes off the consultation fee, so the preview and the flat-value note use
+ * the cheapest consultation in scope; a flat coupon above it simply stops at
+ * the fee.
  *
  * The validity window is picked as whole local days and saved as instants:
  * from the start of the first day to the start of the day after the last
- * (the backend's `valid_to` is exclusive). A scoped coupon applies when any
- * scope matches the booking — its department or its service.
+ * (the backend's `valid_to` is exclusive).
  */
 export function CouponModal({
   open,
   coupon,
-  services,
+  doctors,
   departments,
   onClose,
   onSave,
 }: CouponModalProps) {
-  // The value rule depends on the *scope* fields as well as the value, so the
-  // validator is built from the catalogue rather than declared at module level.
-  const validators = useMemo<FormValidators<CouponForm>>(
-    () => ({
-      ...BASE_VALIDATORS,
-      value: (v, values) =>
-        validateCouponValue(
-          values.type,
-          Number(v),
-          flatCouponCeiling(
-            {
-              serviceIds: values.serviceIds,
-              departmentIds: values.departmentIds,
-            },
-            services,
-          ),
-        ),
-    }),
-    [services],
-  );
-
   const form = useForm<CouponForm>({
     initial: {
       code: coupon?.code ?? '',
@@ -156,63 +144,70 @@ export function CouponModal({
       usageCap: String(coupon?.usageCap ?? 0),
       perUserCap: String(coupon?.perUserCap ?? 0),
       maxDiscount: coupon?.maxDiscountRupees == null ? '' : String(coupon.maxDiscountRupees),
-      onlineOnly: coupon?.onlineOnly ?? false,
       minOrder: String(coupon?.minOrderRupees ?? 0),
-      departmentIds: coupon?.departmentIds ?? [],
-      serviceIds: coupon?.serviceIds ?? [],
+      // Drop departments that no longer exist, so a save is not refused for them (07·S-F7).
+      departmentIds: (coupon?.departmentIds ?? []).filter((id) =>
+        departments.some((d) => d.id === id),
+      ),
       active: coupon?.isActive ?? true,
     },
-    validate: validators,
+    validate: VALIDATORS,
     onSubmit: async (v) => {
       const cap = Number(v.usageCap || 0);
       const perUser = Number(v.perUserCap || 0);
-      const saved = await onSave({
-        code: normaliseCouponCode(v.code),
-        kind: v.type === 'Flat' ? 'flat' : 'percent',
-        value: Number(v.value),
-        validFrom: dayStartIso(v.from),
-        validTo: dayEndExclusiveIso(v.to),
-        usageCap: cap > 0 ? cap : null,
-        perUserCap: perUser > 0 ? perUser : null,
-        maxDiscountRupees:
-          v.type === 'Percent' && v.maxDiscount !== '' ? Number(v.maxDiscount) : null,
-        onlineOnly: v.onlineOnly,
-        minOrderRupees: Number(v.minOrder || 0),
-        departmentIds: v.departmentIds,
-        serviceIds: v.serviceIds,
-        isActive: v.active,
-      });
-      if (saved) onClose();
+      try {
+        await onSave({
+          code: normaliseCouponCode(v.code),
+          kind: v.type === 'Flat' ? 'flat' : 'percent',
+          value: Number(v.value),
+          validFrom: dayStartIso(v.from),
+          validTo: dayEndExclusiveIso(v.to),
+          usageCap: cap > 0 ? cap : null,
+          perUserCap: perUser > 0 ? perUser : null,
+          maxDiscountRupees:
+            v.type === 'Percent' && v.maxDiscount !== '' ? Number(v.maxDiscount) : null,
+          minOrderRupees: Number(v.minOrder || 0),
+          departmentIds: v.departmentIds,
+          isActive: v.active,
+        });
+        onClose();
+      } catch (error) {
+        toast(
+          form.applyServerErrors(
+            error,
+            { fields: serverField, labels: { scopes: 'Departments' } },
+            'The coupon could not be saved.',
+          ),
+          'error',
+        );
+      }
     },
   });
 
-  const scope = {
-    serviceIds: form.values.serviceIds,
-    departmentIds: form.values.departmentIds,
-  };
-  const ceiling = flatCouponCeiling(scope, services);
+  const departmentIds = form.values.departmentIds;
+  const cheapest = cheapestConsultationRupees(doctors, departmentIds);
   const value = Number(form.values.value);
   const valueError = form.errorFor('value');
+  const isFlat = form.values.type === 'Flat';
 
-  const sampleOrder = ceiling ?? PREVIEW_ORDER_VALUE;
+  const sampleOrder = cheapest ?? PREVIEW_ORDER_VALUE;
   const sampleDiscount =
     form.errors.value || !Number.isFinite(value)
       ? 0
       : couponDiscount(
           {
-            kind: form.values.type === 'Flat' ? 'flat' : 'percent',
+            kind: isFlat ? 'flat' : 'percent',
             value,
             minOrderRupees: Number(form.values.minOrder || 0),
             maxDiscountRupees:
-              form.values.type === 'Percent' && form.values.maxDiscount !== ''
-                ? Number(form.values.maxDiscount)
-                : null,
+              !isFlat && form.values.maxDiscount !== '' ? Number(form.values.maxDiscount) : null,
           },
           sampleOrder,
         );
-
-  const serviceLabel = (s: PricedService): string => `${s.name} (${money(s.priceRupees)})`;
-  const deptNameOf = (id: string): string => departments.find((d) => d.id === id)?.name ?? id;
+  const flatAboveFee = isFlat && cheapest !== null && Number.isFinite(value) && value > cheapest;
+  const legacyServices = coupon?.legacyServiceIds.length ?? 0;
+  const deptNameOf = (id: string): string =>
+    departments.find((d) => d.id === id)?.name ?? 'Removed department';
 
   return (
     <FormModal
@@ -225,6 +220,20 @@ export function CouponModal({
       busy={form.submitting}
     >
       <div className="flex flex-col gap-4">
+        <p className="text-body bg-bg-tint text-text-navy flex items-start gap-2 rounded-md px-3 py-2.5">
+          <Icon name="smartphone" size={16} className="mt-0.5 flex-none" />
+          Patients apply coupons when they book in the Medibook app. The front desk does not take
+          coupon codes.
+        </p>
+        {legacyServices > 0 && (
+          <p className="text-body bg-y-100 text-y-700 flex items-start gap-2 rounded-md px-3 py-2.5">
+            <Icon name="triangle-alert" size={16} className="mt-0.5 flex-none" />
+            This coupon was also limited to {legacyServices} service
+            {legacyServices === 1 ? '' : 's'}. Coupons can now be limited to departments only, so
+            saving keeps just its departments.
+          </p>
+        )}
+        <FormErrorSummary messages={form.serverSummary} />
         <div className="grid grid-cols-3 gap-4">
           <Field label="Code" required error={form.errorFor('code')}>
             <TextInput
@@ -236,7 +245,7 @@ export function CouponModal({
               autoFocus
             />
           </Field>
-          <Field label="Discount Type">
+          <Field label="Discount Type" error={form.errorFor('type')}>
             <Select
               value={form.values.type}
               options={COUPON_TYPES}
@@ -245,15 +254,15 @@ export function CouponModal({
             />
           </Field>
           <Field
-            label={form.values.type === 'Percent' ? 'Discount (%)' : 'Discount (₹)'}
+            label={isFlat ? 'Discount (₹)' : 'Discount (%)'}
             required
             error={valueError}
             hint={
-              form.values.type === 'Percent'
+              !isFlat
                 ? 'Up to 100%.'
-                : ceiling != null
-                  ? `Up to ${money(ceiling)} — the cheapest applicable service.`
-                  : 'No service in scope yet.'
+                : flatAboveFee
+                  ? `Above the cheapest consultation in scope (${money(cheapest)}) — there the discount stops at the fee.`
+                  : 'Taken off the consultation fee.'
             }
           >
             <TextInput
@@ -304,7 +313,11 @@ export function CouponModal({
               height={48}
             />
           </Field>
-          <Field label="Uses per Patient" hint="How often one patient may use it. 0 = unlimited.">
+          <Field
+            label="Uses per Patient"
+            error={form.errorFor('perUserCap')}
+            hint="How often one patient may use it. 0 = unlimited."
+          >
             <TextInput
               value={form.values.perUserCap}
               onChange={(v) => form.setField('perUserCap', v.replace(/[^0-9]/g, ''))}
@@ -315,7 +328,11 @@ export function CouponModal({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Minimum Order Value (₹)" hint="The code does nothing below this amount.">
+          <Field
+            label="Minimum Order Value (₹)"
+            error={form.errorFor('minOrder')}
+            hint="The code does nothing below this amount."
+          >
             <TextInput
               value={form.values.minOrder}
               onChange={(v) => form.setField('minOrder', v.replace(/[^0-9]/g, ''))}
@@ -323,8 +340,14 @@ export function CouponModal({
               height={48}
             />
           </Field>
-          {form.values.type === 'Percent' ? (
-            <Field label="Maximum Discount (₹)" hint="Caps the percent discount. Empty = no cap.">
+          {isFlat ? (
+            <span />
+          ) : (
+            <Field
+              label="Maximum Discount (₹)"
+              error={form.errorFor('maxDiscount')}
+              hint="Caps the percent discount. Empty = no cap."
+            >
               <TextInput
                 value={form.values.maxDiscount}
                 onChange={(v) => form.setField('maxDiscount', v.replace(/[^0-9]/g, ''))}
@@ -333,88 +356,42 @@ export function CouponModal({
                 height={48}
               />
             </Field>
-          ) : (
-            <span />
           )}
         </div>
 
-        <div className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3">
-          <Toggle
-            value={form.values.onlineOnly}
-            onChange={(v) => form.setField('onlineOnly', v)}
-            label="Online bookings only"
+        <Field
+          label="Departments"
+          error={form.errorFor('departmentIds')}
+          hint="Leave empty for every department. A booking qualifies when its doctor is in one of them."
+        >
+          <Select
+            value=""
+            options={departments.filter((d) => !departmentIds.includes(d.id)).map((d) => d.name)}
+            onChange={(name) => {
+              const id = departments.find((d) => d.name === name)?.id;
+              if (id) form.setField('departmentIds', [...departmentIds, id]);
+            }}
+            placeholder="Add a department…"
+            height={48}
           />
-          <div className="flex flex-col">
-            <span className="text-body text-text-strong font-medium">Online bookings only</span>
-            <span className="text-caption text-text-muted">
-              When on, the front desk cannot apply this code — only patients booking in the Medibook
-              app.
-            </span>
-          </div>
-        </div>
+        </Field>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field
-            label="Departments"
-            hint="Leave both empty for everything. A booking qualifies if any pick matches."
-          >
-            <Select
-              value=""
-              options={departments
-                .filter((d) => !scope.departmentIds.includes(d.id))
-                .map((d) => d.name)}
-              onChange={(name) => {
-                const id = departments.find((d) => d.name === name)?.id;
-                if (id) form.setField('departmentIds', [...scope.departmentIds, id]);
-              }}
-              placeholder="Add a department…"
-              height={48}
-            />
-          </Field>
-          <Field label="Services" hint="Leave empty for every service.">
-            <Select
-              value=""
-              options={services.filter((s) => !scope.serviceIds.includes(s.id)).map(serviceLabel)}
-              onChange={(label) => {
-                const id = services.find((s) => serviceLabel(s) === label)?.id;
-                if (id) form.setField('serviceIds', [...scope.serviceIds, id]);
-              }}
-              placeholder="Add a service…"
-              height={48}
-            />
-          </Field>
-        </div>
-
-        {(scope.departmentIds.length > 0 || scope.serviceIds.length > 0) && (
+        {departmentIds.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            {scope.departmentIds.map((id) => (
+            {departmentIds.map((id) => (
               <button
                 key={id}
                 type="button"
                 onClick={() =>
                   form.setField(
                     'departmentIds',
-                    scope.departmentIds.filter((x) => x !== id),
+                    departmentIds.filter((x) => x !== id),
                   )
                 }
+                aria-label={`Remove ${deptNameOf(id)}`}
                 className="text-caption bg-blue-soft-bg text-blue inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5"
               >
                 {deptNameOf(id)} <Icon name="x" size={12} />
-              </button>
-            ))}
-            {scope.serviceIds.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() =>
-                  form.setField(
-                    'serviceIds',
-                    scope.serviceIds.filter((x) => x !== id),
-                  )
-                }
-                className="text-caption bg-p-100 text-text-navy inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5"
-              >
-                {services.find((s) => s.id === id)?.name ?? id} <Icon name="x" size={12} />
               </button>
             ))}
           </div>
@@ -428,7 +405,7 @@ export function CouponModal({
         >
           <Icon name="percent" size={16} className="flex-none" />
           {sampleDiscount > 0
-            ? `On a ${money(sampleOrder)} order this code takes off ${money(sampleDiscount)} — patient pays ${money(sampleOrder - sampleDiscount)}.`
+            ? `On a ${money(sampleOrder)} consultation${cheapest === null ? '' : ' (the cheapest in scope)'} this code takes off ${money(sampleDiscount)} — patient pays ${money(sampleOrder - sampleDiscount)} before the convenience fee.`
             : 'Enter a valid discount to preview what a patient would save.'}
         </div>
 
