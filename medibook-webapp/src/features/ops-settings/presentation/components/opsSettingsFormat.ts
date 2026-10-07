@@ -32,13 +32,19 @@ export const APPLIES_TO_LABEL: Readonly<Record<TaxAppliesTo, string>> = {
   all: 'All',
 };
 
-/** The Applies To select's options, in the backend's order. */
-export const APPLIES_TO_OPTIONS: readonly TaxAppliesTo[] = [
-  'consultation',
-  'service',
-  'convenience_fee',
-  'all',
-];
+/**
+ * What a new or edited rate may apply to. The convenience-fee GST is the
+ * platform setting, not a tax-rate row (BE-18), so `convenience_fee` is no
+ * longer offered — an old row that has it keeps showing it until changed.
+ */
+export const APPLIES_TO_OPTIONS: readonly TaxAppliesTo[] = ['consultation', 'service', 'all'];
+
+/** The Applies To choices for a rate currently set to `current`. */
+export function appliesToOptionsFor(current: TaxAppliesTo): readonly TaxAppliesTo[] {
+  return APPLIES_TO_OPTIONS.includes(current)
+    ? APPLIES_TO_OPTIONS
+    : [current, ...APPLIES_TO_OPTIONS];
+}
 
 /** Session timeout as the select spells it: `30` → `"30 min"`. */
 export function timeoutLabel(minutes: number): string {

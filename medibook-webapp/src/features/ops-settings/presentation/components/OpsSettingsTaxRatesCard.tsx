@@ -35,7 +35,8 @@ type ModalState = { kind: 'closed' } | { kind: 'add' } | { kind: 'edit'; rate: T
 
 /**
  * Platform default tax rates (`/platform/tax-rates`) — the rates hospitals
- * inherit for consultations, services and the convenience fee.
+ * inherit for consultations and services. The convenience-fee GST is the
+ * platform setting above, not a rate here (BE-18).
  */
 export function OpsSettingsTaxRatesCard() {
   const rates = useOpsTaxRatesQuery();
