@@ -116,7 +116,14 @@ function withRefreshLock<T>(surface: ApiSurface, task: () => Promise<T>): Promis
 }
 
 async function postRefresh(surface: ApiSurface, refresh: string): Promise<TokenGrant> {
-  const response = await refreshClient.post(`/${surface}${TOKEN_REFRESH_PATH}`, { refresh });
+  // A refresh made while the user is idle (a socket reconnecting at token
+  // expiry, a poll) rotates the pair without extending the idle limit (B1).
+  const headers = isBackgroundTraffic(surface) ? { [ACTIVITY_HEADER]: ACTIVITY_BACKGROUND } : {};
+  const response = await refreshClient.post(
+    `/${surface}${TOKEN_REFRESH_PATH}`,
+    { refresh },
+    { headers },
+  );
   return toTokenGrant(tokensResponseSchema.parse(response.data));
 }
 
