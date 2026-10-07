@@ -40,7 +40,8 @@ export function Pager({ total, page, pageSize = 8, onPage, noun = 'records', rig
             <button
               type="button"
               aria-label="Previous page"
-              onClick={prevDisabled ? undefined : () => onPage(Math.max(0, pg - 1))}
+              disabled={prevDisabled}
+              onClick={() => onPage(Math.max(0, pg - 1))}
               className={arrowClass(prevDisabled)}
             >
               <Icon name="chevron-left" size={16} />
@@ -48,12 +49,13 @@ export function Pager({ total, page, pageSize = 8, onPage, noun = 'records', rig
             <button
               type="button"
               aria-label="Next page"
-              onClick={nextDisabled ? undefined : () => onPage(Math.min(pages - 1, pg + 1))}
+              disabled={nextDisabled}
+              onClick={() => onPage(Math.min(pages - 1, pg + 1))}
               className={arrowClass(nextDisabled)}
             >
               <Icon name="chevron-right" size={16} />
             </button>
-            <span className="text-body text-text-muted self-center">
+            <span className="text-body text-text-muted self-center" aria-live="polite">
               Page {pg + 1} of {pages}
             </span>
           </div>

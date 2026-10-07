@@ -15,10 +15,17 @@ interface BadgeProps {
 /** Widened view for safe lookup of statuses outside the known map. */
 const STATUS_LOOKUP: Record<string, { bg: string; fg: string } | undefined> = STATUS;
 
-/** Status pill; unknown statuses fall back to Scheduled styling. */
+/**
+ * Neutral pill for a status the palette does not know — a new backend enum
+ * value must read as itself, never borrow "Scheduled" blue and pass for a
+ * booking state (UAT-76, 01·F37). Same pair as the palette's neutral pills.
+ */
+const UNKNOWN_STATUS = { bg: 'bg-grey-300', fg: 'text-grey-900' } as const;
+
+/** Status pill; an unknown status shows its own text on a neutral pill. */
 export function Badge({ status, children, className, style }: BadgeProps) {
   const label = children || status;
-  const s = STATUS_LOOKUP[status ?? ''] ?? STATUS.Scheduled;
+  const s = STATUS_LOOKUP[status ?? ''] ?? UNKNOWN_STATUS;
   return (
     <span
       className={cn(

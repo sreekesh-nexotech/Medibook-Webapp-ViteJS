@@ -1,4 +1,5 @@
 import { cn } from '@/shared/lib/cn';
+import { useTabList } from '@/shared/ui/useTabList';
 
 interface TabsProps {
   tabs: readonly string[];
@@ -6,16 +7,19 @@ interface TabsProps {
   onChange: (tab: string) => void;
   /** Gap between tab labels in px (design default 28 — dynamic, hence style). */
   gap?: number;
+  /** Accessible name of the tab list. */
+  ariaLabel?: string;
 }
 
-/** Underline tab group. */
-export function Tabs({ tabs, value, onChange, gap = 28 }: TabsProps) {
+/** Underline tab group — a real tab list: Tab reaches it, arrows switch tabs (UAT-76). */
+export function Tabs({ tabs, value, onChange, gap = 28, ariaLabel }: TabsProps) {
+  const { tabProps } = useTabList(tabs, value, onChange);
   return (
-    <div className="flex pr-2" style={{ gap }}>
-      {tabs.map((t) => (
-        <span
+    <div role="tablist" aria-label={ariaLabel} className="flex pr-2" style={{ gap }}>
+      {tabs.map((t, i) => (
+        <button
           key={t}
-          onClick={() => onChange(t)}
+          {...tabProps(t, i)}
           className={cn(
             'text-body cursor-pointer border-b-2 pb-1',
             value === t
@@ -24,7 +28,7 @@ export function Tabs({ tabs, value, onChange, gap = 28 }: TabsProps) {
           )}
         >
           {t}
-        </span>
+        </button>
       ))}
     </div>
   );

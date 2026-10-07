@@ -9,8 +9,15 @@ export interface ToastItem {
   readonly type: ToastType;
 }
 
-/** How long a toast stays on screen (prototype's ToastHost timeout). */
-const TOAST_DURATION_MS = 2800;
+/**
+ * How long a toast stays on screen. The prototype's 2.8 s was too short to
+ * read an error (UAT-76, 01·F34): confirmations stay 5 s, errors 8 s.
+ */
+export const TOAST_DURATION_MS: Readonly<Record<ToastType, number>> = {
+  success: 5000,
+  info: 5000,
+  error: 8000,
+};
 
 interface ToastState {
   items: readonly ToastItem[];
@@ -31,14 +38,15 @@ export const useToastStore = create<ToastState & ToastActions>()((set) => ({
     set((s) => ({ items: [...s.items, { id, msg, type }] }));
     setTimeout(() => {
       set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
-    }, TOAST_DURATION_MS);
+    }, TOAST_DURATION_MS[type]);
   },
 }));
 
 /**
  * Drop-in replacement for the prototype's global `window.toast(msg, type)` —
  * store actions and components call this exactly where the design fired it.
- * The toast auto-dismisses after 2.8s.
+ * The toast auto-dismisses (5 s, errors 8 s) and is announced by screen
+ * readers through the host's live regions.
  */
 export function toast(msg: string, type: ToastType = 'success'): void {
   useToastStore.getState().show(msg, type);
