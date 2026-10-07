@@ -49,6 +49,29 @@ export const AUTH_SURFACE_PARAM = 'surface';
 /** `AUTH_SURFACE_PARAM` value for the operations console. */
 export const AUTH_SURFACE_OPS = 'ops';
 
+/**
+ * The sign-in screen for `surface`. Operations exits (logout, idle sign-out,
+ * session expiry, a signed-out `/ops` visit) open the Operations tab, so the
+ * next sign-in goes to the right surface (UAT-44).
+ */
+export function loginPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_LOGIN_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_LOGIN_PATH;
+}
+
+/** The forgot-password screen for `surface` (emails come from that surface). */
+export function forgotPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_FORGOT_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_FORGOT_PATH;
+}
+
+/** The surface a `?surface=` value names (anything but `ops` is the hospital app). */
+export function surfaceFromParam(value: string | null): ApiSurface {
+  return value === AUTH_SURFACE_OPS ? 'platform' : 'hospital';
+}
+
 /*
  * Emailed report links. A large export or a scheduled report is emailed as
  * `{FRONTEND_HOSPITAL_URL}/reports/downloads/{file_id}` or

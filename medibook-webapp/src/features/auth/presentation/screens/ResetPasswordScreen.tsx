@@ -6,7 +6,7 @@ import { Icon } from '@/shared/ui/Icon';
 
 import { isFailure } from '@/core/error/failure';
 
-import { AUTH_LOGIN_PATH, AUTH_TOKEN_PARAM } from '@/app/router/paths';
+import { AUTH_TOKEN_PARAM, loginPathFor } from '@/app/router/paths';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
 import { usePasswordResetMutation } from '@/features/auth/application/queries/usePasswordResetMutation';
@@ -14,6 +14,7 @@ import { AuthAlert } from '@/features/auth/presentation/components/AuthAlert';
 import { AuthPasswordField } from '@/features/auth/presentation/components/AuthPasswordField';
 import {
   newPasswordProblem,
+  PASSWORD_MIN_LENGTH,
   passwordFailureMessage,
 } from '@/features/auth/presentation/components/authPassword';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
@@ -38,7 +39,7 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [err, setErr] = useState('');
-  const back = () => navigate(AUTH_LOGIN_PATH, { replace: true });
+  const back = () => navigate(loginPathFor(surface), { replace: true });
 
   const submit = () => {
     const problem = newPasswordProblem(password, confirm);
@@ -111,8 +112,8 @@ export function ResetPasswordScreen({ surface }: ResetPasswordScreenProps) {
             <>
               <div className="text-display text-text-strong mb-2">Set a new password</div>
               <p className="text-body text-text-muted mb-7.5">
-                Choose a password you haven't used here before — at least 10 characters, without
-                your name or email.
+                Choose a strong password — at least {PASSWORD_MIN_LENGTH} characters, without your
+                name or email.
               </p>
               <div className="flex flex-col gap-5">
                 <AuthPasswordField

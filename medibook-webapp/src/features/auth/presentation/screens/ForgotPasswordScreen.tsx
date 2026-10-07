@@ -6,7 +6,7 @@ import { Icon } from '@/shared/ui/Icon';
 
 import { isFailure } from '@/core/error/failure';
 
-import { AUTH_LOGIN_PATH, AUTH_SURFACE_OPS, AUTH_SURFACE_PARAM } from '@/app/router/paths';
+import { AUTH_SURFACE_PARAM, loginPathFor, surfaceFromParam } from '@/app/router/paths';
 
 import { usePasswordForgotMutation } from '@/features/auth/application/queries/usePasswordForgotMutation';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
@@ -28,12 +28,12 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export function ForgotPasswordScreen() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const surface = params.get(AUTH_SURFACE_PARAM) === AUTH_SURFACE_OPS ? 'platform' : 'hospital';
+  const surface = surfaceFromParam(params.get(AUTH_SURFACE_PARAM));
   const forgot = usePasswordForgotMutation();
   const [email, setEmail] = useState('');
   const [err, setErr] = useState('');
   const sent = forgot.isSuccess;
-  const back = () => navigate(AUTH_LOGIN_PATH);
+  const back = () => navigate(loginPathFor(surface));
 
   const send = () => {
     if (!EMAIL_RE.test(email.trim())) {

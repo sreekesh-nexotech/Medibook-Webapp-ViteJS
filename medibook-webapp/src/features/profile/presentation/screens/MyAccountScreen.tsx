@@ -5,7 +5,7 @@ import { Spinner } from '@/shared/ui/Spinner';
 
 import { isFailure } from '@/core/error/failure';
 
-import { AUTH_LOGIN_PATH } from '@/app/router/paths';
+import { loginPathFor } from '@/app/router/paths';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
@@ -50,7 +50,7 @@ export function MyAccountScreen({ surface }: MyAccountScreenProps) {
       <ProfilePasswordCard surface={surface} />
       <ProfileSessionsCard
         surface={surface}
-        onSignedOut={() => navigate(AUTH_LOGIN_PATH, { replace: true })}
+        onSignedOut={() => navigate(loginPathFor(surface), { replace: true })}
       />
       <ProfileBuildInfo />
     </div>

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  forgotPathFor,
   hospitalViewFromPath,
   isOpsReturnPath,
+  loginPathFor,
   loginReturningTo,
   opsViewFromPath,
   returnPathAfterLogin,
+  surfaceFromParam,
 } from '@/app/router/paths';
 
 const FILE_ID = '01a0ee28-a797-79a0-a88d-b9f19c5bcbb9';
@@ -69,5 +72,20 @@ describe('view ids from paths', () => {
     expect(opsViewFromPath(`/ops/hospitals/${FILE_ID}`)).toBe('hospital-detail');
     expect(opsViewFromPath('/ops/billing/invoices/inv-1')).toBe('invoice-detail');
     expect(opsViewFromPath('/ops/nowhere')).toBe('dashboard');
+  });
+});
+
+describe('loginPathFor (UAT-44)', () => {
+  it('sends operations exits to the Operations tab and hospital exits to the default', () => {
+    expect(loginPathFor('platform')).toBe('/auth/login?surface=ops');
+    expect(loginPathFor('hospital')).toBe('/auth/login');
+    expect(forgotPathFor('platform')).toBe('/auth/forgot?surface=ops');
+    expect(forgotPathFor('hospital')).toBe('/auth/forgot');
+  });
+
+  it('reads the surface back from the query param', () => {
+    expect(surfaceFromParam('ops')).toBe('platform');
+    expect(surfaceFromParam(null)).toBe('hospital');
+    expect(surfaceFromParam('hospital')).toBe('hospital');
   });
 });

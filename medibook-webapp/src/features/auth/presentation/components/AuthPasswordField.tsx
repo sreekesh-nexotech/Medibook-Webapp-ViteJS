@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { HTMLInputAutoCompleteAttribute } from 'react';
 
 import { Icon } from '@/shared/ui/Icon';
 
@@ -9,10 +10,18 @@ interface AuthPasswordFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** `new-password` on set/reset screens, `current-password` on sign-in. Default `new-password`. */
+  autoComplete?: HTMLInputAutoCompleteAttribute;
 }
 
 /** `AuthField` for a password, with the login screen's show/hide eye. */
-export function AuthPasswordField({ label, value, onChange, placeholder }: AuthPasswordFieldProps) {
+export function AuthPasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete = 'new-password',
+}: AuthPasswordFieldProps) {
   const [isShown, setIsShown] = useState(false);
   return (
     <AuthField
@@ -21,6 +30,7 @@ export function AuthPasswordField({ label, value, onChange, placeholder }: AuthP
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      autoComplete={autoComplete}
       trailing={
         <button
           type="button"
