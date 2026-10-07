@@ -7,6 +7,7 @@ import {
   useSaveDateExceptionMutation,
 } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { fmtDate } from '@/shared/lib/format';
 import { required } from '@/shared/lib/validate';
 import { Button } from '@/shared/ui/Button';
@@ -14,6 +15,7 @@ import { Can } from '@/shared/ui/Can';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Field } from '@/shared/ui/Field';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -22,8 +24,6 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 import { toast } from '@/shared/ui/toast/toast.store';
-
-import { isFailure } from '@/core/error/failure';
 
 import { hhmmToLabel, labelToHhmm, timeOptionsWith } from './doctors.view';
 import { ScheduleChangeModal } from './ScheduleChangeModal';
@@ -34,8 +34,17 @@ const EXCEPTION_SESSION_CODE = 'custom-1';
 const EXCEPTION_SESSION_LABEL = 'Special hours';
 
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return describeFailure(error, fallback);
 }
+
+/** Server field → exception form field (UAT-48); per-window errors land on the times. */
+const EXCEPTION_SERVER_FIELDS = {
+  date: 'date',
+  kind: 'kind',
+  note: 'note',
+  'sessions.0.starts_at': 'from',
+  sessions: 'to',
+} as const;
 
 /** "10:00 am – 1:00 pm, 4:00 pm – 7:00 pm" for an exception's windows. */
 function windowsLabel(exception: DoctorDateException): string {
@@ -97,10 +106,10 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
       const startsAt = labelToHhmm(values.from) ?? '';
       const endsAt = labelToHhmm(values.to) ?? '';
       return confirm.run({
-        attempt: (isConfirmed) =>
+        attempt: (mode) =>
           save.mutateAsync({
             doctorId,
-            confirm: isConfirmed,
+            mode,
             existing: exception ? { id: exception.id, version: exception.version } : undefined,
             input: {
               date: values.date,
@@ -126,12 +135,18 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
           onClose();
         },
         onError: (error) =>
-          toast(failureText(error, 'Could not save the date exception.'), 'error'),
+          toast(
+            form.applyServerErrors(
+              error,
+              { fields: EXCEPTION_SERVER_FIELDS },
+              'Could not save the date exception.',
+            ),
+            'error',
+          ),
       });
     },
   });
   const isClosed = form.values.kind === 'Closed all day';
-  const hasExtraWindows = (exception?.sessions.length ?? 0) > 1;
   return (
     <>
       <FormModal
@@ -144,6 +159,7 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
         busy={form.submitting || confirm.modal.isApplying}
       >
         <div className="flex flex-col gap-4.5">
+          <FormErrorSummary messages={form.serverSummary} />
           <Field
             label="Date"
             required
@@ -178,7 +194,7 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
           )}
           {!isClosed && (
             <div className="grid grid-cols-2 gap-4.5">
-              <Field label="Opens" required>
+              <Field label="Opens" required error={form.errorFor('from')}>
                 <Select
                   value={form.values.from}
                   options={timeOptionsWith(form.values.from)}
@@ -194,11 +210,6 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
                 />
               </Field>
             </div>
-          )}
-          {!isClosed && hasExtraWindows && (
-            <p className="text-caption text-text-muted">
-              This date has {exception?.sessions.length} windows; saving keeps only the one above.
-            </p>
           )}
           <Field label="Reason" required error={form.errorFor('note')}>
             <TextInput
@@ -238,8 +249,12 @@ export function DateExceptionsPanel({ doctorId, exceptions }: DateExceptionsPane
     const target = removing;
     setRemoving(null);
     void confirm.run({
-      attempt: (isConfirmed) =>
-        remove.mutateAsync({ doctorId, exceptionId: target.id, confirm: isConfirmed }),
+      attempt: (mode) =>
+        remove.mutateAsync({
+          doctorId,
+          exception: { id: target.id, version: target.version },
+          mode,
+        }),
       onApplied: () => toast('Date exception removed', 'info'),
       onError: (error) =>
         toast(failureText(error, 'Could not remove the date exception.'), 'error'),

@@ -1,12 +1,12 @@
 /**
  * Doctors & Departments entities from the hospital API. Plain readonly types
- * — no React, no Axios, no Zod. Fees are whole rupees here; the paise the
- * API uses never leave the infrastructure layer.
+ * — no React, no Axios, no Zod. Fees are integer paise, exactly as the API
+ * stores them (UAT-08); `feeRupees` is a display convenience only.
  */
 
 export interface Department {
   readonly id: string;
-  /** URL-safe key, unique per hospital (derived from the name on create). */
+  /** URL-safe key, unique per hospital (`{DEPT}` in token labels). */
   readonly code: string;
   readonly name: string;
   readonly description: string;
@@ -30,9 +30,13 @@ export interface DoctorProfile {
   readonly experienceYears: number | null;
   readonly bio: string;
   readonly photoFileId: string | null;
-  /** Consultation fee in whole rupees. */
+  /** Consultation fee in paise (₹499.50 = 49950); 0 = a free consultation. */
+  readonly feePaise: number;
+  /** Follow-up fee in paise, or `null` = a follow-up costs the consultation fee. */
+  readonly followUpFeePaise: number | null;
+  /** `feePaise` in rupees, for display and sorting only — never sent back. */
   readonly feeRupees: number;
-  /** Fee for a follow-up within the hospital's follow-up window, or `null` if none is set. */
+  /** `followUpFeePaise` in rupees, for display only. */
   readonly followUpFeeRupees: number | null;
   /** How long a consultation is expected to take; `null` = the hospital default. */
   readonly expectedConsultMinutes: number | null;
@@ -125,7 +129,8 @@ export interface ResolvedDay {
 export interface AffectedBooking {
   readonly appointmentId: string;
   readonly bookingRef: string;
-  readonly tokenLabel: string;
+  /** `null` for a booking without a token yet (the backend allows it). */
+  readonly tokenLabel: string | null;
   readonly patientName: string;
   readonly scheduledStartAt: string;
 }
@@ -139,12 +144,38 @@ export interface ScheduleChange<T = null> {
   readonly affectedBookings: readonly AffectedBooking[];
   /** The written record when the change was applied and the API returns one. */
   readonly result: T | null;
+  /**
+   * A dry run's fingerprint of what it previewed, sent back on confirm so the
+   * server can refuse when the affected bookings changed in between (BE-33);
+   * `null` from a backend that does not issue one.
+   */
+  readonly previewToken: string | null;
+  /** The applied change queued a background slot re-generation (the grid catches up shortly). */
+  readonly rematerialisationQueued: boolean;
+}
+
+/**
+ * How one booking-affecting write is sent (Q32, Q73, D-21). Every such write
+ * carries an `Idempotency-Key`: a fresh one for each dry run, and one per
+ * confirmed user action that is reused if the confirm is retried.
+ */
+export interface ScheduleWriteMode {
+  /** `false` = dry run (nothing is applied); `true` = apply. */
+  readonly confirm: boolean;
+  readonly idempotencyKey: string;
+  /** The dry run's `previewToken`, on confirm only. */
+  readonly previewToken?: string | null;
 }
 
 export interface DepartmentInput {
   readonly name: string;
   readonly description: string;
   readonly isActive: boolean;
+  /**
+   * The code only when the user typed one. Omitted, the server makes it from
+   * the name (BE-33) and an edit keeps the stored code (UAT-49).
+   */
+  readonly code?: string;
 }
 
 export interface DoctorInput {
@@ -157,15 +188,18 @@ export interface DoctorInput {
   readonly experienceYears: number | null;
   readonly bio: string;
   readonly room: string;
-  readonly feeRupees: number;
+  /** Integer paise; 0 is a free consultation (the backend allows ≥ 0). */
+  readonly feePaise: number;
   /** `null` = a follow-up costs the consultation fee. */
-  readonly followUpFeeRupees: number | null;
+  readonly followUpFeePaise: number | null;
   /** `null` = the hospital's default consultation time. */
   readonly expectedConsultMinutes: number | null;
   readonly slotLengthMin: number;
   readonly isBookableOnline: boolean;
   readonly status: DoctorStatus;
   readonly photoFileId: string | null;
+  /** Only when the user typed one; the server makes it from the name otherwise (BE-33, UAT-49). */
+  readonly slug?: string;
 }
 
 export interface LeaveInput {
@@ -186,4 +220,23 @@ export interface DoctorFilters {
   readonly search?: string;
   readonly departmentId?: string;
   readonly status?: DoctorStatus;
+}
+
+/** An approved patient review of a doctor (`GET /hospital/doctors/{id}/reviews`, DOC-01). */
+export interface DoctorReview {
+  readonly id: string;
+  /** 1–5. */
+  readonly rating: number;
+  readonly comment: string;
+  readonly createdAt: string | null;
+  /** How the patient is named (never a full name), when the server sends one. */
+  readonly author: string | null;
+  readonly bookingRef: string | null;
+}
+
+/** One page of a doctor's reviews. */
+export interface DoctorReviewPage {
+  readonly items: readonly DoctorReview[];
+  readonly total: number;
+  readonly hasNext: boolean;
 }

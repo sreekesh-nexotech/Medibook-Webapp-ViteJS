@@ -1,5 +1,6 @@
 import type { ShiftPattern, WeekDay } from '@/features/doctors/application/store/catalog.types';
 import { cn } from '@/shared/lib/cn';
+import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { Select } from '@/shared/ui/Select';
 import { Toggle } from '@/shared/ui/Toggle';
@@ -19,6 +20,8 @@ interface WeeklyHoursProps {
   patterns?: readonly ShiftPattern[];
   info?: string;
   disabled?: boolean;
+  /** Per-day problems to show under that day (keyed by weekday index), e.g. from `weekErrors`. */
+  errors?: Readonly<Record<number, string>>;
 }
 
 /**
@@ -37,6 +40,7 @@ export function WeeklyHours({
   patterns,
   info,
   disabled = false,
+  errors = {},
 }: WeeklyHoursProps) {
   const patch = (index: number, next: Partial<WeekDay>): void =>
     onChange(value.map((d, i) => (i === index ? { ...d, ...next } : d)));
@@ -97,12 +101,18 @@ export function WeeklyHours({
                         height={40}
                         disabled={disabled}
                         aria-label={`${d.day} end time`}
+                        invalid={Boolean(errors[i])}
                       />
                     </div>
                   </div>
                 )
               ) : (
                 <span className="text-body text-text-muted ml-auto">Closed</span>
+              )}
+              {errors[i] && (
+                <span className="text-caption text-d-700 flex w-full items-center gap-1.5">
+                  <Icon name="triangle-alert" size={13} /> {errors[i]}
+                </span>
               )}
               {patterns && patterns.length > 0 && d.on && (
                 <div className="flex w-full flex-wrap items-center gap-2">

@@ -9,20 +9,25 @@ import { deleteDepartment } from '@/features/doctors/application/usecases/delete
 import { updateDepartment } from '@/features/doctors/application/usecases/updateDepartment';
 
 interface SaveDepartmentInput {
-  /** Absent → create. */
-  readonly id?: string;
+  /** Absent → create; present → update that row at the version the user edited. */
+  readonly existing?: { readonly id: string; readonly version: number };
   readonly input: DepartmentInput;
 }
 
-/** Create or update a department. */
+/**
+ * Create or update a department. A 409 (someone else saved first) refreshes
+ * the list too, so reopening the editor starts from the current version.
+ */
 export function useSaveDepartmentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, input }: SaveDepartmentInput) =>
-      unwrap(await (id ? updateDepartment(id, input) : createDepartment(input))),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() });
-    },
+    mutationFn: async ({ existing, input }: SaveDepartmentInput) =>
+      unwrap(
+        await (existing
+          ? updateDepartment(existing.id, input, existing.version)
+          : createDepartment(input)),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() }),
   });
 }
 
