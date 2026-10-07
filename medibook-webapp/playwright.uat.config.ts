@@ -23,6 +23,8 @@ const NAVIGATION_TIMEOUT_MS = 45_000;
 export default defineConfig({
   testDir: 'e2e/uat',
   testMatch: /\d\d-.*\.spec\.ts$/,
+  // The seeded history has finished replaying through the workers (support/globalSetup.ts).
+  globalSetup: './e2e/uat/support/globalSetup.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,
