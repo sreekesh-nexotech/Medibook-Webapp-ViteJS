@@ -14,6 +14,7 @@ import type {
   LoginResult,
   PhiAccessEntry,
   PhiSubjectKind,
+  StaffDirectoryEntry,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** A label plus the `Badge` status token whose tint means the same thing. */
@@ -266,4 +267,16 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 /** The id filters take a full UUID only (the server refuses anything else). */
 export function isFullUuid(value: string): boolean {
   return UUID_PATTERN.test(value.trim());
+}
+
+/** "Anita Menon · Lakeshore Hospital · Admin · a***@lakeshore…" for the account picker. */
+export function staffOptionLabel(entry: StaffDirectoryEntry): string {
+  const parts = [
+    entry.fullName,
+    entry.hospitalName,
+    entry.roleName,
+    entry.email ?? entry.phone ?? entry.employeeCode,
+  ].filter(Boolean);
+  const label = parts.join(' · ');
+  return entry.status === 'active' ? label : `${label} (${entry.status})`;
 }

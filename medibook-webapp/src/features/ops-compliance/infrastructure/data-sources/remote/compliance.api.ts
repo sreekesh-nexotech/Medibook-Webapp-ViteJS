@@ -16,6 +16,7 @@ import {
   loginEventPageSchema,
   loginEventResponseSchema,
   phiAccessPageSchema,
+  staffDirectoryPageSchema,
   type ConfigChangeResponse,
   type DataRequestResponse,
   type LoginEventResponse,
@@ -25,6 +26,10 @@ const LOGIN_HISTORY_PATH = '/compliance/login-history';
 const CONFIG_CHANGES_PATH = '/compliance/config-changes';
 const DATA_REQUESTS_PATH = '/compliance/data-requests';
 const PHI_ACCESS_PATH = '/compliance/phi-access';
+const HOSPITAL_STAFF_PATH = '/hospital-staff';
+
+/** Staff accounts offered per lookup. */
+const STAFF_LOOKUP_LIMIT = 20;
 
 /** CSV exports stop after this many rows (50 pages) so one click cannot run unbounded. */
 export const COMPLIANCE_EXPORT_MAX_ROWS = 5000;
@@ -130,4 +135,16 @@ export async function postRejectDataRequest(
 export async function getPhiAccess(params: ComplianceQueryParams) {
   const response = await platformApi.get(PHI_ACCESS_PATH, { params });
   return phiAccessPageSchema.parse(response.data);
+}
+
+/**
+ * `GET /platform/hospital-staff?q=` (B9, BE-30) — hospital staff across
+ * hospitals by name, email, phone or employee code (`q` ≥ 2 characters).
+ * `hospitals.view`; the compliance role once B2's any-of permissions land.
+ */
+export async function getHospitalStaffDirectory(q: string) {
+  const response = await platformApi.get(HOSPITAL_STAFF_PATH, {
+    params: { q, page: 1, page_size: STAFF_LOOKUP_LIMIT },
+  });
+  return staffDirectoryPageSchema.parse(response.data);
 }

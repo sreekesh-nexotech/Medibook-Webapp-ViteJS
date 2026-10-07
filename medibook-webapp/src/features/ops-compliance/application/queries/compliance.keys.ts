@@ -18,4 +18,5 @@ export const complianceKeys = {
   requestDetail: (id: string) => [...complianceKeys.requests(), 'detail', id] as const,
   phiAccess: () => [...complianceKeys.all, 'phi-access'] as const,
   phiAccessPage: (params: PhiAccessParams) => [...complianceKeys.phiAccess(), params] as const,
+  staffLookup: (q: string) => [...complianceKeys.all, 'hospital-staff', q] as const,
 };

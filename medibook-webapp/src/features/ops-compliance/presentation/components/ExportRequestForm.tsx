@@ -12,10 +12,15 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
 import { useComplianceLoginsQuery } from '@/features/ops-compliance/application/queries/useComplianceLoginsQuery';
+import {
+  STAFF_LOOKUP_MIN_CHARS,
+  useComplianceStaffLookupQuery,
+} from '@/features/ops-compliance/application/queries/useComplianceStaffLookupQuery';
 import type {
   DataExportDraft,
   LoginHistoryParams,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
+import { staffOptionLabel } from '@/features/ops-compliance/presentation/components/compliance.labels';
 import { usePlatformUsersQuery } from '@/features/ops-platform-users/application/queries/usePlatformUsersQuery';
 import type { PlatformUserListParams } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
 
@@ -37,8 +42,9 @@ const PATIENT_PICK_LIMIT = 20;
 const MIN_SEARCH_CHARS = 2;
 
 /**
- * Hospital staff who have signed in recently — the only staff accounts the
- * console can name (the backend has no platform-side staff directory).
+ * Hospital staff who have signed in recently — the fallback when the staff
+ * directory (B9 `GET /platform/hospital-staff`) is not open to this role or
+ * not on this server.
  */
 const STAFF_SOURCE: LoginHistoryParams = {
   dateFrom: '',
@@ -91,8 +97,11 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
     page: 1,
     pageSize: PATIENT_PICK_LIMIT,
   };
+  const isPatient = type === 'Patient account';
   const patientsQuery = usePlatformUsersQuery(patientParams);
   const staffQuery = useComplianceLoginsQuery(STAFF_SOURCE);
+  const lookup = useComplianceStaffLookupQuery(isPatient ? '' : term);
+  const useDirectory = !isPatient && term.length >= STAFF_LOOKUP_MIN_CHARS && lookup.isSuccess;
 
   const patientOptions: readonly SubjectOption[] = (patientsQuery.data?.items ?? []).map((u) => ({
     userId: u.id,
@@ -100,17 +109,27 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
       .filter(Boolean)
       .join(' · '),
   }));
-  const staffOptions: readonly SubjectOption[] = [
+  const recentStaffOptions: readonly SubjectOption[] = [
     ...new Map(
       (staffQuery.data?.items ?? [])
         .filter((l) => l.userId != null)
+        .filter((l) => term === '' || l.identifier.toLowerCase().includes(term.toLowerCase()))
         .map((l) => [l.userId ?? '', { userId: l.userId ?? '', label: l.identifier }]),
     ).values(),
   ];
+  const directoryOptions: readonly SubjectOption[] = [
+    ...new Map(
+      (lookup.data ?? []).map((e) => [e.userId, { userId: e.userId, label: staffOptionLabel(e) }]),
+    ).values(),
+  ];
+  const staffSource = useDirectory
+    ? 'Hospital staff directory'
+    : lookup.isError
+      ? 'Directory unavailable — staff who signed in recently'
+      : 'Staff who signed in recently; type 2+ characters to search the directory';
 
-  const isPatient = type === 'Patient account';
-  const query = isPatient ? patientsQuery : staffQuery;
-  const options = isPatient ? patientOptions : staffOptions;
+  const query = isPatient ? patientsQuery : useDirectory ? lookup : staffQuery;
+  const options = isPatient ? patientOptions : useDirectory ? directoryOptions : recentStaffOptions;
   const selected = options.find((o) => o.userId === userId) ?? null;
 
   const placeholder = query.isLoading
@@ -120,7 +139,9 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
       : options.length === 0
         ? isPatient
           ? 'No patient accounts match this search'
-          : 'No hospital staff have signed in recently'
+          : useDirectory
+            ? 'No hospital staff match this search'
+            : 'No hospital staff have signed in recently'
         : 'Choose an account';
 
   const submit = (): void => {
@@ -152,6 +173,7 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
                 const next = SUBJECT_TYPES.find((t) => t === v);
                 if (!next) return;
                 setType(next);
+                setSearch('');
                 setUserId('');
                 setError(undefined);
               }}
@@ -172,10 +194,18 @@ export function ExportRequestForm({ busy, onSubmit }: ExportRequestFormProps) {
               />
             </OpsField>
           ) : (
-            <OpsField label="Source">
-              <div className="text-caption text-text-muted flex h-12 items-center">
-                Hospital staff who signed in recently
-              </div>
+            <OpsField label="Find staff" hint={staffSource}>
+              <TextInput
+                value={search}
+                onChange={(v) => {
+                  setSearch(v);
+                  setUserId('');
+                }}
+                placeholder="Name, email, phone or employee code"
+                icon="search"
+                inputMode="search"
+                height={48}
+              />
             </OpsField>
           )}
           <OpsField label="Account" required error={error} hint={TYPE_HINT[type]}>

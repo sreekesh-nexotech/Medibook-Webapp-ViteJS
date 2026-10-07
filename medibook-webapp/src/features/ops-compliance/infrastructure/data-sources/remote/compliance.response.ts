@@ -8,6 +8,7 @@ import {
   LOGIN_RESULTS,
   PHI_SUBJECT_KINDS,
   type PhiAccessEntry,
+  type StaffDirectoryEntry,
   type ConfigChangeRecord,
   type DataRequest,
   type DataRequestAction,
@@ -191,5 +192,36 @@ export function toPhiAccessEntry(dto: PhiAccessResponse): PhiAccessEntry {
     subjectIds: dto.subject_ids,
     resultCount: dto.result_count,
     searchParam: dto.search_param,
+  };
+}
+
+/** `PlatformStaffDirectorySerializer` (B9, `GET /platform/hospital-staff`). */
+export const staffDirectoryResponseSchema = z.object({
+  staff_id: z.string(),
+  user_id: z.string(),
+  full_name: z.string(),
+  email: z.string().nullable(),
+  phone_e164: z.string().nullable(),
+  employee_code: z.string().nullable(),
+  status: z.string(),
+  hospital: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
+  role: z.object({ name: z.string().nullable().optional() }).nullable().optional(),
+});
+
+export const staffDirectoryPageSchema = paginatedSchema(staffDirectoryResponseSchema);
+
+export type StaffDirectoryResponse = z.infer<typeof staffDirectoryResponseSchema>;
+
+export function toStaffDirectoryEntry(dto: StaffDirectoryResponse): StaffDirectoryEntry {
+  return {
+    staffId: dto.staff_id,
+    userId: dto.user_id,
+    fullName: dto.full_name,
+    email: dto.email,
+    phone: dto.phone_e164,
+    employeeCode: dto.employee_code,
+    status: dto.status,
+    hospitalName: dto.hospital?.name ?? null,
+    roleName: dto.role?.name ?? null,
   };
 }

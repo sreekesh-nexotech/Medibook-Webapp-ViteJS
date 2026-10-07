@@ -15,6 +15,7 @@ import type {
   LoginHistoryParams,
   PhiAccessEntry,
   PhiAccessParams,
+  StaffDirectoryEntry,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** The platform's compliance records. */
@@ -42,4 +43,6 @@ export interface ComplianceRepository {
   rejectDataRequest(id: string, reason: string): Promise<Result<DataRequest>>;
   /** One page of the PHI read audit (B6). */
   listPhiAccess(params: PhiAccessParams): Promise<Result<Page<PhiAccessEntry>>>;
+  /** Hospital staff accounts matching a name, email, phone or employee code (B9). */
+  findHospitalStaff(q: string): Promise<Result<StaffDirectoryEntry[]>>;
 }

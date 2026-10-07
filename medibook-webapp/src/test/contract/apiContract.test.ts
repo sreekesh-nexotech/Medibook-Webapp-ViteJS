@@ -306,6 +306,8 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   logsExportResponseSchema: 'Reading it renders the whole filtered audit trail as a CSV file.',
   phiAccessPageSchema:
     'B6 endpoint (GET /platform/compliance/phi-access), not on the recording backend yet.',
+  staffDirectoryPageSchema:
+    'B9 endpoint (GET /platform/hospital-staff), not on the recording backend yet.',
   retentionResponseSchema:
     'B6 endpoint (GET /platform/compliance/retention), not on the recording backend yet.',
 };

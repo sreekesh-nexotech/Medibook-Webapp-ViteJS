@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { DataRequest } from '@/features/ops-compliance/domain/entities/compliance.entities';
+import { toStaffDirectoryEntry } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 import {
   toDataRequestParams,
   toLoginFilterParams,
@@ -13,6 +14,7 @@ import {
   loginInstanceLabel,
   phiReadLabel,
   phiResultLabel,
+  staffOptionLabel,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
 
 const BASE: DataRequest = {
@@ -232,5 +234,27 @@ describe('patient record access (B6, H-07)', () => {
       page_size: 15,
       sort: '-occurred_at',
     });
+  });
+});
+
+describe('hospital staff lookup (B9)', () => {
+  it('labels a directory row for the account picker', () => {
+    const entry = toStaffDirectoryEntry({
+      staff_id: 's1',
+      user_id: 'u1',
+      full_name: 'Anita Menon',
+      email: 'a***@lakeshore.example.com',
+      phone_e164: null,
+      employee_code: 'LK-001',
+      status: 'active',
+      hospital: { name: 'Lakeshore Hospital' },
+      role: { name: 'Admin' },
+    });
+    expect(staffOptionLabel(entry)).toBe(
+      'Anita Menon · Lakeshore Hospital · Admin · a***@lakeshore.example.com',
+    );
+    expect(staffOptionLabel({ ...entry, status: 'deactivated', email: null })).toBe(
+      'Anita Menon · Lakeshore Hospital · Admin · LK-001 (deactivated)',
+    );
   });
 });

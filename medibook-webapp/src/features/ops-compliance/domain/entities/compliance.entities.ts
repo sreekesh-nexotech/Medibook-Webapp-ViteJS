@@ -259,3 +259,20 @@ export interface PhiAccessParams extends PhiAccessFilters {
   readonly pageSize: number;
   readonly sortDirection: ComplianceSortDirection;
 }
+
+/* ------------------------------------------- hospital staff lookup (B9, BE-30) */
+
+/** A hospital staff membership found by `GET /platform/hospital-staff`. */
+export interface StaffDirectoryEntry {
+  readonly staffId: string;
+  /** The account a data-subject request names. */
+  readonly userId: string;
+  readonly fullName: string;
+  /** Masked unless the caller holds `platform_users.edit`. */
+  readonly email: string | null;
+  readonly phone: string | null;
+  readonly employeeCode: string | null;
+  readonly status: string;
+  readonly hospitalName: string | null;
+  readonly roleName: string | null;
+}

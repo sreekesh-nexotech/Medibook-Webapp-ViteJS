@@ -9,6 +9,7 @@ import {
   getConfigChanges,
   getDataRequest,
   getDataRequests,
+  getHospitalStaffDirectory,
   getLoginHistory,
   getPhiAccess,
   postDataRequest,
@@ -29,6 +30,7 @@ import {
   toDataRequest,
   toLoginEvent,
   toPhiAccessEntry,
+  toStaffDirectoryEntry,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 
 /** The backend answers 501 when the export renderer only runs in the nightly worker. */
@@ -79,4 +81,7 @@ export const complianceRepository: ComplianceRepository = {
 
   listPhiAccess: (params) =>
     attempt(async () => toPage(await getPhiAccess(toPhiAccessParams(params)), toPhiAccessEntry)),
+
+  findHospitalStaff: (q) =>
+    attempt(async () => (await getHospitalStaffDirectory(q)).results.map(toStaffDirectoryEntry)),
 };
