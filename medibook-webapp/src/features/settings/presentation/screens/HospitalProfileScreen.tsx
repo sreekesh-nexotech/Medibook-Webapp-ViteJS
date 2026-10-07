@@ -260,25 +260,20 @@ export function HospitalProfileScreen() {
 
   /* ---- banners ---- */
 
-  const saveBannerInput = async (input: BannerInput): Promise<boolean> => {
+  /** Rejects with the failure: the modal maps its field errors (UAT-48). */
+  const saveBannerInput = async (input: BannerInput): Promise<void> => {
     const editing = bannerEdit?.banner ?? null;
-    try {
-      if (editing) {
-        await updateBanner.mutateAsync({
-          id: editing.id,
-          changes: input,
-          version: editing.version,
-        });
-        toast('Banner saved', 'success');
-      } else {
-        const nextOrder = banners.reduce((max, b) => Math.max(max, b.sortOrder + 1), 0);
-        await createBanner.mutateAsync({ input, sortOrder: nextOrder });
-        toast('Banner scheduled — it goes live on its start date', 'success');
-      }
-      return true;
-    } catch (error) {
-      toast(errorCopy(error), 'error');
-      return false;
+    if (editing) {
+      await updateBanner.mutateAsync({
+        id: editing.id,
+        changes: input,
+        version: editing.version,
+      });
+      toast('Banner saved', 'success');
+    } else {
+      const nextOrder = banners.reduce((max, b) => Math.max(max, b.sortOrder + 1), 0);
+      await createBanner.mutateAsync({ input, sortOrder: nextOrder });
+      toast('Banner scheduled — it goes live on its start date', 'success');
     }
   };
 

@@ -28,7 +28,7 @@ interface PatternForm {
 }
 
 const PATTERN_VALIDATORS: FormValidators<PatternForm> = {
-  name: (v) => required(v, 'Pattern name'),
+  name: (v) => required(v, 'Session name'),
   to: (v, values) => {
     const from = timeLabelToMinutes(values.from);
     const to = timeLabelToMinutes(v);
@@ -61,14 +61,14 @@ function PatternModal({ pattern, onSave, onClose }: PatternModalProps) {
     <FormModal
       open
       onClose={onClose}
-      title={pattern ? 'Edit Shift Pattern' : 'Add Shift Pattern'}
+      title={pattern ? 'Edit Session' : 'Add Session'}
       width={520}
       onSubmit={form.handleSubmit}
-      submitLabel={pattern ? 'Save Pattern' : 'Add Pattern'}
+      submitLabel={pattern ? 'Save Session' : 'Add Session'}
     >
       <div className="flex flex-col gap-4.5">
         <Field
-          label="Pattern Name"
+          label="Session Name"
           required
           error={form.errorFor('name')}
           hint="Shown on the day chips, e.g. “Morning OPD”."
@@ -151,7 +151,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
   return (
     <div>
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <span className="text-body text-text-strong font-medium">Shift Patterns</span>
+        <span className="text-body text-text-strong font-medium">Sessions</span>
         <InfoDot text="This doctor's named consultation windows. Assign them to days in Working Hours; changes are saved with Save Changes." />
         <span className="flex-1" />
         <Can perm={'Doctors & Departments.add'}>
@@ -161,7 +161,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
             icon="plus"
             onClick={() => setEditing({ pattern: null })}
           >
-            Add Shift Pattern
+            Add Session
           </Button>
         </Can>
       </div>
@@ -169,9 +169,9 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
         <EmptyState
           compact
           icon="calendar-clock"
-          title="No shift patterns yet"
+          title="No sessions yet"
           message="Create one — “Morning OPD 9–1” — and assign it to the days this doctor consults."
-          actionLabel="Add Shift Pattern"
+          actionLabel="Add Session"
           actionIcon="plus"
           onAction={() => setEditing({ pattern: null })}
         />
@@ -196,7 +196,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
                 <Can perm={'Doctors & Departments.edit'}>
                   <IconBtn
                     name="pencil"
-                    label="Edit shift pattern"
+                    label="Edit session"
                     title={`Edit ${p.name}`}
                     box={32}
                     size={15}
@@ -206,7 +206,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
                 <Can perm={'Doctors & Departments.del'}>
                   <IconBtn
                     name="trash-2"
-                    label="Remove shift"
+                    label="Remove session"
                     title={`Remove ${p.name}`}
                     box={32}
                     size={15}
@@ -232,7 +232,7 @@ export function ShiftPatternsPanel({ patterns, week, onChange }: ShiftPatternsPa
         open={Boolean(removing)}
         danger
         confirmLabel="Remove"
-        title="Remove Shift Pattern"
+        title="Remove Session"
         body={
           removing
             ? `Remove “${removing.name}” (${removing.from} – ${removing.to})? It is unassigned from the ${assignedDays(

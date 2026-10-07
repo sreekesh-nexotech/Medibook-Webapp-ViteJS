@@ -78,7 +78,7 @@ export function WeeklyHours({
               {d.on ? (
                 assigned.length > 0 ? (
                   <span className="text-caption text-text-muted ml-auto">
-                    {assigned.length} shift pattern{assigned.length === 1 ? '' : 's'}
+                    {assigned.length} session{assigned.length === 1 ? '' : 's'}
                   </span>
                 ) : (
                   <div className="ml-auto flex items-center gap-2">
