@@ -22,6 +22,16 @@ export const IF_MATCH_HEADER = 'If-Match';
 /** Replay-safe writes: the backend dedupes a declared method by this key (D-21). */
 export const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 
+/**
+ * Marks a request the user did not make (a poll while they are idle), so the
+ * server does not count it as activity for the idle session limit (BE-21,
+ * SEC-01-B). The backend's CORS allowlist must accept this header.
+ */
+export const ACTIVITY_HEADER = 'X-Medibook-Activity';
+
+/** `ACTIVITY_HEADER` value for background traffic. */
+export const ACTIVITY_BACKGROUND = 'background';
+
 /** Echoed in every error envelope's `request_id`; the backend also reads it. */
 export const REQUEST_ID_HEADER = 'X-Request-Id';
 
@@ -60,9 +70,8 @@ export const WS_RECONNECT_BASE_MS = 1_000;
 export const WS_RECONNECT_MAX_MS = 30_000;
 
 /**
- * Server close codes (`core/ws.py`): bad/missing token, authenticated but not
- * permitted on this channel (BE-21 — older backends send 4401 for both),
- * idle timeout.
+ * Server close codes (`core/ws.py`): bad/missing/expired token, permission
+ * refused (BE-21: the role may not open this channel), idle timeout.
  */
 export const WS_CLOSE_UNAUTHORIZED = 4401;
 export const WS_CLOSE_FORBIDDEN = 4403;
