@@ -188,6 +188,24 @@ export const BOOK_FOR_MRN_PARAM = 'mrn';
 /** Query param carrying a department name from the front desk to Token Management. */
 export const TOKEN_DEPT_PARAM = 'dept';
 
+/** Query param opening the appointment list on one tab (a slug, e.g. `pending-payment`). */
+export const APPOINTMENTS_TAB_PARAM = 'tab';
+
+/** Query param opening the appointment list with one booking's drawer open. */
+export const APPOINTMENT_PARAM = 'appointment';
+
+/** The appointment list, optionally on a tab and/or with one booking open. */
+export function hospitalAppointmentsPath(
+  role: HospitalRole,
+  options: { readonly tab?: string; readonly appointmentId?: string } = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.tab) params.set(APPOINTMENTS_TAB_PARAM, options.tab);
+  if (options.appointmentId) params.set(APPOINTMENT_PARAM, options.appointmentId);
+  const query = params.toString();
+  return `${hospitalPath(role, 'appointments')}${query ? `?${query}` : ''}`;
+}
+
 /** New Appointment, pre-selecting the patient with this MRN. */
 export function hospitalBookForPatientPath(role: HospitalRole, mrn: string): string {
   return `${hospitalPath(role, 'create')}?${new URLSearchParams({ [BOOK_FOR_MRN_PARAM]: mrn })}`;

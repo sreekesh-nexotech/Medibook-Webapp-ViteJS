@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { hospitalPath, isHospitalRole, type HospitalStaticView } from '@/app/router/paths';
+import {
+  hospitalAppointmentsPath,
+  hospitalPath,
+  isHospitalRole,
+  type HospitalStaticView,
+} from '@/app/router/paths';
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
+import { usePermission, type PermissionKey } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { money, moneyShort } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
@@ -33,9 +40,13 @@ import type {
 import { useAdminDashboardQuery } from '@/features/dashboard/application/queries/useAdminDashboardQuery';
 import {
   DOCTOR_STATUS_BADGE,
+  revenueByChannel,
+  revenueByMethod,
   statusBars,
 } from '@/features/dashboard/presentation/components/dashboard.viewModel';
 import { OverviewHeader } from '@/features/dashboard/presentation/components/OverviewHeader';
+import { RevenueSplitCard } from '@/features/dashboard/presentation/components/RevenueSplitCard';
+import { StaleDataBanner } from '@/features/dashboard/presentation/components/StaleDataBanner';
 import { PERIOD_CODE, type Period } from '@/features/dashboard/presentation/components/period';
 
 /** Bar colours cycled across the department chart (design `AD_DEPT` palette). */
@@ -66,13 +77,14 @@ const PERF_ROWS = 5;
 
 const PERF_COLUMNS = ['Doctor', 'Department', 'Appointments', 'Rating', 'Status'] as const;
 
-/** A "Requires Attention" row (design's `ALERTS` items). */
+/** A "Requires Attention" row (design's `ALERTS` items), with where it leads and the permission that needs. */
 interface Alert {
   readonly icon: IconName;
   readonly iconClass: string;
   readonly t: string;
   readonly s: string;
-  readonly go: HospitalStaticView;
+  readonly to: string;
+  readonly perm: PermissionKey;
 }
 
 function plural(n: number, word: string): string {
@@ -93,9 +105,6 @@ const PATIENT_COUNT_PARAMS: PatientListParams = {
 const ALL_PERIODS: SettlementPeriodFilters = {};
 
 const PAISE_PER_RUPEE = 100;
-
-/** `appointments.by_status` key for cancelled bookings. */
-const CANCELLED_STATUS = 'cancelled';
 
 /** Sum of the periods' net payable, in rupees. */
 function netRupees(periods: readonly SettlementPeriod[]): number {
@@ -118,6 +127,9 @@ export function AdminDashboardScreen() {
   const go = (view: HospitalStaticView): void => {
     navigate(hospitalPath(activeRole, view));
   };
+  const { can } = usePermission();
+  const timeZone = useHospitalTimeZone();
+  const pathTo = (view: HospitalStaticView): string => hospitalPath(activeRole, view);
 
   const [period, setPeriod] = useState<Period>('Today');
   const dashboard = useAdminDashboardQuery(PERIOD_CODE[period]);
@@ -139,8 +151,10 @@ export function AdminDashboardScreen() {
     ]);
   };
 
-  const loading = dashboard.isLoading;
-  const data = dashboard.data;
+  // While a newly picked period loads, the previous one's figures must not
+  // sit under the new labels (appendix 02 F5): show the loading state.
+  const loading = dashboard.isLoading || dashboard.isPlaceholderData;
+  const data = dashboard.isPlaceholderData ? undefined : dashboard.data;
   const periodWord = period === 'Today' ? 'today' : period.toLowerCase();
 
   const roster = doctors.data ?? [];
@@ -167,11 +181,13 @@ export function AdminDashboardScreen() {
     };
   });
 
-  // The backend's `appointments.total` still counts cancelled bookings
-  // (BACKEND_BLOCKERS DASH-01); the front desk's count and this screen's
-  // charts leave them out, so the tile does too.
-  const cancelled = data?.appointmentsByStatus[CANCELLED_STATUS] ?? 0;
-  const bookedCount = Math.max(0, (data?.appointmentsTotal ?? 0) - cancelled);
+  // One definition with the charts (DASH-01): cancellations and no-shows are
+  // reported beside the count, never inside it — on either backend version.
+  const bookedCount = data?.appointmentsBooked ?? 0;
+  const leftOut = [
+    data && data.appointmentsCancelled > 0 ? `${data.appointmentsCancelled} cancelled` : null,
+    data && data.appointmentsNoShow > 0 ? `${plural(data.appointmentsNoShow, 'no-show')}` : null,
+  ].filter(Boolean);
 
   const KPIS: readonly StatCardData[] = [
     {
@@ -179,8 +195,8 @@ export function AdminDashboardScreen() {
       label: period === 'Today' ? 'Appointments Today' : 'Appointments',
       value: bookedCount,
       sub:
-        cancelled > 0
-          ? `Online + walk-in · ${cancelled} cancelled not counted`
+        leftOut.length > 0
+          ? `Online + walk-in · ${leftOut.join(', ')} not counted`
           : 'Online + walk-in',
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
@@ -228,7 +244,8 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-d-100 text-d-500',
       t: `${plural(alerts.unpaidWalkInsToday, 'walk-in payment')} pending`,
       s: 'Awaiting collection at the desk today',
-      go: 'appointments',
+      to: hospitalAppointmentsPath(activeRole, { tab: 'pending-payment' }),
+      perm: 'Appointments.view',
     });
   }
   if (alerts && alerts.pendingApprovals > 0) {
@@ -236,8 +253,12 @@ export function AdminDashboardScreen() {
       icon: 'calendar-check',
       iconClass: 'bg-blue-soft-bg text-blue',
       t: `${plural(alerts.pendingApprovals, 'booking')} awaiting approval`,
-      s: 'Online requests the hospital has to confirm',
-      go: 'appointments',
+      s:
+        alerts.pendingApprovalsToday !== null
+          ? `${alerts.pendingApprovalsToday} for today · online requests the hospital has to confirm`
+          : 'Online requests the hospital has to confirm',
+      to: hospitalAppointmentsPath(activeRole, { tab: 'needs-approval' }),
+      perm: 'Appointments.view',
     });
   }
   if (alerts && alerts.pendingPatientChanges > 0) {
@@ -245,8 +266,9 @@ export function AdminDashboardScreen() {
       icon: 'users',
       iconClass: 'bg-p-100 text-p-500',
       t: `${plural(alerts.pendingPatientChanges, 'patient change')} to review`,
-      s: 'Profile edits patients asked for',
-      go: 'patients',
+      s: 'Patient record edits waiting for approval',
+      to: pathTo('patients'),
+      perm: 'Patients.view',
     });
   }
   if (alerts && alerts.cashSessionsToReconcile > 0) {
@@ -255,7 +277,8 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-y-100 text-y-600',
       t: `${plural(alerts.cashSessionsToReconcile, 'cash session')} to reconcile`,
       s: 'Closed desk drawers awaiting a check',
-      go: 'payments',
+      to: pathTo('payments'),
+      perm: 'Payments.view',
     });
   }
   if (onHold.length) {
@@ -264,7 +287,8 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-y-100 text-y-600',
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
-      go: 'settlements',
+      to: pathTo('settlements'),
+      perm: 'Billing & Settlements.view',
     });
   }
   if (periodsQuery.isError) {
@@ -274,7 +298,8 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-d-100 text-d-500',
       t: 'Settlements could not be checked',
       s: 'Open Settlements to see held or pending payouts',
-      go: 'settlements',
+      to: pathTo('settlements'),
+      perm: 'Billing & Settlements.view',
     });
   }
   if (awaitingPayout.length) {
@@ -283,7 +308,8 @@ export function AdminDashboardScreen() {
       iconClass: 'bg-blue-soft-bg text-blue',
       t: `${plural(awaitingPayout.length, 'settlement')} awaiting payout`,
       s: `${money(netRupees(awaitingPayout))} expected from Medibook`,
-      go: 'settlements',
+      to: pathTo('settlements'),
+      perm: 'Billing & Settlements.view',
     });
   }
 
@@ -295,8 +321,8 @@ export function AdminDashboardScreen() {
       icon: 'stethoscope',
       title: `No consultations ${periodWord}.`,
       message: 'Doctors appear here once appointments are booked with them.',
-      actionLabel: 'Manage staff',
-      onAction: () => go('doctors'),
+      actionLabel: can('Doctors & Departments.view') ? 'Manage staff' : undefined,
+      onAction: can('Doctors & Departments.view') ? () => go('doctors') : undefined,
     };
 
   if (dashboard.isError && !data) {
@@ -321,6 +347,13 @@ export function AdminDashboardScreen() {
         setPeriod={setPeriod}
         onRefresh={refresh}
       />
+      {dashboard.isError && dashboard.data && !dashboard.isPlaceholderData && (
+        <StaleDataBanner
+          updatedAt={dashboard.dataUpdatedAt}
+          timeZone={timeZone}
+          onRetry={() => void dashboard.refetch()}
+        />
+      )}
       {loading ? <SkeletonKpiStrip count={KPIS.length} /> : <KpiStrip items={KPIS} />}
       <div className="flex gap-5">
         <Card className="flex-[3]">
@@ -353,8 +386,8 @@ export function AdminDashboardScreen() {
               icon="circle-check"
               title="Nothing needs attention."
               message="No unpaid walk-ins, approvals, patient changes or cash sessions waiting."
-              actionLabel="Open appointments"
-              onAction={() => go('appointments')}
+              actionLabel={can('Appointments.view') ? 'Open appointments' : undefined}
+              onAction={can('Appointments.view') ? () => go('appointments') : undefined}
             />
           ) : (
             <div className="flex flex-col gap-3">
@@ -362,8 +395,9 @@ export function AdminDashboardScreen() {
                 <button
                   type="button"
                   key={a.t}
-                  onClick={() => go(a.go)}
-                  className="border-border-soft hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 rounded-md border p-3 text-left transition-colors duration-150"
+                  disabled={!can(a.perm)}
+                  onClick={() => navigate(a.to)}
+                  className="border-border-soft hover:bg-grey-200 flex w-full cursor-pointer items-center gap-3 rounded-md border p-3 text-left transition-colors duration-150 disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   <div
                     className={cn(
@@ -377,24 +411,34 @@ export function AdminDashboardScreen() {
                     <div className="text-body text-text-strong font-medium">{a.t}</div>
                     <div className="text-caption text-text-muted">{a.s}</div>
                   </div>
-                  <Icon name="chevron-right" size={18} className="text-text-faint" />
+                  {can(a.perm) && (
+                    <Icon name="chevron-right" size={18} className="text-text-faint" />
+                  )}
                 </button>
               ))}
             </div>
           )}
         </Card>
       </div>
+      <RevenueSplitCard
+        period={period}
+        loading={loading}
+        byChannel={data ? revenueByChannel(data) : []}
+        byMethod={data ? revenueByMethod(data) : []}
+      />
       <div className="flex gap-5">
         <Card className="flex-[2]">
           <div className="mb-4 flex items-center justify-between">
             <SectionTitle size={16}>Doctor Performance</SectionTitle>
-            <button
-              type="button"
-              onClick={() => go('doctors')}
-              className="text-body text-blue cursor-pointer border-0 bg-transparent p-0 font-medium"
-            >
-              Manage Staff
-            </button>
+            {can('Doctors & Departments.view') && (
+              <button
+                type="button"
+                onClick={() => go('doctors')}
+                className="text-body text-blue cursor-pointer border-0 bg-transparent p-0 font-medium"
+              >
+                Manage Staff
+              </button>
+            )}
           </div>
           <TableShell
             columns={PERF_COLUMNS}
@@ -417,10 +461,12 @@ export function AdminDashboardScreen() {
                   )}
                 </td>
                 <td className={tdClass}>
-                  {r.status === null ? (
-                    <span className="text-text-muted">Not on roster</span>
-                  ) : (
+                  {r.status !== null ? (
                     <Badge status={r.status} />
+                  ) : (
+                    <span className="text-text-muted">
+                      {doctors.isError || doctors.isPending ? '—' : 'Not on roster'}
+                    </span>
                   )}
                 </td>
               </tr>
@@ -430,7 +476,8 @@ export function AdminDashboardScreen() {
             The five busiest doctors {periodWord}
             {perfDocs.length > 0 &&
               ` (${perfDocs.reduce((n, r) => n + r.completed, 0)} consultations completed)`}
-            ; ratings and availability from the doctor roster.
+            ; ratings and availability from the doctor roster
+            {doctors.isError ? ' (the roster could not be loaded)' : ''}.
           </div>
         </Card>
         <Card className="flex-1">

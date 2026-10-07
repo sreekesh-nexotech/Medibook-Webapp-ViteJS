@@ -1,7 +1,10 @@
+import { formatTimeIn, formatWeekdayDayIn, isoDayIn } from '@/shared/lib/hospitalTime';
 import type { BarChartDatum } from '@/shared/ui/BarChart';
 
 import type {
+  AdminDashboard,
   AppointmentBrief,
+  QueueSession,
   ReceptionDashboard,
 } from '@/features/dashboard/domain/entities/dashboard.types';
 import type { DoctorStatus } from '@/features/doctors/domain/entities/doctors.types';
@@ -73,9 +76,135 @@ export function actionItems(data: ReceptionDashboard): ActionItem[] {
   return rows.sort((x, y) => x.appt.scheduledStartAt.localeCompare(y.appt.scheduledStartAt));
 }
 
-const TIME_FORMAT: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+/** The hospital-local day of a front-desk row (BE-26 sends it; else read it off the start). */
+export function briefDay(appt: AppointmentBrief, timeZone: string): string {
+  return appt.scheduledDate ?? isoDayIn(appt.scheduledStartAt, timeZone);
+}
 
-/** ISO date-time → "10:30 am". */
-export function clockTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-IN', TIME_FORMAT);
+/**
+ * When a needs-action row is due, in the hospital's zone: the clock time for
+ * today's, the day and time for any other day (UAT-62 — an approval for next
+ * week must not look due now).
+ */
+export function actionWhen(appt: AppointmentBrief, today: string, timeZone: string): string {
+  const time = formatTimeIn(appt.scheduledStartAt, timeZone);
+  const day = briefDay(appt, timeZone);
+  return day === today ? time : `${formatWeekdayDayIn(day, timeZone)} · ${time}`;
+}
+
+/* ---------------------------------------------------------- live queue */
+
+const LIVE_SESSION_STATUSES: ReadonlySet<string> = new Set(['open', 'paused']);
+
+/**
+ * A session has a patient at the desk now (UAT-61): its current appointment
+ * is set — the backend clears it on done, skip, no-show and close — and the
+ * session is still running.
+ */
+export function isSessionServing(session: QueueSession): boolean {
+  return session.currentAppointmentId !== null && LIVE_SESSION_STATUSES.has(session.status);
+}
+
+export interface DepartmentQueueRow {
+  readonly id: string;
+  readonly name: string;
+  readonly waiting: number;
+  readonly isServing: boolean;
+  /** The token at the desk, by the hospital's own label (BE-20); `null` when not sent. */
+  readonly servingLabel: string | null;
+}
+
+/**
+ * One row per active department: its sessions' waiting tokens and whether a
+ * patient is at a desk. Sessions name their department (BE-20) or are joined
+ * through the doctor roster; labels are never invented (no `T-012`).
+ */
+export function departmentQueueRows(
+  departments: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly isActive: boolean;
+  }[],
+  sessions: readonly QueueSession[],
+  departmentOfDoctor: ReadonlyMap<string, string>,
+): readonly DepartmentQueueRow[] {
+  return departments
+    .filter((d) => d.isActive)
+    .map((d) => {
+      const own = sessions.filter(
+        (s) => (s.departmentId ?? departmentOfDoctor.get(s.doctorId)) === d.id,
+      );
+      const serving = own.find(isSessionServing);
+      return {
+        id: d.id,
+        name: d.name,
+        waiting: own.reduce((n, s) => n + s.waitingCount, 0),
+        isServing: serving !== undefined,
+        servingLabel: serving?.currentTokenLabel ?? null,
+      };
+    });
+}
+
+/* -------------------------------------------------------------- revenue */
+
+const CHANNEL_LABEL: Readonly<Record<string, string>> = {
+  online: 'Online (collected by Medibook)',
+  desk: 'At the desk',
+};
+
+const METHOD_LABEL: Readonly<Record<string, string>> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  pos: 'POS',
+  netbanking: 'Net banking',
+  wallet: 'Wallet',
+  emi: 'EMI',
+  paylater: 'Pay later',
+  other: 'Other',
+};
+
+export interface RevenueRow {
+  readonly key: string;
+  readonly label: string;
+  readonly collected: number;
+  /** `null` when the backend does not split refunds this way (pre-DASH-02). */
+  readonly refunded: number | null;
+  readonly net: number | null;
+}
+
+function rows(
+  collected: Readonly<Record<string, number>>,
+  refunded: Readonly<Record<string, number>> | null,
+  labels: Readonly<Record<string, string>>,
+  fixed: readonly string[],
+): readonly RevenueRow[] {
+  const keys = Array.from(
+    new Set([...fixed, ...Object.keys(collected), ...Object.keys(refunded ?? {})]),
+  ).filter((k) => k !== 'null');
+  return keys
+    .map((key) => {
+      const c = collected[key] ?? 0;
+      const r = refunded ? (refunded[key] ?? 0) : null;
+      return {
+        key,
+        label: labels[key] ?? key,
+        collected: c,
+        refunded: r,
+        net: r === null ? null : c - r,
+      };
+    })
+    .filter((row) => fixed.includes(row.key) || row.collected !== 0 || (row.refunded ?? 0) !== 0);
+}
+
+/** Collections (and refunds, once split) by channel: online vs desk (R1). */
+export function revenueByChannel(data: AdminDashboard): readonly RevenueRow[] {
+  return rows(data.collectedByChannel, data.refundedByChannel, CHANNEL_LABEL, ['online', 'desk']);
+}
+
+/** Collections (and refunds, once split) by payment method, largest first. */
+export function revenueByMethod(data: AdminDashboard): readonly RevenueRow[] {
+  return [...rows(data.collectedByMethod, data.refundedByMethod, METHOD_LABEL, [])].sort(
+    (a, b) => b.collected - a.collected,
+  );
 }

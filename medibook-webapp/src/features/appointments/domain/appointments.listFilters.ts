@@ -28,6 +28,21 @@ export const APPOINTMENT_TABS = [
 
 export type AppointmentTab = (typeof APPOINTMENT_TABS)[number];
 
+/** URL slugs for the tabs (`?tab=`), so other screens can deep-link a filtered list. */
+export const TAB_SLUGS: Readonly<Record<AppointmentTab, string>> = {
+  All: 'all',
+  Online: 'online',
+  'Walk-in': 'walk-in',
+  'Pending Payment': 'pending-payment',
+  'In Queue': 'in-queue',
+  'Needs Approval': 'needs-approval',
+};
+
+/** The tab a `?tab=` slug names; `All` for anything unknown. */
+export function tabFromSlug(slug: string | null): AppointmentTab {
+  return APPOINTMENT_TABS.find((t) => TAB_SLUGS[t] === slug) ?? 'All';
+}
+
 /** Tabs that show a count next to their name. */
 export type CountedTab = Exclude<AppointmentTab, 'All'>;
 
