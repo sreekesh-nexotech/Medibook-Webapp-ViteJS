@@ -53,6 +53,8 @@ export interface HospitalSession {
     readonly readOnly: boolean;
     /** The hospital's uploaded logo (a stored file id), or `null`. */
     readonly logoFileId: string | null;
+    /** IANA zone the hospital works in (D-09), or `null` when the server did not say. */
+    readonly timeZone: string | null;
   };
 }
 

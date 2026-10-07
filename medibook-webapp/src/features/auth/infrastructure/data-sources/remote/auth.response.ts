@@ -39,6 +39,8 @@ export const hospitalMeResponseSchema = z.object({
     read_only: z.boolean(),
     // Optional so an older backend without it still signs in.
     logo_file_id: z.string().nullable().optional(),
+    /** IANA zone of the hospital (`hospitals.timezone`, D-09); hospital-local "today" uses it. */
+    timezone: z.string().nullable().optional(),
   }),
   default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
 });
@@ -90,6 +92,7 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
       status: dto.hospital.status,
       readOnly: dto.hospital.read_only,
       logoFileId: dto.hospital.logo_file_id ?? null,
+      timeZone: dto.hospital.timezone ?? null,
     },
   };
 }
