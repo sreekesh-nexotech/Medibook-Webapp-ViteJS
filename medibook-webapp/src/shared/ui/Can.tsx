@@ -23,6 +23,11 @@ interface CanProps {
 
 const DEFAULT_DISABLED_TITLE = 'Your role does not have permission for this action';
 
+const WRITE_BLOCK_TITLE: Readonly<Record<'read_only' | 'suspended', string>> = {
+  read_only: 'The hospital is read-only until its Medibook subscription is paid',
+  suspended: 'The hospital is suspended by Medibook operations',
+};
+
 /**
  * Renders `children` only when the signed-in role holds the permission —
  * audit 2.4 / X-01 / Q-03: "Permissions can be ticked, but no screen ever
@@ -44,17 +49,20 @@ export function Can({
   disableInstead = false,
   disabledTitle = DEFAULT_DISABLED_TITLE,
 }: CanProps) {
-  const { canAll, canAny } = usePermission();
+  const { canAll, canAny, writeBlock } = usePermission();
   const keys: readonly PermissionKey[] = typeof perm === 'string' ? [perm] : perm;
   const allowed = all ? canAll(...keys) : canAny(...keys);
 
   if (allowed) return <>{children}</>;
   if (!disableInstead) return <>{fallback}</>;
 
+  // A read-only or suspended hospital blocks the action for every role (UAT-38).
+  const title = writeBlock === null ? disabledTitle : WRITE_BLOCK_TITLE[writeBlock];
+
   // `inert` keeps the control out of reach of the keyboard too, not only the
   // mouse (SEC-11); the outer span still shows the explanation on hover.
   return (
-    <span title={disabledTitle} className="inline-flex cursor-not-allowed">
+    <span title={title} className="inline-flex cursor-not-allowed">
       <span inert className="inline-flex opacity-50">
         {children}
       </span>

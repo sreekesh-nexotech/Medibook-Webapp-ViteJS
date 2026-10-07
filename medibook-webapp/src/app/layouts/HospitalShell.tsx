@@ -18,6 +18,7 @@ import type { HospitalSession } from '@/features/auth/domain/entities/auth.types
 import { useHospitalImageUrlQuery } from '@/features/settings/application/queries/useHospitalImageUrlQuery';
 
 import { ErrorBoundary } from './ErrorBoundary';
+import { HospitalStateBanner } from './HospitalStateBanner';
 import { IdleWarningModal } from './IdleWarningModal';
 import {
   documentTitleFor,
@@ -59,7 +60,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
   const idle = useIdleTimeout({ minutes: idleMinutes, surface: 'hospital', onTimeout: onLogout });
   const location = useLocation();
   const navigate = useNavigate();
-  const { canViewModule } = usePermission();
+  const { canViewModule, writeBlock } = usePermission();
   const hospitalName = session.hospital.name;
   const { user } = session;
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
@@ -136,6 +137,12 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           onLogout={onLogout}
           onNavigate={handleNavigate}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
+        />
+        <HospitalStateBanner
+          block={writeBlock}
+          onOpenBilling={
+            canViewModule('Billing & Settlements') ? () => handleNavigate('settlements') : undefined
+          }
         />
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           <ErrorBoundary

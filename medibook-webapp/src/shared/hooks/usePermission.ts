@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { activeSurface } from '@/core/api/surface';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+import { hospitalSessionOf } from '@/features/auth/application/store/auth.roles';
 import {
   PERM_ACTIONS,
   RBAC_MODULES,
@@ -94,7 +95,18 @@ function parseKey(key: PermissionKey): { module: RbacModule; action: PermAction 
   return { module: module as RbacModule, action: action as PermAction };
 }
 
+/**
+ * Why the hospital cannot save anything right now, whatever the role holds:
+ * a lapsed subscription (read-only, D-30) or a suspension by operations
+ * (decision 9). The backend's tenant gate refuses every write in both states
+ * before RBAC runs, so the checks below answer `false` for `add`, `edit` and
+ * `del` (UAT-38). `null` when writes are allowed.
+ */
+export type HospitalWriteBlock = 'read_only' | 'suspended' | null;
+
 export interface UsePermissionResult {
+  /** Set when the hospital refuses every write (see `HospitalWriteBlock`). */
+  writeBlock: HospitalWriteBlock;
   /** True when the current role has this permission. */
   can: (perm: PermissionKey) => boolean;
   /** True when the role has at least one of these. */
@@ -113,6 +125,15 @@ export interface UsePermissionResult {
 /** The checks `usePermission` answers with, before the role's name is attached. */
 export type PermissionChecks = Omit<UsePermissionResult, 'roleId' | 'roleName'>;
 
+/** The write block for a hospital's status and subscription state. */
+export function hospitalWriteBlock(hospital: {
+  readonly status: string;
+  readonly readOnly: boolean;
+}): HospitalWriteBlock {
+  if (hospital.status === 'suspended' || hospital.status === 'closed') return 'suspended';
+  return hospital.readOnly ? 'read_only' : null;
+}
+
 /**
  * The permission checks for a hospital session's backend codes
  * (`appointments.view`, …). `null` means there is no hospital session (the
@@ -120,15 +141,20 @@ export type PermissionChecks = Omit<UsePermissionResult, 'roleId' | 'roleName'>;
  * checks — decide who reaches the console. A hospital screen never renders
  * before its guard has the session.
  */
-export function permissionChecks(codes: readonly string[] | null): PermissionChecks {
+export function permissionChecks(
+  codes: readonly string[] | null,
+  writeBlock: HospitalWriteBlock = null,
+): PermissionChecks {
   const perms = codes ? toGrid(codes) : null;
   const can = (perm: PermissionKey): boolean => {
     if (!perms) return true;
     const parsed = parseKey(perm);
     if (!parsed) return false;
+    if (writeBlock !== null && parsed.action !== 'view') return false;
     return perms[parsed.module][parsed.action];
   };
   return {
+    writeBlock: perms ? writeBlock : null,
     can,
     canAny: (...list) => list.length === 0 || list.some(can),
     canAll: (...list) => list.every(can),
@@ -142,11 +168,14 @@ export function usePermission(): UsePermissionResult {
   // `OpsGuard`, so there is no hospital session to read there.
   const isHospital = activeSurface() === 'hospital';
   const { data: session } = useSessionQuery('hospital', isHospital);
-  const hospitalSession = isHospital && session?.surface === 'hospital' ? session : null;
+  const hospitalSession = isHospital ? hospitalSessionOf(session) : null;
 
   return useMemo<UsePermissionResult>(
     () => ({
-      ...permissionChecks(hospitalSession ? hospitalSession.permissions : null),
+      ...permissionChecks(
+        hospitalSession ? hospitalSession.permissions : null,
+        hospitalSession ? hospitalWriteBlock(hospitalSession.hospital) : null,
+      ),
       roleId: hospitalSession?.role.code ?? null,
       roleName: hospitalSession?.role.name ?? null,
     }),
