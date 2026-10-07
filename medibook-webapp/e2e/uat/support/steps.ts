@@ -86,6 +86,25 @@ async function keepEvidence(id: string, pages: readonly Page[]): Promise<void> {
   }
 }
 
+const DIALOG_ESCAPES = 3;
+
+/**
+ * After a failure, close what the failed step left open (a drawer, a modal),
+ * so the next step starts from the screen and fails — or passes — on its own.
+ */
+async function dismissDialogs(pages: readonly Page[]): Promise<void> {
+  for (const page of pages) {
+    for (let i = 0; i < DIALOG_ESCAPES && !page.isClosed(); i += 1) {
+      const open = await page
+        .getByRole('dialog')
+        .count()
+        .catch(() => 0);
+      if (open === 0) break;
+      await page.keyboard.press('Escape').catch(() => undefined);
+    }
+  }
+}
+
 /**
  * Run UAT step `id`. Failures are soft: the step is marked failed with the
  * reason and the section continues. Returns whether it passed.
@@ -109,6 +128,7 @@ export async function uatStep(
       ok = false;
       const pages = typeof options.pages === 'function' ? options.pages() : (options.pages ?? []);
       await keepEvidence(id, pages);
+      await dismissDialogs(pages);
       // What the app's API said while the step ran is usually the reason.
       const seen = (options.watch ?? []).flatMap((w) => w.problems());
       const message = describeError(error);

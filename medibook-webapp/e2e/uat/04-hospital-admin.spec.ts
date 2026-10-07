@@ -1028,8 +1028,9 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
     await search.fill(closure.id);
     await search.press('Enter');
     // The actor column names the person; your own entries read "You".
+    // Matched on the row's accessible name: its text content runs the cells together.
     const actor = new RegExp(`\\b(You|${escapeRegExp(admin.name)})\\b`);
-    const holidayRows = trail.getByRole('row').filter({ hasText: actor });
+    const holidayRows = trail.getByRole('row', { name: actor });
     await expect(holidayRows.first()).toBeVisible();
     await expect(holidayRows.first().getByText(fmtDate(today).slice(0, 6))).toBeVisible();
 
@@ -1041,10 +1042,7 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
 
     await search.fill(refunded);
     await search.press('Enter');
-    const refundRow = trail
-      .getByRole('row')
-      .filter({ hasText: /\/refunds/ })
-      .filter({ hasText: actor });
+    const refundRow = trail.getByRole('row', { name: actor }).filter({ hasText: /\/refunds/ });
     await expect(refundRow.first()).toBeVisible();
   });
 
@@ -1074,8 +1072,9 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
       for (const column of data.columns) {
         await expect(table.getByRole('columnheader', { name: column.label }).first()).toBeVisible();
       }
+      const summary = page.getByRole('region', { name: `${report.title} summary` });
       for (const kpi of data.kpis) {
-        await expect(page.getByText(kpi.label, { exact: true }).first()).toBeVisible();
+        await expect(summary.getByText(kpi.label, { exact: true })).toBeVisible();
       }
     }
     // Export one of them.

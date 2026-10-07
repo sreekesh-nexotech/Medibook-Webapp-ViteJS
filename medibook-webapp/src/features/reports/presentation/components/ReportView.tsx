@@ -263,11 +263,14 @@ export function ReportView({ report }: ReportViewProps) {
       {/* summary tiles — computed by the server over every filtered row */}
       {data && !rangeError ? (
         data.kpis.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section
+            aria-label={`${report.title} summary`}
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          >
             {data.kpis.map((k) => (
               <StatCard key={k.key} k={kpiTile(k, report)} />
             ))}
-          </div>
+          </section>
         )
       ) : result.isError || rangeError ? null : (
         <SkeletonKpiStrip count={3} />

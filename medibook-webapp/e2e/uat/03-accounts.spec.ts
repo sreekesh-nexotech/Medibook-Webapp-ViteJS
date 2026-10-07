@@ -223,24 +223,33 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
   await uatStep('C-4', { watch: watch(), pages }, async () => {
     const { page } = needs(desk, 'C-1');
     const lines = await adminApi.all<PaymentLineDto>('/payments', {
-      method: 'upi',
       channel: 'desk',
       status: 'captured',
       date_from: addDays(today, -PAYMENT_LOOKBACK_DAYS),
       date_to: today,
     });
+    // A booking paid by UPI alone: a refund covers every line of the booking,
+    // and a cash line would be handed back from the accountant's own drawer
+    // (decision 2) — that is A-11's case, not this one.
+    const methodsOf = (appointmentId: string) =>
+      new Set(lines.filter((l) => l.appointment_id === appointmentId).map((l) => l.method));
     const line = needs(
       lines.find(
         (l) =>
+          l.method === 'upi' &&
           l.appointment_id &&
           !l.visit_id &&
           l.appointment_status === 'completed' &&
           !l.latest_refund &&
           l.captured_at &&
-          l.patient,
+          l.patient &&
+          [...methodsOf(l.appointment_id)].every((m) => m === 'upi'),
       ),
-      'a UPI payment of a completed booking (seed data)',
+      'a UPI-only payment of a completed booking (seed data)',
     );
+    const bookingPaise = lines
+      .filter((l) => l.appointment_id === line.appointment_id)
+      .reduce((sum, l) => sum + l.amount_paise, 0);
     const day = isoDateIn(new Date(needs(line.captured_at, 'capture time')));
     const patientName = needs(line.patient, 'patient').full_name;
     const ref = needs(line.booking_refs[0], 'booking ref');
@@ -256,7 +265,7 @@ test('4.3 Accounts — accountant, Lakeshore', async ({ browser }) => {
     const modal = dialog(page, 'Refund booking');
     await modal.getByLabel('Reason').fill('Duplicate charge reported by the patient');
     await modal
-      .getByRole('button', { name: `Refund ${rupees(line.amount_paise / 100)} in full` })
+      .getByRole('button', { name: `Refund ${rupees(bookingPaise / 100)} in full` })
       .click();
     await expect(toast(page, 'Refund recorded')).toBeVisible();
     await expect(target.getByText('Refunded', { exact: true }).first()).toBeVisible();
