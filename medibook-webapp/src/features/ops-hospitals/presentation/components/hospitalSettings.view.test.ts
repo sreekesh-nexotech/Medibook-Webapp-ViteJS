@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  bookingFormatProblem,
   numberingFormatProblem,
   tokenFormatProblem,
 } from '@/features/ops-hospitals/presentation/components/hospitalSettings.view';
@@ -30,5 +31,13 @@ describe('tokenFormatProblem', () => {
 
   it('refuses tokens that only numbering formats know', () => {
     expect(tokenFormatProblem('{FY}{SEQ:3}')).toBe('Unknown token {FY}.');
+  });
+});
+
+describe('bookingFormatProblem (H-02)', () => {
+  it('needs {PREFIX} first, then a separator', () => {
+    expect(bookingFormatProblem('{PREFIX}-{YY}{MM}-{SEQ:5}')).toBeNull();
+    expect(bookingFormatProblem('{PREFIX}B{SEQ:6}')).not.toBeNull();
+    expect(bookingFormatProblem('B-{PREFIX}-{SEQ:6}')).not.toBeNull();
   });
 });

@@ -8,14 +8,16 @@ import { rejectOnboardingCase } from '@/features/ops-hospitals/application/useca
 interface RejectCaseInput {
   readonly caseId: string;
   readonly reason: string;
+  /** The case version (`If-Match`). */
+  readonly version: number | null;
 }
 
-/** Close an application as rejected, with the reason the hospital is given. */
+/** Close an application as rejected; the hospital is suspended (decision 9). */
 export function useRejectOnboardingCaseMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ caseId, reason }: RejectCaseInput) =>
-      unwrap(await rejectOnboardingCase(caseId, reason)),
+    mutationFn: async ({ caseId, reason, version }: RejectCaseInput) =>
+      unwrap(await rejectOnboardingCase(caseId, reason, version)),
     onSettled: () => invalidateOnboarding(queryClient),
   });
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
 
@@ -11,13 +12,20 @@ import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
+import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 
-import type { OnboardingCaseStage } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
+import { ONBOARDING_CASE_PARAM } from '@/app/router/paths';
+
+import type {
+  OnboardingCaseStage,
+  OnboardingListQuery,
+} from '@/features/ops-hospitals/domain/entities/onboarding.entity';
 import { useOnboardingCasesQuery } from '@/features/ops-hospitals/application/queries/useOnboardingCasesQuery';
+import { useRefreshOnboarding } from '@/features/ops-hospitals/application/queries/useRefreshOnboarding';
 import { OnboardingCasePanel } from '@/features/ops-hospitals/presentation/components/OnboardingCasePanel';
 import {
   PIPELINE_STAGES,
@@ -27,8 +35,14 @@ import {
   STAGE_PILL,
   STAGE_TINT,
 } from '@/features/ops-hospitals/presentation/components/onboarding.status';
+import { useHospitalsDebouncedValue } from '@/features/ops-hospitals/presentation/components/useHospitalsDebouncedValue';
 
 const ALL_STAGES = 'Stage: All';
+
+/** Applications listed per page beside the open case. */
+const CASES_PAGE_SIZE = 20;
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 /** ISO timestamp → "12 Oct 2026"; empty for none. */
 function dateCopy(iso: string | null): string {
@@ -40,45 +54,59 @@ function dateCopy(iso: string | null): string {
  * `/platform/onboarding/cases` (P3).
  *
  * Applications counted by the server's stage (application → documents
- * requested → under review → approved → live, plus rejected), and one
- * selected application's checklist, administrator status and go-live gate
- * beside it. New hospitals are created from the Hospitals registry; the
- * console's Onboard Hospital modal is not wired to the API yet, so it is not
- * offered here.
+ * requested → under review → approved → live, plus rejected), filtered,
+ * searched and paged on the server (10·F22), and one application's checklist,
+ * administrator, notes and go-live gate beside it. `?case=<id>` opens a case
+ * directly — the hospital page links here that way (10·F13). Refresh reloads
+ * the open case too (10·F20).
  */
 export function OpsOnboardingScreen() {
-  const pipeline = useOnboardingCasesQuery();
+  const [params, setParams] = useSearchParams();
+  const refreshAll = useRefreshOnboarding();
 
   const [q, setQ] = useState('');
   const [stageF, setStageF] = useState<OnboardingCaseStage | 'All'>('All');
-  const [picked, setPicked] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const debouncedQ = useHospitalsDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
 
-  const cases = pipeline.data?.cases ?? [];
+  const query: OnboardingListQuery = {
+    page: page + 1,
+    pageSize: CASES_PAGE_SIZE,
+    stages: stageF === 'All' ? [] : [stageF],
+    q: debouncedQ,
+    assignedToId: null,
+  };
+  const pipeline = useOnboardingCasesQuery(query);
+
+  const rows = pipeline.data?.cases ?? [];
   const counts = pipeline.data?.counts;
+  const total = pipeline.data?.total ?? 0;
 
-  const ql = q.trim().toLowerCase();
-  const rows = cases
-    .filter(
-      (c) =>
-        (stageF === 'All' || c.stage === stageF) &&
-        (!ql || c.hospitalName.toLowerCase().includes(ql)),
-    )
-    // Applications that need work first, in pipeline order, then by name.
-    .sort(
-      (a, b) =>
-        PIPELINE_STAGES.indexOf(a.stage) - PIPELINE_STAGES.indexOf(b.stage) ||
-        a.hospitalName.localeCompare(b.hospitalName),
+  // The deep-linked case wins; otherwise the first row on the page.
+  const linkedId = params.get(ONBOARDING_CASE_PARAM);
+  const activeId = linkedId ?? rows[0]?.id ?? null;
+  const pick = (id: string): void => {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set(ONBOARDING_CASE_PARAM, id);
+        return next;
+      },
+      { replace: true },
     );
+  };
 
-  // Selection is derived, not stored in an effect: the picked case wins while
-  // it is still in the filtered list, otherwise the first row does.
-  const active = rows.find((c) => c.id === picked) ?? rows[0] ?? null;
-  const filtersActive = Boolean(ql) || stageF !== 'All';
+  const filtersActive = Boolean(q.trim()) || stageF !== 'All';
   const clearAll = (): void => {
     setQ('');
     setStageF('All');
+    setPage(0);
   };
-  const truncated = pipeline.data ? pipeline.data.total > cases.length : false;
+  const chooseStage = (stage: OnboardingCaseStage | 'All'): void => {
+    setStageF(stage);
+    setPage(0);
+  };
+  const nothingAtAll = !filtersActive && total === 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -91,7 +119,8 @@ export function OpsOnboardingScreen() {
               pad={16}
               hover
               className={cn('min-w-0', selected && 'border-text-navy')}
-              onClick={() => setStageF(selected ? 'All' : stage)}
+              onClick={() => chooseStage(selected ? 'All' : stage)}
+              ariaLabel={`${STAGE_LABEL[stage]}: ${counts ? counts[stage] : 'not loaded'}${selected ? ', filter on' : ''}`}
             >
               <div className="flex items-center gap-2.5">
                 <div
@@ -117,28 +146,31 @@ export function OpsOnboardingScreen() {
 
       <Card>
         <div className="mb-4">
-          <SearchField value={q} onChange={setQ} placeholder="Search applicant hospital by name" />
+          <SearchField
+            value={q}
+            onChange={(v) => {
+              setQ(v);
+              setPage(0);
+            }}
+            placeholder="Search applicant hospital by name"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <RefreshBtn
             onRefresh={async () => {
-              await pipeline.refetch();
+              await refreshAll();
             }}
-            title="Refresh the onboarding pipeline"
+            title="Refresh the pipeline and the open application"
           />
           <FilterSelect
             value={stageF === 'All' ? ALL_STAGES : STAGE_LABEL[stageF]}
             aria-label="Filter by onboarding stage"
             options={[ALL_STAGES, ...PIPELINE_STAGES.map((s) => STAGE_LABEL[s])]}
-            onChange={(v) => setStageF(PIPELINE_STAGES.find((s) => STAGE_LABEL[s] === v) ?? 'All')}
+            onChange={(v) =>
+              chooseStage(PIPELINE_STAGES.find((s) => STAGE_LABEL[s] === v) ?? 'All')
+            }
           />
           {filtersActive && <ClearChip onClick={clearAll} />}
-          <div className="flex-1"></div>
-          {truncated && pipeline.data && (
-            <span className="text-caption text-text-muted">
-              Showing the newest {cases.length} of {pipeline.data.total} applications
-            </span>
-          )}
         </div>
       </Card>
 
@@ -150,22 +182,12 @@ export function OpsOnboardingScreen() {
           message={isFailure(pipeline.error) ? pipeline.error.message : undefined}
           onRetry={() => void pipeline.refetch()}
         />
-      ) : cases.length === 0 ? (
+      ) : nothingAtAll && !linkedId ? (
         <Card>
           <EmptyState
             icon="rocket"
             title="No applications yet."
             message="A case opens here as soon as a hospital is created in the Hospitals registry."
-          />
-        </Card>
-      ) : rows.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon="search"
-            title="No applications match your filters."
-            message="Clear the filters to see the whole pipeline."
-            actionLabel="Clear filters"
-            onAction={clearAll}
           />
         </Card>
       ) : (
@@ -175,42 +197,62 @@ export function OpsOnboardingScreen() {
               <SectionTitle size={16}>
                 {stageF === 'All' ? 'All applications' : STAGE_LABEL[stageF]}
               </SectionTitle>
-              <span className="text-caption text-text-muted tabular-nums">{rows.length}</span>
+              <span className="text-caption text-text-muted tabular-nums">{total}</span>
             </div>
-            <div className="flex max-h-150 flex-col gap-2 overflow-y-auto">
-              {rows.map((c) => {
-                const selected = active?.id === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    aria-current={selected ? 'true' : undefined}
-                    onClick={() => setPicked(c.id)}
-                    className={cn(
-                      'flex w-full flex-col gap-1.5 rounded-md border px-3.5 py-3 text-left transition-colors duration-150',
-                      selected
-                        ? 'border-text-navy bg-blue-soft-bg'
-                        : 'border-border-soft hover:bg-grey-200 cursor-pointer',
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-body text-text-strong truncate font-medium">
-                        {c.hospitalName}
+            {rows.length === 0 ? (
+              <EmptyState
+                compact
+                icon="search"
+                title="No applications match your filters."
+                message="Clear the filters to see the whole pipeline."
+                actionLabel="Clear filters"
+                onAction={clearAll}
+              />
+            ) : (
+              <div className="flex max-h-150 flex-col gap-2 overflow-y-auto">
+                {rows.map((c) => {
+                  const selected = activeId === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-current={selected ? 'true' : undefined}
+                      onClick={() => pick(c.id)}
+                      className={cn(
+                        'flex w-full flex-col gap-1.5 rounded-md border px-3.5 py-3 text-left transition-colors duration-150',
+                        selected
+                          ? 'border-text-navy bg-blue-soft-bg'
+                          : 'border-border-soft hover:bg-grey-200 cursor-pointer',
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-body text-text-strong truncate font-medium">
+                          {c.hospitalName}
+                        </span>
+                        <Badge status={STAGE_PILL[c.stage]}>{STAGE_LABEL[c.stage]}</Badge>
+                      </div>
+                      <span className="text-caption text-text-muted truncate">
+                        Instance {c.hospitalStatus}
+                        {c.submittedAt ? ` · applied ${dateCopy(c.submittedAt)}` : ''}
                       </span>
-                      <Badge status={STAGE_PILL[c.stage]}>{STAGE_LABEL[c.stage]}</Badge>
-                    </div>
-                    <span className="text-caption text-text-muted truncate">
-                      Instance {c.hospitalStatus}
-                      {c.submittedAt ? ` · applied ${dateCopy(c.submittedAt)}` : ''}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {total > CASES_PAGE_SIZE && (
+              <Pager
+                total={total}
+                page={page}
+                pageSize={CASES_PAGE_SIZE}
+                onPage={setPage}
+                noun="applications"
+              />
+            )}
           </Card>
           <div className="lg:col-span-2">
-            {active ? (
-              <OnboardingCasePanel key={active.id} summary={active} />
+            {activeId ? (
+              <OnboardingCasePanel key={activeId} caseId={activeId} />
             ) : (
               <Card>
                 <EmptyState

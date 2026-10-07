@@ -1,15 +1,15 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
-  ManualOnboardingStage,
+  OnboardingCaseChanges,
   OnboardingCaseDetail,
 } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
 import { onboardingRepository } from '@/features/ops-hospitals/infrastructure/repositories/onboarding.repository.impl';
 
-export function setOnboardingStage(
+export function updateOnboardingCase(
   caseId: string,
-  stage: ManualOnboardingStage,
+  changes: OnboardingCaseChanges,
   version: number | null,
 ): Promise<Result<OnboardingCaseDetail>> {
-  return onboardingRepository.setStage(caseId, stage, version);
+  return onboardingRepository.updateCase(caseId, changes, version);
 }

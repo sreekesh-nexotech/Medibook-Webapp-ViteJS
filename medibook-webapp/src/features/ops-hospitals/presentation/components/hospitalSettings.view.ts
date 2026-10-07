@@ -105,3 +105,13 @@ export function tokenFormatProblem(format: string): string | null {
   if (value.replace(ANY_TOKEN, '').match(/[{}]/)) return 'A brace is not closed.';
   return null;
 }
+
+/** H-02: a booking ref starts with its hospital's prefix and a non-alphanumeric separator. */
+const BOOKING_FORMAT_START = /^\{PREFIX\}[^A-Za-z0-9{]/;
+
+/** The booking-specific shape rule (`numbering.booking_errors`); `null` when it holds. */
+export function bookingFormatProblem(format: string): string | null {
+  return BOOKING_FORMAT_START.test(format.trim())
+    ? null
+    : 'A booking format must start with {PREFIX} and a separator, e.g. {PREFIX}-{YY}-{SEQ:6}.';
+}

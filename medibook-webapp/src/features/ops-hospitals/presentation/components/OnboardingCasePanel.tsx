@@ -26,18 +26,18 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import type {
   ChecklistItem,
   ChecklistUpdate,
-  OnboardingCaseSummary,
 } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
 import { useHospitalQuery } from '@/features/ops-hospitals/application/queries/useHospitalQuery';
 import { useApproveHospitalMutation } from '@/features/ops-hospitals/application/queries/useApproveHospitalMutation';
 import { useGoLiveMutation } from '@/features/ops-hospitals/application/queries/useGoLiveMutation';
-import { useOpenHospitalToPatientsMutation } from '@/features/ops-hospitals/application/queries/useOpenHospitalToPatientsMutation';
 import { useOnboardingCaseQuery } from '@/features/ops-hospitals/application/queries/useOnboardingCaseQuery';
 import { useRejectOnboardingCaseMutation } from '@/features/ops-hospitals/application/queries/useRejectOnboardingCaseMutation';
 import { useSetOnboardingStageMutation } from '@/features/ops-hospitals/application/queries/useSetOnboardingStageMutation';
 import { useUpdateChecklistItemMutation } from '@/features/ops-hospitals/application/queries/useUpdateChecklistItemMutation';
 import { useUploadKycScanMutation } from '@/features/ops-hospitals/application/queries/useUploadKycScanMutation';
 import { DocUploadButton } from '@/features/ops-hospitals/presentation/components/DocUploadButton';
+import { FirstAdminInvitationCard } from '@/features/ops-hospitals/presentation/components/FirstAdminInvitationCard';
+import { OnboardingCaseNotesCard } from '@/features/ops-hospitals/presentation/components/OnboardingCaseNotesCard';
 import {
   CHECKLIST_LABEL,
   CHECKLIST_PILL,
@@ -83,7 +83,8 @@ function itemHint(item: ChecklistItem): string {
 }
 
 interface OnboardingCasePanelProps {
-  summary: OnboardingCaseSummary;
+  /** The case to show — from the list, or from a `?case=` deep link (10·F13). */
+  caseId: string;
 }
 
 /**
@@ -95,12 +96,13 @@ interface OnboardingCasePanelProps {
  * go-live act on the whole application.
  *
  * There is deliberately no "verify everything" control: each document carries
- * its own decision and timestamp.
+ * its own decision and timestamp. Every case and checklist write carries the
+ * row version (`If-Match`, BE-29), so two operators never overwrite each other.
  */
-export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
+export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
   const navigate = useNavigate();
-  const caseQuery = useOnboardingCaseQuery(summary.id);
-  const hospitalQuery = useHospitalQuery(summary.hospitalId);
+  const caseQuery = useOnboardingCaseQuery(caseId);
+  const hospitalQuery = useHospitalQuery(caseQuery.data?.hospitalId ?? '', caseQuery.isSuccess);
 
   const updateItem = useUpdateChecklistItemMutation();
   const uploadScan = useUploadKycScanMutation();
@@ -108,7 +110,6 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const rejectCase = useRejectOnboardingCaseMutation();
   const approve = useApproveHospitalMutation();
   const goLive = useGoLiveMutation();
-  const openToPatients = useOpenHospitalToPatientsMutation();
   const downloadScan = useFileDownloadMutation();
 
   const [modal, setModal] = useState<PanelModal>(null);
@@ -138,19 +139,30 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   const hospital = hospitalQuery.data;
   const stage = detail.stage;
   const live = stage === 'live';
-  const closed = live || stage === 'rejected';
+  const rejected = stage === 'rejected';
+  const closed = live || rejected;
   const blockers = detail.blockers;
   const ready = !closed && blockers.length === 0;
-  const adminAccepted = !blockers.some((b) => b.code === NO_ADMIN_BLOCKER);
+  const adminAccepted =
+    detail.firstAdminInvitation?.adminAccepted ??
+    !blockers.some((b) => b.code === NO_ADMIN_BLOCKER);
   const settled = detail.checklist.filter(
     (i) => i.status === 'verified' || i.status === 'waived',
   ).length;
   const total = detail.checklist.length;
-  const planCode = hospital?.subscription?.planCode ?? '—';
+  const planCode = hospital?.subscription?.planName ?? hospital?.subscription?.planCode ?? '—';
 
   const tick = (item: ChecklistItem, update: ChecklistUpdate, done: string): void => {
+    // A document received or verified again drops its old send-back reason (10·F19).
+    const clearsNote =
+      item.note !== null && (update.status === 'received' || update.status === 'verified');
     updateItem.mutate(
-      { caseId: detail.id, code: item.code, update },
+      {
+        caseId: detail.id,
+        code: item.code,
+        version: item.version,
+        update: clearsNote && update.note === undefined ? { ...update, note: '' } : update,
+      },
       {
         onSuccess: () => toast(done, 'success'),
         onError: (error) => toast(errorCopy(error), 'error'),
@@ -178,9 +190,10 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
       await updateItem.mutateAsync({
         caseId: detail.id,
         code: sendingBack.code,
+        version: sendingBack.version,
         update: { status: 'pending', note: reason },
       });
-      toast(`${sendingBack.name} sent back to ${detail.hospitalName}.`, 'info');
+      toast(`${sendingBack.name} sent back — tell ${detail.hospitalName} what to bring.`, 'info');
       return true;
     } catch (error) {
       toast(errorCopy(error), 'error');
@@ -190,8 +203,11 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
 
   const rejectApplication = async (reason: string): Promise<boolean> => {
     try {
-      await rejectCase.mutateAsync({ caseId: detail.id, reason });
-      toast(`${detail.hospitalName}'s application was rejected.`, 'info');
+      await rejectCase.mutateAsync({ caseId: detail.id, reason, version: detail.version });
+      toast(
+        `${detail.hospitalName}'s application was rejected and the hospital suspended.`,
+        'info',
+      );
       return true;
     } catch (error) {
       toast(errorCopy(error), 'error');
@@ -207,32 +223,57 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
   };
 
   const confirmGoLive = (): void => {
-    goLive.mutate(detail.hospitalId, {
-      onSuccess: () => {
-        setModal(null);
-        if (!openOnGoLive) {
-          toast(
-            `${detail.hospitalName} is live. Patients cannot see it until you list it on its hospital page.`,
-            'success',
-          );
-          return;
-        }
-        // Go-live sets only the status; listing and online booking are separate switches.
-        openToPatients.mutate(detail.hospitalId, {
-          onSuccess: () =>
-            toast(`${detail.hospitalName} is live and taking online bookings.`, 'success'),
-          onError: (error) =>
+    goLive.mutate(
+      {
+        hospitalId: detail.hospitalId,
+        // One call opens the hospital to patients (CORE-03-B); a soft launch
+        // leaves its patient-app switches as they are.
+        flags: openOnGoLive ? { appVisibility: 'visible', onlineBookingEnabled: true } : null,
+      },
+      {
+        onSuccess: (outcome) => {
+          setModal(null);
+          if (outcome.openFailure) {
             toast(
-              `${detail.hospitalName} is live, but it could not be opened to patients: ${errorCopy(error)} Turn it on from its hospital page.`,
+              `${detail.hospitalName} is live, but it could not be opened to patients: ${errorCopy(outcome.openFailure)} Turn it on from its hospital page.`,
               'error',
-            ),
-        });
+            );
+          } else if (outcome.isOpenToPatients) {
+            toast(`${detail.hospitalName} is live and taking online bookings.`, 'success');
+          } else {
+            toast(
+              `${detail.hospitalName} is live. Patients cannot see it until you list it on its hospital page.`,
+              'success',
+            );
+          }
+        },
+        onError: (error) => {
+          toast(errorCopy(error), 'error');
+          setModal(null);
+        },
       },
-      onError: (error) => {
-        toast(errorCopy(error), 'error');
-        setModal(null);
+    );
+  };
+
+  const reopen = (): void => {
+    setStage.mutate(
+      { caseId: detail.id, stage: 'review', version: detail.version },
+      {
+        onSuccess: () =>
+          toast(`${detail.hospitalName}'s application is open again (under review).`, 'success'),
+        onError: (error) => toast(errorCopy(error), 'error'),
       },
-    });
+    );
+  };
+
+  const detachScan = (item: ChecklistItem): void => {
+    updateItem.mutate(
+      { caseId: detail.id, code: item.code, version: item.version, update: { fileId: null } },
+      {
+        onSuccess: () => toast(`Scan removed from ${item.name}.`, 'success'),
+        onError: (error) => toast(errorCopy(error), 'error'),
+      },
+    );
   };
 
   return (
@@ -275,7 +316,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                     const next = MANUAL_STAGES.find((s) => STAGE_LABEL[s] === label);
                     if (!next || next === stage) return;
                     setStage.mutate(
-                      { caseId: detail.id, stage: next },
+                      { caseId: detail.id, stage: next, version: detail.version },
                       {
                         onSuccess: () => toast(`Moved to ${STAGE_LABEL[next]}.`, 'success'),
                         onError: (error) => toast(errorCopy(error), 'error'),
@@ -320,17 +361,32 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
         </div>
       </Card>
 
-      {stage === 'rejected' && (
-        <Card pad={16} className="flex items-start gap-3">
+      {rejected && (
+        <Card pad={16} className="flex flex-wrap items-start gap-3">
           <Icon name="circle-x" size={18} className="text-d-500 mt-0.5 flex-none" />
-          <div className="text-body text-text-body">
+          <div className="text-body text-text-body min-w-50 flex-1">
             <span className="text-text-strong font-medium">Application rejected.</span>{' '}
             {detail.rejectionReason ?? 'No reason was recorded.'}
+            <div className="text-caption text-text-muted mt-1">
+              The hospital is suspended (reason: onboarding rejected): its staff can sign in and
+              read, but every change is refused. Re-opening the case lifts the suspension.
+            </div>
           </div>
+          {canReview && (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="rotate-ccw"
+              busy={setStage.isPending}
+              onClick={reopen}
+            >
+              Re-open application
+            </Button>
+          )}
         </Card>
       )}
 
-      {stage !== 'rejected' && (
+      {!rejected && (
         <Card pad={16}>
           <div className="flex flex-wrap items-start gap-3.5">
             <div
@@ -369,30 +425,14 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
         </Card>
       )}
 
-      <Card>
-        <SectionTitle>Hospital Administrator</SectionTitle>
-        <div className="mt-3 flex items-start gap-3">
-          <div
-            className={cn(
-              'flex size-9 flex-none items-center justify-center rounded-md',
-              adminAccepted ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
-            )}
-          >
-            <Icon name={adminAccepted ? 'user-check' : 'user-plus'} size={17} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-body text-text-strong font-medium">
-              {adminAccepted
-                ? 'An administrator has accepted the invitation'
-                : 'Waiting for the first administrator to accept'}
-            </div>
-            <div className="text-caption text-text-muted">
-              The first administrator is invited when the hospital is created. Inviting, resending
-              or adding administrators from the console is not yet available from the server.
-            </div>
-          </div>
-        </div>
-      </Card>
+      <FirstAdminInvitationCard
+        hospitalId={detail.hospitalId}
+        hospitalName={detail.hospitalName}
+        invitation={detail.firstAdminInvitation}
+        adminAccepted={adminAccepted}
+      />
+
+      <OnboardingCaseNotesCard key={`${detail.id}:${detail.version ?? ''}`} detail={detail} />
 
       <Card>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
@@ -412,10 +452,10 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
             icon="file-text"
             title="Nothing on the checklist."
             message="Add the documents this hospital must provide from the platform catalogue."
-            actionLabel={closed ? undefined : 'Update checklist'}
+            actionLabel={closed || !canReview ? undefined : 'Update checklist'}
             actionIcon="send"
             actionVariant="button"
-            onAction={closed ? undefined : () => setModal('docs')}
+            onAction={closed || !canReview ? undefined : () => setModal('docs')}
           />
         ) : (
           <div className="flex flex-col gap-3">
@@ -451,6 +491,16 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
                       className="text-caption text-blue mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
                     >
                       <Icon name="file-down" size={13} className="flex-none" /> Download scan
+                    </button>
+                  )}
+                  {item.fileId && canReview && !closed && (
+                    <button
+                      type="button"
+                      onClick={() => detachScan(item)}
+                      disabled={updateItem.isPending}
+                      className="text-caption text-d-500 mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
+                    >
+                      <Icon name="trash-2" size={13} className="flex-none" /> Remove scan
                     </button>
                   )}
                   {item.note && (
@@ -562,7 +612,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
           title={`Send ${sendingBack.name} back?`}
           reasons={SEND_BACK_REASONS}
           submitLabel="Send Back"
-          info={`The document returns to pending with your reason. The rest of the checklist keeps its own status.`}
+          info="The document returns to pending with your reason. Medibook does not message the hospital about it — tell them what to bring. The rest of the checklist keeps its own status."
           notePlaceholder="e.g. The GST certificate is registered to a different entity"
           onClose={() => setSendingBack(null)}
           onSubmit={sendBack}
@@ -574,7 +624,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
           title={`Reject ${detail.hospitalName}'s application?`}
           reasons={REJECT_APPLICATION_REASONS}
           submitLabel="Reject Application"
-          info="The case closes as rejected and the reason is recorded. The hospital does not go live."
+          info="The case closes as rejected, the reason is recorded and the hospital is suspended (its staff can still sign in and read). The hospital is not told automatically — let them know."
           notePlaceholder="e.g. The registration certificate could not be verified with the state"
           onClose={() => setModal(null)}
           onSubmit={rejectApplication}
@@ -597,7 +647,7 @@ export function OnboardingCasePanel({ summary }: OnboardingCasePanelProps) {
           { k: 'Plan', v: planCode },
         ]}
         confirmLabel={goLive.isPending ? 'Going live…' : 'Go Live'}
-        busy={goLive.isPending || openToPatients.isPending}
+        busy={goLive.isPending}
         onConfirm={confirmGoLive}
       >
         <div className="bg-bg-subtle border-border flex w-full items-center gap-3 rounded-md border px-4 py-3 text-left">
