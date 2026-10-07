@@ -203,12 +203,12 @@ async function onboardOnScreen(page: Page, h: OnboardInput): Promise<string> {
     form.getByRole('button', { name: 'Onboard Hospital' }).click(),
   ]);
   expect(response.status(), 'the hospital is provisioned').toBe(201);
-  const created = (await response.json()) as { readonly id: string };
+  const created = (await response.json()) as { readonly hospital: { readonly id: string } };
   await expect(
     toast(page, `${h.name} onboarded. Its administrator has been invited.`),
   ).toBeVisible();
   await expect(topbarTitle(page)).toHaveText('Hospital Profile');
-  return created.id;
+  return created.hospital.id;
 }
 
 /** Open a hospital's profile from the registry search. */
@@ -243,6 +243,7 @@ async function setUpNewHospital(api: ApiClient, tag: string): Promise<HospitalDo
   const doctor = await api.post<HospitalDoctor>('/doctors', {
     department_id: department.id,
     name: `Dr. Uat Onboard ${tag}`,
+    specialisation: 'General Physician',
     consultation_fee_paise: 50_000,
     slot_length_min: 15,
     status: 'active',
@@ -396,7 +397,7 @@ test('4.5 Operations — owner', async ({ browser }) => {
       .click();
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
     await page
-      .getByRole('combobox', { name: 'Onboarding stage' })
+      .getByRole('combobox', { name: 'Onboarding stage', exact: true })
       .selectOption('Documents requested');
     await expect(toast(page, 'Moved to Documents requested.')).toBeVisible();
     const cases = await owner.get<ApiPage<CaseDto>>('/onboarding/cases', { hospital_id: id });
@@ -669,6 +670,9 @@ test('4.5 Operations — owner', async ({ browser }) => {
     await page
       .getByRole('combobox', { name: 'Filter plan changes by status' })
       .selectOption('Requested');
+    // The request may be newer than the list this browser read moments ago (the
+    // Plans screen reads the same list): refresh, as a tester would.
+    await page.getByRole('button', { name: 'Refresh plan changes' }).click();
     await page.getByRole('button', { name: 'Approve plan change' }).first().click();
     await dialog(page, 'Approve this plan change?')
       .getByRole('button', { name: 'Approve Change' })
@@ -864,10 +868,14 @@ test('4.5 Operations — owner', async ({ browser }) => {
       readonly date_from: string;
       readonly date_to: string;
     };
-    expect(span.date_to, 'the window ends today').toBe(today);
-    expect([addDays(today, -6), addDays(today, -7)], 'the window is the last 7 days').toContain(
-      span.date_from,
-    );
+    // Analytics come from the nightly rollup, so every window ends yesterday (IST),
+    // the last rolled-up day (backend analytics_queries.parse; the screen says so).
+    const yesterday = addDays(today, -1);
+    expect(span.date_to, 'the window ends on the last rolled-up day').toBe(yesterday);
+    expect(span.date_from, 'the window is 7 days').toBe(addDays(yesterday, -6));
+    await expect(
+      page.getByText(`${fmtDate(span.date_from)} – ${fmtDate(span.date_to)}`).first(),
+    ).toBeVisible();
     for (const tab of ['Providers', 'Error Rates', 'Bookings']) {
       await page.getByRole('tab', { name: tab }).click();
       await s.watch.settled();
@@ -956,7 +964,10 @@ test('4.5 Operations — owner', async ({ browser }) => {
       await s.watch.settled();
     }
     await page.getByRole('tab', { name: 'Export on Request' }).click();
-    const requestNo = await fileExportRequest(page, needs(patient.email, 'a patient email'));
+    const requestNo = await fileExportRequest(page, {
+      email: needs(patient.email, 'a patient email'),
+      name: patient.name,
+    });
     const listed = row(page, requestNo);
     await expect(listed).toBeVisible();
     await expect(listed).toContainText(patient.name);

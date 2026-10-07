@@ -249,7 +249,7 @@ test('4.6 Other operations roles', async ({ browser }) => {
     // A data request is recorded and listed with the subject's and requester's names.
     await openNav(page, 'Compliance');
     await page.getByRole('tab', { name: 'Export on Request' }).click();
-    const requestNo = await fileExportRequest(page, patientEmail);
+    const requestNo = await fileExportRequest(page, { email: patientEmail, name: patient.name });
     const listed = row(page, requestNo);
     await expect(listed).toContainText(patient.name);
     await expect(listed).toContainText(officer.name);
