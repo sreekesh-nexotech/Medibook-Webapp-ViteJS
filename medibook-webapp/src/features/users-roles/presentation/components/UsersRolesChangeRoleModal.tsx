@@ -6,6 +6,8 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import { isFailure } from '@/core/error/failure';
+
 import { useStaffCountersQuery } from '@/features/users-roles/application/queries/useStaffCountersQuery';
 import { useUpdateStaffDetailsMutation } from '@/features/users-roles/application/queries/useUpdateStaffDetailsMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
@@ -24,8 +26,23 @@ const NO_COUNTER = 'No default counter';
 interface UsersRolesChangeRoleModalProps {
   user: UserRow;
   roles: readonly RoleView[];
+  /** The signed-in user's own row: the role cannot be changed (B2 refuses it, UAT-24). */
+  isSelf: boolean;
   onClose: () => void;
 }
+
+/** Backend code for an edit against a row that changed since it was read. */
+const CONFLICT_VERSION = 'CONFLICT_VERSION';
+
+/** Field-error keys the staff PATCH answers with, per form field (08 F6). */
+type EditField = 'role' | 'employeeCode' | 'designation' | 'counter';
+
+const FIELD_KEYS: Readonly<Record<string, EditField>> = {
+  role_code: 'role',
+  employee_code: 'employeeCode',
+  designation: 'designation',
+  counter_id: 'counter',
+};
 
 /** Blank → `null`, so clearing a field clears it on the server. */
 function orNull(value: string): string | null {
@@ -43,6 +60,7 @@ function orNull(value: string): string | null {
 export function UsersRolesChangeRoleModal({
   user,
   roles,
+  isSelf,
   onClose,
 }: UsersRolesChangeRoleModalProps) {
   const save = useUpdateStaffDetailsMutation();
@@ -53,6 +71,7 @@ export function UsersRolesChangeRoleModal({
   const [designation, setDesignation] = useState(user.designation ?? '');
   const [counterId, setCounterId] = useState<string | null>(user.counterId);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<EditField, string>>>({});
 
   const picked = roles.find((r) => r.id === roleId);
   const unchanged =
@@ -86,7 +105,25 @@ export function UsersRolesChangeRoleModal({
           );
           onClose();
         },
-        onError: (failure) => setError(failureText(failure, 'Could not save the changes.')),
+        onError: (failure) => {
+          // Each server field error lands under its own field; anything
+          // else (last admin, self role change, a stale row) above the form.
+          const mapped: Partial<Record<EditField, string>> = {};
+          if (isFailure(failure)) {
+            for (const [key, messages] of Object.entries(failure.fieldErrors)) {
+              const field = FIELD_KEYS[key];
+              if (field && messages[0]) mapped[field] = messages[0];
+            }
+          }
+          setFieldErrors(mapped);
+          setError(
+            Object.keys(mapped).length > 0
+              ? null
+              : isFailure(failure) && failure.code === CONFLICT_VERSION
+                ? `${user.name} was changed by someone else in the meantime. Close this and open it again to edit the latest details.`
+                : failureText(failure, 'Could not save the changes.'),
+          );
+        },
       },
     );
   };
@@ -103,14 +140,26 @@ export function UsersRolesChangeRoleModal({
       onSubmit={submit}
     >
       <div className="flex flex-col gap-4">
-        <Field label="Role" required error={error}>
+        {error && (
+          <div role="alert" className="text-body text-d-700 bg-d-100 rounded-md px-3.5 py-2.5">
+            {error}
+          </div>
+        )}
+        <Field
+          label="Role"
+          required
+          error={fieldErrors.role}
+          hint={isSelf ? 'You cannot change your own role — another administrator can.' : undefined}
+        >
           <Select
             value={picked?.name ?? ''}
             placeholder="Select role"
             options={roles.map((r) => r.name)}
+            disabled={isSelf}
             onChange={(name) => {
               setRoleId(roles.find((r) => r.name === name)?.id ?? user.roleId);
               setError(null);
+              setFieldErrors({});
             }}
           />
         </Field>
@@ -128,7 +177,11 @@ export function UsersRolesChangeRoleModal({
           </div>
         )}
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Employee Code" hint="The hospital's own staff ID.">
+          <Field
+            label="Employee Code"
+            hint="The hospital's own staff ID."
+            error={fieldErrors.employeeCode}
+          >
             <TextInput
               value={employeeCode}
               maxLength={EMPLOYEE_CODE_MAX}
@@ -136,7 +189,7 @@ export function UsersRolesChangeRoleModal({
               onChange={setEmployeeCode}
             />
           </Field>
-          <Field label="Designation">
+          <Field label="Designation" error={fieldErrors.designation}>
             <TextInput
               value={designation}
               maxLength={DESIGNATION_MAX}
@@ -147,6 +200,7 @@ export function UsersRolesChangeRoleModal({
         </div>
         <Field
           label="Default Counter"
+          error={fieldErrors.counter}
           hint={
             countersQuery.isError
               ? 'Counters could not be loaded; the current one is kept.'

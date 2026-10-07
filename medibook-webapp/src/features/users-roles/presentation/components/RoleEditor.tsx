@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useCan } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -9,8 +10,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import type { HospitalRole } from '@/app/router/paths';
-
+import { useUpdateRoleDescriptionMutation } from '@/features/users-roles/application/queries/useUpdateRoleDescriptionMutation';
 import { useUpdateRolePermissionsMutation } from '@/features/users-roles/application/queries/useUpdateRolePermissionsMutation';
 import type { PermissionModule } from '@/features/users-roles/domain/entities/usersRoles.types';
 import {
@@ -22,18 +22,20 @@ import {
   type RbacModule,
 } from '@/features/users-roles/application/store/rbac.types';
 import { accessBuckets } from '@/features/users-roles/presentation/components/access-buckets';
-import {
-  ACTION_LABEL,
-  defaultSignInAs,
-} from '@/features/users-roles/presentation/components/access-preview';
+import { ACTION_LABEL } from '@/features/users-roles/presentation/components/access-preview';
 import { PermCheck } from '@/features/users-roles/presentation/components/PermCheck';
 import { RoleAccessPreview } from '@/features/users-roles/presentation/components/RoleAccessPreview';
 import {
+  extraModuleAccess,
   extraPermissionModules,
   failureText,
   gridToPermissionCodes,
+  nonGridCodes,
   type RoleView,
 } from '@/features/users-roles/presentation/components/usersRoles.viewModel';
+
+/** Backend limit (`PATCH /roles/{code}` `description`, USR-02). */
+const DESCRIPTION_MAX = 300;
 
 const PERM_COLS: readonly (readonly [PermAction, string])[] = PERM_ACTIONS.map((a) => [
   a,
@@ -53,11 +55,14 @@ interface RoleEditorProps {
  * name), the locked notice for the admin role, and the live access preview.
  *
  * A hospital has exactly four system roles (backend Q60) — there is no
- * create, rename or delete — so name and description are read-only and only
- * the grid is saved (`PATCH /roles/{code}/permissions`). That call replaces
- * the whole set, so `gridToPermissionCodes` carries over the codes of the
- * modules this grid does not show. Audit 3.4.1 rides along: the grid sits in a
- * labelled, focusable scroll region instead of crushing below desktop width.
+ * create, rename or delete. The grid is saved with
+ * `PATCH /roles/{code}/permissions`, which replaces the whole set: the codes
+ * of the modules outside the grid start from the role itself (never from the
+ * permission catalogue, which may load late or fail — UAT-22) and are edited
+ * under the grid. The description is the hospital admin's to edit
+ * (`PATCH /roles/{code}`, `If-Match`, USR-02). Audit 3.4.1 rides along: the
+ * grid sits in a labelled, focusable scroll region instead of crushing below
+ * desktop width.
  *
  * The drawer is mounted only while open (the screen renders it conditionally),
  * so its grid starts from the role it was opened with — no prop-into-state
@@ -65,18 +70,22 @@ interface RoleEditorProps {
  */
 export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
   const savePermissions = useUpdateRolePermissionsMutation();
+  const saveDescription = useUpdateRoleDescriptionMutation();
+  const canEditRoles = useCan('Users & Roles.edit');
 
   const locked = !role.editable;
 
   const [perms, setPerms] = useState<PermsGrid>(role.perms);
   const extraModules = extraPermissionModules(catalogue);
-  // Codes for the modules outside the grid (e.g. `cash_desk.view`), editable below it.
+  // Codes for the modules outside the grid (e.g. `cash_desk.view`), from the
+  // role itself — so they survive a catalogue that arrives late (UAT-22).
   const [extra, setExtra] = useState<ReadonlySet<string>>(
-    () =>
-      new Set(
-        role.permissionCodes.filter((c) => extraModules.some((m) => c.startsWith(`${m.module}.`))),
-      ),
+    () => new Set(nonGridCodes(role.permissionCodes)),
   );
+  const [description, setDescription] = useState(role.description ?? '');
+  const descriptionValue = description.trim() === '' ? null : description.trim();
+  const isDescriptionEditable = canEditRoles && role.version !== null;
+  const isDescriptionDirty = isDescriptionEditable && descriptionValue !== role.description;
   const toggleExtra = (code: string): void => {
     if (locked) return;
     setExtra((current) => {
@@ -86,27 +95,33 @@ export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
       return next;
     });
   };
-  const [signInAs, setSignInAs] = useState<HospitalRole>(defaultSignInAs(role));
+  const isSaving = savePermissions.isPending || saveDescription.isPending;
 
-  const handleSave = (): void =>
-    savePermissions.mutate(
-      {
-        roleCode: role.code,
-        // The grid's codes plus the extra modules as edited; any module the
-        // catalogue did not list (catalogue unavailable) is carried over.
-        permissions: gridToPermissionCodes(
-          perms,
-          extraModules.length > 0 ? [...extra] : role.permissionCodes,
-        ),
-      },
-      {
-        onSuccess: () => {
-          toast(`${role.name} permissions updated`, 'success');
-          onClose();
-        },
-        onError: (failure) => toast(failureText(failure, 'Could not save the role.'), 'error'),
-      },
-    );
+  const handleSave = async (): Promise<void> => {
+    try {
+      let version = role.version;
+      if (isDescriptionDirty && role.version !== null) {
+        const saved = await saveDescription.mutateAsync({
+          roleCode: role.code,
+          description: descriptionValue,
+          version: role.version,
+        });
+        version = saved.version;
+      }
+      if (!locked) {
+        await savePermissions.mutateAsync({
+          roleCode: role.code,
+          // The grid's codes plus the outside-grid codes as edited.
+          permissions: gridToPermissionCodes(perms, [...extra]),
+          version,
+        });
+      }
+      toast(`${role.name} updated`, 'success');
+      onClose();
+    } catch (failure) {
+      toast(failureText(failure, 'Could not save the role.'), 'error');
+    }
+  };
 
   const toggle = (mod: RbacModule, act: PermAction): void => {
     if (locked) return;
@@ -141,9 +156,9 @@ export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
             Cancel
           </Button>
           <span className="flex-1" />
-          {!locked && (
+          {(!locked || isDescriptionDirty) && (
             <Can perm="Users & Roles.edit">
-              <Button icon="check" onClick={handleSave} busy={savePermissions.isPending}>
+              <Button icon="check" onClick={() => void handleSave()} busy={isSaving}>
                 Save Role
               </Button>
             </Can>
@@ -155,8 +170,17 @@ export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
         <Field label="Role Name" hint="Hospital roles are fixed">
           <TextInput value={role.name} disabled />
         </Field>
-        <Field label="Description">
-          <TextInput value={role.desc} disabled />
+        <Field
+          label="Description"
+          hint={isDescriptionEditable ? 'Shown on the role card. Up to 300 characters.' : undefined}
+        >
+          <TextInput
+            value={isDescriptionEditable ? description : role.desc}
+            onChange={setDescription}
+            maxLength={DESCRIPTION_MAX}
+            placeholder={role.desc}
+            disabled={!isDescriptionEditable}
+          />
         </Field>
       </div>
       {locked && (
@@ -267,8 +291,7 @@ export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
             roleName={role.name}
             roleColor={role.color}
             perms={perms}
-            signInAs={signInAs}
-            onSignInAsChange={setSignInAs}
+            extraModules={extraModuleAccess(catalogue, [...extra])}
           />
         )}
         <div className="text-caption text-text-muted mt-2">

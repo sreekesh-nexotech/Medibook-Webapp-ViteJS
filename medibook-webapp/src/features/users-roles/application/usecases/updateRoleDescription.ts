@@ -6,10 +6,10 @@ import type {
 } from '@/features/users-roles/domain/entities/usersRoles.types';
 import { usersRolesRepository } from '@/features/users-roles/infrastructure/repositories/usersRoles.repository.impl';
 
-export function updateRolePermissions(
+export function updateRoleDescription(
   roleCode: StaffRoleCode,
-  permissions: readonly string[],
-  version: number | null,
+  description: string | null,
+  version: number,
 ): Promise<Result<StaffRole>> {
-  return usersRolesRepository.updateRolePermissions(roleCode, permissions, version);
+  return usersRolesRepository.updateRoleDescription(roleCode, description, version);
 }
