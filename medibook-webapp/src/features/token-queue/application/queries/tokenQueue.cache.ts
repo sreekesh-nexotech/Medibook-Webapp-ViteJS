@@ -6,15 +6,22 @@ import { tokenQueueKeys } from '@/features/token-queue/application/queries/token
 
 /**
  * Put a fresh session snapshot into every cached session list, keeping the
- * newer version when a push and a command answer race; then let the
- * appointment lists (H7) re-read the statuses the command changed, and the
- * session's call history pick up the new call.
+ * newer version when a push and a command answer race. Local only: no request.
  */
-export function applySession(queryClient: QueryClient, session: QueueSession): void {
+export function putSession(queryClient: QueryClient, session: QueueSession): void {
   queryClient.setQueriesData<readonly QueueSession[]>(
     { queryKey: tokenQueueKeys.sessions() },
     (rows) => rows?.map((s) => (s.id === session.id && session.version >= s.version ? session : s)),
   );
+}
+
+/**
+ * A command's answer: the session snapshot goes into the cache, then the
+ * appointment lists (H7) re-read the statuses the command changed, and the
+ * session's call history picks up the new call.
+ */
+export function applySession(queryClient: QueryClient, session: QueueSession): void {
+  putSession(queryClient, session);
   refreshBookings(queryClient);
   void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.calls(session.id) });
 }
@@ -23,6 +30,40 @@ export function applySession(queryClient: QueryClient, session: QueueSession): v
 export function refreshQueue(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.sessions() });
   refreshBookings(queryClient);
+}
+
+/** What a run of server pushes asks to re-read, merged until the next refresh. */
+export interface PushedChanges {
+  /** A push came without a usable snapshot: the session lists re-read. */
+  readonly sessions: boolean;
+  /** Sessions whose snapshot was pushed: their call histories re-read. */
+  readonly callsOf: ReadonlySet<string>;
+}
+
+export const NO_PUSHED_CHANGES: PushedChanges = { sessions: false, callsOf: new Set() };
+
+/** Add one push to the changes waiting for the next refresh. */
+export function mergePush(
+  changes: PushedChanges,
+  push: { readonly sessionId: string } | 'bookings',
+): PushedChanges {
+  if (push === 'bookings') return { ...changes, sessions: true };
+  return { ...changes, callsOf: new Set([...changes.callsOf, push.sessionId]) };
+}
+
+/**
+ * One refresh for every push since the last one (the snapshots themselves
+ * went into the cache as they arrived, `putSession`): each query re-reads
+ * once however many pushes asked for it.
+ */
+export function refreshPushed(queryClient: QueryClient, changes: PushedChanges): void {
+  if (changes.sessions) {
+    void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.sessions() });
+  }
+  refreshBookings(queryClient);
+  for (const sessionId of changes.callsOf) {
+    void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.calls(sessionId) });
+  }
 }
 
 /**

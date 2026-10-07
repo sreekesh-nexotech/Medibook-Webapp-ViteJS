@@ -79,3 +79,12 @@ export const WS_CLOSE_IDLE = 4408;
 
 /** Normal closure — what `socket.close()` sends when the app closes it on purpose. */
 export const WS_CLOSE_NORMAL = 1000;
+
+/**
+ * Refreshes driven by server pushes run at most once per this window: the
+ * first push refreshes at once, the rest of a burst (a busy queue, a worker
+ * catching up a backlog) collapse into one refresh when it ends. One refetch
+ * per push let a burst spend a desk's whole per-user request budget
+ * (`core/ratelimit.py` SURFACE_LIMITS, 300 a minute) and lock it out with 429.
+ */
+export const WS_PUSH_REFRESH_WINDOW_MS = 3_000;
