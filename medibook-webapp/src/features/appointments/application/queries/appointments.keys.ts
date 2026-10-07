@@ -13,8 +13,12 @@ export const appointmentsKeys = {
   page: (params: AppointmentListParams) => [...appointmentsKeys.lists(), 'page', params] as const,
   counts: (params: AppointmentListParams) =>
     [...appointmentsKeys.lists(), 'counts', params] as const,
-  detail: (id: string) => [...appointmentsKeys.all, 'detail', id] as const,
-  events: (id: string) => [...appointmentsKeys.all, 'events', id] as const,
+  /** Every single-appointment read (the drawer). */
+  details: () => [...appointmentsKeys.all, 'detail'] as const,
+  detail: (id: string) => [...appointmentsKeys.details(), id] as const,
+  /** Every appointment history. */
+  eventLists: () => [...appointmentsKeys.all, 'events'] as const,
+  events: (id: string) => [...appointmentsKeys.eventLists(), id] as const,
   receipt: (id: string) => [...appointmentsKeys.all, 'receipt', id] as const,
   tokenSlip: (id: string) => [...appointmentsKeys.all, 'token-slip', id] as const,
   quote: (input: QuoteInput) => [...appointmentsKeys.all, 'quote', input] as const,

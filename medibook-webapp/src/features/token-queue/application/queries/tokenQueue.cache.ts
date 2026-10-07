@@ -15,12 +15,24 @@ export function applySession(queryClient: QueryClient, session: QueueSession): v
     { queryKey: tokenQueueKeys.sessions() },
     (rows) => rows?.map((s) => (s.id === session.id && session.version >= s.version ? session : s)),
   );
-  void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
+  refreshBookings(queryClient);
   void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.calls(session.id) });
 }
 
 /** Something about the day's bookings changed without a snapshot (a booking or a cancel). */
 export function refreshQueue(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.sessions() });
+  refreshBookings(queryClient);
+}
+
+/**
+ * A queue change moves bookings on (called, with the doctor, done, no-show):
+ * the lists re-read their statuses, and so does an open appointment drawer
+ * with its history — a token called on Token Management offers No-show in
+ * the drawer straight away (UAT R-10).
+ */
+function refreshBookings(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: appointmentsKeys.lists() });
+  void queryClient.invalidateQueries({ queryKey: appointmentsKeys.details() });
+  void queryClient.invalidateQueries({ queryKey: appointmentsKeys.eventLists() });
 }
