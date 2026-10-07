@@ -227,6 +227,13 @@ export function AppointmentsScreen() {
   const rows = filter && query.data ? query.data.items : [];
   const total = filter && query.data ? query.data.total : 0;
 
+  // A live update can shrink the list under the current page: step back to its last page.
+  const lastPage = Math.max(0, Math.ceil(total / APPT_PAGE) - 1);
+  const isPastEnd =
+    filter !== null && !query.isPlaceholderData && query.isSuccess && page > lastPage;
+  // Adjusting state from the previous render's data (React's documented pattern).
+  if (isPastEnd) setPage(lastPage);
+
   const approve = useApproveMutation();
   const checkIn = useCheckInMutation();
   const actionKeys = useActionKeys();
@@ -416,14 +423,16 @@ export function AppointmentsScreen() {
           <span
             className="text-caption text-text-muted flex items-center gap-1.5 whitespace-nowrap"
             title={caption.title}
-            aria-live="polite"
           >
             <span className={cn('size-2 rounded-full', caption.dot)} aria-hidden="true"></span>
             {caption.label} · Updated {updatedAt}
           </span>
         </div>
         <div
-          className={cn('transition-opacity duration-150', query.isPlaceholderData && 'opacity-60')}
+          className={cn(
+            'transition-opacity duration-150',
+            filter !== null && query.isPlaceholderData && 'opacity-60',
+          )}
           aria-busy={query.isFetching}
         >
           <TableShell
