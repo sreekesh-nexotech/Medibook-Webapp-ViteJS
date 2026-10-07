@@ -122,7 +122,8 @@ interface HospitalProfileProps {
 export function HospitalProfile({ h }: HospitalProfileProps) {
   const navigate = useNavigate();
   const { can } = useOpsPermission();
-  const plansQuery = usePlansQuery();
+  // The plan price comes from the catalog (`plans.view`); without it the profile shows the plan name only.
+  const plansQuery = usePlansQuery(can('plans.view'));
   const suspendMutation = useSuspendHospitalMutation();
   const reinstateMutation = useReinstateHospitalMutation();
   // SEC-05: suspending, reactivating and editing a hospital need hospitals.edit.

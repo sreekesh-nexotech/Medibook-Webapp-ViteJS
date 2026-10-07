@@ -85,12 +85,16 @@ export function OpsHospitalsScreen() {
   const canOnboarding = can('onboarding.view');
   const canAddHospital = can('hospitals.add');
   const [searchParams] = useSearchParams();
-  const plansQuery = usePlansQuery();
+  // The plan filter needs the catalog, which only `plans.view` may read (Support may not).
+  const canPlans = can('plans.view');
+  const plansQuery = usePlansQuery(canPlans);
   const plans = plansQuery.data ?? [];
 
   const [tab, setTab] = useState<'All' | 'Pending'>('All');
   const [q, setQ] = useState('');
-  const [planF, setPlanF] = useState<string>(searchParams.get('plan') ?? 'All');
+  const [planF, setPlanF] = useState<string>(
+    canPlans ? (searchParams.get('plan') ?? 'All') : 'All',
+  );
   const [statusF, setStatusF] = useState('All');
   const [page, setPage] = useState(0);
   const [onboard, setOnboard] = useState(false);
@@ -266,12 +270,14 @@ export function OpsHospitalsScreen() {
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={refresh} title="Refresh the hospital registry" />
-          <FilterSelect
-            value={planF}
-            aria-label="Filter by subscription plan"
-            options={['Plan: All', ...plans.map((p) => p.name)]}
-            onChange={(v) => reset(setPlanF)(v === 'Plan: All' ? 'All' : v)}
-          />
+          {canPlans && (
+            <FilterSelect
+              value={planF}
+              aria-label="Filter by subscription plan"
+              options={['Plan: All', ...plans.map((p) => p.name)]}
+              onChange={(v) => reset(setPlanF)(v === 'Plan: All' ? 'All' : v)}
+            />
+          )}
           {tab === 'All' && (
             <FilterSelect
               value={statusF}
