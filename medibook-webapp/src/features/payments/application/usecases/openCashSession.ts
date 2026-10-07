@@ -6,6 +6,7 @@ import { paymentsRepository } from '@/features/payments/infrastructure/repositor
 export function openCashSession(
   openingFloatPaise: number,
   counterId: string | null,
+  idempotencyKey: string,
 ): Promise<Result<CashSession>> {
-  return paymentsRepository.openCashSession(openingFloatPaise, counterId);
+  return paymentsRepository.openCashSession(openingFloatPaise, counterId, idempotencyKey);
 }

@@ -6,17 +6,16 @@ import { cn } from '@/shared/lib/cn';
 import { fmtDate, money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
-import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { CashSession } from '@/features/payments/domain/entities/payments.entities';
 import { useCashDeskAccess } from '@/features/payments/application/queries/useCashDeskAccess';
-import { useReconcileCashSessionMutation } from '@/features/payments/application/queries/useCashSessionMutations';
 import { useCashSessionsToReconcileQuery } from '@/features/payments/application/queries/useCashSessionsToReconcileQuery';
+import { PaymentsDrawerActivityModal } from '@/features/payments/presentation/components/PaymentsDrawerActivityModal';
+import { PaymentsReconcileModal } from '@/features/payments/presentation/components/PaymentsReconcileModal';
 import {
   clockCopy,
   drawerBalance,
@@ -49,15 +48,16 @@ function varianceCell(session: CashSession) {
 /**
  * Closed cash drawers waiting for an admin (`cash_desk.del` = reconcile,
  * D-28). Each row shows what the server expected, what the staff member
- * counted and the variance; reconciling records that an admin checked it.
- * Drawers left open are auto-closed at 23:59 with no count and appear here as
- * “Not counted”.
+ * counted and the variance, and opens the drawer's own cash payments and
+ * refunds to explain it (UAT-72). Reconciling records the admin's check and a
+ * note; a drawer the 23:59 job closed without a count is given the cash
+ * actually found in it (BE-23).
  */
 export function PaymentsCashReconcile() {
   const access = useCashDeskAccess();
   const list = useCashSessionsToReconcileQuery(access.canReconcile);
-  const reconcile = useReconcileCashSessionMutation();
-  const [confirming, setConfirming] = useState<CashSession | null>(null);
+  const [reconciling, setReconciling] = useState<CashSession | null>(null);
+  const [inspecting, setInspecting] = useState<CashSession | null>(null);
 
   if (!access.canReconcile) return null;
 
@@ -80,25 +80,11 @@ export function PaymentsCashReconcile() {
           }
         : undefined;
 
-  const confirmReconcile = (): void => {
-    const session = confirming;
-    setConfirming(null);
-    if (!session) return;
-    reconcile.mutate(session.id, {
-      onSuccess: () => toast(`${session.staffName}’s drawer reconciled`, 'success'),
-      onError: (failure) =>
-        toast(
-          isFailure(failure) ? failure.message : 'The drawer could not be reconciled.',
-          'error',
-        ),
-    });
-  };
-
   return (
     <Card>
       <div className="mb-3.5 flex flex-wrap items-center gap-2">
         <SectionTitle>Cash drawers to reconcile</SectionTitle>
-        <InfoDot text="Each front-desk drawer is closed with the cash counted. Check the variance against the day’s cash payments and refunds, then mark it reconciled. Drawers left open are closed automatically at 23:59 without a count." />
+        <InfoDot text="Each front-desk drawer is closed with the cash counted. Open a drawer’s payments to check the variance against its cash payments and refunds, then mark it reconciled. Drawers left open are closed automatically at 23:59 without a count — enter the cash you find when you reconcile them." />
         <span className="flex-1" />
         {list.data && (
           <span className="text-caption text-text-muted tabular-nums">{rows.length} waiting</span>
@@ -115,7 +101,14 @@ export function PaymentsCashReconcile() {
             <td className={cn(tdClass, 'text-text-strong font-medium')}>
               {s.staffName}
               <div className="text-caption text-text-muted font-normal">
-                {s.counterCode ? `Counter ${s.counterCode} · ` : ''}closed {clockCopy(s.closedAt)}
+                {s.counterCode ? `Counter ${s.counterCode} · ` : ''}
+                {s.isAutoClosed
+                  ? `closed automatically ${clockCopy(s.closedAt)}`
+                  : `closed ${clockCopy(s.closedAt)}${
+                      s.closedByName && s.closedByName !== s.staffName
+                        ? ` by ${s.closedByName}`
+                        : ''
+                    }`}
               </div>
             </td>
             <td className={cn(tdClass, 'whitespace-nowrap')}>{fmtDate(s.businessDate)}</td>
@@ -130,30 +123,36 @@ export function PaymentsCashReconcile() {
               <span className="text-text-muted">{s.closeNote || '—'}</span>
             </td>
             <td className={tdClass}>
-              <Button
-                size="sm"
-                variant="secondary"
-                busy={reconcile.isPending && reconcile.variables === s.id}
-                onClick={() => setConfirming(s)}
-              >
-                Reconcile
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="ghost" icon="eye" onClick={() => setInspecting(s)}>
+                  Payments
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setReconciling(s)}>
+                  Reconcile
+                </Button>
+              </div>
             </td>
           </tr>
         ))}
       </TableShell>
-      <ConfirmModal
-        open={confirming !== null}
-        title="Mark this drawer reconciled?"
-        body={
-          confirming
-            ? `${confirming.staffName}’s drawer for ${fmtDate(confirming.businessDate)} leaves the queue and is recorded as checked by you. Make sure any variance has been explained first.`
-            : ''
-        }
-        confirmLabel="Reconcile"
-        onClose={() => setConfirming(null)}
-        onConfirm={confirmReconcile}
-      />
+      {reconciling && (
+        <PaymentsReconcileModal
+          key={reconciling.id}
+          session={reconciling}
+          onClose={() => setReconciling(null)}
+        />
+      )}
+      {inspecting && (
+        <PaymentsDrawerActivityModal
+          drawer={{
+            id: inspecting.id,
+            businessDate: inspecting.businessDate,
+            staffName: inspecting.staffName,
+            counterCode: inspecting.counterCode,
+          }}
+          onClose={() => setInspecting(null)}
+        />
+      )}
     </Card>
   );
 }

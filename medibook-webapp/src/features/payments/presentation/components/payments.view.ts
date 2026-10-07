@@ -1,20 +1,31 @@
 /**
  * Presentation lookups and pure helpers for the Payments screen (H9): the
- * look-back date windows, method / status vocabulary, and the day's totals.
+ * look-back date windows, method / status vocabulary, refund availability and
+ * the day's totals.
  */
-import { addDaysISO, parseHundredths, todayISO } from '@/shared/lib/format';
+import { isFailure } from '@/core/error/failure';
+import { addDaysISO, fmtDate, parseHundredths, toLocalISO, todayISO } from '@/shared/lib/format';
 
 import type {
+  BookingStatus,
+  CashSummaryRow,
+  LineRefund,
   PaymentLine,
   PaymentLineStatus,
   PaymentMethod,
   PaymentRefund,
+  RefundStatus,
 } from '@/features/payments/domain/entities/payments.entities';
 
-/** Payments look back: a window always ends today. */
-export type PaymentWindow = 'Today' | 'This Week' | 'This Month';
+/** Payments look back: a preset window ends today; a custom one is any range. */
+export type PaymentWindow = 'Today' | 'This Week' | 'This Month' | 'Custom range';
 
-export const PAYMENT_WINDOWS: readonly PaymentWindow[] = ['Today', 'This Week', 'This Month'];
+export const PAYMENT_WINDOWS: readonly PaymentWindow[] = [
+  'Today',
+  'This Week',
+  'This Month',
+  'Custom range',
+];
 
 const WEEK_DAYS = 7;
 const FIRST_OF_MONTH = '01';
@@ -24,8 +35,12 @@ export interface DateRange {
   readonly dateTo: string;
 }
 
-export function rangeForWindow(window: PaymentWindow): DateRange {
+/** The dates a window covers; `Custom range` uses `custom` (defaulting to today). */
+export function rangeForWindow(window: PaymentWindow, custom?: Partial<DateRange>): DateRange {
   const today = todayISO();
+  if (window === 'Custom range') {
+    return { dateFrom: custom?.dateFrom || today, dateTo: custom?.dateTo || today };
+  }
   if (window === 'This Week')
     return { dateFrom: addDaysISO(today, -(WEEK_DAYS - 1)), dateTo: today };
   if (window === 'This Month')
@@ -74,7 +89,7 @@ export function refundCopy(refunds: readonly PaymentRefund[]): {
   readonly amount: number;
   readonly how: string;
 } | null {
-  const done = refunds.filter((r) => r.status !== 'failed');
+  const done = refunds.filter((r) => r.status !== 'failed' && r.status !== 'superseded');
   if (done.length === 0) return null;
   const amount = done.reduce((sum, r) => sum + r.amountRupees, 0);
   const methods = [...new Set(done.map((r) => r.method))];
@@ -83,6 +98,128 @@ export function refundCopy(refunds: readonly PaymentRefund[]): {
       ? 'at desk'
       : `to ${methods.map((m) => m.toUpperCase()).join(', ')}`;
   return { amount, how };
+}
+
+/* ------------------------------------------------------------------ refunds */
+
+/** Bookings that are over: only these may be refunded from Payments (BE-09, UAT-10). */
+const CLOSED_BOOKINGS: ReadonlySet<BookingStatus> = new Set(['cancelled', 'completed', 'no_show']);
+
+/** Refund states that hold the line's one live refund: no second one may be asked for (UAT-41). */
+const REFUND_IN_FLIGHT: ReadonlySet<RefundStatus> = new Set(['requested', 'processing']);
+
+/**
+ * The line's latest refund: what the row carries (backend B3), or — on an
+ * older backend — the newest refund from its detail, `undefined` until loaded.
+ */
+export function lineRefundOf(
+  line: PaymentLine,
+  fetched: readonly PaymentRefund[] | undefined,
+): LineRefund | null | undefined {
+  if (line.latestRefund !== undefined) return line.latestRefund;
+  if (fetched === undefined) return undefined;
+  const live = fetched.filter((r) => r.status !== 'superseded');
+  const latest = live[live.length - 1];
+  return latest
+    ? {
+        id: latest.id,
+        status: latest.status,
+        amountRupees: latest.amountRupees,
+        failureReason: latest.failureReason,
+      }
+    : null;
+}
+
+/** What the Refund action may do for one line. */
+export type RefundAvailability =
+  /** Not refundable from here at all (failed, a visit line, no booking). */
+  | { readonly kind: 'none' }
+  /** Already refunded in full. */
+  | { readonly kind: 'refunded' }
+  /** A refund is with the gateway: wait for it, do not ask twice. */
+  | { readonly kind: 'processing' }
+  /** The booking is still live: cancelling it refunds it (BE-09). */
+  | { readonly kind: 'live'; readonly status: BookingStatus }
+  /** May be refunded; `retry` after a failed refund. */
+  | { readonly kind: 'available'; readonly retry: boolean };
+
+/**
+ * Whether a line may be refunded. A refund covers the whole booking, so it is
+ * offered on paid lines of bookings that are over (cancelled, completed,
+ * no-show); a live booking is cancelled instead, which refunds it. When the
+ * booking's status is unknown the server decides (409 REFUND_REQUIRES_CANCEL).
+ */
+export function refundAvailability(
+  line: PaymentLine,
+  bookingStatus: BookingStatus | null,
+  refund: LineRefund | null | undefined,
+): RefundAvailability {
+  if (line.status === 'refunded' || refund?.status === 'processed') return { kind: 'refunded' };
+  if (line.status !== 'captured' || !line.appointmentId) return { kind: 'none' };
+  if (refund && REFUND_IN_FLIGHT.has(refund.status)) return { kind: 'processing' };
+  if (bookingStatus !== null && !CLOSED_BOOKINGS.has(bookingStatus)) {
+    return { kind: 'live', status: bookingStatus };
+  }
+  return { kind: 'available', retry: refund?.status === 'failed' };
+}
+
+/** Badge status and label per refund state. */
+export const REFUND_STATUS_BADGE: Readonly<
+  Record<RefundStatus, { readonly status: string; readonly label: string }>
+> = {
+  requested: { status: 'Pending', label: 'Refund requested' },
+  processing: { status: 'Pending', label: 'Refund processing' },
+  processed: { status: 'Refunded', label: 'Refunded' },
+  failed: { status: 'Failed', label: 'Refund failed' },
+  superseded: { status: 'Inactive', label: 'Replaced' },
+};
+
+/** What refunding a booking hands back: every captured line of its order. */
+export function orderRefundTotal(lines: readonly PaymentLine[]): number {
+  return lines.filter((l) => l.status === 'captured').reduce((s, l) => s + l.amountRupees, 0);
+}
+
+/** Backend codes a refund attempt can end with (D-28, BE-09). */
+const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
+const REFUND_REQUIRES_CANCEL = 'REFUND_REQUIRES_CANCEL';
+
+const REFUND_FAILED = 'The refund failed. Please try again.';
+
+/**
+ * What the desk is told when a refund is refused, in its own terms: open a
+ * drawer (only if the role can), or cancel the live booking instead.
+ */
+export function refundFailureCopy(error: unknown, canOpenDrawer: boolean): string {
+  if (!isFailure(error)) return REFUND_FAILED;
+  if (error.code === CASH_SESSION_REQUIRED) {
+    return canOpenDrawer
+      ? 'Open your cash drawer before refunding cash. Other payment methods do not need it.'
+      : 'Cash is handed back from an open cash drawer, and your role cannot open one. Ask a colleague who can.';
+  }
+  if (error.code === REFUND_REQUIRES_CANCEL) {
+    return 'This booking is still live. Cancel it from Appointments — cancelling refunds it in full.';
+  }
+  return error.message;
+}
+
+/** Backend code for a write against a row that changed since it was read. */
+const CONFLICT_VERSION = 'CONFLICT_VERSION';
+
+/** What a refused drawer close or reconcile says, in the desk's terms (B2: If-Match, owner rule). */
+export function cashWriteFailureCopy(error: unknown, fallback: string): string {
+  if (!isFailure(error)) return fallback;
+  if (error.code === CONFLICT_VERSION) {
+    return 'This drawer changed since you opened it (a payment or another close). Close this window, refresh and try again.';
+  }
+  return error.message;
+}
+
+/** `08 Oct 2026 · 10:42 am` in the device's clock, or `—`. */
+export function dateTimeCopy(iso: string | null): string {
+  if (!iso) return '—';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return '—';
+  return `${fmtDate(toLocalISO(at))} · ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 /** The day's figures for the KPI strip, from captured lines only. */
@@ -133,6 +270,17 @@ export type DrawerBalance = 'balanced' | 'short' | 'over';
 export function drawerBalance(variancePaise: number): DrawerBalance {
   if (variancePaise === 0) return 'balanced';
   return variancePaise < 0 ? 'short' : 'over';
+}
+
+/**
+ * A summary row's variance over its counted drawers only — counted cash
+ * against what those drawers should have held (B2 `counted_expected_paise`),
+ * so an open drawer's float and takings never read as "short" (F25).
+ */
+export function summaryVariance(row: CashSummaryRow): number | null {
+  if (row.countedCashPaise === null) return null;
+  if (row.countedExpectedPaise !== null) return row.countedCashPaise - row.countedExpectedPaise;
+  return row.variancePaise;
 }
 
 /** "9:14 am" in the device's clock, for when a drawer opened or closed. */

@@ -9,15 +9,19 @@ import { Card } from '@/shared/ui/Card';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Field } from '@/shared/ui/Field';
 import { Icon } from '@/shared/ui/Icon';
+import { Select } from '@/shared/ui/Select';
 import { SkeletonLine } from '@/shared/ui/Skeleton';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import type { CashSession } from '@/features/payments/domain/entities/payments.entities';
+import { useCashCountersQuery } from '@/features/payments/application/queries/useCashCountersQuery';
 import { useCashDeskAccess } from '@/features/payments/application/queries/useCashDeskAccess';
 import { useOpenCashSessionMutation } from '@/features/payments/application/queries/useCashSessionMutations';
 import { useOpenCashSessionQuery } from '@/features/payments/application/queries/useOpenCashSessionQuery';
-import { PaymentsCloseDrawerModal } from '@/features/payments/presentation/components/PaymentsCloseDrawerModal';
+import {
+  type ClosableDrawer,
+  PaymentsCloseDrawerModal,
+} from '@/features/payments/presentation/components/PaymentsCloseDrawerModal';
 import {
   clockCopy,
   paiseToRupees,
@@ -26,6 +30,14 @@ import {
 
 /** The backend's answer when the staff member already has an open drawer (D-28). */
 const CASH_SESSION_ALREADY_OPEN = 'CASH_SESSION_ALREADY_OPEN';
+
+/** Counter choice that leaves it to the server: the staff member's default counter. */
+const DEFAULT_COUNTER = 'My default counter';
+const NO_DEFAULT_COUNTER = 'No counter';
+
+function counterLabel(c: { readonly code: string; readonly name: string }): string {
+  return `${c.name} (${c.code})`;
+}
 
 /**
  * The signed-in staff member's cash drawer (D-28). The backend refuses every
@@ -38,11 +50,25 @@ export function PaymentsCashDrawer() {
   const access = useCashDeskAccess();
   const drawer = useOpenCashSessionQuery(access.canView ? access.staffId : null);
   const openDrawer = useOpenCashSessionMutation();
+  const isClosed = drawer.isSuccess && drawer.data === null;
+  const counters = useCashCountersQuery(access.canOpen && isClosed);
   const [floatText, setFloatText] = useState('');
   const [floatError, setFloatError] = useState<string | null>(null);
-  const [closing, setClosing] = useState<CashSession | null>(null);
+  const [counterChoice, setCounterChoice] = useState<string | null>(null);
+  // One replay key per open action: a retry of the same float and counter
+  // reuses it; editing either, or a successful open, starts a new action (B2).
+  const [openKey, setOpenKey] = useState(() => crypto.randomUUID());
+  const renewKey = (): void => setOpenKey(crypto.randomUUID());
+  const [closing, setClosing] = useState<ClosableDrawer | null>(null);
 
   if (!access.canView || access.staffId === null) return null;
+
+  const activeCounters = (counters.data ?? []).filter((c) => c.isActive);
+  const defaultOption = access.defaultCounter
+    ? `${DEFAULT_COUNTER} — ${counterLabel(access.defaultCounter)}`
+    : NO_DEFAULT_COUNTER;
+  const counterOptions = [defaultOption, ...activeCounters.map(counterLabel)];
+  const chosenCounter = activeCounters.find((c) => counterLabel(c) === counterChoice) ?? null;
 
   const submitOpen = (event: FormEvent): void => {
     event.preventDefault();
@@ -53,11 +79,18 @@ export function PaymentsCashDrawer() {
     }
     setFloatError(null);
     openDrawer.mutate(
-      { openingFloatPaise: paise, counterId: null },
+      { openingFloatPaise: paise, counterId: chosenCounter?.id ?? null, idempotencyKey: openKey },
       {
-        onSuccess: () => {
+        onSuccess: (opened) => {
           setFloatText('');
-          toast(`Cash drawer opened with ${money(paiseToRupees(paise))}`, 'success');
+          setCounterChoice(null);
+          renewKey();
+          toast(
+            `Cash drawer opened with ${money(paiseToRupees(paise))}${
+              opened.counterCode ? ` at counter ${opened.counterCode}` : ''
+            }`,
+            'success',
+          );
         },
         onError: (failure) => {
           setFloatError(
@@ -72,9 +105,18 @@ export function PaymentsCashDrawer() {
     );
   };
 
-  const counterCopy = access.defaultCounter
-    ? ` It opens at ${access.defaultCounter.name} (${access.defaultCounter.code}).`
-    : '';
+  const openDrawerData = drawer.data;
+  const startClose = (): void => {
+    if (!openDrawerData) return;
+    setClosing({
+      id: openDrawerData.id,
+      version: openDrawerData.version,
+      staffName: openDrawerData.staffName,
+      openingFloatPaise: openDrawerData.openingFloatPaise,
+      expectedCashPaise: openDrawerData.expectedCashPaise,
+      isOwn: true,
+    });
+  };
 
   return (
     <Card pad={16}>
@@ -115,7 +157,7 @@ export function PaymentsCashDrawer() {
             </span>
           </div>
           {access.canClose && (
-            <Button variant="secondary" icon="lock" onClick={() => setClosing(drawer.data ?? null)}>
+            <Button variant="secondary" icon="lock" onClick={startClose}>
               Close drawer
             </Button>
           )}
@@ -129,11 +171,32 @@ export function PaymentsCashDrawer() {
             <div className="text-body text-text-strong font-medium">Your cash drawer is closed</div>
             <div className="text-caption text-text-muted">
               Open it before taking or refunding cash. UPI and card payments work without it.
-              {counterCopy}
+              Receipts print the counter you open it at.
             </div>
           </div>
           {access.canOpen ? (
             <form className="flex flex-wrap items-start gap-3" onSubmit={submitOpen}>
+              <div className="w-60">
+                <Field
+                  label="Counter"
+                  hint={
+                    counters.isError
+                      ? 'Counters could not be loaded; your default is used.'
+                      : undefined
+                  }
+                >
+                  <Select
+                    value={counterChoice ?? defaultOption}
+                    options={counterOptions}
+                    onChange={(v) => {
+                      setCounterChoice(v);
+                      renewKey();
+                    }}
+                    disabled={counters.isError}
+                    height={44}
+                  />
+                </Field>
+              </div>
               <div className="w-48">
                 <Field label="Opening float (₹)" required error={floatError}>
                   <TextInput
@@ -141,6 +204,7 @@ export function PaymentsCashDrawer() {
                     onChange={(v) => {
                       setFloatText(v);
                       setFloatError(null);
+                      renewKey();
                     }}
                     inputMode="decimal"
                     placeholder="e.g. 500"

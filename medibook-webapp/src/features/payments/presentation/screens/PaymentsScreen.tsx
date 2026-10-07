@@ -3,14 +3,19 @@ import { useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
 
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { useCan } from '@/shared/hooks/usePermission';
+import type { SortState } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadFromUrl } from '@/shared/lib/download';
 import { money } from '@/shared/lib/format';
+import { dateRange as dateRangeError } from '@/shared/lib/validate';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
+import { Icon } from '@/shared/ui/Icon';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { Pager } from '@/shared/ui/Pager';
@@ -23,50 +28,61 @@ import { Tabs } from '@/shared/ui/Tabs';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
-import { useRefundMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import { useAppointmentsQuery } from '@/features/appointments/application/queries/appointments.queries';
 import { AppointmentPaymentModal } from '@/features/appointments/presentation/components/AppointmentPaymentModal';
-import { AppointmentReasonModal } from '@/features/appointments/presentation/components/AppointmentReasonModal';
 import { AppointmentReceiptModal } from '@/features/appointments/presentation/components/AppointmentReceiptModal';
 import { needsPayment } from '@/features/appointments/presentation/components/appointments.view';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
+  BookingStatus,
+  PaymentChannel,
   PaymentExportFile,
   PaymentExportFormat,
   PaymentFilters,
   PaymentLine,
   PaymentLineStatus,
+  PaymentSortField,
 } from '@/features/payments/domain/entities/payments.entities';
+import { useCashDeskAccess } from '@/features/payments/application/queries/useCashDeskAccess';
 import { useExportPaymentsMutation } from '@/features/payments/application/queries/useExportPaymentsMutation';
 import { useInvalidatePayments } from '@/features/payments/application/queries/useInvalidatePayments';
-import { usePaymentRefundsQuery } from '@/features/payments/application/queries/usePaymentRefundsQuery';
+import { useLineRefundsQuery } from '@/features/payments/application/queries/useLineRefundsQuery';
 import { usePaymentsQuery } from '@/features/payments/application/queries/usePaymentsQuery';
 import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
 import { useRefundsQuery } from '@/features/payments/application/queries/useRefundsQuery';
 import { PaymentsCashDrawer } from '@/features/payments/presentation/components/PaymentsCashDrawer';
 import { PaymentsCashReconcile } from '@/features/payments/presentation/components/PaymentsCashReconcile';
 import { PaymentsCashSummary } from '@/features/payments/presentation/components/PaymentsCashSummary';
+import { PaymentsDetailDrawer } from '@/features/payments/presentation/components/PaymentsDetailDrawer';
+import { PaymentsRefundDialog } from '@/features/payments/presentation/components/PaymentsRefundDialog';
+import { PaymentsRefundsPanel } from '@/features/payments/presentation/components/PaymentsRefundsPanel';
 import { PaymentsVisitReceiptsModal } from '@/features/payments/presentation/components/PaymentsVisitReceiptsModal';
 import {
   LINE_STATUS_LABEL,
   METHOD_LABEL,
   MODE_FILTER,
   PAYMENT_WINDOWS,
+  REFUND_STATUS_BADGE,
   type PaymentWindow,
+  dateTimeCopy,
+  lineRefundOf,
   rangeForWindow,
-  refundCopy,
+  refundAvailability,
   totalsOf,
   updatedCopy,
 } from '@/features/payments/presentation/components/payments.view';
 
-/** Payment tabs. `Pending` lists unpaid walk-ins (appointments), not payment lines. */
-type PayTab = 'All' | 'Paid' | 'Pending' | 'Refunded';
+/**
+ * Payment tabs. `Pending` lists unpaid walk-ins (appointments), not payment
+ * lines; `Refunds` lists refunds by the day they were asked for.
+ */
+type PayTab = 'All' | 'Paid' | 'Pending' | 'Refunded' | 'Refunds';
 
-const PAY_TABS: readonly PayTab[] = ['All', 'Paid', 'Pending', 'Refunded'];
+const PAY_TABS: readonly PayTab[] = ['All', 'Paid', 'Pending', 'Refunded', 'Refunds'];
 
 /** Line statuses per tab that shows payment lines. All keeps refunded lines, so a payment never vanishes once refunded. */
-const TAB_STATUSES: Readonly<Record<Exclude<PayTab, 'Pending'>, readonly PaymentLineStatus[]>> = {
+const TAB_STATUSES: Readonly<Record<'All' | 'Paid' | 'Refunded', readonly PaymentLineStatus[]>> = {
   All: ['captured', 'refunded'],
   Paid: ['captured'],
   Refunded: ['refunded'],
@@ -75,7 +91,27 @@ const TAB_STATUSES: Readonly<Record<Exclude<PayTab, 'Pending'>, readonly Payment
 /** Records shown per page (design `PAY_PAGE`). */
 const PAY_PAGE = 9;
 
-const COLUMNS = ['Patient', 'Doctor / Dept', 'Source', 'Mode', 'Amount', 'Status', 'Action'];
+/** Wait this long after the last keystroke before searching (appendix 04 F12). */
+const SEARCH_DEBOUNCE_MS = 350;
+
+const COLUMNS = [
+  'Date / Time',
+  'Patient',
+  'Doctor / Dept',
+  'Source',
+  'Mode',
+  'Amount',
+  'Status',
+  'Action',
+];
+
+/** Columns the server sorts (`sort=captured_at|amount_paise`, appendix 04 R4). */
+const SORT_KEYS: Readonly<Record<string, PaymentSortField>> = {
+  'Date / Time': 'captured_at',
+  Amount: 'amount_paise',
+};
+
+const DEFAULT_SORT: SortState = { key: 'captured_at', dir: 'desc' };
 
 const ALL_SOURCES = 'All Sources';
 const ALL_MODES = 'All Modes';
@@ -83,6 +119,14 @@ const ALL_DEPTS = 'All Departments';
 const ALL_DOCTORS = 'All Doctors';
 const SOURCE_WALK_IN = 'Walk-in';
 const SOURCE_ONLINE = 'Online';
+
+const SOURCE_CHANNEL: Readonly<Record<string, PaymentChannel>> = {
+  [SOURCE_WALK_IN]: 'desk',
+  [SOURCE_ONLINE]: 'online',
+};
+
+const DATE_INPUT_CLASS =
+  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
 
 /** The three server-built exports, in the order offered. */
 const EXPORT_FORMATS: readonly { readonly format: PaymentExportFormat; readonly label: string }[] =
@@ -101,17 +145,6 @@ function saveExport(file: PaymentExportFile): void {
   setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
 }
 
-/** The backend's answer when a cash refund has no open cash drawer (D-28). */
-const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
-const REFUND_NEEDS_DRAWER =
-  'Open your cash drawer above before refunding cash. Other payment methods do not need it.';
-
-const REFUND_COPY = {
-  title: 'Refund Payment',
-  body: 'The full amount is refunded — one refund per payment line, to its original method. Cash is handed back from your open cash session.',
-  confirm: 'Refund in full',
-};
-
 /** One table row: a payment line, or an unpaid walk-in waiting at the desk. */
 type PayRow =
   | { readonly kind: 'line'; readonly line: PaymentLine }
@@ -123,52 +156,75 @@ function errorCopy(error: unknown): string | undefined {
 
 /**
  * Payments (module H9) — payment lines from `/hospital/payments` (desk and
- * online, D-27) plus the unpaid walk-ins from the appointments feature, which
- * is where they are collected. Collect, receipt and refund reuse that
- * feature's modals, as the integration plan prescribes; a desk visit paid as
- * one line lists its per-consultation receipts.
+ * online, D-27), the unpaid walk-ins from the appointments feature (where they
+ * are collected), and the refunds list. Collect and receipt reuse that
+ * feature's modals; a desk visit paid as one line lists its per-consultation
+ * receipts; a refund covers the whole booking and is offered only once the
+ * booking is over (UAT-10, UAT-42).
  *
  * Amounts are what was collected. The tax breakdown lives on each receipt.
  */
 export function PaymentsScreen() {
   const { role } = useParams();
+  const canRefund = useCan('Payments.del');
+  const cashAccess = useCashDeskAccess();
 
   const [tab, setTab] = useState<PayTab>('All');
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState(ALL_SOURCES);
   const [modeF, setModeF] = useState(ALL_MODES);
   const [dateF, setDateF] = useState<PaymentWindow>('Today');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [deptF, setDeptF] = useState(ALL_DEPTS);
   const [docF, setDocF] = useState(ALL_DOCTORS);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [page, setPage] = useState(0);
   const [pay, setPay] = useState<DeskAppointment | null>(null);
   const [receiptFor, setReceiptFor] = useState<string | null>(null);
   const [visitFor, setVisitFor] = useState<PaymentLine | null>(null);
   const [refundFor, setRefundFor] = useState<PaymentLine | null>(null);
+  const [detailFor, setDetailFor] = useState<string | null>(null);
 
+  const search = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
   const departments = useDepartmentsQuery().data ?? [];
   const doctors = useDoctorsQuery().data ?? [];
   const invalidatePayments = useInvalidatePayments();
-  const refund = useRefundMutation();
-  const exportCsv = useExportPaymentsMutation();
+  const exporter = useExportPaymentsMutation();
 
-  const range = rangeForWindow(dateF);
+  const customError =
+    dateF === 'Custom range' && customFrom !== '' && customTo !== ''
+      ? dateRangeError(customFrom, customTo)
+      : undefined;
+  const range = rangeForWindow(
+    dateF,
+    customError ? undefined : { dateFrom: customFrom, dateTo: customTo },
+  );
   const today = rangeForWindow('Today');
   const departmentId = departments.find((d) => d.name === deptF)?.id ?? null;
   const doctorId = doctors.find((d) => d.name === docF)?.id ?? null;
+  const channel = SOURCE_CHANNEL[sourceF] ?? null;
 
+  const linesTab = tab === 'All' || tab === 'Paid' || tab === 'Refunded';
   const filters: PaymentFilters = {
     ...range,
-    statuses: tab === 'Pending' ? [] : TAB_STATUSES[tab],
+    statuses: linesTab ? TAB_STATUSES[tab] : [],
     method: MODE_FILTER[modeF] ?? null,
+    channel,
     doctorId,
     departmentId,
-    q,
+    q: search,
   };
-  const showsLines = tab !== 'Pending';
+  const sortField: PaymentSortField = sort.key === 'amount_paise' ? 'amount_paise' : 'captured_at';
   const linesQuery = usePaymentsQuery(
-    { ...filters, page: page + 1, pageSize: PAY_PAGE },
-    showsLines,
+    {
+      ...filters,
+      page: page + 1,
+      pageSize: PAY_PAGE,
+      sortField,
+      sortDirection: sort.dir,
+    },
+    linesTab,
   );
   const apptsQuery = useAppointmentsQuery(range);
   const todayApptsQuery = useAppointmentsQuery(today);
@@ -176,6 +232,7 @@ export function PaymentsScreen() {
     ...today,
     statuses: ['captured'],
     method: null,
+    channel: null,
     doctorId: null,
     departmentId: null,
     q: '',
@@ -184,7 +241,7 @@ export function PaymentsScreen() {
   const appts = apptsQuery.data ?? [];
   const apptById = new Map(appts.map((a) => [a.id, a]));
   const totals = totalsOf(totalsQuery.data ?? []);
-  // Refunds processed today, desk and online (`GET /refunds`).
+  // Refunds asked for today, desk and online (`GET /refunds`, by request date).
   const refundsQuery = useRefundsQuery(today.dateFrom, today.dateTo);
   const refundedToday = (refundsQuery.data ?? [])
     .filter((r) => r.status === 'processed')
@@ -194,7 +251,7 @@ export function PaymentsScreen() {
   const isUnpaid = (a: DeskAppointment): boolean => needsPayment(a);
   const pendingToday = (todayApptsQuery.data ?? []).filter(isUnpaid).length;
 
-  const ql = q.trim().toLowerCase();
+  const ql = search.toLowerCase();
   const pendingRows = appts.filter(
     (a) =>
       isUnpaid(a) &&
@@ -208,15 +265,18 @@ export function PaymentsScreen() {
           .includes(ql)),
   );
 
-  // Source has no server filter: it narrows the current page only (the
-  // caption below says so).
+  // An older backend cannot filter by channel: the page is narrowed here and
+  // the caption below says so.
+  const isChannelFiltered = linesQuery.data?.isChannelFiltered ?? true;
   const lines = (linesQuery.data?.items ?? []).filter(
-    (l) =>
-      sourceF === ALL_SOURCES ||
-      (sourceF === SOURCE_ONLINE ? l.channel === 'online' : l.channel === 'desk'),
+    (l) => isChannelFiltered || channel === null || l.channel === channel,
   );
-  const refunds = usePaymentRefundsQuery(
-    lines.filter((l) => l.status === 'refunded').map((l) => l.id),
+  // Lines whose refund state the row does not carry (older backend) are
+  // looked up, so a processing refund is never offered again (UAT-41).
+  const fetchedRefunds = useLineRefundsQuery(
+    lines
+      .filter((l) => l.latestRefund === undefined && l.appointmentId && l.status !== 'failed')
+      .map((l) => l.id),
   );
 
   const pendingPage = pendingRows.slice(page * PAY_PAGE, page * PAY_PAGE + PAY_PAGE);
@@ -238,7 +298,7 @@ export function PaymentsScreen() {
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
       // Lines refunded in full drop out of the captured total.
       sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} still held today${
-        refundedToday > 0 ? ` · ${money(refundedToday)} refunded today` : ''
+        refundedToday > 0 ? ` · ${money(refundedToday)} refunded today (desk and online)` : ''
       }`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
@@ -280,8 +340,14 @@ export function PaymentsScreen() {
       fn(value);
       setPage(0);
     };
+  const onSort = (key: string): void => {
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' },
+    );
+    setPage(0);
+  };
   const filtersActive =
-    ql !== '' ||
+    q !== '' ||
     dateF !== 'Today' ||
     sourceF !== ALL_SOURCES ||
     deptF !== ALL_DEPTS ||
@@ -290,6 +356,8 @@ export function PaymentsScreen() {
   const clearAll = (): void => {
     setQ('');
     setDateF('Today');
+    setCustomFrom('');
+    setCustomTo('');
     setSourceF(ALL_SOURCES);
     setDeptF(ALL_DEPTS);
     setDocF(ALL_DOCTORS);
@@ -298,46 +366,27 @@ export function PaymentsScreen() {
   };
 
   const refresh = async (): Promise<void> => {
-    await Promise.all([
-      showsLines ? linesQuery.refetch() : Promise.resolve(),
-      apptsQuery.refetch(),
-      totalsQuery.refetch(),
-      refundsQuery.refetch(),
-      todayApptsQuery.refetch(),
-    ]);
+    await Promise.all([invalidatePayments(), apptsQuery.refetch(), todayApptsQuery.refetch()]);
   };
 
   const runExport = (format: PaymentExportFormat): void => {
-    exportCsv.mutate(
+    exporter.mutate(
       { filters, format },
       {
         onSuccess: (file) => {
           saveExport(file);
+          if (file.isTruncated) {
+            toast(
+              `Exported ${file.filename}, but the server stopped at ${
+                file.rowLimit ? file.rowLimit.toLocaleString('en-IN') : 'its row limit'
+              } rows. Narrow the dates to export the rest.`,
+              'info',
+            );
+            return;
+          }
           toast(`Exported ${file.filename}`, 'success');
         },
         onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error'),
-      },
-    );
-  };
-
-  const confirmRefund = (reason: string): void => {
-    const line = refundFor;
-    if (!line?.appointmentId) return;
-    refund.mutate(
-      { id: line.appointmentId, reason },
-      {
-        onSuccess: () => {
-          toast('Refund issued', 'success');
-          setRefundFor(null);
-          invalidatePayments();
-        },
-        onError: (error) =>
-          toast(
-            isFailure(error) && error.code === CASH_SESSION_REQUIRED
-              ? REFUND_NEEDS_DRAWER
-              : (errorCopy(error) ?? 'The refund failed.'),
-            'error',
-          ),
       },
     );
   };
@@ -353,44 +402,58 @@ export function PaymentsScreen() {
         sub: 'Desk visit',
       };
     }
+    // The line names its own doctor (B3); older backends fall back to the
+    // appointments in the window, then to the booking reference.
+    if (line.doctorName) return { main: line.doctorName, sub: line.departmentName ?? '' };
     const appt = line.appointmentId ? apptById.get(line.appointmentId) : undefined;
     return appt
       ? { main: appt.doctor.name, sub: appt.department.name }
       : { main: line.bookingRefs.join(', ') || '—', sub: 'Booking' };
   };
 
+  const bookingStatusOf = (line: PaymentLine): BookingStatus | null =>
+    line.bookingStatus ??
+    (line.appointmentId ? (apptById.get(line.appointmentId)?.status ?? null) : null);
+
   const loading =
-    (showsLines && linesQuery.isPending) ||
-    (tab !== 'Paid' && tab !== 'Refunded' && apptsQuery.isPending);
-  const failed = (showsLines && linesQuery.isError) || (!showsLines && apptsQuery.isError);
-  const tableState: TableStateSpec | undefined = loading
-    ? { kind: 'loading', rows: PAY_PAGE }
-    : failed
-      ? {
-          kind: 'error',
-          message: errorCopy(linesQuery.error ?? apptsQuery.error),
-          onRetry: () => void refresh(),
-        }
-      : rows.length === 0
-        ? filtersActive
-          ? {
-              kind: 'empty',
-              title: 'No payments match your filters.',
-              message: 'Nothing was collected for this combination of date, source and mode.',
-              actionLabel: 'Clear filters',
-              onAction: clearAll,
-            }
-          : {
-              kind: 'empty',
-              icon: 'indian-rupee',
-              title:
-                tab === 'Pending'
-                  ? 'Nothing waiting to be collected.'
-                  : 'No payments recorded yet.',
-              message:
-                'Desk payments appear here as they are recorded, prepaid online bookings as they arrive.',
-            }
-        : undefined;
+    (linesTab && linesQuery.isPending) ||
+    (tab !== 'Paid' && tab !== 'Refunded' && tab !== 'Refunds' && apptsQuery.isPending);
+  const failed = (linesTab && linesQuery.isError) || (tab === 'Pending' && apptsQuery.isError);
+  const tableState: TableStateSpec | undefined = customError
+    ? {
+        kind: 'empty',
+        icon: 'calendar-x',
+        title: 'Fix the date range to see payments.',
+        message: customError,
+      }
+    : loading
+      ? { kind: 'loading', rows: PAY_PAGE }
+      : failed
+        ? {
+            kind: 'error',
+            message: errorCopy(linesQuery.error ?? apptsQuery.error),
+            onRetry: () => void refresh(),
+          }
+        : rows.length === 0
+          ? filtersActive
+            ? {
+                kind: 'empty',
+                title: 'No payments match your filters.',
+                message: 'Nothing was collected for this combination of date, source and mode.',
+                actionLabel: 'Clear filters',
+                onAction: clearAll,
+              }
+            : {
+                kind: 'empty',
+                icon: 'indian-rupee',
+                title:
+                  tab === 'Pending'
+                    ? 'Nothing waiting to be collected.'
+                    : 'No payments recorded yet.',
+                message:
+                  'Desk payments appear here as they are recorded, prepaid online bookings as they arrive.',
+              }
+          : undefined;
 
   const updatedAt = Math.max(linesQuery.dataUpdatedAt, apptsQuery.dataUpdatedAt);
 
@@ -405,9 +468,9 @@ export function PaymentsScreen() {
         <span
           className="flex flex-wrap gap-2"
           title={
-            tab === 'Pending'
-              ? 'Unpaid walk-ins are not payment lines — nothing to export'
-              : 'Export every payment line matching these filters'
+            linesTab
+              ? 'Export every payment line matching these filters'
+              : 'Only payment lines can be exported'
           }
         >
           {EXPORT_FORMATS.map(({ format, label }) => (
@@ -416,8 +479,8 @@ export function PaymentsScreen() {
               variant="secondary"
               icon="download"
               onClick={() => runExport(format)}
-              busy={exportCsv.isPending && exportCsv.variables.format === format}
-              disabled={tab === 'Pending' || total === 0 || exportCsv.isPending}
+              busy={exporter.isPending && exporter.variables.format === format}
+              disabled={!linesTab || total === 0 || exporter.isPending || customError !== undefined}
             >
               Export {label}
             </Button>
@@ -433,7 +496,7 @@ export function PaymentsScreen() {
           />
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <RefreshBtn onRefresh={refresh} title="Refresh payments" />
+          <RefreshBtn onRefresh={refresh} title="Refresh payments and the cash drawer" />
           <FilterSelect
             value={dateF}
             options={PAYMENT_WINDOWS}
@@ -442,24 +505,50 @@ export function PaymentsScreen() {
             )}
             aria-label="Filter by date"
           />
-          <FilterSelect
-            value={sourceF}
-            options={[ALL_SOURCES, SOURCE_WALK_IN, SOURCE_ONLINE]}
-            onChange={reset(setSourceF)}
-            aria-label="Filter by booking source"
-          />
-          <FilterSelect
-            value={deptF}
-            options={[ALL_DEPTS, ...departments.map((d) => d.name)]}
-            onChange={reset(setDeptF)}
-            aria-label="Filter by department"
-          />
-          <FilterSelect
-            value={docF}
-            options={[ALL_DOCTORS, ...doctors.map((d) => d.name)]}
-            onChange={reset(setDocF)}
-            aria-label="Filter by doctor"
-          />
+          {dateF === 'Custom range' && (
+            <>
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo || undefined}
+                onChange={(e) => reset(setCustomFrom)(e.target.value)}
+                aria-label="From date"
+                title="From date"
+                className={DATE_INPUT_CLASS}
+              />
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom || undefined}
+                onChange={(e) => reset(setCustomTo)(e.target.value)}
+                aria-label="To date"
+                title="To date"
+                className={DATE_INPUT_CLASS}
+              />
+            </>
+          )}
+          {tab !== 'Refunds' && (
+            <>
+              <FilterSelect
+                value={sourceF}
+                options={[ALL_SOURCES, SOURCE_WALK_IN, SOURCE_ONLINE]}
+                onChange={reset(setSourceF)}
+                aria-label="Filter by booking source"
+              />
+              <FilterSelect
+                value={deptF}
+                options={[ALL_DEPTS, ...departments.map((d) => d.name)]}
+                onChange={reset(setDeptF)}
+                aria-label="Filter by department"
+              />
+              <FilterSelect
+                value={docF}
+                options={[ALL_DOCTORS, ...doctors.map((d) => d.name)]}
+                onChange={reset(setDocF)}
+                aria-label="Filter by doctor"
+              />
+            </>
+          )}
           <FilterSelect
             value={modeF}
             options={[ALL_MODES, ...Object.keys(MODE_FILTER)]}
@@ -471,173 +560,207 @@ export function PaymentsScreen() {
               Clear all
             </button>
           )}
-          <InfoDot text="Desk payments are collected at the hospital (cash / UPI / card). Online bookings are prepaid through the Medibook app — Medibook collects them and settles the net to the hospital later, so they are shown as 'Prepaid'. Amounts are as collected; each receipt shows its tax breakdown." />
+          <InfoDot text="Desk payments are collected at the hospital (cash / UPI / card). Online bookings are prepaid through the Medibook app — Medibook collects them and settles the net to the hospital later, so they are shown as 'Prepaid'. Amounts are as collected; each receipt shows its tax breakdown. A refund returns the whole booking, to each original method." />
           <span className="flex-1"></span>
           <span className="text-caption text-text-muted whitespace-nowrap">
             Updated {updatedCopy(updatedAt)}
           </span>
         </div>
-        {sourceF !== ALL_SOURCES && showsLines && (
+        {customError && <div className="text-body text-d-500 mb-3">{customError}</div>}
+        {!isChannelFiltered && linesTab && (
           <div className="text-caption text-text-muted mb-3">
-            Source filters this page only — the server cannot filter payments by source.
+            Source filters this page only — this server cannot filter payments by source yet.
           </div>
         )}
-        <TableShell
-          columns={COLUMNS}
-          rightCols={['Amount']}
-          state={tableState}
-          scrollLabel="Payments"
-        >
-          {rows.map((row) => {
-            const dd = doctorDept(row);
-            if (row.kind === 'pending') {
-              const { appt } = row;
-              return (
-                <tr
-                  key={`pending-${appt.id}`}
-                  className="hover:bg-grey-200 transition-colors duration-150"
-                >
-                  <td className={cn(tdClass, 'text-text-strong font-medium')}>
-                    {appt.patient?.fullName ?? 'Patient unavailable'}
-                    <div className="text-caption text-text-muted font-normal">
-                      {appt.patient?.mrn ?? appt.bookingRef}
-                    </div>
-                  </td>
-                  <td className={tdClass}>
-                    {dd.main}
-                    <div className="text-caption text-text-muted">{dd.sub}</div>
-                  </td>
-                  <td className={tdClass}>
-                    <Badge status={appt.source === 'online' ? SOURCE_ONLINE : SOURCE_WALK_IN} />
-                  </td>
-                  <td className={tdClass}>—</td>
-                  <td className={cn(tdClass, 'text-right')}>
-                    <div className="text-text-strong font-semibold tabular-nums">
-                      {money(appt.totalRupees)}
-                    </div>
-                    <div className="text-caption text-text-muted">due</div>
-                  </td>
-                  <td className={tdClass}>
-                    {appt.paymentStatus === 'refunded' ? (
-                      <Badge status="Pending">Refunded · due again</Badge>
-                    ) : (
-                      <Badge status="Pending" />
-                    )}
-                  </td>
-                  <td className={tdClass}>
-                    <Can perm="Payments.add">
-                      <Button size="sm" icon="indian-rupee" onClick={() => setPay(appt)}>
-                        Record
-                      </Button>
-                    </Can>
-                  </td>
-                </tr>
-              );
-            }
-            const { line } = row;
-            const refunded = line.status === 'refunded' ? refundCopy(refunds[line.id] ?? []) : null;
-            return (
-              <tr key={line.id} className="hover:bg-grey-200 transition-colors duration-150">
-                <td className={cn(tdClass, 'text-text-strong font-medium')}>
-                  {line.patient?.fullName ?? 'Patient unavailable'}
-                  <div className="text-caption text-text-muted font-normal">
-                    {line.patient?.mrn ?? line.bookingRefs.join(', ')}
-                  </div>
-                </td>
-                <td className={tdClass}>
-                  {dd.main}
-                  <div className="text-caption text-text-muted">{dd.sub}</div>
-                </td>
-                <td className={tdClass}>
-                  <Badge status={line.channel === 'online' ? SOURCE_ONLINE : SOURCE_WALK_IN} />
-                </td>
-                <td className={tdClass}>
-                  {line.channel === 'online' ? (
-                    <span className="text-text-muted">Prepaid</span>
-                  ) : (
-                    METHOD_LABEL[line.method]
-                  )}
-                  {line.collectedByName && (
-                    <div className="text-caption text-text-muted">
-                      {line.collectedByName}
-                      {line.counterCode ? ` · ${line.counterCode}` : ''}
-                    </div>
-                  )}
-                </td>
-                <td className={cn(tdClass, 'text-right')}>
-                  <div className="text-text-strong font-semibold tabular-nums">
-                    {money(line.amountRupees)}
-                  </div>
-                </td>
-                <td className={tdClass}>
-                  <div className="flex flex-col items-start gap-0.75">
-                    <Badge status={LINE_STATUS_LABEL[line.status]} />
-                    {refunded && (
-                      <span className="text-caption text-text-muted tabular-nums">
-                        −{money(refunded.amount)} {refunded.how}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className={tdClass}>
-                  <div className="flex items-center gap-2">
-                    {line.status !== 'failed' && line.appointmentId && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon="receipt"
-                        onClick={() => setReceiptFor(line.appointmentId)}
-                      >
-                        Receipt
-                      </Button>
-                    )}
-                    {line.status !== 'failed' && line.visitId && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon="receipt"
-                        onClick={() => setVisitFor(line)}
-                      >
-                        Receipts
-                      </Button>
-                    )}
-                    {/* HA-09: refund is reachable for prepaid online lines too. A
-                        visit line has no refund endpoint (refunds are per
-                        appointment), so it offers none. */}
-                    {/* SEC-13: the refund endpoint requires payments.del. */}
-                    {line.status === 'captured' && line.appointmentId && (
-                      <Can perm="Payments.del">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon="undo-2"
-                          onClick={() => setRefundFor(line)}
-                        >
-                          Refund
-                        </Button>
-                      </Can>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </TableShell>
-        <Pager
-          total={total}
-          page={page}
-          pageSize={PAY_PAGE}
-          onPage={setPage}
-          noun={tab === 'Pending' ? 'unpaid walk-ins' : 'payment lines'}
-          right={
-            <span className="text-body text-text-navy font-medium tabular-nums">
-              Desk collected today: {money(totals.deskTotal)}
-              {tab === 'All' && pendingRows.length > 0
-                ? ` · ${pendingRows.length} unpaid walk-in${pendingRows.length === 1 ? '' : 's'} listed first`
-                : ''}
-            </span>
-          }
-        />
+        {tab === 'All' && apptsQuery.isError && (
+          <div className="text-caption text-d-700 mb-3 flex items-center gap-1.5">
+            <Icon name="triangle-alert" size={13} /> Unpaid walk-ins could not be loaded:{' '}
+            {errorCopy(apptsQuery.error) ?? 'try Refresh.'}
+          </div>
+        )}
+        {tab === 'Refunds' ? (
+          <PaymentsRefundsPanel range={range} method={MODE_FILTER[modeF] ?? null} search={search} />
+        ) : (
+          <>
+            <TableShell
+              columns={COLUMNS}
+              rightCols={['Amount']}
+              sortKeys={SORT_KEYS}
+              sort={sort}
+              onSort={onSort}
+              state={tableState}
+              scrollLabel="Payments"
+            >
+              {rows.map((row) => {
+                const dd = doctorDept(row);
+                if (row.kind === 'pending') {
+                  const { appt } = row;
+                  return (
+                    <tr
+                      key={`pending-${appt.id}`}
+                      className="hover:bg-grey-200 transition-colors duration-150"
+                    >
+                      <td className={cn(tdClass, 'text-text-muted whitespace-nowrap')}>Due</td>
+                      <td className={cn(tdClass, 'text-text-strong font-medium')}>
+                        {appt.patient?.fullName ?? 'Patient unavailable'}
+                        <div className="text-caption text-text-muted font-normal">
+                          {appt.patient?.mrn ?? appt.bookingRef}
+                        </div>
+                      </td>
+                      <td className={tdClass}>
+                        {dd.main}
+                        <div className="text-caption text-text-muted">{dd.sub}</div>
+                      </td>
+                      <td className={tdClass}>
+                        <Badge status={appt.source === 'online' ? SOURCE_ONLINE : SOURCE_WALK_IN} />
+                      </td>
+                      <td className={tdClass}>—</td>
+                      <td className={cn(tdClass, 'text-right')}>
+                        <div className="text-text-strong font-semibold tabular-nums">
+                          {money(appt.totalRupees)}
+                        </div>
+                        <div className="text-caption text-text-muted">due</div>
+                      </td>
+                      <td className={tdClass}>
+                        {appt.paymentStatus === 'refunded' ? (
+                          <Badge status="Pending">Refunded · due again</Badge>
+                        ) : (
+                          <Badge status="Pending" />
+                        )}
+                      </td>
+                      <td className={tdClass}>
+                        <Can perm="Payments.add">
+                          <Button size="sm" icon="indian-rupee" onClick={() => setPay(appt)}>
+                            Record
+                          </Button>
+                        </Can>
+                      </td>
+                    </tr>
+                  );
+                }
+                const { line } = row;
+                const refund = lineRefundOf(line, fetchedRefunds[line.id]);
+                const availability = refundAvailability(line, bookingStatusOf(line), refund);
+                const refundBadge =
+                  refund && refund.status !== 'processed'
+                    ? REFUND_STATUS_BADGE[refund.status]
+                    : null;
+                return (
+                  <tr
+                    key={line.id}
+                    onClick={() => setDetailFor(line.id)}
+                    className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+                  >
+                    <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
+                      {dateTimeCopy(line.capturedAt ?? line.createdAt)}
+                    </td>
+                    <td className={cn(tdClass, 'text-text-strong font-medium')}>
+                      {line.patient?.fullName ?? 'Patient unavailable'}
+                      <div className="text-caption text-text-muted font-normal">
+                        {line.patient?.mrn ?? line.bookingRefs.join(', ')}
+                      </div>
+                    </td>
+                    <td className={tdClass}>
+                      {dd.main}
+                      <div className="text-caption text-text-muted">{dd.sub}</div>
+                    </td>
+                    <td className={tdClass}>
+                      <Badge status={line.channel === 'online' ? SOURCE_ONLINE : SOURCE_WALK_IN} />
+                    </td>
+                    <td className={tdClass}>
+                      {line.channel === 'online' ? (
+                        <span className="text-text-muted">Prepaid</span>
+                      ) : (
+                        METHOD_LABEL[line.method]
+                      )}
+                      {line.collectedByName && (
+                        <div className="text-caption text-text-muted">
+                          {line.collectedByName}
+                          {line.counterCode ? ` · ${line.counterCode}` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td className={cn(tdClass, 'text-right')}>
+                      <div className="text-text-strong font-semibold tabular-nums">
+                        {money(line.amountRupees)}
+                      </div>
+                    </td>
+                    <td className={tdClass}>
+                      <div className="flex flex-col items-start gap-0.75">
+                        <Badge status={LINE_STATUS_LABEL[line.status]} />
+                        {refundBadge && (
+                          <Badge status={refundBadge.status}>{refundBadge.label}</Badge>
+                        )}
+                        {refund?.status === 'failed' && refund.failureReason && (
+                          <span className="text-caption text-d-700">{refund.failureReason}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={tdClass} onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {line.status !== 'failed' && line.appointmentId && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon="receipt"
+                            onClick={() => setReceiptFor(line.appointmentId)}
+                          >
+                            Receipt
+                          </Button>
+                        )}
+                        {line.status !== 'failed' && line.visitId && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon="receipt"
+                            onClick={() => setVisitFor(line)}
+                          >
+                            Receipts
+                          </Button>
+                        )}
+                        {/* SEC-13: refunds require payments.del. A visit line
+                            has no refund endpoint (refunds are per appointment). */}
+                        {canRefund && availability.kind === 'available' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon="undo-2"
+                            onClick={() => setRefundFor(line)}
+                          >
+                            {availability.retry ? 'Retry refund' : 'Refund booking'}
+                          </Button>
+                        )}
+                        {canRefund && availability.kind === 'live' && (
+                          <span
+                            className="text-caption text-text-muted"
+                            title="A refund ends the booking. Cancel it from Appointments; cancelling refunds it in full."
+                          >
+                            Cancel booking to refund
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </TableShell>
+            <Pager
+              total={total}
+              page={page}
+              pageSize={PAY_PAGE}
+              onPage={setPage}
+              noun={tab === 'Pending' ? 'unpaid walk-ins' : 'payment lines'}
+              right={
+                <span className="text-body text-text-navy font-medium tabular-nums">
+                  Desk collected today: {money(totals.deskTotal)}
+                  {tab === 'All' && pendingRows.length > 0
+                    ? ` · ${pendingRows.length} unpaid walk-in${pendingRows.length === 1 ? '' : 's'} listed first`
+                    : ''}
+                </span>
+              }
+            />
+          </>
+        )}
       </Card>
       <AppointmentPaymentModal
         appt={pay}
@@ -645,7 +768,7 @@ export function PaymentsScreen() {
         onPaid={() => {
           const paid = pay;
           setPay(null);
-          invalidatePayments();
+          void invalidatePayments();
           if (paid) setReceiptFor(paid.id);
         }}
       />
@@ -659,15 +782,15 @@ export function PaymentsScreen() {
           setReceiptFor(appointmentId);
         }}
       />
-      <AppointmentReasonModal
-        open={refundFor !== null}
-        title={REFUND_COPY.title}
-        body={REFUND_COPY.body}
-        confirmLabel={REFUND_COPY.confirm}
-        busy={refund.isPending}
-        onClose={() => setRefundFor(null)}
-        onConfirm={confirmRefund}
-      />
+      {refundFor && (
+        <PaymentsRefundDialog
+          key={refundFor.id}
+          line={refundFor}
+          canOpenDrawer={cashAccess.canOpen}
+          onClose={() => setRefundFor(null)}
+        />
+      )}
+      <PaymentsDetailDrawer paymentId={detailFor} onClose={() => setDetailFor(null)} />
     </div>
   );
 }
