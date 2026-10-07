@@ -61,3 +61,17 @@ export interface OpsStaffInvite {
   readonly lastName: string | null;
   readonly roleId: string;
 }
+
+/** A new platform role: a unique code, a display name and its permission grid. */
+export interface OpsRoleDraft {
+  /** Lowercase letters, digits and underscores, 2–41 characters. */
+  readonly code: string;
+  readonly name: string;
+  readonly permissions: readonly string[];
+}
+
+/** An edit of a role: rename and/or replace its grid. */
+export interface OpsRoleChanges {
+  readonly name?: string;
+  readonly permissions?: readonly string[];
+}

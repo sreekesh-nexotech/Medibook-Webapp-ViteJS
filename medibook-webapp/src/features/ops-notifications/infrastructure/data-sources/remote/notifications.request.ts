@@ -5,11 +5,14 @@ import type {
 
 /**
  * `ConfigBannerRequest` / `PatchedConfigBannerRequest` (`schema.yml`). The
- * backend rejects unknown fields, so only the ones set are sent. `body`, the
- * CTA and `audience` are not edited here and keep their server defaults.
+ * backend rejects unknown fields, so only the ones set are sent.
  */
 export interface BannerWriteRequest {
   title?: string;
+  body?: string | null;
+  cta_label?: string | null;
+  cta_target?: string | null;
+  audience?: string;
   image_file?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -48,6 +51,10 @@ function endOfDay(day: string | null): string | null {
 export function toCreateRequest(fields: BannerFields, sortOrder: number): BannerWriteRequest {
   return {
     title: fields.title,
+    body: fields.body,
+    cta_label: fields.ctaLabel,
+    cta_target: fields.ctaTarget,
+    audience: fields.audience,
     image_file: fields.imageFileId,
     starts_at: startOfDay(fields.from),
     ends_at: endOfDay(fields.to),
@@ -59,6 +66,10 @@ export function toCreateRequest(fields: BannerFields, sortOrder: number): Banner
 export function toPatchRequest(patch: BannerPatch): BannerWriteRequest {
   const body: BannerWriteRequest = {};
   if (patch.title !== undefined) body.title = patch.title;
+  if (patch.body !== undefined) body.body = patch.body;
+  if (patch.ctaLabel !== undefined) body.cta_label = patch.ctaLabel;
+  if (patch.ctaTarget !== undefined) body.cta_target = patch.ctaTarget;
+  if (patch.audience !== undefined) body.audience = patch.audience;
   if (patch.imageFileId !== undefined) body.image_file = patch.imageFileId;
   if (patch.from !== undefined) body.starts_at = startOfDay(patch.from);
   if (patch.to !== undefined) body.ends_at = endOfDay(patch.to);

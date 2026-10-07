@@ -93,3 +93,30 @@ export function ageFrom(dateOfBirth: string | null, now: number): string {
 export function isLockedAt(lockedUntil: string | null, now: number): boolean {
   return lockedUntil !== null && Date.parse(lockedUntil) > now;
 }
+
+/**
+ * What the search box matches for this role. Without `platform_users.edit`
+ * contacts arrive masked, and the backend matches only a full email or phone
+ * for those roles (L-11) — so the hint says so instead of looking broken.
+ */
+export function searchHint(unmasked: boolean): string {
+  return unmasked
+    ? 'Matches email or phone number (part of either). Names are not searchable.'
+    : 'Your role sees contacts masked, so search needs the exact email or the full phone number (+91…).';
+}
+
+/** Devices: platform and versions in one line, e.g. "android · app 2.3.1 · OS 14". */
+export function deviceLine(
+  platform: string,
+  appVersion: string | null,
+  osVersion: string | null,
+): string {
+  return [platform, appVersion ? `app ${appVersion}` : null, osVersion ? `OS ${osVersion}` : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** "Verified 12 Jan 2026" / "Not verified" for a phone or email verification timestamp. */
+export function verifiedLabel(at: string | null): string {
+  return at ? `Verified ${formatDate(at)}` : 'Not verified';
+}

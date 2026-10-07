@@ -20,7 +20,6 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import { useComplianceConfigChangesQuery } from '@/features/ops-compliance/application/queries/useComplianceConfigChangesQuery';
-import { useComplianceHospitalsQuery } from '@/features/ops-compliance/application/queries/useComplianceHospitalsQuery';
 import { useExportComplianceConfigChangesMutation } from '@/features/ops-compliance/application/queries/useExportComplianceConfigChangesMutation';
 import type {
   ConfigChangeFilters,
@@ -36,6 +35,7 @@ import {
   fmtConfigValue,
   principalLabel,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
+import { useHospitalOptionsQuery } from '@/features/ops-hospitals/application/queries/useHospitalOptionsQuery';
 import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
 
 const PAGE_SIZE = 8;
@@ -46,6 +46,7 @@ const ALL_SCOPES = 'Scope: All';
 const PLATFORM = 'Platform';
 const ALL_HOSPITALS = 'All hospitals';
 const ALL_AREAS = 'Area: All';
+const ALL_HOSPITAL_PICK = 'Hospital: All';
 
 /** Column → server sort field. */
 const SORT_FIELDS: Readonly<Record<string, ConfigChangeSortField>> = {
@@ -80,18 +81,29 @@ export function ConfigChangesCard() {
   const [page, setPage] = useState(0);
   const { sort, onSort } = useSort<never>({ key: 'when', dir: 'desc' });
 
-  const hospitalsQuery = useComplianceHospitalsQuery();
-  const hospitals = hospitalsQuery.data?.items ?? [];
+  // Names come from the row when the backend sends them (B6); the registry
+  // and staff lookups only run for roles allowed to read them (12·F17).
+  const hospitalOptions = useHospitalOptionsQuery();
+  const hospitals = hospitalOptions.options;
   const scopeLabel = (c: ConfigChangeRecord): string =>
     c.scope === 'platform'
       ? PLATFORM
-      : (hospitals.find((h) => h.id === c.hospitalId)?.name ?? 'Hospital instance');
+      : (c.hospitalName ??
+        hospitals.find((h) => h.id === c.hospitalId)?.name ??
+        'Hospital instance');
+  const actorLabel = (c: ConfigChangeRecord): string =>
+    c.actorName ??
+    staffNames.get(c.actorUserId) ??
+    principalLabel(c.scope === 'platform' ? 'platform' : 'hospital');
+  const [hospitalF, setHospitalF] = useState(ALL_HOSPITAL_PICK);
+  const pickedHospital = hospitals.find((h) => h.name === hospitalF) ?? null;
 
   const filters: ConfigChangeFilters = {
     dateFrom: from,
     dateTo: to,
     scope: scopeF === PLATFORM ? 'platform' : scopeF === ALL_HOSPITALS ? 'hospital' : null,
     settingKeyPrefix: CONFIG_AREAS.find((a) => a.label === areaF)?.prefix ?? null,
+    hospitalId: pickedHospital?.id ?? null,
   };
   const changesQuery = useComplianceConfigChangesQuery({
     ...filters,
@@ -120,11 +132,14 @@ export function ConfigChangesCard() {
       fn(v);
       setPage(0);
     };
-  const filtersActive = Boolean(scopeF !== ALL_SCOPES || areaF !== ALL_AREAS || from || to);
+  const filtersActive = Boolean(
+    scopeF !== ALL_SCOPES || areaF !== ALL_AREAS || hospitalF !== ALL_HOSPITAL_PICK || from || to,
+  );
   const clearAll = (): void => {
     setQ('');
     setScopeF(ALL_SCOPES);
     setAreaF(ALL_AREAS);
+    setHospitalF(ALL_HOSPITAL_PICK);
     setFrom('');
     setTo('');
     setPage(0);
@@ -148,7 +163,7 @@ export function ConfigChangesCard() {
           ...all.map((c) => [
             c.occurredAt,
             c.actorUserId,
-            staffNames.get(c.actorUserId) ?? principalLabel(c.scope),
+            actorLabel(c),
             configAreaOf(c.settingKey),
             c.settingKey,
             fmtConfigValue(c.beforeValue),
@@ -229,6 +244,14 @@ export function ConfigChangesCard() {
           options={[ALL_AREAS, ...CONFIG_AREAS.map((a) => a.label)]}
           onChange={reset(setAreaF)}
         />
+        {hospitalOptions.canView && (
+          <FilterSelect
+            value={hospitalF}
+            aria-label="Filter by hospital"
+            options={[ALL_HOSPITAL_PICK, ...hospitals.map((h) => h.name)]}
+            onChange={reset(setHospitalF)}
+          />
+        )}
         <ComplianceDateInput value={from} onChange={reset(setFrom)} title="From date" />
         <ComplianceDateInput value={to} onChange={reset(setTo)} title="To date" />
         {(filtersActive || ql) && (
@@ -267,8 +290,7 @@ export function ConfigChangesCard() {
               />
             </td>
             <td className={tdClass} title={c.actorUserId}>
-              {staffNames.get(c.actorUserId) ??
-                principalLabel(c.scope === 'platform' ? 'platform' : 'hospital')}
+              {actorLabel(c)}
             </td>
             <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
               {fmtComplianceWhen(c.occurredAt)}

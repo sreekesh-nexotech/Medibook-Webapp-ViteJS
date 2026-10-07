@@ -3,10 +3,13 @@ import { attempt } from '@/core/error/attempt';
 
 import type { OpsUsersRepository } from '@/features/ops-users/domain/repositories/opsUsers.repository';
 import {
+  deleteRole,
   getPermissions,
   getRoles,
   getStaff,
+  patchRole,
   patchStaffRole,
+  postRole,
   postStaff,
   postStaffAction,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.api';
@@ -32,7 +35,21 @@ export const opsUsersRepository: OpsUsersRepository = {
 
   unlockStaff: (id) => attempt(async () => toStaffMember(await postStaffAction(id, 'unlock'))),
 
+  resendStaffInvite: (id) =>
+    attempt(async () => toStaffMember(await postStaffAction(id, 'resend-invite'))),
+
   listRoles: () => attempt(async () => (await getRoles()).results.map(toStaffRole)),
+
+  createRole: (draft) => attempt(async () => toStaffRole(await postRole(draft))),
+
+  updateRole: (id, changes, version) =>
+    attempt(async () => toStaffRole(await patchRole(id, changes, version))),
+
+  deleteRole: (id, version) =>
+    attempt(async () => {
+      await deleteRole(id, version);
+      return null;
+    }),
 
   listPermissions: () => attempt(async () => toPermissions(await getPermissions())),
 };

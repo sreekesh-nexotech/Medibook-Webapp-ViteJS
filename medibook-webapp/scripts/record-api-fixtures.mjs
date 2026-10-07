@@ -21,6 +21,10 @@
  * Add `FIXTURE_ONLY=<key>,<key>` to rewrite only those fixtures.
  *
  * Use a hospital admin (every hospital endpoint) and a platform owner.
+ *
+ * `FIXTURE_ONLY=key1,key2` still reads every endpoint (later entries take
+ * their ids from earlier ones) but writes only the listed fixtures, so a new
+ * schema can be recorded without re-recording — and churning — the others.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -682,6 +686,12 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-compliance.dataRequestResponseSchema',
+    surface: 'platform',
+    path: '/platform/compliance/data-requests/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-compliance.dataRequestPageSchema')?.id }),
+  },
+  {
     key: 'ops-logs.logsPageResponseSchema',
     surface: 'platform',
     path: '/platform/logs',
@@ -693,7 +703,73 @@ const SPEC = [
     path: '/platform/banners',
     params: LIST,
   },
+  {
+    key: 'ops-content.legalDocumentPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/legal-documents',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.faqPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/faqs',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.locationPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/locations',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.ambulancePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/ambulance-providers',
+    params: LIST,
+  },
+  {
+    key: 'ops-message-templates.messageTemplatePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/messaging/templates',
+    params: LIST,
+  },
+  {
+    key: 'ops-onboarding-documents.documentRequirementPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/onboarding/document-requirements',
+    params: LIST,
+  },
+  {
+    key: 'ops-support.ticketPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets',
+    params: LIST,
+  },
+  {
+    key: 'ops-support.ticketDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-support.ticketPageResponseSchema')?.id }),
+  },
+  {
+    key: 'ops-reviews.reviewPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/reviews',
+    params: LIST,
+  },
   { key: 'ops-reports.reportListResponseSchema', surface: 'platform', path: '/platform/reports' },
+  {
+    key: 'ops-reports.reportResultResponseSchema',
+    surface: 'platform',
+    path: '/platform/reports/bookings',
+    params: { page: 1, page_size: 5, booking_date_from: '2026-01-01' },
+  },
+  {
+    key: 'ops-reports.reportSchedulePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/report-schedules',
+    params: LIST,
+  },
   {
     key: 'ops-analytics.overviewResponseSchema',
     surface: 'platform',
@@ -854,5 +930,6 @@ process.stdout.write(
   `Recorded ${recorded} of ${SPEC.length} responses into src/test/contract/fixtures/\n`,
 );
 for (const [key, status] of report) {
-  if (status !== 'recorded') process.stdout.write(`  ${key}: ${status}\n`);
+  if (status !== 'recorded' && !status.startsWith('read,'))
+    process.stdout.write(`  ${key}: ${status}\n`);
 }

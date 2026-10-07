@@ -1,0 +1,84 @@
+{
+  "results": [
+    {
+      "id": "01a11752-e28c-7351-acb5-ac97ecaa30b4",
+      "report_code": "bookings",
+      "scope": "platform",
+      "hospital_id": null,
+      "cadence": "weekly",
+      "format": "xlsx",
+      "recipients": ["farah.khan@medibook.example.com", "kavya.iyer@medibook.example.com"],
+      "is_active": true,
+      "last_sent_at": null,
+      "report_title": "Bookings Report",
+      "created_at": "2026-10-07T17:04:30.348068Z",
+      "updated_at": "2026-10-07T17:04:30.348074Z"
+    },
+    {
+      "id": "01a11752-e283-7323-b2c2-55328e20033c",
+      "report_code": "payment",
+      "scope": "hospital",
+      "hospital_id": "01a1174e-167c-7be1-bd8b-332f4479df0b",
+      "cadence": "weekly",
+      "format": "csv",
+      "recipients": [
+        "amit.deshmukh@sahyadri.medibook.example.com",
+        "rahul.kulkarni@sahyadri.medibook.example.com"
+      ],
+      "is_active": true,
+      "last_sent_at": null,
+      "report_title": "Payment Report",
+      "created_at": "2026-10-07T17:04:30.339999Z",
+      "updated_at": "2026-10-07T17:04:30.340003Z"
+    },
+    {
+      "id": "01a11752-e277-7c91-a598-57347f81435a",
+      "report_code": "revenue",
+      "scope": "hospital",
+      "hospital_id": "01a1174e-150b-7752-939f-fa1f567cce88",
+      "cadence": "weekly",
+      "format": "csv",
+      "recipients": [
+        "anita.menon@lakeshore.medibook.example.com",
+        "joseph.kurian@lakeshore.medibook.example.com"
+      ],
+      "is_active": true,
+      "last_sent_at": null,
+      "report_title": "Revenue Report",
+      "created_at": "2026-10-07T17:04:30.327724Z",
+      "updated_at": "2026-10-07T17:04:30.327733Z"
+    },
+    {
+      "id": "01a1174e-197f-7a02-8de3-cd5c19ad64d0",
+      "report_code": "revenue",
+      "scope": "hospital",
+      "hospital_id": "01a1174e-18b6-70f2-8fb3-503a3db6c484",
+      "cadence": "daily",
+      "format": "xlsx",
+      "recipients": [],
+      "is_active": true,
+      "last_sent_at": null,
+      "report_title": "Revenue Report",
+      "created_at": "2026-08-12T05:15:00.214727Z",
+      "updated_at": "2026-08-12T05:15:00.214748Z"
+    },
+    {
+      "id": "01a1174e-197c-7f92-ad23-43405982e8a3",
+      "report_code": "payment",
+      "scope": "hospital",
+      "hospital_id": "01a1174e-18b6-70f2-8fb3-503a3db6c484",
+      "cadence": "daily",
+      "format": "xlsx",
+      "recipients": [],
+      "is_active": true,
+      "last_sent_at": null,
+      "report_title": "Payment Report",
+      "created_at": "2026-08-12T05:15:00.211967Z",
+      "updated_at": "2026-08-12T05:15:00.211984Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 11,
+  "has_next": true
+}

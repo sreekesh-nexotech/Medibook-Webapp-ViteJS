@@ -39,6 +39,14 @@ export interface PlatformSettingsValues {
   readonly sessionTimeoutMin: number;
   readonly minAppVersionAndroid: string | null;
   readonly minAppVersionIos: string | null;
+  /**
+   * Settings newer backends add (`null` when the server does not have them, and
+   * then never sent): payout runs need a second person to approve (B4,
+   * decision 3); anti-hoarding booking caps on the patient app (B5, H-08).
+   */
+  readonly payoutFourEyes: boolean | null;
+  readonly maxPendingBookingsPerUser: number | null;
+  readonly maxBookingsPerPersonDoctorDay: number | null;
 }
 
 /** The platform settings record as last read from the server. */
@@ -59,6 +67,13 @@ export interface FeatureFlag {
   readonly updatedAt: string;
 }
 
+/** What may change on a flag (`PATCH /platform/feature-flags/{key}`); the key is fixed. */
+export interface FeatureFlagChanges {
+  readonly enabled?: boolean;
+  readonly description?: string;
+  readonly isPublic?: boolean;
+}
+
 /** A page of a platform config list, as far as the screen reads it. */
 export interface ConfigList<T> {
   readonly items: readonly T[];
@@ -66,7 +81,11 @@ export interface ConfigList<T> {
   readonly total: number;
 }
 
-/** What a tax rate is charged on. */
+/**
+ * What a tax rate is charged on. `convenience_fee` only appears on rows made
+ * before the convenience-fee GST moved to the platform setting (BE-18); new
+ * rates cannot use it.
+ */
 export type TaxAppliesTo = 'consultation' | 'service' | 'convenience_fee' | 'all';
 
 /** The editable fields of a platform default tax rate. */

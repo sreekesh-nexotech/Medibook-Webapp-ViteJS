@@ -83,6 +83,20 @@ export function downloadTextFile(filename: string, text: string, mime = 'text/pl
   setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
 }
 
+/** Download a binary file the app already holds (an XLSX or PDF export body). */
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+}
+
 /**
  * Download `rows` as a real CSV file — pass the header row first:
  *

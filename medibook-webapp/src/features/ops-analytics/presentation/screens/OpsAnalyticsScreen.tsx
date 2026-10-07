@@ -47,6 +47,14 @@ import { ProviderUsageCard } from '@/features/ops-analytics/presentation/compone
 import { TopHospitalsByUsageCard } from '@/features/ops-analytics/presentation/components/TopHospitalsByUsageCard';
 
 const ALL_SCOPES = 'All scopes';
+
+/**
+ * How the booking figures are counted (UAT-71, 12·F4/F4b) — said on screen
+ * so Analytics is not read against Reports or the hospital dashboards with
+ * different definitions in mind.
+ */
+const BOOKING_DEFINITIONS =
+  'From the nightly rollup, up to yesterday (IST). A booking counts on the day it was made; an online checkout that was never paid is not a booking (as in Reports). Completed, cancelled and no-show count on the day each happened, so on short windows the rates compare different days and are a guide, not a cohort.';
 const ONE_DECIMAL = 10;
 const LOAD_FAILED = 'Analytics could not be loaded. Please try again.';
 
@@ -88,17 +96,17 @@ function bookingKpis(o: AnalyticsOverview): readonly StatCardData[] {
     },
     {
       icon: 'circle-check',
-      label: 'Booking Success Rate',
+      label: 'Completed ÷ Bookings Made',
       value: `${pct(o.completed, o.bookingsTotal)}%`,
-      sub: 'Completed vs total bookings',
+      sub: `${o.completed.toLocaleString('en-IN')} completed in the window`,
       iconClass: 'bg-g-100 text-g-600',
       valueClass: 'text-g-600',
     },
     {
       icon: 'circle-x',
-      label: 'Cancellation Rate',
+      label: 'Cancelled ÷ Bookings Made',
       value: `${pct(o.cancellations, o.bookingsTotal)}%`,
-      sub: `${pct(o.noShows, o.bookingsTotal)}% no-show`,
+      sub: `${pct(o.noShows, o.bookingsTotal)}% no-show · unpaid checkouts excluded`,
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
       subClass: 'text-text-muted',
@@ -377,6 +385,7 @@ export function OpsAnalyticsScreen() {
       {isBookings && bookings && (
         <>
           <KpiStrip items={bookingKpis(bookings.overview)} />
+          <p className="text-caption text-text-muted m-0">{BOOKING_DEFINITIONS}</p>
           <div className="grid items-stretch gap-5 lg:grid-cols-[2fr_1fr]">
             <BookingsTrendCard series={bookings.series} bucketLabel="Per month" period={period} />
             <DepartmentSplitCard depts={bookings.depts} />

@@ -15,6 +15,8 @@ import {
   dataRequestResponseSchema,
   loginEventPageSchema,
   loginEventResponseSchema,
+  phiAccessPageSchema,
+  staffDirectoryPageSchema,
   type ConfigChangeResponse,
   type DataRequestResponse,
   type LoginEventResponse,
@@ -23,6 +25,11 @@ import {
 const LOGIN_HISTORY_PATH = '/compliance/login-history';
 const CONFIG_CHANGES_PATH = '/compliance/config-changes';
 const DATA_REQUESTS_PATH = '/compliance/data-requests';
+const PHI_ACCESS_PATH = '/compliance/phi-access';
+const HOSPITAL_STAFF_PATH = '/hospital-staff';
+
+/** Staff accounts offered per lookup. */
+const STAFF_LOOKUP_LIMIT = 20;
 
 /** CSV exports stop after this many rows (50 pages) so one click cannot run unbounded. */
 export const COMPLIANCE_EXPORT_MAX_ROWS = 5000;
@@ -76,11 +83,15 @@ export function getAllConfigChanges(
   return walkPages(CONFIG_CHANGES_PATH, params, configChangeResponseSchema);
 }
 
-export async function getDataRequests(page: number, pageSize: number) {
-  const response = await platformApi.get(DATA_REQUESTS_PATH, {
-    params: { page, page_size: pageSize, sort: '-requested_at' },
-  });
+export async function getDataRequests(params: ComplianceQueryParams) {
+  const response = await platformApi.get(DATA_REQUESTS_PATH, { params });
   return dataRequestPageSchema.parse(response.data);
+}
+
+/** `GET /platform/compliance/data-requests/{id}` — one request with notes and carve-out. */
+export async function getDataRequest(id: string): Promise<DataRequestResponse> {
+  const response = await platformApi.get(`${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}`);
+  return dataRequestResponseSchema.parse(response.data);
 }
 
 /** `POST /platform/compliance/data-requests` — idempotent on the caller's key. */
@@ -94,10 +105,17 @@ export async function postDataRequest(
   return dataRequestResponseSchema.parse(response.data);
 }
 
-export async function postProcessDataRequest(id: string): Promise<DataRequestResponse> {
+/**
+ * `POST …/{id}/process {notes?}` — prepares an export, or completes a
+ * rectification with the notes saying what was corrected.
+ */
+export async function postProcessDataRequest(
+  id: string,
+  notes?: string,
+): Promise<DataRequestResponse> {
   const response = await platformApi.post(
     `${DATA_REQUESTS_PATH}/${encodeURIComponent(id)}/process`,
-    {},
+    notes ? { notes } : {},
   );
   return dataRequestResponseSchema.parse(response.data);
 }
@@ -111,4 +129,22 @@ export async function postRejectDataRequest(
     { reason },
   );
   return dataRequestResponseSchema.parse(response.data);
+}
+
+/** `GET /platform/compliance/phi-access` (B6, `compliance.view`) — the PHI read audit. */
+export async function getPhiAccess(params: ComplianceQueryParams) {
+  const response = await platformApi.get(PHI_ACCESS_PATH, { params });
+  return phiAccessPageSchema.parse(response.data);
+}
+
+/**
+ * `GET /platform/hospital-staff?q=` (B9, BE-30) — hospital staff across
+ * hospitals by name, email, phone or employee code (`q` ≥ 2 characters).
+ * `hospitals.view`; the compliance role once B2's any-of permissions land.
+ */
+export async function getHospitalStaffDirectory(q: string) {
+  const response = await platformApi.get(HOSPITAL_STAFF_PATH, {
+    params: { q, page: 1, page_size: STAFF_LOOKUP_LIMIT },
+  });
+  return staffDirectoryPageSchema.parse(response.data);
 }

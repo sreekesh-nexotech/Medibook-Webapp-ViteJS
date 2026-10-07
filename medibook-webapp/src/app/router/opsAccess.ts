@@ -27,6 +27,11 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   'platform-user-detail': 'platform_users.view',
   notifications: 'settings.view',
   settings: 'settings.view',
+  content: 'settings.view',
+  reviews: 'notifications.edit',
+  support: 'support.view',
+  'message-templates': 'settings.view',
+  'onboarding-documents': 'settings.view',
   account: null,
 };
 

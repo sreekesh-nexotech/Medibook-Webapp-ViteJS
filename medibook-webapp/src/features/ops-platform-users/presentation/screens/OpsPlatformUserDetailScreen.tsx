@@ -13,12 +13,14 @@ import {
   NO_VALUE,
   ageFrom,
   bookingStatusPill,
+  deviceLine,
   formatDate,
   formatDateTime,
   fullName,
   humanize,
   isLockedAt,
   userName,
+  verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
 import { useNow } from '@/shared/hooks/useNow';
 import { Avatar } from '@/shared/ui/Avatar';
@@ -140,16 +142,34 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   };
 
   const contact = [u.phone, u.email].filter(Boolean).join(' · ');
+  // No City: the backend holds no city for a patient account (13·Patient Account #11).
   const info: InfoGridItem[] = [
     { k: 'Name', v: name },
     { k: 'Mobile', v: u.phone ?? NO_VALUE, num: true },
     { k: 'Email', v: u.email ?? NO_VALUE },
     { k: 'Registered', v: formatDate(u.createdAt) },
     { k: 'Status', v: pill.label },
-    { k: 'City', v: NO_VALUE },
+    { k: 'Last sign-in', v: formatDateTime(u.lastLoginAt) },
+    { k: 'Mobile verification', v: verifiedLabel(u.phoneVerifiedAt) },
+    { k: 'Email verification', v: u.email ? verifiedLabel(u.emailVerifiedAt) : NO_VALUE },
+    { k: 'Password', v: u.hasPassword ? 'Set' : 'Not set — signs in with OTP' },
+    { k: 'Active sessions', v: u.activeSessions.toLocaleString('en-IN'), num: true },
+    {
+      k: 'Date of birth',
+      v: u.profile?.dateOfBirth ? formatDate(u.profile.dateOfBirth) : NO_VALUE,
+    },
+    { k: 'Gender', v: u.profile?.gender ? humanize(u.profile.gender) : NO_VALUE },
+    {
+      k: 'Marketing messages',
+      v: u.profile ? (u.profile.marketingOptIn ? 'Opted in' : 'Opted out') : NO_VALUE,
+    },
   ];
   if (blocked) info.push({ k: 'Blocked reason', v: u.blockedReason ?? NO_VALUE });
   if (locked) info.push({ k: 'Sign-in locked until', v: formatDateTime(u.lockedUntil) });
+  if (u.status === 'pending_deletion') {
+    info.push({ k: 'Deletion requested', v: formatDateTime(u.deletionRequestedAt) });
+    if (u.deletionDueAt) info.push({ k: 'Deletes on', v: formatDateTime(u.deletionDueAt) });
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -185,7 +205,46 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
           )}
         </div>
       </Card>
+      {u.status === 'pending_deletion' && (
+        <p className="text-body text-text-body bg-y-100 m-0 rounded-sm px-4 py-3">
+          The patient asked to delete this account
+          {u.deletionRequestedAt ? ` on ${formatDate(u.deletionRequestedAt)}` : ''}. It is deleted
+          automatically when the cooling-off period ends
+          {u.deletionDueAt ? ` (${formatDate(u.deletionDueAt)})` : ''}; signing in before then
+          cancels the request (D-24). Bookings, payments and receipts are kept.
+        </p>
+      )}
       <InfoGrid items={info} />
+      <Card>
+        <SectionTitle className="mb-4">Devices</SectionTitle>
+        {u.devices.length > 0 ? (
+          <TableShell
+            columns={['Device', 'Status', 'Last seen']}
+            scrollLabel="Devices this account signed in on"
+          >
+            {u.devices.map((d) => (
+              <tr key={d.id}>
+                <td className={`${tdClass} text-text-strong font-medium`}>
+                  {deviceLine(d.platform, d.appVersion, d.osVersion)}
+                </td>
+                <td className={tdClass}>
+                  <Badge status={d.isActive ? 'Active' : 'Inactive'}>
+                    {d.isActive ? 'Active' : 'Signed out'}
+                  </Badge>
+                </td>
+                <td className={tdClass}>{formatDateTime(d.lastSeenAt)}</td>
+              </tr>
+            ))}
+          </TableShell>
+        ) : (
+          <EmptyState
+            compact
+            icon="smartphone"
+            title="No devices registered."
+            message="Devices appear once the patient signs in to the app with notifications allowed."
+          />
+        )}
+      </Card>
       <Card>
         <SectionTitle className="mb-4">Family Members</SectionTitle>
         {family.length > 0 ? (

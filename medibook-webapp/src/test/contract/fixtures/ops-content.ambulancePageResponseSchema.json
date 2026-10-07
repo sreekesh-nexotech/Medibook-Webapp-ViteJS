@@ -1,0 +1,44 @@
+{
+  "results": [
+    {
+      "id": "01a1174e-1407-7103-b26e-7dd7901ce09d",
+      "location": "01a1174e-1316-7a73-a4f7-0ff838d06e86",
+      "name": "Kovai Emergency Care",
+      "phone_e164": "+910000000000",
+      "eta_minutes": 10,
+      "service_area": "RS Puram, Coimbatore",
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.563992Z",
+      "updated_at": "2026-08-08T04:00:00.564014Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-13ca-72f0-afeb-054d67a2a1ac",
+      "location": "01a1174e-12b9-73b1-ab0a-15758c23e07d",
+      "name": "Lifeline Ambulance Kochi",
+      "phone_e164": "+910000000000",
+      "eta_minutes": 12,
+      "service_area": "Kadavanthra, Kochi",
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.502589Z",
+      "updated_at": "2026-08-08T04:00:00.502610Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-13e9-7991-b868-2519c2c4c6b5",
+      "location": "01a1174e-12f0-7271-af12-667db2b8802b",
+      "name": "Pune Rapid Response",
+      "phone_e164": "+910000000000",
+      "eta_minutes": 15,
+      "service_area": "Shivajinagar, Pune",
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.533712Z",
+      "updated_at": "2026-08-08T04:00:00.533735Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 3,
+  "has_next": false
+}

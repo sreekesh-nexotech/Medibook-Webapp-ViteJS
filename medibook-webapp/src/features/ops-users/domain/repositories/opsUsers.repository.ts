@@ -3,6 +3,8 @@ import type { Result } from '@/core/error/failure';
 
 import type {
   OpsPermission,
+  OpsRoleChanges,
+  OpsRoleDraft,
   OpsStaffInvite,
   OpsStaffMember,
   OpsStaffRole,
@@ -21,6 +23,11 @@ export interface OpsUsersRepository {
   reactivateStaff(id: string): Promise<Result<OpsStaffMember>>;
   /** Clear a sign-in lockout. */
   unlockStaff(id: string): Promise<Result<OpsStaffMember>>;
+  /** Email an invited member a fresh set-password link (B2, BE-31). */
+  resendStaffInvite(id: string): Promise<Result<OpsStaffMember>>;
   listRoles(): Promise<Result<readonly OpsStaffRole[]>>;
+  createRole(draft: OpsRoleDraft): Promise<Result<OpsStaffRole>>;
+  updateRole(id: string, changes: OpsRoleChanges, version: number): Promise<Result<OpsStaffRole>>;
+  deleteRole(id: string, version: number): Promise<Result<null>>;
   listPermissions(): Promise<Result<readonly OpsPermission[]>>;
 }

@@ -21,6 +21,7 @@ import type { TaxRate } from '@/features/ops-settings/domain/entities/opsSetting
 import {
   APPLIES_TO_LABEL,
   formatRateBp,
+  taxRateInUseMessage,
 } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 import { OpsSettingsTaxRateModal } from '@/features/ops-settings/presentation/components/OpsSettingsTaxRateModal';
 
@@ -35,7 +36,8 @@ type ModalState = { kind: 'closed' } | { kind: 'add' } | { kind: 'edit'; rate: T
 
 /**
  * Platform default tax rates (`/platform/tax-rates`) — the rates hospitals
- * inherit for consultations, services and the convenience fee.
+ * inherit for consultations and services. The convenience-fee GST is the
+ * platform setting above, not a rate here (BE-18).
  */
 export function OpsSettingsTaxRatesCard() {
   const rates = useOpsTaxRatesQuery();
@@ -53,7 +55,12 @@ export function OpsSettingsTaxRatesCard() {
       {
         onSuccess: () => toast(`${target.code} deleted.`, 'success'),
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not delete that rate.', 'error'),
+          toast(
+            isFailure(failure)
+              ? (taxRateInUseMessage(failure.code, failure.meta) ?? failure.message)
+              : 'Could not delete that rate.',
+            'error',
+          ),
       },
     );
   };

@@ -1,12 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Card } from '@/shared/ui/Card';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { SkeletonCards, SkeletonKpiStrip, SkeletonTable } from '@/shared/ui/Skeleton';
 import type { StatCardData } from '@/shared/ui/StatCard';
 
+import { canOpenOpsView } from '@/app/router/opsAccess';
 import { type OpsStaticView, opsPath } from '@/app/router/paths';
 
 import { useOpsDashboardQuery } from '@/features/ops-dashboard/application/queries/useOpsDashboardQuery';
@@ -66,7 +68,7 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
       icon: 'calendar-check',
       label: 'Bookings (30 days)',
       value: k.appointmentsLast30Days.toLocaleString('en-IN'),
-      sub: 'Appointments created, all hospitals',
+      sub: 'All hospitals · unpaid online checkouts excluded',
       iconClass: 'bg-badge-noshow-bg text-orange',
       valueClass: 'text-orange',
       subClass: 'text-text-muted',
@@ -81,6 +83,7 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
  */
 export function OpsDashboardScreen() {
   const navigate = useNavigate();
+  const checks = useOpsPermission();
   const dashboardQuery = useOpsDashboardQuery();
 
   if (dashboardQuery.isPending) {
@@ -112,7 +115,13 @@ export function OpsDashboardScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiStrip items={toKpis(dashboard.kpis)} onItem={(k) => navigate(opsPath(k.go))} />
+      <KpiStrip
+        items={toKpis(dashboard.kpis)}
+        onItem={(k) => {
+          // A tile only leads to a screen the role can open (UAT-35).
+          if (canOpenOpsView(k.go, checks)) navigate(opsPath(k.go));
+        }}
+      />
       <div className="grid grid-cols-[2fr_1fr] items-stretch gap-5">
         <PlatformGlanceCard kpis={dashboard.kpis} />
         <CriticalAlertsCard alerts={dashboard.alerts} />

@@ -42,6 +42,7 @@ const roleSchema = z.object({
 
 export const staffResponseSchema = staffSchema;
 export const staffPageResponseSchema = paginatedSchema(staffSchema);
+export const roleResponseSchema = roleSchema;
 export const rolePageResponseSchema = paginatedSchema(roleSchema);
 
 export const permissionsResponseSchema = z.object({

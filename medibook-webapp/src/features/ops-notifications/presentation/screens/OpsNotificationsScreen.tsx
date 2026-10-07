@@ -27,6 +27,7 @@ import type {
   BannerDraft,
   CampaignBanner,
 } from '@/features/ops-notifications/domain/entities/notifications.entities';
+import { audienceLabel } from '@/features/ops-notifications/presentation/components/bannerRules';
 import { BannerModal } from '@/features/ops-notifications/presentation/components/BannerModal';
 import { BannerThumb } from '@/features/ops-notifications/presentation/components/BannerThumb';
 
@@ -176,8 +177,8 @@ export function OpsNotificationsScreen() {
                 {liveNow ? `“${liveNow.title}”` : 'no campaign banner'}
               </div>
               <div className="text-caption text-text-muted">
-                Live banners rotate on the patient app home screen in the order below. When none is
-                live, the app shows its built-in home screen.
+                Live banners rotate on the patient app home screen in the order below, each for the
+                audience it is set to. When none is live, the app shows its built-in home screen.
               </div>
             </div>
           </Card>
@@ -252,7 +253,8 @@ export function OpsNotificationsScreen() {
                         {b.title}
                       </div>
                       <div className="text-caption text-text-muted tabular-nums">
-                        {fmtDate(b.from)} – {fmtDate(b.to)}
+                        {fmtDate(b.from)} – {fmtDate(b.to)} · {audienceLabel(b.audience)}
+                        {b.ctaLabel ? ` · “${b.ctaLabel}” button` : ''}
                       </div>
                     </div>
                     <Badge status={st} />
@@ -318,7 +320,7 @@ export function OpsNotificationsScreen() {
         title="Delete this banner?"
         body={
           delBanner
-            ? `“${delBanner.title}” is removed from the app immediately. This cannot be undone.`
+            ? `“${delBanner.title}” leaves the app straight away. It is kept on record but cannot be restored from the console.`
             : ''
         }
         confirmLabel={deleteMutation.isPending ? 'Deleting…' : 'Delete Banner'}

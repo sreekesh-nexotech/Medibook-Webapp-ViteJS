@@ -18,20 +18,22 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
-import { useComplianceHospitalsQuery } from '@/features/ops-compliance/application/queries/useComplianceHospitalsQuery';
 import { useComplianceLoginsQuery } from '@/features/ops-compliance/application/queries/useComplianceLoginsQuery';
 import { useExportComplianceLoginsMutation } from '@/features/ops-compliance/application/queries/useExportComplianceLoginsMutation';
 import {
   LOGIN_RESULTS,
   type LoginEvent,
   type LoginHistoryFilters,
+  type LoginPrincipal,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
+import { useHospitalOptionsQuery } from '@/features/ops-hospitals/application/queries/useHospitalOptionsQuery';
 import { ComplianceDateInput } from '@/features/ops-compliance/presentation/components/ComplianceDateInput';
 import {
   LOGIN_RESULT_LOOK,
   deviceLabel,
   exportedMessage,
   fmtComplianceWhen,
+  loginInstanceLabel,
   principalLabel,
 } from '@/features/ops-compliance/presentation/components/compliance.labels';
 
@@ -42,6 +44,19 @@ const COLUMNS = ['User', 'Instance', 'When', 'IP address', 'Device', 'Result'] a
 const ALL_INSTANCES = 'Instance: All';
 const ALL_RESULTS = 'Result: All';
 const OPS_CONSOLE = 'Ops console';
+
+/** Account-type choices → the `principal` values they send (several need B6's multi-value filter). */
+const ACCOUNT_TYPES: readonly {
+  readonly label: string;
+  readonly principals: readonly LoginPrincipal[];
+}[] = [
+  { label: 'Accounts: All', principals: [] },
+  { label: 'Staff only', principals: ['hospital', 'platform'] },
+  { label: 'Hospital staff', principals: ['hospital'] },
+  { label: 'Ops staff', principals: ['platform'] },
+  { label: 'Patients', principals: ['patient'] },
+];
+const ALL_ACCOUNTS = ACCOUNT_TYPES[0]?.label ?? '';
 
 /** Only the time is sortable server-side (`sort=occurred_at`). */
 const SORT_KEYS: Readonly<Record<string, string>> = { When: 'when' };
@@ -59,23 +74,27 @@ export function LoginHistoryCard() {
   const [q, setQ] = useState('');
   const [instF, setInstF] = useState(ALL_INSTANCES);
   const [resultF, setResultF] = useState(ALL_RESULTS);
+  const [accountF, setAccountF] = useState(ALL_ACCOUNTS);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
   const { sort, onSort } = useSort<never>({ key: 'when', dir: 'desc' });
 
-  const hospitalsQuery = useComplianceHospitalsQuery();
-  const hospitals = hospitalsQuery.data?.items ?? [];
-  const hospitalName = (id: string | null): string =>
-    id == null ? OPS_CONSOLE : (hospitals.find((h) => h.id === id)?.name ?? 'Hospital instance');
+  // Compliance reads hospital names from the row (B6); the registry lookup
+  // only runs for roles with hospitals.view (12·F17).
+  const hospitalOptions = useHospitalOptionsQuery();
+  const hospitals = hospitalOptions.options;
+  const nameOf = (id: string): string | null => hospitals.find((h) => h.id === id)?.name ?? null;
+  const instanceOf = (l: LoginEvent): string => loginInstanceLabel(l, nameOf);
 
   const pickedHospital = hospitals.find((h) => h.name === instF) ?? null;
+  const accountPrincipals = ACCOUNT_TYPES.find((a) => a.label === accountF)?.principals ?? [];
   const filters: LoginHistoryFilters = {
     dateFrom: from,
     dateTo: to,
     result: LOGIN_RESULTS.find((r) => LOGIN_RESULT_LOOK[r].label === resultF) ?? null,
     hospitalId: pickedHospital?.id ?? null,
-    principal: instF === OPS_CONSOLE ? 'platform' : null,
+    principals: instF === OPS_CONSOLE ? ['platform'] : accountPrincipals,
   };
   const loginsQuery = useComplianceLoginsQuery({
     ...filters,
@@ -98,11 +117,14 @@ export function LoginHistoryCard() {
       fn(v);
       setPage(0);
     };
-  const filtersActive = Boolean(instF !== ALL_INSTANCES || resultF !== ALL_RESULTS || from || to);
+  const filtersActive = Boolean(
+    instF !== ALL_INSTANCES || resultF !== ALL_RESULTS || accountF !== ALL_ACCOUNTS || from || to,
+  );
   const clearAll = (): void => {
     setQ('');
     setInstF(ALL_INSTANCES);
     setResultF(ALL_RESULTS);
+    setAccountF(ALL_ACCOUNTS);
     setFrom('');
     setTo('');
     setPage(0);
@@ -112,13 +134,13 @@ export function LoginHistoryCard() {
   const exportCsv = (): void => {
     exportMutation.mutate(filters, {
       onSuccess: ({ rows: all, truncated }) => {
-        downloadCsv('medibook-staff-login-history.csv', [
+        downloadCsv('medibook-sign-in-history.csv', [
           ['When (UTC)', 'User', 'Account type', 'Instance', 'IP address', 'Device', 'Result'],
           ...all.map((l: LoginEvent) => [
             l.occurredAt,
             l.identifier,
             principalLabel(l.principal),
-            hospitalName(l.hospitalId),
+            instanceOf(l),
             l.ip,
             l.userAgent ?? '',
             LOGIN_RESULT_LOOK[l.result].label,
@@ -161,8 +183,8 @@ export function LoginHistoryCard() {
   return (
     <Card>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <SectionTitle>Staff Login History</SectionTitle>
-        <InfoDot text="Every sign-in attempt against the operations console and each hospital instance: which account, when, from which IP and device, and the result. Retained for 365 days." />
+        <SectionTitle>Sign-in History</SectionTitle>
+        <InfoDot text="Every sign-in attempt against the operations console, each hospital instance and the patient app: which account, when, from which IP and device, and the result. Kept 3 years, then archived — never deleted. Use Accounts › Staff only to leave out patient sign-ins." />
         <div className="flex-1"></div>
         <Button
           size="sm"
@@ -190,6 +212,12 @@ export function LoginHistoryCard() {
           onChange={reset(setInstF)}
         />
         <FilterSelect
+          value={accountF}
+          aria-label="Filter by account type"
+          options={ACCOUNT_TYPES.map((a) => a.label)}
+          onChange={reset(setAccountF)}
+        />
+        <FilterSelect
           value={resultF}
           aria-label="Filter by result"
           options={[ALL_RESULTS, ...LOGIN_RESULTS.map((r) => LOGIN_RESULT_LOOK[r].label)]}
@@ -213,7 +241,7 @@ export function LoginHistoryCard() {
       </div>
       <TableShell
         columns={COLUMNS}
-        scrollLabel="Staff sign-in attempts"
+        scrollLabel="Sign-in attempts"
         sortKeys={SORT_KEYS}
         sort={sort}
         onSort={(key) => {
@@ -235,7 +263,7 @@ export function LoginHistoryCard() {
                   sub={principalLabel(l.principal)}
                 />
               </td>
-              <td className={tdClass}>{hospitalName(l.hospitalId)}</td>
+              <td className={tdClass}>{instanceOf(l)}</td>
               <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
                 {fmtComplianceWhen(l.occurredAt)}
               </td>

@@ -4,6 +4,8 @@ import { acceptFor } from '@/core/api/files.rules';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
+import { Select } from '@/shared/ui/Select';
+import { TextArea } from '@/shared/ui/TextArea';
 import { TextInput } from '@/shared/ui/TextInput';
 
 import { useBannerImageUrlQuery } from '@/features/ops-notifications/application/queries/useBannerImageUrlQuery';
@@ -12,6 +14,15 @@ import type {
   BannerImageChange,
   CampaignBanner,
 } from '@/features/ops-notifications/domain/entities/notifications.entities';
+import {
+  APP_DEEP_LINK_PREFIX,
+  audienceLabel,
+  BANNER_AUDIENCES,
+  BODY_MAX,
+  CTA_LABEL_MAX,
+  ctaErrors,
+  DEFAULT_BANNER_AUDIENCE,
+} from '@/features/ops-notifications/presentation/components/bannerRules';
 
 interface BannerModalProps {
   open: boolean;
@@ -26,6 +37,8 @@ interface BannerModalProps {
 
 interface BannerErrors {
   title?: string | null;
+  ctaLabel?: string | null;
+  ctaTarget?: string | null;
   from?: string | null;
   to?: string | null;
 }
@@ -33,6 +46,10 @@ interface BannerErrors {
 /** The text fields of the editor; the creative is tracked separately. */
 interface BannerFieldsDraft {
   readonly title: string;
+  readonly body: string;
+  readonly ctaLabel: string;
+  readonly ctaTarget: string;
+  readonly audience: string;
   readonly from: string;
   readonly to: string;
 }
@@ -50,9 +67,30 @@ const dateInputClass =
 
 /** The fields this modal opens on — a new banner, a campaign banner, or the default. */
 function initialDraft(banner: CampaignBanner | null): BannerFieldsDraft {
-  if (!banner) return { title: '', from: '', to: '' };
-  return { title: banner.title, from: banner.from ?? '', to: banner.to ?? '' };
+  if (!banner) {
+    return {
+      title: '',
+      body: '',
+      ctaLabel: '',
+      ctaTarget: '',
+      audience: DEFAULT_BANNER_AUDIENCE,
+      from: '',
+      to: '',
+    };
+  }
+  return {
+    title: banner.title,
+    body: banner.body ?? '',
+    ctaLabel: banner.ctaLabel ?? '',
+    ctaTarget: banner.ctaTarget ?? '',
+    audience: banner.audience,
+    from: banner.from ?? '',
+    to: banner.to ?? '',
+  };
 }
+
+/** Blank text is "none" on the server. */
+const orNull = (v: string): string | null => (v.trim() === '' ? null : v.trim());
 
 /**
  * Add / edit a campaign banner, or edit the default banner (image upload +
@@ -95,27 +133,46 @@ export function BannerModal({ open, banner, busy = false, onClose, onSave }: Ban
   };
 
   const submit = () => {
+    const cta = ctaErrors(f.ctaLabel, f.ctaTarget);
     const e: BannerErrors = {
       title: f.title.trim() ? null : 'Give the banner a title.',
+      ctaLabel: cta.label,
+      ctaTarget: cta.target,
       from: f.from ? null : 'Set a start date.',
       to: f.to && f.to >= f.from ? null : 'Set an end date on or after the start.',
     };
     setErr(e);
-    if (e.title || e.from || e.to) return;
+    if (e.title || e.ctaLabel || e.ctaTarget || e.from || e.to) return;
     const image: BannerImageChange = picked
       ? { kind: 'upload', file: picked.file }
       : removed
         ? { kind: 'remove' }
         : { kind: 'keep' };
-    onSave({ ...f, image }, picked?.preview ?? null);
+    onSave(
+      {
+        title: f.title,
+        body: orNull(f.body),
+        ctaLabel: orNull(f.ctaLabel),
+        ctaTarget: orNull(f.ctaTarget),
+        audience: f.audience,
+        from: f.from,
+        to: f.to,
+        image,
+      },
+      picked?.preview ?? null,
+    );
   };
+
+  const audienceOptions = BANNER_AUDIENCES.some((a) => a.code === f.audience)
+    ? BANNER_AUDIENCES.map((a) => a.label)
+    : [audienceLabel(f.audience), ...BANNER_AUDIENCES.map((a) => a.label)];
 
   return (
     <FormModal
       open={open}
       onClose={onClose}
       title={banner ? 'Edit Banner' : 'Add Banner'}
-      width={520}
+      width={560}
       onSubmit={submit}
       submitLabel={banner ? 'Save Banner' : 'Add Banner'}
       busy={busy}
@@ -129,6 +186,61 @@ export function BannerModal({ open, banner, busy = false, onClose, onSave }: Ban
               setErr({ ...err, title: null });
             }}
             placeholder="e.g. Monsoon Health Camp — 20% off"
+            height={48}
+          />
+        </OpsField>
+        <OpsField
+          label="Supporting text"
+          hint={`Optional, one or two lines under the title (up to ${BODY_MAX} characters).`}
+        >
+          <TextArea
+            value={f.body}
+            onChange={(v) => setF({ ...f, body: v })}
+            maxLength={BODY_MAX}
+            rows={2}
+            placeholder="e.g. Free BP and sugar checks at partner hospitals this weekend"
+          />
+        </OpsField>
+        <div className="grid grid-cols-[1fr_2fr] gap-4">
+          <OpsField label="Button text" error={err.ctaLabel}>
+            <TextInput
+              value={f.ctaLabel}
+              onChange={(v) => {
+                setF({ ...f, ctaLabel: v });
+                setErr({ ...err, ctaLabel: null });
+              }}
+              maxLength={CTA_LABEL_MAX}
+              placeholder="e.g. Book now"
+              height={48}
+            />
+          </OpsField>
+          <OpsField
+            label="Button opens"
+            error={err.ctaTarget}
+            hint={`An app screen (${APP_DEEP_LINK_PREFIX}…) or an https:// page. Leave both empty for no button.`}
+          >
+            <TextInput
+              value={f.ctaTarget}
+              onChange={(v) => {
+                setF({ ...f, ctaTarget: v });
+                setErr({ ...err, ctaTarget: null });
+              }}
+              inputMode="url"
+              placeholder={`${APP_DEEP_LINK_PREFIX}hospitals`}
+              height={48}
+            />
+          </OpsField>
+        </div>
+        <OpsField label="Shown to" hint="Who sees this banner on the patient app home screen.">
+          <Select
+            value={audienceLabel(f.audience)}
+            options={audienceOptions}
+            onChange={(label) =>
+              setF({
+                ...f,
+                audience: BANNER_AUDIENCES.find((a) => a.label === label)?.code ?? f.audience,
+              })
+            }
             height={48}
           />
         </OpsField>

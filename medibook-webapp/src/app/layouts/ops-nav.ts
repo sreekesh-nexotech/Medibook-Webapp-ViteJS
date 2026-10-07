@@ -49,11 +49,18 @@ export const OPS_NAV: readonly OpsNavSection[] = [
       { id: 'users', label: 'Users & Roles', icon: 'shield-check' },
       { id: 'platform-users', label: 'Platform Users', icon: 'users' },
       { id: 'notifications', label: 'Notifications', icon: 'megaphone' },
+      { id: 'reviews', label: 'Review Moderation', icon: 'star' },
+      { id: 'support', label: 'Support Desk', icon: 'headset' },
     ],
   },
   {
     section: 'System',
-    items: [{ id: 'settings', label: 'Platform Settings', icon: 'settings' }],
+    items: [
+      { id: 'settings', label: 'Platform Settings', icon: 'settings' },
+      { id: 'content', label: 'Patient App Content', icon: 'book-open' },
+      { id: 'message-templates', label: 'Message Templates', icon: 'message-circle' },
+      { id: 'onboarding-documents', label: 'Onboarding Documents', icon: 'file-text' },
+    ],
   },
 ];
 
@@ -96,7 +103,21 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
     'Hospital Onboarding',
     'Applications, KYC verification and go-live across the onboarding pipeline',
   ],
-  compliance: ['Compliance', 'Registration, licence and document compliance per hospital instance'],
+  compliance: ['Compliance', 'Sign-in history, configuration changes and data-subject requests'],
+  content: [
+    'Patient App Content',
+    'Legal documents, FAQs, locations and ambulance providers in the patient app',
+  ],
+  reviews: ['Review Moderation', 'Patient reviews of doctors, approved before they are published'],
+  support: ['Support Desk', 'Tickets from hospitals and patients: reply, assign and resolve'],
+  'message-templates': [
+    'Message Templates',
+    'The wording of every SMS, WhatsApp, push and staff email Medibook sends',
+  ],
+  'onboarding-documents': [
+    'Onboarding Documents',
+    'The documents collected from every new hospital during onboarding',
+  ],
   account: ['My Account', 'Your name, password and signed-in devices'],
 };
 

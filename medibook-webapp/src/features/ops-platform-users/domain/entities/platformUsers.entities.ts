@@ -9,8 +9,17 @@
 export const PLATFORM_USER_STATUSES = ['active', 'blocked', 'pending_deletion', 'deleted'] as const;
 export type PlatformUserStatus = (typeof PLATFORM_USER_STATUSES)[number];
 
-/** Server-side sort for the accounts list — the only sortable column is registration. */
-export type PlatformUserSort = 'created_at' | '-created_at';
+/** Server-side sorts: registration, and booking count once B2 adds it (BE-31). */
+export type PlatformUserSort = 'created_at' | '-created_at' | 'booking_count' | '-booking_count';
+
+/** What a KPI tile counts: accounts in one status, and/or registered since a day. */
+export interface PlatformUserCountFilter {
+  readonly status: PlatformUserStatus | null;
+  /** Inclusive `yyyy-mm-dd` (IST) — B2's `created_from` (BE-31). */
+  readonly createdFrom: string | null;
+  /** Signed in on or after this inclusive `yyyy-mm-dd` (IST) — B2's `last_login_from` (BE-31). */
+  readonly lastLoginFrom?: string | null;
+}
 
 /** Filters, sort and page for `GET /platform/users`. */
 export interface PlatformUserListParams {
@@ -36,6 +45,15 @@ export interface PlatformUserSummary {
   readonly deletionRequestedAt: string | null;
   readonly lastLoginAt: string | null;
   readonly createdAt: string;
+  /** Bookings the account has made (B2, BE-31); `null` until the backend sends it. */
+  readonly bookingCount: number | null;
+}
+
+/** Demographics from the patient profile — never medical data (D-04). */
+export interface PlatformUserProfile {
+  readonly dateOfBirth: string | null;
+  readonly gender: string | null;
+  readonly marketingOptIn: boolean;
 }
 
 /** A person the account books for (the account holder is `isSelf`). */
@@ -81,4 +99,8 @@ export interface PlatformUserDetail extends PlatformUserSummary {
   readonly bookings: readonly PlatformUserBooking[];
   readonly devices: readonly PlatformUserDevice[];
   readonly activeSessions: number;
+  /** `null` when the account has no patient profile yet. */
+  readonly profile: PlatformUserProfile | null;
+  /** When a pending deletion completes (B2), if the backend sends it. */
+  readonly deletionDueAt: string | null;
 }

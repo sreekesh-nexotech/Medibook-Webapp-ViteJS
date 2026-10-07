@@ -195,3 +195,32 @@ export const UsersRolesScreen = lazy(() =>
     default: m.UsersRolesScreen,
   })),
 );
+export const OpsContentScreen = lazy(() =>
+  import('@/features/ops-content/presentation/screens/OpsContentScreen').then((m) => ({
+    default: m.OpsContentScreen,
+  })),
+);
+export const OpsReviewsScreen = lazy(() =>
+  import('@/features/ops-reviews/presentation/screens/OpsReviewsScreen').then((m) => ({
+    default: m.OpsReviewsScreen,
+  })),
+);
+export const OpsSupportScreen = lazy(() =>
+  import('@/features/ops-support/presentation/screens/OpsSupportScreen').then((m) => ({
+    default: m.OpsSupportScreen,
+  })),
+);
+export const OpsMessageTemplatesScreen = lazy(() =>
+  import('@/features/ops-message-templates/presentation/screens/OpsMessageTemplatesScreen').then(
+    (m) => ({
+      default: m.OpsMessageTemplatesScreen,
+    }),
+  ),
+);
+export const OpsOnboardingDocumentsScreen = lazy(() =>
+  import('@/features/ops-onboarding-documents/presentation/screens/OpsOnboardingDocumentsScreen').then(
+    (m) => ({
+      default: m.OpsOnboardingDocumentsScreen,
+    }),
+  ),
+);

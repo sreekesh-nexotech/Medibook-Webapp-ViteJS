@@ -366,6 +366,16 @@ export type OpsView =
   | 'onboarding'
   /** Document/regulatory compliance per hospital. */
   | 'compliance'
+  /** Patient App Content (UAT report §8). */
+  | 'content'
+  /** Review Moderation (UAT report §8). */
+  | 'reviews'
+  /** Support Desk (UAT report §8). */
+  | 'support'
+  /** Message Templates (UAT report §8). */
+  | 'message-templates'
+  /** Onboarding Documents (UAT report §8). */
+  | 'onboarding-documents'
   /** The signed-in user's own account: name, password, sessions. */
   | 'account';
 
@@ -396,6 +406,11 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   settings: 'settings',
   onboarding: 'onboarding',
   compliance: 'compliance',
+  content: 'content',
+  reviews: 'reviews',
+  support: 'support',
+  'message-templates': 'message-templates',
+  'onboarding-documents': 'onboarding-documents',
   account: 'account',
 };
 
@@ -457,6 +472,17 @@ export function opsAccountPath(): string {
   return opsPath('account');
 }
 
+/** Query param carrying a hospital filter into Compliance Logs (hospital profile → logs). */
+export const OPS_LOGS_HOSPITAL_PARAM = 'hospital_id';
+
+/** Compliance Logs, optionally narrowed to one hospital's entries. */
+export function opsLogsPath(hospitalId?: string): string {
+  const base = opsPath('logs');
+  return hospitalId
+    ? `${base}?${new URLSearchParams({ [OPS_LOGS_HOSPITAL_PARAM]: hospitalId }).toString()}`
+    : base;
+}
+
 /** Ops list views resolvable 1:1 from their first URL segment. */
 const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'dashboard',
@@ -473,6 +499,11 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'settings',
   'onboarding',
   'compliance',
+  'content',
+  'reviews',
+  'support',
+  'message-templates',
+  'onboarding-documents',
   'account',
 ];
 

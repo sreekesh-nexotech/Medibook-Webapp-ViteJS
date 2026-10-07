@@ -56,8 +56,15 @@ import {
   subscriptionSchema,
 } from '@/features/ops-billing/infrastructure/data-sources/remote/billing.response';
 import {
+  ambulancePageResponseSchema,
+  faqPageResponseSchema,
+  legalDocumentPageResponseSchema,
+  locationPageResponseSchema,
+} from '@/features/ops-content/infrastructure/data-sources/remote/content.response';
+import {
   configChangePageSchema,
   dataRequestPageSchema,
+  dataRequestResponseSchema,
   loginEventPageSchema,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 import { opsDashboardResponseSchema } from '@/features/ops-dashboard/infrastructure/data-sources/remote/opsDashboard.response';
@@ -80,7 +87,18 @@ import {
   platformUserDetailResponseSchema,
   platformUsersPageResponseSchema,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.response';
-import { reportListResponseSchema } from '@/features/ops-reports/infrastructure/data-sources/remote/opsReports.response';
+import { reviewPageResponseSchema } from '@/features/ops-reviews/infrastructure/data-sources/remote/reviews.response';
+import { messageTemplatePageResponseSchema } from '@/features/ops-message-templates/infrastructure/data-sources/remote/messageTemplates.response';
+import { documentRequirementPageResponseSchema } from '@/features/ops-onboarding-documents/infrastructure/data-sources/remote/onboardingDocuments.response';
+import {
+  ticketDetailResponseSchema,
+  ticketPageResponseSchema,
+} from '@/features/ops-support/infrastructure/data-sources/remote/support.response';
+import {
+  reportListResponseSchema,
+  reportResultResponseSchema as opsReportResultResponseSchema,
+  reportSchedulePageResponseSchema,
+} from '@/features/ops-reports/infrastructure/data-sources/remote/opsReports.response';
 import {
   featureFlagPageResponseSchema,
   platformSettingsResponseSchema,
@@ -205,7 +223,12 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-billing.planChangePageSchema': planChangePageSchema,
   'ops-billing.subscriptionSchema': subscriptionSchema,
   'ops-compliance.configChangePageSchema': configChangePageSchema,
+  'ops-content.ambulancePageResponseSchema': ambulancePageResponseSchema,
+  'ops-content.faqPageResponseSchema': faqPageResponseSchema,
+  'ops-content.legalDocumentPageResponseSchema': legalDocumentPageResponseSchema,
+  'ops-content.locationPageResponseSchema': locationPageResponseSchema,
   'ops-compliance.dataRequestPageSchema': dataRequestPageSchema,
+  'ops-compliance.dataRequestResponseSchema': dataRequestResponseSchema,
   'ops-compliance.loginEventPageSchema': loginEventPageSchema,
   'ops-dashboard.opsDashboardResponseSchema': opsDashboardResponseSchema,
   'ops-hospitals.caseDetailResponseSchema': caseDetailResponseSchema,
@@ -220,6 +243,14 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-platform-users.platformUserDetailResponseSchema': platformUserDetailResponseSchema,
   'ops-platform-users.platformUsersPageResponseSchema': platformUsersPageResponseSchema,
   'ops-reports.reportListResponseSchema': reportListResponseSchema,
+  'ops-reviews.reviewPageResponseSchema': reviewPageResponseSchema,
+  'ops-support.ticketPageResponseSchema': ticketPageResponseSchema,
+  'ops-message-templates.messageTemplatePageResponseSchema': messageTemplatePageResponseSchema,
+  'ops-onboarding-documents.documentRequirementPageResponseSchema':
+    documentRequirementPageResponseSchema,
+  'ops-support.ticketDetailResponseSchema': ticketDetailResponseSchema,
+  'ops-reports.reportResultResponseSchema': opsReportResultResponseSchema,
+  'ops-reports.reportSchedulePageResponseSchema': reportSchedulePageResponseSchema,
   'ops-settings.featureFlagPageResponseSchema': featureFlagPageResponseSchema,
   'ops-settings.platformSettingsResponseSchema': platformSettingsResponseSchema,
   'ops-settings.taxRatePageResponseSchema': taxRatePageResponseSchema,
@@ -323,6 +354,13 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
   periodDetailResponseSchema:
     'Not yet recorded: GET /platform/settlements/periods/{id} (B4 BE-27 breakdown).',
   payoutPageResponseSchema: 'Not yet recorded: GET /platform/settlements/payouts (B4 BE-27).',
+  logsExportResponseSchema: 'Reading it renders the whole filtered audit trail as a CSV file.',
+  phiAccessPageSchema:
+    'B6 endpoint (GET /platform/compliance/phi-access), not on the recording backend yet.',
+  staffDirectoryPageSchema:
+    'B9 endpoint (GET /platform/hospital-staff), not on the recording backend yet.',
+  retentionResponseSchema:
+    'B6 endpoint (GET /platform/compliance/retention), not on the recording backend yet.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

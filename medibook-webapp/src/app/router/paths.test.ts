@@ -8,6 +8,8 @@ import {
   loginReturningTo,
   opsBillingForHospitalPath,
   opsSettlementsForHospitalPath,
+  opsLogsPath,
+  opsPath,
   opsViewFromPath,
   returnPathAfterLogin,
   surfaceFromParam,
@@ -96,5 +98,24 @@ describe('hospital-scoped ops links (11·R8, 09·R7)', () => {
   it('opens Billing and Settlements filtered to one hospital', () => {
     expect(opsBillingForHospitalPath(FILE_ID)).toBe(`/ops/billing?hospital=${FILE_ID}`);
     expect(opsSettlementsForHospitalPath(FILE_ID)).toBe(`/ops/settlements?hospital=${FILE_ID}`);
+  });
+});
+
+describe('ops screens added for UAT report §8', () => {
+  it('maps each new view to its own URL and back', () => {
+    for (const view of [
+      'content',
+      'reviews',
+      'support',
+      'message-templates',
+      'onboarding-documents',
+    ] as const) {
+      expect(opsViewFromPath(opsPath(view))).toBe(view);
+    }
+  });
+
+  it('opens Compliance Logs filtered to one hospital', () => {
+    expect(opsLogsPath()).toBe('/ops/logs');
+    expect(opsLogsPath(FILE_ID)).toBe(`/ops/logs?hospital_id=${FILE_ID}`);
   });
 });

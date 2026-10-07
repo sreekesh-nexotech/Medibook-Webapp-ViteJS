@@ -1,0 +1,29 @@
+{
+  "id": "01a11752-9e4a-7570-a1bc-d1e8171fed87",
+  "ticket_no": "TKT-2026-0018",
+  "raised_by_kind": "hospital_staff",
+  "hospital_id": "01a1174e-150b-7752-939f-fa1f567cce88",
+  "category": "billing",
+  "subject": "Settlement amount differs from our register",
+  "description": "Please check — details attached.",
+  "priority": "high",
+  "status": "open",
+  "resolved_at": null,
+  "closed_at": null,
+  "created_at": "2026-10-05T16:30:01.875151Z",
+  "updated_at": "2026-10-05T16:30:01.875250Z",
+  "version": 1,
+  "raised_by_id": "01a1174e-19d9-7bc0-9e92-4c4a414bb051",
+  "assigned_to_id": null,
+  "messages": [
+    {
+      "id": "01a11752-9e4e-74f3-8a3a-75f66db30fe8",
+      "author_kind": "requester",
+      "author_name": "Anita Menon",
+      "body": "Please check — details attached.",
+      "attachment_file_ids": ["01a11752-9e33-7ca3-942f-f6925ea3f620"],
+      "occurred_at": "2026-10-05T16:30:01.878535Z",
+      "is_internal": false
+    }
+  ]
+}

@@ -18,9 +18,10 @@ import type {
 } from '@/features/ops-settings/domain/entities/opsSettings.entity';
 import {
   APPLIES_TO_LABEL,
-  APPLIES_TO_OPTIONS,
+  appliesToOptionsFor,
   bpToPercentInput,
   percentInputToBp,
+  taxRateInUseMessage,
 } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 
 /** The modal's text-and-toggle form. */
@@ -55,10 +56,8 @@ const EMPTY_FORM: TaxRateForm = {
   isActive: true,
 };
 
-const LABEL_OPTIONS = APPLIES_TO_OPTIONS.map((v) => APPLIES_TO_LABEL[v]);
-
-function appliesToFromLabel(label: string): TaxAppliesTo {
-  return APPLIES_TO_OPTIONS.find((v) => APPLIES_TO_LABEL[v] === label) ?? EMPTY_FORM.appliesTo;
+function appliesToFromLabel(label: string, current: TaxAppliesTo): TaxAppliesTo {
+  return appliesToOptionsFor(current).find((v) => APPLIES_TO_LABEL[v] === label) ?? current;
 }
 
 function toForm(rate: TaxRate | null): TaxRateForm {
@@ -103,7 +102,7 @@ export function OpsSettingsTaxRateModal({ rate, onClose }: OpsSettingsTaxRateMod
       if (formKey) fromServer[formKey] = messages[0] ?? null;
     }
     setErr((p) => ({ ...p, ...fromServer }));
-    toast(failure.message, 'error');
+    toast(taxRateInUseMessage(failure.code, failure.meta) ?? failure.message, 'error');
   };
 
   const handleSubmit = () => {
@@ -160,8 +159,20 @@ export function OpsSettingsTaxRateModal({ rate, onClose }: OpsSettingsTaxRateMod
       busy={busy}
     >
       <div className="grid grid-cols-2 gap-4">
-        <OpsField label="Code" required error={err.code}>
-          <TextInput value={f.code} name="code" onChange={(v) => upd('code', v)} height={48} />
+        <OpsField
+          label="Code"
+          required
+          error={err.code}
+          hint={rate ? 'Fixed once the rate exists — services refer to it.' : undefined}
+        >
+          <TextInput
+            value={f.code}
+            name="code"
+            onChange={(v) => upd('code', v)}
+            readOnly={rate !== null}
+            disabled={rate !== null}
+            height={48}
+          />
         </OpsField>
         <OpsField label="Name" required error={err.name}>
           <TextInput value={f.name} name="name" onChange={(v) => upd('name', v)} height={48} />
@@ -175,11 +186,19 @@ export function OpsSettingsTaxRateModal({ rate, onClose }: OpsSettingsTaxRateMod
             height={48}
           />
         </OpsField>
-        <OpsField label="Applies To" error={err.appliesTo}>
+        <OpsField
+          label="Applies To"
+          error={err.appliesTo}
+          hint={
+            f.appliesTo === 'convenience_fee'
+              ? 'Pricing no longer reads this: the convenience-fee GST is set in Platform Settings. Pick what this rate should apply to.'
+              : 'The convenience-fee GST is set in Platform Settings, not here.'
+          }
+        >
           <Select
             value={APPLIES_TO_LABEL[f.appliesTo]}
-            options={LABEL_OPTIONS}
-            onChange={(v) => upd('appliesTo', appliesToFromLabel(v))}
+            options={appliesToOptionsFor(f.appliesTo).map((v) => APPLIES_TO_LABEL[v])}
+            onChange={(v) => upd('appliesTo', appliesToFromLabel(v, f.appliesTo))}
             height={48}
           />
         </OpsField>

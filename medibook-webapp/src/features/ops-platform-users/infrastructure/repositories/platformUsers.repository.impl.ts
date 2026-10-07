@@ -7,14 +7,14 @@ import {
   getPlatformUsers,
   postPlatformUserAction,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.api';
-import { toListQuery } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.request';
+import {
+  toCountQuery,
+  toListQuery,
+} from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.request';
 import {
   toPlatformUserDetail,
   toPlatformUserSummary,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.response';
-
-/** A count needs only the page's `total`, so ask for the smallest page. */
-const COUNT_PAGE_SIZE = 1;
 
 /**
  * `UserBlockRequest.reason` is required by the schema on unblock and unlock
@@ -26,15 +26,7 @@ export const platformUsersRepository: PlatformUsersRepository = {
   listUsers: (params) =>
     attempt(async () => toPage(await getPlatformUsers(toListQuery(params)), toPlatformUserSummary)),
 
-  countUsers: (status) =>
-    attempt(async () => {
-      const page = await getPlatformUsers({
-        page: 1,
-        page_size: COUNT_PAGE_SIZE,
-        ...(status ? { status } : {}),
-      });
-      return page.total;
-    }),
+  countUsers: (filter) => attempt(async () => (await getPlatformUsers(toCountQuery(filter))).total),
 
   getUser: (id) => attempt(async () => toPlatformUserDetail(await getPlatformUser(id))),
 
