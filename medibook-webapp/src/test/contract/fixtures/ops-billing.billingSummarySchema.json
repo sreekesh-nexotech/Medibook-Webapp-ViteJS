@@ -1,0 +1,19 @@
+{
+  "mrr_paise": 3632966,
+  "outstanding_paise": 17681994,
+  "overdue_paise": 0,
+  "unpaid_invoices": 2,
+  "collected_paise": 353900,
+  "credit_applied_paise": 1494603,
+  "credit_balance_paise": 0,
+  "collected_from": "2026-10-01",
+  "collected_to": "2026-10-08",
+  "subscriptions_by_status": {
+    "trialing": 2,
+    "active": 4,
+    "past_due": 0,
+    "grace": 0,
+    "read_only": 0,
+    "cancelled": 0
+  }
+}

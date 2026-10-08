@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "kind": "booking",
+      "format": "{PREFIX}-{YY}{MM}-{SEQ:5}",
+      "prefix": "LKSB",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "calendar_year",
+      "fy_start_month": 4,
+      "gapless": false,
+      "editable_by": "hospital_admin",
+      "locked": false,
+      "has_allocated": true,
+      "next_preview": "LKSB-2610-00196",
+      "version": 1,
+      "updated_at": "2026-10-08T00:03:10.027333Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    },
+    {
+      "kind": "mrn",
+      "format": "{PREFIX}{SEQ:6}",
+      "prefix": "LKSM",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "never",
+      "fy_start_month": 4,
+      "gapless": false,
+      "editable_by": "hospital_admin",
+      "locked": true,
+      "has_allocated": true,
+      "next_preview": "LKSM000060",
+      "version": 1,
+      "updated_at": "2026-10-08T00:03:10.018598Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    },
+    {
+      "kind": "receipt",
+      "format": "{PREFIX}/{FY}/{SEQ:5}",
+      "prefix": "LKSR",
+      "separator": null,
+      "pad_width": 4,
+      "reset": "fiscal_year",
+      "fy_start_month": 4,
+      "gapless": true,
+      "editable_by": "hospital_admin",
+      "locked": false,
+      "has_allocated": true,
+      "next_preview": "LKSR/26-27/00179",
+      "version": 1,
+      "updated_at": "2026-10-08T00:00:41.692231Z",
+      "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+    }
+  ]
+}

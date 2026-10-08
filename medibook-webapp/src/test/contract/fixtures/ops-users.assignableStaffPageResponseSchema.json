@@ -1,0 +1,58 @@
+{
+  "results": [
+    {
+      "id": "01a118b6-8e2c-7380-b63a-d1e4784697fc",
+      "name": "Arjun Bhat",
+      "role": {
+        "id": "01a118b5-e3a2-7c60-b901-df5ca807b517",
+        "code": "read_only",
+        "name": "Read only"
+      },
+      "status": "active"
+    },
+    {
+      "id": "01a118b6-8dfd-7301-9638-da9433340527",
+      "name": "Deepak Nair",
+      "role": {
+        "id": "01a118b5-e37d-7b52-b143-22473981af90",
+        "code": "support",
+        "name": "Support"
+      },
+      "status": "active"
+    },
+    {
+      "id": "01a118b6-8de3-7073-a437-63d7bdef0f31",
+      "name": "Farah Khan",
+      "role": {
+        "id": "01a118b5-e367-7732-aea2-e337fa7ca453",
+        "code": "finance",
+        "name": "Finance"
+      },
+      "status": "active"
+    },
+    {
+      "id": "01a118b6-8dac-7643-87ab-6d78021ba516",
+      "name": "Kavya Iyer",
+      "role": {
+        "id": "01a118b5-e2af-72e3-aa5d-dd46b28cb557",
+        "code": "owner",
+        "name": "Owner"
+      },
+      "status": "active"
+    },
+    {
+      "id": "01a118b6-8e16-7ff2-bb3b-53abf7d2b5ff",
+      "name": "Lakshmi Venkat",
+      "role": {
+        "id": "01a118b5-e394-7c20-933f-535be8447ae6",
+        "code": "compliance",
+        "name": "Compliance"
+      },
+      "status": "active"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 7,
+  "has_next": true
+}

@@ -18,6 +18,7 @@ import {
   platformMeResponseSchema,
 } from '@/features/auth/infrastructure/data-sources/remote/auth.response';
 import {
+  faqFeedSchema,
   supportTicketDetailSchema,
   supportTicketPageSchema,
 } from '@/features/help/infrastructure/data-sources/remote/help.response';
@@ -29,6 +30,7 @@ import {
   dateExceptionPageSchema,
   departmentPageSchema,
   doctorPageSchema,
+  doctorReviewPageSchema,
   leavePageSchema,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.api';
 import {
@@ -39,6 +41,7 @@ import {
   deliveryPageResponseSchema,
   templatePageResponseSchema,
 } from '@/features/messaging/infrastructure/data-sources/remote/messaging.response';
+import { hospitalAlertFeedResponseSchema } from '@/features/notifications/infrastructure/data-sources/remote/notifications.response';
 import {
   apiErrorsResponseSchema,
   bookingsByMonthResponseSchema,
@@ -48,11 +51,15 @@ import {
   topHospitalsResponseSchema,
 } from '@/features/ops-analytics/infrastructure/data-sources/remote/analytics.response';
 import {
+  billingSummarySchema,
   dunningPageSchema,
   invoiceDetailSchema,
   invoicePageSchema,
   paymentPageSchema,
+  paymentSchema,
   planChangePageSchema,
+  prorationPreviewSchema,
+  subscriptionPageSchema,
   subscriptionSchema,
 } from '@/features/ops-billing/infrastructure/data-sources/remote/billing.response';
 import {
@@ -66,22 +73,31 @@ import {
   dataRequestPageSchema,
   dataRequestResponseSchema,
   loginEventPageSchema,
+  phiAccessPageSchema,
+  staffDirectoryPageSchema,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 import { opsDashboardResponseSchema } from '@/features/ops-dashboard/infrastructure/data-sources/remote/opsDashboard.response';
+import { numberingSeriesResponseSchema as opsHospitalsNumberingSeriesResponseSchema } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitalSettings.response';
 import {
+  commissionHistoryResponseSchema,
   hospitalDetailResponseSchema,
   hospitalPageResponseSchema,
+  payoutBankAccountPageResponseSchema,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.response';
 import {
   caseDetailResponseSchema,
   caseListResponseSchema,
   requirementPageResponseSchema,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/onboarding.response';
-import { logsPageResponseSchema } from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
+import {
+  logsPageResponseSchema,
+  retentionResponseSchema,
+} from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
 import { bannersPageResponseSchema } from '@/features/ops-notifications/infrastructure/data-sources/remote/notifications.response';
 import {
   planPageResponseSchema,
   subscriberPageResponseSchema,
+  subscriberRowsPageSchema,
 } from '@/features/ops-plans/infrastructure/data-sources/remote/plans.response';
 import {
   platformUserDetailResponseSchema,
@@ -105,16 +121,20 @@ import {
   taxRatePageResponseSchema,
 } from '@/features/ops-settings/infrastructure/data-sources/remote/opsSettings.response';
 import {
+  payoutPageResponseSchema as opsSettlementsPayoutPageResponseSchema,
   payoutRunDetailResponseSchema,
   payoutRunPageResponseSchema,
+  periodDetailResponseSchema,
   periodPageResponseSchema,
 } from '@/features/ops-settlements/infrastructure/data-sources/remote/opsSettlements.response';
 import {
+  assignableStaffPageResponseSchema,
   rolePageResponseSchema as opsUsersRolePageResponseSchema,
   staffPageResponseSchema as opsUsersStaffPageResponseSchema,
   permissionsResponseSchema,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.response';
 import {
+  approvalRequestPageResponseSchema,
   hospitalPatientPageResponseSchema,
   hospitalPatientResponseSchema,
   patientAppointmentPageResponseSchema,
@@ -144,6 +164,12 @@ import {
   taxRatePageSchema,
 } from '@/features/settings/infrastructure/data-sources/remote/services.api';
 import { settingsCounterPageSchema } from '@/features/settings/infrastructure/data-sources/remote/counters.response';
+import { displayDevicePageSchema } from '@/features/settings/infrastructure/data-sources/remote/displayDevices.response';
+import {
+  numberingListResponseSchema,
+  numberingPreviewResponseSchema,
+} from '@/features/settings/infrastructure/data-sources/remote/numbering.response';
+import { printTemplatePageSchema } from '@/features/settings/infrastructure/data-sources/remote/printTemplates.response';
 import {
   bankAccountPageResponseSchema,
   hospitalProfileResponseSchema,
@@ -153,6 +179,7 @@ import {
 } from '@/features/settings/infrastructure/data-sources/remote/settings.response';
 import {
   billingPlanPageResponseSchema,
+  creditNotePageResponseSchema,
   invoiceDetailResponseSchema,
   invoicePageResponseSchema,
   planChangeRequestPageResponseSchema,
@@ -160,6 +187,7 @@ import {
   usageResponseSchema,
 } from '@/features/settlements/infrastructure/data-sources/remote/billing.response';
 import {
+  payoutPageResponseSchema as settlementsPayoutPageResponseSchema,
   settlementPeriodDetailResponseSchema,
   settlementPeriodPageResponseSchema,
   statementPageResponseSchema,
@@ -203,13 +231,16 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'doctors.dateExceptionPageSchema': dateExceptionPageSchema,
   'help.supportTicketDetailSchema': supportTicketDetailSchema,
   'help.supportTicketPageSchema': supportTicketPageSchema,
+  'help.faqFeedSchema': faqFeedSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,
+  'doctors.doctorReviewPageSchema': doctorReviewPageSchema,
   'doctors.leavePageSchema': leavePageSchema,
   'doctors.scheduleResponseSchema': scheduleResponseSchema,
   'messaging.deliveryPageResponseSchema': deliveryPageResponseSchema,
   'messaging.templatePageResponseSchema': templatePageResponseSchema,
+  'notifications.hospitalAlertFeedResponseSchema': hospitalAlertFeedResponseSchema,
   'ops-analytics.apiErrorsResponseSchema': apiErrorsResponseSchema,
   'ops-analytics.bookingsByMonthResponseSchema': bookingsByMonthResponseSchema,
   'ops-analytics.departmentsSplitResponseSchema': departmentsSplitResponseSchema,
@@ -217,10 +248,14 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-analytics.providersResponseSchema': providersResponseSchema,
   'ops-analytics.topHospitalsResponseSchema': topHospitalsResponseSchema,
   'ops-billing.dunningPageSchema': dunningPageSchema,
+  'ops-billing.billingSummarySchema': billingSummarySchema,
   'ops-billing.invoiceDetailSchema': invoiceDetailSchema,
   'ops-billing.invoicePageSchema': invoicePageSchema,
   'ops-billing.paymentPageSchema': paymentPageSchema,
+  'ops-billing.paymentSchema': paymentSchema,
   'ops-billing.planChangePageSchema': planChangePageSchema,
+  'ops-billing.prorationPreviewSchema': prorationPreviewSchema,
+  'ops-billing.subscriptionPageSchema': subscriptionPageSchema,
   'ops-billing.subscriptionSchema': subscriptionSchema,
   'ops-compliance.configChangePageSchema': configChangePageSchema,
   'ops-content.ambulancePageResponseSchema': ambulancePageResponseSchema,
@@ -230,16 +265,23 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-compliance.dataRequestPageSchema': dataRequestPageSchema,
   'ops-compliance.dataRequestResponseSchema': dataRequestResponseSchema,
   'ops-compliance.loginEventPageSchema': loginEventPageSchema,
+  'ops-compliance.phiAccessPageSchema': phiAccessPageSchema,
+  'ops-compliance.staffDirectoryPageSchema': staffDirectoryPageSchema,
   'ops-dashboard.opsDashboardResponseSchema': opsDashboardResponseSchema,
   'ops-hospitals.caseDetailResponseSchema': caseDetailResponseSchema,
   'ops-hospitals.caseListResponseSchema': caseListResponseSchema,
+  'ops-hospitals.commissionHistoryResponseSchema': commissionHistoryResponseSchema,
   'ops-hospitals.hospitalDetailResponseSchema': hospitalDetailResponseSchema,
   'ops-hospitals.hospitalPageResponseSchema': hospitalPageResponseSchema,
+  'ops-hospitals.numberingSeriesResponseSchema': opsHospitalsNumberingSeriesResponseSchema,
+  'ops-hospitals.payoutBankAccountPageResponseSchema': payoutBankAccountPageResponseSchema,
   'ops-hospitals.requirementPageResponseSchema': requirementPageResponseSchema,
   'ops-logs.logsPageResponseSchema': logsPageResponseSchema,
+  'ops-logs.retentionResponseSchema': retentionResponseSchema,
   'ops-notifications.bannersPageResponseSchema': bannersPageResponseSchema,
   'ops-plans.planPageResponseSchema': planPageResponseSchema,
   'ops-plans.subscriberPageResponseSchema': subscriberPageResponseSchema,
+  'ops-plans.subscriberRowsPageSchema': subscriberRowsPageSchema,
   'ops-platform-users.platformUserDetailResponseSchema': platformUserDetailResponseSchema,
   'ops-platform-users.platformUsersPageResponseSchema': platformUsersPageResponseSchema,
   'ops-reports.reportListResponseSchema': reportListResponseSchema,
@@ -254,12 +296,16 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-settings.featureFlagPageResponseSchema': featureFlagPageResponseSchema,
   'ops-settings.platformSettingsResponseSchema': platformSettingsResponseSchema,
   'ops-settings.taxRatePageResponseSchema': taxRatePageResponseSchema,
+  'ops-settlements.payoutPageResponseSchema': opsSettlementsPayoutPageResponseSchema,
   'ops-settlements.payoutRunDetailResponseSchema': payoutRunDetailResponseSchema,
   'ops-settlements.payoutRunPageResponseSchema': payoutRunPageResponseSchema,
+  'ops-settlements.periodDetailResponseSchema': periodDetailResponseSchema,
   'ops-settlements.periodPageResponseSchema': periodPageResponseSchema,
+  'ops-users.assignableStaffPageResponseSchema': assignableStaffPageResponseSchema,
   'ops-users.permissionsResponseSchema': permissionsResponseSchema,
   'ops-users.rolePageResponseSchema': opsUsersRolePageResponseSchema,
   'ops-users.staffPageResponseSchema': opsUsersStaffPageResponseSchema,
+  'patients.approvalRequestPageResponseSchema': approvalRequestPageResponseSchema,
   'patients.hospitalPatientPageResponseSchema': hospitalPatientPageResponseSchema,
   'patients.hospitalPatientResponseSchema': hospitalPatientResponseSchema,
   'patients.patientAppointmentPageResponseSchema': patientAppointmentPageResponseSchema,
@@ -276,19 +322,25 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'settings.bannerPageResponseSchema': bannerPageResponseSchema,
   'settings.couponPageSchema': couponPageSchema,
   'settings.couponRedemptionPageSchema': couponRedemptionPageSchema,
+  'settings.displayDevicePageSchema': displayDevicePageSchema,
   'settings.doctorServicePageSchema': doctorServicePageSchema,
   'settings.holidayPageResponseSchema': holidayPageResponseSchema,
   'settings.hospitalProfileResponseSchema': hospitalProfileResponseSchema,
   'settings.hospitalSettingsResponseSchema': hospitalSettingsResponseSchema,
+  'settings.numberingListResponseSchema': numberingListResponseSchema,
+  'settings.numberingPreviewResponseSchema': numberingPreviewResponseSchema,
+  'settings.printTemplatePageSchema': printTemplatePageSchema,
   'settings.scheduleHoursListResponseSchema': scheduleHoursListResponseSchema,
   'settings.servicePageSchema': servicePageSchema,
   'settings.settingsCounterPageSchema': settingsCounterPageSchema,
   'settings.taxRatePageSchema': taxRatePageSchema,
   'settings.tokenPolicyResponseSchema': tokenPolicyResponseSchema,
   'settlements.billingPlanPageResponseSchema': billingPlanPageResponseSchema,
+  'settlements.creditNotePageResponseSchema': creditNotePageResponseSchema,
   'settlements.invoiceDetailResponseSchema': invoiceDetailResponseSchema,
   'settlements.invoicePageResponseSchema': invoicePageResponseSchema,
   'settlements.planChangeRequestPageResponseSchema': planChangeRequestPageResponseSchema,
+  'settlements.payoutPageResponseSchema': settlementsPayoutPageResponseSchema,
   'settlements.settlementPeriodDetailResponseSchema': settlementPeriodDetailResponseSchema,
   'settlements.settlementPeriodPageResponseSchema': settlementPeriodPageResponseSchema,
   'settlements.statementPageResponseSchema': statementPageResponseSchema,
@@ -306,63 +358,26 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'users-roles.staffPageResponseSchema': usersRolesStaffPageResponseSchema,
 };
 
-/** Read endpoints the recorder leaves out on purpose. A new GET that is neither recorded nor listed here fails the coverage test. */
+/**
+ * Read endpoints the recorder leaves out on purpose: each one writes, mints a
+ * one-off signed link, needs a one-time token, or answers a non-JSON body. A
+ * new GET that is neither recorded nor listed here fails the coverage test.
+ */
 const NOT_RECORDED: Readonly<Record<string, string>> = {
-  receiptPdfResponseSchema: 'Reading it generates and stores the receipt PDF.',
-  auditLogExportResponseSchema: 'Reading it starts an export file.',
-  reportExportDeferredResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
-  reportExportQueuedResponseSchema: 'Only sent past the sync row limit (50,000; 2,000 for PDF).',
-  invitationPreviewResponseSchema: 'Needs a live invitation token.',
-  faqFeedSchema: 'New hospital FAQ feed (BE-34); record once the backend serves it.',
-  doctorReviewPageSchema:
-    'DOC-01: GET /hospital/doctors/{id}/reviews is not served by the recorded backend yet; record it once B9 lands.',
-  // New to the web app in fe/f2 (Hospital Settings); the recorder's SPEC lists them — record
-  // against the seeded backend at integration. Shapes follow the backend serializers named
-  // on each schema.
-  numberingListResponseSchema:
-    'Not yet recorded: GET /hospital/numbering (NumberingSeriesSerializer).',
-  numberingPreviewResponseSchema:
-    'Not yet recorded: GET /hospital/numbering/{kind}/preview (NumberingPreviewSerializer).',
-  printTemplatePageSchema:
-    'Not yet recorded: GET /hospital/print-templates (PrintTemplateSerializer).',
-  displayDevicePageSchema:
-    'Not yet recorded: GET /hospital/display-devices (DisplayDeviceSerializer).',
-  // New reads of fix wave 1 (fe/f3). Their recorder entries are in place;
-  // record them against the merged backend and move them to CONTRACTS.
-  approvalRequestPageResponseSchema: 'New in wave 1 — record against the merged backend.',
-  creditNotePageResponseSchema: 'New in wave 1 — record against the merged backend.',
-  statementPdfLinkSchema: 'Reading it renders and stores the statement PDF (SET-02).',
-  assignableStaffPageResponseSchema:
-    'New at integration (B10): GET /platform/staff/assignable — record against the merged backend.',
-  // New to the web app in fe/f4 (shells, ops hospitals, billing, plans, settlements). The
-  // recorder's SPEC lists each one; record against the merged backend at integration (several
-  // come from the B4 / B9 contracts and are not served by the recorded backend yet).
-  hospitalAlertFeedResponseSchema:
-    'Not yet recorded: GET /hospital/notifications (B9 DASH-03; the bell falls back without it).',
-  paymentSchema: 'Not yet recorded: GET /platform/billing/payments/{id} (B4 BE-28).',
-  billingSummarySchema: 'Not yet recorded: GET /platform/billing/summary (B4 BE-28).',
-  subscriptionPageSchema:
-    'Not yet recorded: GET /platform/billing/subscriptions (SubscriptionSerializer).',
-  prorationPreviewSchema:
-    'Not yet recorded: GET /platform/billing/subscriptions/{id}/proration-preview (B4).',
-  numberingSeriesResponseSchema:
-    'Not yet recorded: GET /platform/hospitals/{id}/numbering/{kind} (NumberingSeriesSerializer).',
-  commissionHistoryResponseSchema:
-    'Not yet recorded: GET /platform/hospitals/{id}/commission-history (B4 API-01).',
-  payoutBankAccountPageResponseSchema:
-    'Not yet recorded: GET /platform/hospitals/{id}/bank-accounts (B4 M-45).',
-  subscriberRowsPageSchema:
-    'Not yet recorded: GET /platform/plans/{id}/subscribers rows (SubscriptionSerializer).',
-  periodDetailResponseSchema:
-    'Not yet recorded: GET /platform/settlements/periods/{id} (B4 BE-27 breakdown).',
-  payoutPageResponseSchema: 'Not yet recorded: GET /platform/settlements/payouts (B4 BE-27).',
-  logsExportResponseSchema: 'Reading it renders the whole filtered audit trail as a CSV file.',
-  phiAccessPageSchema:
-    'B6 endpoint (GET /platform/compliance/phi-access), not on the recording backend yet.',
-  staffDirectoryPageSchema:
-    'B9 endpoint (GET /platform/hospital-staff), not on the recording backend yet.',
-  retentionResponseSchema:
-    'B6 endpoint (GET /platform/compliance/retention), not on the recording backend yet.',
+  receiptPdfResponseSchema:
+    'GET /hospital/appointments/{id}/receipt.pdf renders and stores the PDF when the worker has not, and mints a signed link.',
+  statementPdfLinkSchema:
+    'GET /platform/statements/{id}.pdf renders and stores the statement PDF on first read and mints a signed link (SET-02).',
+  auditLogExportResponseSchema:
+    'GET /hospital/audit/log/export.csv answers a CSV file (parsed as text), not JSON.',
+  logsExportResponseSchema:
+    'GET /platform/logs/export.csv answers a CSV file (parsed as text), not JSON.',
+  reportExportDeferredResponseSchema:
+    'The 202 of GET /platform/reports/{code}/export.{fmt}: only past the sync row limit (50,000; 2,000 for PDF), and it queues a worker export.',
+  reportExportQueuedResponseSchema:
+    'The 202 of GET /hospital/reports/{code}/export.{fmt}: only past the sync row limit (50,000; 2,000 for PDF), and it queues a worker export.',
+  invitationPreviewResponseSchema:
+    'GET /hospital/auth/invitations/{token} needs a live one-time invitation token from the invite email.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "id": "01a118d1-7120-7662-a303-88b2bb171f53",
+      "hospital_id": "01a118d1-70e6-7af3-9591-5fa9bfb9f777",
+      "hospital_name": "Uat Trial Clinic Cnmu",
+      "plan_id": "01a118d1-67a3-7440-85c2-2b626c916014",
+      "plan_code": "uat-plan-cnmu",
+      "plan_name": "UAT Plan Cnmu",
+      "billing_period": "monthly",
+      "status": "trialing",
+      "read_only": false,
+      "started_at": "2026-10-08T00:02:21.600686Z",
+      "trial_ends_at": "2026-10-21T18:30:00Z",
+      "current_period_start": "2026-10-08T00:02:21.600686Z",
+      "current_period_end": "2026-10-21T18:30:00Z",
+      "next_invoice_at": "2026-10-21T18:30:00Z",
+      "cancel_at_period_end": false,
+      "cancelled_at": null,
+      "gateway": "manual",
+      "grace_days_override": null,
+      "created_at": "2026-10-08T00:02:21.600789Z",
+      "updated_at": "2026-10-08T00:02:21.600793Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

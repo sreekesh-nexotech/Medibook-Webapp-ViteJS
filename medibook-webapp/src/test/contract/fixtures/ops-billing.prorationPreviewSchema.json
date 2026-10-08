@@ -1,0 +1,16 @@
+{
+  "subscription_id": "01a118b6-8f23-7ae1-ac5f-42f6a3754310",
+  "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+  "from_plan_id": "01a118b6-8e4f-7723-ada7-0984fdc00798",
+  "to_plan_id": "01a118b6-8e4f-7723-ada7-0984fdc00798",
+  "to_billing_period": "yearly",
+  "kind": "none",
+  "lines": [],
+  "subtotal_paise": 0,
+  "gst_paise": 0,
+  "total_paise": 0,
+  "invoice_total_paise": 0,
+  "credit_note_total_paise": 0,
+  "new_period_start": null,
+  "new_period_end": null
+}

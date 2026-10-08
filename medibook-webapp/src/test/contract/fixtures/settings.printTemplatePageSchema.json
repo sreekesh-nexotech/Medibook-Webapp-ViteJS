@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "id": "01a118b6-8f16-73e3-bafb-c2ebdca42d5a",
+      "kind": "receipt",
+      "name": "Default receipt (A5)",
+      "paper": "A5",
+      "template_html": "<!doctype html><html><head><meta charset=\"utf-8\"><style>\n@page { size: A5; margin: 10mm; } body { font-family: sans-serif; font-size: 10px; }\ntable { width: 100%; border-collapse: collapse; } td, th { padding: 3px; border-bottom: 1px solid #ddd; text-align: left; }\n.r { text-align: right; } h1 { font-size: 14px; margin: 0; } .muted { color: #555; }\n</style></head><body>\n<table><tr><td>{% if hospital.logo_url %}<img src=\"{{ hospital.logo_url }}\" style=\"max-height:40px\">{% endif %}</td>\n<td class=\"r\"><h1>{{ hospital.name }}</h1><div class=\"muted\">{{ hospital.address }}</div>\n{% if hospital.gstin %}<div class=\"muted\">GSTIN {{ hospital.gstin }}</div>{% endif %}</td></tr></table>\n<p><strong>Receipt {{ receipt.receipt_no }}</strong> · {{ receipt.issued_local }}<br>\nPatient: {{ patient.name }} (MRN {{ patient.mrn }}) · Ref {{ appointment.booking_ref }}</p>\n<table><tr><th>Item</th><th>Supplier</th><th class=\"r\">Amount</th><th class=\"r\">Tax</th></tr>\n{% for line in receipt.lines %}<tr><td>{{ line.description }}</td><td>{{ line.supplier_name }}</td>\n<td class=\"r\">{{ line.amount_display }}</td><td class=\"r\">{{ line.tax_display }}</td></tr>{% endfor %}\n<tr><td colspan=\"2\"><strong>Total</strong></td><td class=\"r\" colspan=\"2\"><strong>{{ receipt.total_display }}</strong></td></tr></table>\n<p>Paid: {% for p in receipt.payment_lines %}{{ p.method|upper }} {{ p.amount_display }}{% if not forloop.last %} + {% endif %}{% endfor %}</p>\n{% if receipt.show_staff %}<p class=\"muted\">Issued by {{ receipt.issued_by_name }}{% if receipt.counter_code %} · Counter {{ receipt.counter_code }}{% endif %}</p>{% endif %}\n<p class=\"muted\">{{ platform.legal_name }}{% if platform.gstin %} · GSTIN {{ platform.gstin }}{% endif %}</p>\n{% if hospital.stamp_url %}<div class=\"r\"><img src=\"{{ hospital.stamp_url }}\" style=\"max-height:48px\"></div>{% endif %}\n</body></html>",
+      "is_default": true,
+      "version": 1,
+      "created_at": "2026-08-13T04:30:00.107243Z",
+      "updated_at": "2026-08-13T04:30:00.107257Z"
+    },
+    {
+      "id": "01a118b6-8f15-7790-b421-391203934b48",
+      "kind": "token_slip",
+      "name": "Default token slip",
+      "paper": "80mm",
+      "template_html": "<!doctype html><html><head><meta charset=\"utf-8\"><style>\n@page { size: 80mm auto; margin: 4mm; } body { font-family: sans-serif; font-size: 11px; }\n.token { font-size: 34px; font-weight: 700; text-align: center; margin: 6px 0; }\n.c { text-align: center; } .muted { color: #555; }\n</style></head><body>\n{% if hospital.logo_url %}<div class=\"c\"><img src=\"{{ hospital.logo_url }}\" style=\"max-height:32px\"></div>{% endif %}\n<div class=\"c\"><strong>{{ hospital.name }}</strong></div>\n<div class=\"token\">{{ appointment.token_label }}</div>\n<div class=\"c\">{{ doctor.name }} · {{ session.label }}</div>\n<div class=\"c\">{{ appointment.scheduled_local }}</div>\n<div class=\"c muted\">{{ patient.display_name }} · MRN {{ patient.mrn }}</div>\n<div class=\"c muted\">Ref {{ appointment.booking_ref }}</div>\n</body></html>",
+      "is_default": true,
+      "version": 1,
+      "created_at": "2026-08-13T04:30:00.105859Z",
+      "updated_at": "2026-08-13T04:30:00.105874Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 2,
+  "has_next": false
+}

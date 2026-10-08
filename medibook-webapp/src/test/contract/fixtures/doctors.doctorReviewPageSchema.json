@@ -1,0 +1,48 @@
+{
+  "results": [
+    {
+      "id": "01a118b8-4be5-77e0-bf68-2bc281547b34",
+      "doctor_id": "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
+      "rating": 5,
+      "comment": "Very thorough, explained everything.",
+      "patient_initials": "V.M.",
+      "reviewed_at": "2026-10-03T15:30:00.012472Z"
+    },
+    {
+      "id": "01a118b8-3296-7f40-ae76-ed286f69723a",
+      "doctor_id": "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
+      "rating": 3,
+      "comment": "Okay, long wait at the desk.",
+      "patient_initials": "P.N.",
+      "reviewed_at": "2026-10-01T15:30:00.008365Z"
+    },
+    {
+      "id": "01a118b7-e19e-7842-9008-96d4b9b9ccd9",
+      "doctor_id": "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
+      "rating": 2,
+      "comment": "Rushed consultation.",
+      "patient_initials": "I.S.",
+      "reviewed_at": "2026-09-25T15:30:00.016030Z"
+    },
+    {
+      "id": "01a118b7-c52b-7853-9c87-15f350138c9a",
+      "doctor_id": "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
+      "rating": 5,
+      "comment": "Very thorough, explained everything.",
+      "patient_initials": "F.B.",
+      "reviewed_at": "2026-09-23T15:30:00.008539Z"
+    },
+    {
+      "id": "01a118b7-35c5-7b11-a106-fbd0af62f5e3",
+      "doctor_id": "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
+      "rating": 4,
+      "comment": "Good doctor, short wait.",
+      "patient_initials": "P.N.",
+      "reviewed_at": "2026-09-12T15:30:00.008478Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 6,
+  "has_next": true
+}

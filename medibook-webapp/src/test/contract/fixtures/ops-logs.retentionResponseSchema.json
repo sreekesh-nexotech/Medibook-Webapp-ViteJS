@@ -1,0 +1,101 @@
+{
+  "policies": [
+    {
+      "table": "audit_log",
+      "label": "Audit trail",
+      "retention_days": 1095,
+      "retention_years": 3,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "login_events",
+      "label": "Sign-in history",
+      "retention_days": 1095,
+      "retention_years": 3,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "config_changes",
+      "label": "Configuration changes",
+      "retention_days": 1095,
+      "retention_years": 3,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "phi_access_log",
+      "label": "Patient-record access log",
+      "retention_days": 1095,
+      "retention_years": 3,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "otp_challenges",
+      "label": "One-time codes",
+      "retention_days": 90,
+      "retention_years": 0.2,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "login_attempts",
+      "label": "Sign-in attempts",
+      "retention_days": 90,
+      "retention_years": 0.2,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "webhook_events",
+      "label": "Provider webhooks",
+      "retention_days": 180,
+      "retention_years": 0.5,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "payments",
+      "label": "Payments",
+      "retention_days": 2920,
+      "retention_years": 8,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "refunds",
+      "label": "Refunds",
+      "retention_days": 2920,
+      "retention_years": 8,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "receipts",
+      "label": "Receipts",
+      "retention_days": 2920,
+      "retention_years": 8,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "ledger_entries",
+      "label": "Ledger",
+      "retention_days": 2920,
+      "retention_years": 8,
+      "at_end_of_window": "archive",
+      "deleted": false
+    },
+    {
+      "table": "subscription_invoices",
+      "label": "Subscription invoices",
+      "retention_days": 2920,
+      "retention_years": 8,
+      "at_end_of_window": "archive",
+      "deleted": false
+    }
+  ],
+  "basis": "v1 §10 retention windows; Q122: records are never purged, only archived"
+}

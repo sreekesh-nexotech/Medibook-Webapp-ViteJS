@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "id": "01a118b6-9ed5-76a1-80c3-9fa68c6eeda3",
+      "account_holder": "Lakeshore Healthcare Pvt Ltd",
+      "account_last4": "0000",
+      "account_number_masked": "AAAAAAAA0000",
+      "ifsc": "AAAA0000000",
+      "bank_name": "HDFC Bank",
+      "upi_id": "aaaaaaaaa-aa@aaaaaaaa",
+      "is_primary": true,
+      "verified": true,
+      "verified_at": "2026-08-18T09:30:00.098877Z",
+      "created_at": "2026-08-18T09:30:00.094727Z",
+      "updated_at": "2026-10-07T23:59:56.976510Z",
+      "version": 4,
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "verified_by_id": "01a118b6-8de2-78a2-8766-914ba630c637"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

@@ -7,7 +7,7 @@
         "first_name": "Anita",
         "last_name": "Menon",
         "email": "anita.menon@lakeshore.medibook.example.com",
-        "phone_e164": "+919705571090",
+        "phone_e164": "+910000000000",
         "last_login_at": "2026-10-06T17:03:54.752618Z"
       },
       "role": {
@@ -30,7 +30,7 @@
         "first_name": "Vineeth",
         "last_name": "Kumar",
         "email": "vineeth.kumar@lakeshore.medibook.example.com",
-        "phone_e164": "+919705579009",
+        "phone_e164": "+910000000000",
         "last_login_at": "2026-10-06T11:50:55.926160Z"
       },
       "role": {
@@ -53,7 +53,7 @@
         "first_name": "Shalini",
         "last_name": "Thomas",
         "email": "shalini.thomas@lakeshore.medibook.example.com",
-        "phone_e164": "+919705586928",
+        "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.049994Z"
       },
       "role": {
@@ -76,7 +76,7 @@
         "first_name": "Joseph",
         "last_name": "Kurian",
         "email": "joseph.kurian@lakeshore.medibook.example.com",
-        "phone_e164": "+919705594847",
+        "phone_e164": "+910000000000",
         "last_login_at": "2026-10-06T09:02:29.034312Z"
       },
       "role": {
@@ -99,7 +99,7 @@
         "first_name": "Nimmy",
         "last_name": "George",
         "email": "nimmy.george@lakeshore.medibook.example.com",
-        "phone_e164": "+919705602766",
+        "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.614714Z"
       },
       "role": {

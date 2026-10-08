@@ -1,0 +1,81 @@
+{
+  "id": "01a118b8-8eab-7352-b19c-3d33f4f3d1c6",
+  "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "period_start": "2026-09-01",
+  "period_end": "2026-09-30",
+  "status": "paid",
+  "gross_paise": 4665000,
+  "refunds_paise": 810000,
+  "gateway_fees_paise": 110122,
+  "commission_paise": 265150,
+  "adjustments_paise": 10000,
+  "tds_paise": 0,
+  "net_payable_paise": 3297728,
+  "closed_at": "2026-10-07T23:35:10.763553Z",
+  "closed_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+  "created_at": "2026-10-07T23:35:10.763614Z",
+  "updated_at": "2026-10-07T23:35:10.834700Z",
+  "breakdown": {
+    "gross_paise": 4665000,
+    "refunds_paise": 810000,
+    "gateway_fees_paise": 110122,
+    "commission_paise": 224250,
+    "commission_gst_paise": 40900,
+    "convenience_fees_paise": 160000,
+    "convenience_fee_gst_paise": 32000,
+    "carried_adjustments_paise": 0,
+    "ledger_net_paise": 3287728,
+    "bookings_count": 80,
+    "entries": 493,
+    "late_entries": 0,
+    "adjustments_paise": 10000,
+    "tds_paise": 0,
+    "expected_net_paise": 3297728,
+    "difference_paise": 0,
+    "reconciled": true
+  },
+  "statement_id": "01a118b8-8f0b-7292-af95-cda5f14c42bf",
+  "statement_no": "STM-26-27-0001",
+  "statements": [
+    {
+      "id": "01a118b8-8f0b-7292-af95-cda5f14c42bf",
+      "statement_no": "STM-26-27-0001",
+      "period_start": "2026-09-01",
+      "period_end": "2026-09-30",
+      "issued_at": "2026-10-07T23:35:10.856786+00:00"
+    }
+  ],
+  "adjustments": [
+    {
+      "id": "01a118b8-8ec9-75a2-be89-4dea85ecec56",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "settlement_period_id": "01a118b8-8eab-7352-b19c-3d33f4f3d1c6",
+      "amount_paise": 10000,
+      "reason": "Goodwill credit for the gateway outage on the 21st",
+      "created_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+      "carried_forward": false,
+      "created_at": "2026-10-07T23:35:10.793116Z"
+    }
+  ],
+  "payout": {
+    "id": "01a118b8-8edd-7441-8e22-bda33a7004e6",
+    "payout_run_id": "01a118b8-8edc-76f2-855d-9e3471530b8e",
+    "run_no": "PR-2026-0001",
+    "settlement_period_id": "01a118b8-8eab-7352-b19c-3d33f4f3d1c6",
+    "period_start": "2026-09-01",
+    "period_end": "2026-09-30",
+    "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+    "bank_account_id": "01a118b6-9ed5-76a1-80c3-9fa68c6eeda3",
+    "bank_account_last4": "0000",
+    "amount_paise": 3297728,
+    "status": "released",
+    "utr_ref": "HDFCN01A118B88EDD",
+    "released_at": "2026-10-07T23:35:10.834700Z",
+    "released_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+    "failure_reason": null,
+    "notes": null,
+    "created_at": "2026-10-07T23:35:10.813836Z",
+    "updated_at": "2026-10-07T23:35:10.834716Z"
+  }
+}

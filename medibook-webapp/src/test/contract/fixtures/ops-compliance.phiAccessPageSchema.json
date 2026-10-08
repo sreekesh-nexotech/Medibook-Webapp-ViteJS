@@ -1,0 +1,135 @@
+{
+  "results": [
+    {
+      "id": "01a118e9-5499-7c62-b675-2c1886b4bdac",
+      "occurred_at": "2026-10-08T00:28:27.161185Z",
+      "request_id": "b411a5f8-b7d8-4cae-8dff-832d3225c0e9",
+      "principal": "platform",
+      "actor_user_id": "01a118b6-8da1-7e51-9e59-d80938df2219",
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "GET",
+      "endpoint": "api/v1/platform/users/<uuid:user_id>",
+      "subject_kind": "user",
+      "subject_ids": ["01a118b8-1345-7c92-82e1-dc3738c89205"],
+      "result_count": 1,
+      "search_param": null,
+      "search_hash": null,
+      "meta": {
+        "page": "1",
+        "view": "PlatformUserDetailView",
+        "filters": []
+      },
+      "actor_name": "Kavya Iyer",
+      "hospital_name": null
+    },
+    {
+      "id": "01a118e9-5466-7a00-85db-5fb5f586eaee",
+      "occurred_at": "2026-10-08T00:28:27.110591Z",
+      "request_id": "c39bfe00-94fd-4a2d-9ea2-b07475e397f1",
+      "principal": "platform",
+      "actor_user_id": "01a118b6-8da1-7e51-9e59-d80938df2219",
+      "hospital_id": null,
+      "ip": "203.0.113.10",
+      "method": "GET",
+      "endpoint": "api/v1/platform/users",
+      "subject_kind": "user",
+      "subject_ids": [
+        "01a118b8-1345-7c92-82e1-dc3738c89205",
+        "01a118b7-c58f-7cb0-a632-f9c0b7f05c64",
+        "01a118b7-776e-7972-9b71-ea9e90996828",
+        "01a118b7-2817-7362-90d5-4cc521b51bd8",
+        "01a118b6-d7f9-7971-8ccc-759f9fd673e8"
+      ],
+      "result_count": 5,
+      "search_param": null,
+      "search_hash": null,
+      "meta": {
+        "page": "1",
+        "view": "PlatformUsersListView",
+        "filters": []
+      },
+      "actor_name": "Kavya Iyer",
+      "hospital_name": null
+    },
+    {
+      "id": "01a118e9-4839-7ed3-a417-82984219974e",
+      "occurred_at": "2026-10-08T00:28:23.993068Z",
+      "request_id": "28f43329-7380-4367-86b2-742f5f84eb31",
+      "principal": "hospital",
+      "actor_user_id": "01a118b6-8fcf-79e3-b43d-3f19a5f489b6",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "ip": "203.0.113.10",
+      "method": "GET",
+      "endpoint": "api/v1/hospital/patients/<uuid:hospital_patient_id>/appointments",
+      "subject_kind": "hospital_patient",
+      "subject_ids": ["01a118d2-2e44-7703-a395-1cdb376e68f5"],
+      "result_count": 1,
+      "search_param": null,
+      "search_hash": null,
+      "meta": {
+        "page": "1",
+        "view": "HospitalPatientAppointmentsView",
+        "filters": []
+      },
+      "actor_name": "Anita Menon",
+      "hospital_name": "Lakeshore Multispeciality Hospital"
+    },
+    {
+      "id": "01a118e9-4808-7d33-9209-0182c3be4909",
+      "occurred_at": "2026-10-08T00:28:23.944041Z",
+      "request_id": "252a4614-cde0-4bde-afc1-2e68454eb01a",
+      "principal": "hospital",
+      "actor_user_id": "01a118b6-8fcf-79e3-b43d-3f19a5f489b6",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "ip": "203.0.113.10",
+      "method": "GET",
+      "endpoint": "api/v1/hospital/patients/<uuid:hospital_patient_id>",
+      "subject_kind": "hospital_patient",
+      "subject_ids": ["01a118d2-2e44-7703-a395-1cdb376e68f5"],
+      "result_count": 1,
+      "search_param": null,
+      "search_hash": null,
+      "meta": {
+        "page": "1",
+        "view": "HospitalPatientDetailView",
+        "filters": []
+      },
+      "actor_name": "Anita Menon",
+      "hospital_name": "Lakeshore Multispeciality Hospital"
+    },
+    {
+      "id": "01a118e9-47e3-7b92-a6bc-fc88fda2ea8f",
+      "occurred_at": "2026-10-08T00:28:23.907704Z",
+      "request_id": "eafcafa8-5875-4c8f-ae38-db8d94dd8b63",
+      "principal": "hospital",
+      "actor_user_id": "01a118b6-8fcf-79e3-b43d-3f19a5f489b6",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "ip": "203.0.113.10",
+      "method": "GET",
+      "endpoint": "api/v1/hospital/patients",
+      "subject_kind": "hospital_patient",
+      "subject_ids": [
+        "01a118d2-2e44-7703-a395-1cdb376e68f5",
+        "01a118cf-e9df-7711-a39f-ca1b3d02fc67",
+        "01a118cf-8bec-7153-b692-a2fbd3df811a",
+        "01a118cf-37d8-7cc2-9284-a4597d104d7f",
+        "01a118cf-2378-7d10-b126-885b86353e51"
+      ],
+      "result_count": 5,
+      "search_param": null,
+      "search_hash": null,
+      "meta": {
+        "page": "1",
+        "view": "HospitalPatientListView",
+        "filters": []
+      },
+      "actor_name": "Anita Menon",
+      "hospital_name": "Lakeshore Multispeciality Hospital"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 113,
+  "has_next": true
+}

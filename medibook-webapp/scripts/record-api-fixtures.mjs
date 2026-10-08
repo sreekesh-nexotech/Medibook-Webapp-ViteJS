@@ -194,6 +194,7 @@ const SPEC = [
     path: '/hospital/support/tickets/{id}',
     needs: (fx) => ({ id: first(fx, 'help.supportTicketPageSchema')?.id }),
   },
+  { key: 'help.faqFeedSchema', surface: 'hospital', path: '/hospital/content/faqs' },
 
   // hospital: payments and cash
   {
@@ -242,6 +243,18 @@ const SPEC = [
     surface: 'hospital',
     path: '/hospital/doctors/{id}/schedule',
     needs: (fx) => ({ id: first(fx, 'doctors.doctorPageSchema')?.id }),
+  },
+  {
+    key: 'doctors.doctorReviewPageSchema',
+    surface: 'hospital',
+    path: '/hospital/doctors/{id}/reviews',
+    params: LIST,
+    needs: (fx) => ({
+      id: (
+        first(fx, 'doctors.doctorPageSchema', (d) => d.rating_count > 0) ??
+        first(fx, 'doctors.doctorPageSchema')
+      )?.id,
+    }),
   },
   {
     key: 'slots.slotGridPageResponseSchema',
@@ -698,10 +711,28 @@ const SPEC = [
     needs: (fx) => ({ id: first(fx, 'ops-compliance.dataRequestPageSchema')?.id }),
   },
   {
+    key: 'ops-compliance.phiAccessPageSchema',
+    surface: 'platform',
+    path: '/platform/compliance/phi-access',
+    params: LIST,
+  },
+  {
+    key: 'ops-compliance.staffDirectoryPageSchema',
+    surface: 'platform',
+    path: '/platform/hospital-staff',
+    // `q` needs at least two characters; the seeded staff share an email domain.
+    params: { ...LIST, q: 'lakeshore' },
+  },
+  {
     key: 'ops-logs.logsPageResponseSchema',
     surface: 'platform',
     path: '/platform/logs',
     params: { page: 1, page_size: 5 },
+  },
+  {
+    key: 'ops-logs.retentionResponseSchema',
+    surface: 'platform',
+    path: '/platform/compliance/retention',
   },
   {
     key: 'ops-notifications.bannersPageResponseSchema',
