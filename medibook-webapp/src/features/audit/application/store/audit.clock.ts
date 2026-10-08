@@ -25,11 +25,6 @@ export function localTimeHm(d: Date = new Date()): string {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-/** Today as `yyyy-mm-dd` in the user's own calendar. */
-export function todayIso(): string {
-  return localDateIso();
-}
-
 /** Weekday index of an ISO date, 0 = Monday … 6 = Sunday. */
 export function isoWeekdayIndex(iso: string): number {
   const [y, m, d] = iso.split('-').map(Number);

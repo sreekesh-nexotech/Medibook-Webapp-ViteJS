@@ -8,6 +8,9 @@ import {
   graceNotice,
   planChoices,
 } from '@/features/settlements/presentation/components/planBillingView';
+import { todayISO } from '@/shared/lib/format';
+import { todayIn } from '@/shared/lib/hospitalTime';
+import { HOSPITAL_DATE, HOSPITAL_TIME_ZONE, PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 function plan(id: string, name: string, yearly: number | null = 1_000_000): BillingPlan {
   return {
@@ -114,5 +117,19 @@ describe('graceNotice', () => {
         TODAY,
       ),
     ).toBeNull();
+  });
+});
+
+describe('graceNotice on a PC behind the hospital (UAT-47)', () => {
+  withPcBehindHospital();
+
+  it('treats an invoice due on the hospital’s today as due, though the PC is a day behind', () => {
+    expect(todayISO()).toBe(PC_DATE);
+    const due = [invoice({ dueAt: HOSPITAL_DATE })];
+    const subscription = { status: 'past_due', graceDaysOverride: null };
+    expect(graceNotice(subscription, due, todayIn(HOSPITAL_TIME_ZONE, Date.now()))?.endsOn).toBe(
+      '2026-10-15',
+    );
+    expect(graceNotice(subscription, due, todayISO())).toBeNull();
   });
 });

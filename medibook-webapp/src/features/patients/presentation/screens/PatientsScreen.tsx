@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { useCan } from '@/shared/hooks/usePermission';
 import type { SortState } from '@/shared/hooks/useSort';
 import { Avatar } from '@/shared/ui/Avatar';
@@ -145,6 +146,8 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
   const navigate = useNavigate();
   const canAdd = useCan('Patients.add');
   const canBook = useCan('Appointments.add');
+  // Ages count to the hospital's today (D-09, UAT-47).
+  const { today } = useHospitalToday();
 
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState(ALL_SOURCES);
@@ -307,7 +310,7 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
                     <span className="text-text-strong font-medium">{p.fullName}</span>
                   </div>
                 </td>
-                <td className={tdClass}>{ageFromDob(p.dateOfBirth) ?? '—'}</td>
+                <td className={tdClass}>{ageFromDob(p.dateOfBirth, today) ?? '—'}</td>
                 <td className={tdClass}>{genderLabel(p.gender) || '—'}</td>
                 <td className={tdClass}>{displayPhone(p.phone) || '—'}</td>
                 <td className={tdClass}>{p.completedVisits ?? visits.get(p.id) ?? '—'}</td>

@@ -55,7 +55,10 @@ export function toLocalISO(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Today's local calendar date as `yyyy-mm-dd`. */
+/**
+ * The PC's own calendar date as `yyyy-mm-dd`. Hospital screens never use it:
+ * their "today" is the hospital's (`useHospitalToday`, D-09, UAT-47).
+ */
 export function todayISO(): string {
   return toLocalISO(new Date());
 }

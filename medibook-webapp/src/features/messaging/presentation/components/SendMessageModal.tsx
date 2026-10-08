@@ -2,7 +2,9 @@ import { useState } from 'react';
 
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { fmtDate, todayISO } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { fmtDate } from '@/shared/lib/format';
+import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
@@ -22,7 +24,7 @@ import {
   DESK_SEND_EVENTS,
   channelLabel,
   eventLabel,
-  fmtLocalTime,
+  messageableAppointments,
   messagingSampleValues,
   patientChannelFromLabel,
   templateTime,
@@ -30,7 +32,6 @@ import {
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import type {
-  AppointmentStatus,
   PatientAppointment,
   PatientListParams,
   PatientRecord,
@@ -44,13 +45,6 @@ const MIN_SEARCH_CHARS = 2;
 
 /** Wait this long after the last keystroke before searching (05 F29). */
 const SEARCH_DEBOUNCE_MS = 300;
-
-/** Appointments still worth confirming or reminding about. */
-const MESSAGEABLE_STATUSES: ReadonlySet<AppointmentStatus> = new Set([
-  'pending_approval',
-  'scheduled',
-  'checked_in',
-]);
 
 /** What the screen needs to confirm, then queue, one send. */
 export interface SendReview {
@@ -86,16 +80,9 @@ function patientLabel(p: PatientRecord): string {
   return `${p.fullName} · ${p.mrn}${p.phone ? ` · ${p.phone}` : ''}`;
 }
 
-function appointmentLabel(a: PatientAppointment): string {
-  return `${a.bookingRef} · ${a.doctorName} · ${fmtDate(a.scheduledDate)} ${fmtLocalTime(a.scheduledStartAt)}`;
-}
-
-/** Upcoming, still-active appointments, soonest first. */
-function messageable(items: readonly PatientAppointment[]): readonly PatientAppointment[] {
-  const today = todayISO();
-  return items
-    .filter((a) => MESSAGEABLE_STATUSES.has(a.status) && a.scheduledDate >= today)
-    .toSorted((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
+/** The booking as the picker lists it, its time on the hospital's clock (D-09). */
+function appointmentLabel(a: PatientAppointment, timeZone: string): string {
+  return `${a.bookingRef} · ${a.doctorName} · ${fmtDate(a.scheduledDate)} ${formatTimeIn(a.scheduledStartAt, timeZone)}`;
 }
 
 /**
@@ -125,6 +112,8 @@ function destinationFor(
  */
 export function SendMessageModal({ open, onClose, onReview }: SendMessageModalProps) {
   const [search, setSearch] = useState('');
+  // Upcoming means from the hospital's today; times are its clock (D-09, UAT-47).
+  const { today, timeZone } = useHospitalToday();
   const session = useSessionQuery('hospital').data;
   const hospitalName = session?.surface === 'hospital' ? session.hospital.name : null;
   const term = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
@@ -163,7 +152,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   const patient = patients.find((p) => p.id === values.patientId) ?? null;
   const appointmentsQuery = usePatientAppointmentsQuery(values.patientId || undefined);
-  const appointments = messageable(appointmentsQuery.data?.items ?? []);
+  const appointments = messageableAppointments(appointmentsQuery.data?.items ?? [], today);
   const appt = appointments.find((a) => a.id === values.appointmentId) ?? null;
 
   const templatesQuery = useMessagingTemplatesQuery(values.channel);
@@ -179,7 +168,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           '{{name}}': patient.firstName,
           '{{doctorName}}': appt.doctorName,
           '{{date}}': fmtDate(appt.scheduledDate),
-          '{{time}}': templateTime(appt.scheduledStartAt),
+          '{{time}}': templateTime(appt.scheduledStartAt, timeZone),
           '{{token}}': appt.tokenLabel ?? '',
           '{{bookingRef}}': appt.bookingRef,
           ...(hospitalName ? { '{{hospitalName}}': hospitalName } : {}),
@@ -249,10 +238,10 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           </Field>
           <Field label="Appointment" required error={form.errorFor('appointmentId')}>
             <Select
-              value={appt ? appointmentLabel(appt) : ''}
-              options={appointments.map(appointmentLabel)}
+              value={appt ? appointmentLabel(appt, timeZone) : ''}
+              options={appointments.map((a) => appointmentLabel(a, timeZone))}
               onChange={(label) => {
-                const picked = appointments.find((a) => appointmentLabel(a) === label);
+                const picked = appointments.find((a) => appointmentLabel(a, timeZone) === label);
                 form.setField('appointmentId', picked?.id ?? '');
               }}
               placeholder={appointmentPlaceholder}

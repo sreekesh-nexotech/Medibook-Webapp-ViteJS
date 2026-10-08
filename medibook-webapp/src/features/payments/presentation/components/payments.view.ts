@@ -4,7 +4,8 @@
  * the day's totals.
  */
 import { isFailure } from '@/core/error/failure';
-import { addDaysISO, fmtDate, parseHundredths, toLocalISO, todayISO } from '@/shared/lib/format';
+import { fmtDate, parseHundredths, toLocalISO } from '@/shared/lib/format';
+import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
   BookingStatus,
@@ -35,14 +36,21 @@ export interface DateRange {
   readonly dateTo: string;
 }
 
-/** The dates a window covers; `Custom range` uses `custom` (defaulting to today). */
-export function rangeForWindow(window: PaymentWindow, custom?: Partial<DateRange>): DateRange {
-  const today = todayISO();
+/**
+ * The dates a window covers, ending on `today` — the hospital's calendar day
+ * (`useHospitalToday`, D-09, UAT-47), never the PC's. `Custom range` uses
+ * `custom`, defaulting to today.
+ */
+export function rangeForWindow(
+  window: PaymentWindow,
+  today: string,
+  custom?: Partial<DateRange>,
+): DateRange {
   if (window === 'Custom range') {
     return { dateFrom: custom?.dateFrom || today, dateTo: custom?.dateTo || today };
   }
   if (window === 'This Week')
-    return { dateFrom: addDaysISO(today, -(WEEK_DAYS - 1)), dateTo: today };
+    return { dateFrom: addIsoDays(today, -(WEEK_DAYS - 1)), dateTo: today };
   if (window === 'This Month')
     return { dateFrom: `${today.slice(0, 8)}${FIRST_OF_MONTH}`, dateTo: today };
   return { dateFrom: today, dateTo: today };

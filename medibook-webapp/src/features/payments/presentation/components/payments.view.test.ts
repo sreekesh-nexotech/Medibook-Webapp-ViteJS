@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type {
   CashSummaryRow,
@@ -16,6 +16,9 @@ import {
   rupeesToPaise,
   summaryVariance,
 } from '@/features/payments/presentation/components/payments.view';
+import { todayISO } from '@/shared/lib/format';
+import { todayIn } from '@/shared/lib/hospitalTime';
+import { HOSPITAL_DATE, HOSPITAL_TIME_ZONE, PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 describe('rupeesToPaise', () => {
   it('reads what the front desk types as whole paise', () => {
@@ -201,9 +204,51 @@ describe('summaryVariance', () => {
 describe('rangeForWindow', () => {
   it('uses the custom range, defaulting to today', () => {
     expect(
-      rangeForWindow('Custom range', { dateFrom: '2026-09-01', dateTo: '2026-09-30' }),
+      rangeForWindow('Custom range', '2026-10-08', {
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-30',
+      }),
     ).toEqual({ dateFrom: '2026-09-01', dateTo: '2026-09-30' });
-    const today = rangeForWindow('Today');
-    expect(rangeForWindow('Custom range')).toEqual(today);
+    expect(rangeForWindow('Custom range', '2026-10-08')).toEqual(
+      rangeForWindow('Today', '2026-10-08'),
+    );
+  });
+
+  it('ends each preset on the given day', () => {
+    expect(rangeForWindow('This Week', '2026-10-02')).toEqual({
+      dateFrom: '2026-09-26',
+      dateTo: '2026-10-02',
+    });
+    expect(rangeForWindow('This Month', '2026-10-02')).toEqual({
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-02',
+    });
+  });
+});
+
+describe('payment presets follow the hospital’s today (UAT-47)', () => {
+  withPcBehindHospital();
+
+  it('reads Today, This Week and This Month on the hospital’s calendar, not the PC’s', () => {
+    expect(todayISO()).toBe(PC_DATE);
+    const today = todayIn(HOSPITAL_TIME_ZONE, Date.now());
+    expect(rangeForWindow('Today', today)).toEqual({
+      dateFrom: HOSPITAL_DATE,
+      dateTo: HOSPITAL_DATE,
+    });
+    expect(rangeForWindow('This Week', today)).toEqual({
+      dateFrom: '2026-10-02',
+      dateTo: HOSPITAL_DATE,
+    });
+    expect(rangeForWindow('This Month', today).dateTo).toBe(HOSPITAL_DATE);
+  });
+
+  it('rolls the month over with the hospital: 1 Nov there is still 31 Oct on the PC', () => {
+    vi.setSystemTime(Date.UTC(2026, 9, 31, 20, 0));
+    expect(todayISO()).toBe('2026-10-31');
+    expect(rangeForWindow('This Month', todayIn(HOSPITAL_TIME_ZONE, Date.now()))).toEqual({
+      dateFrom: '2026-11-01',
+      dateTo: '2026-11-01',
+    });
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PatientRecord } from '@/features/patients/domain/entities/patients.entities';
 import {
+  ageFromDob,
   changeSummary,
   changeValueText,
   demographicsOf,
@@ -12,6 +13,9 @@ import {
   pincodeError,
   toE164,
 } from '@/features/patients/presentation/components/patientsFormat';
+import { todayISO } from '@/shared/lib/format';
+import { todayIn } from '@/shared/lib/hospitalTime';
+import { HOSPITAL_TIME_ZONE, PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 const RECORD: PatientRecord = {
   id: 'p-1',
@@ -149,5 +153,28 @@ describe('isOwnChangeRequest (L-09)', () => {
     expect(isOwnChangeRequest(null, 'Vineeth Kumar', me)).toBe(false);
     expect(isOwnChangeRequest(null, null, me)).toBe(false);
     expect(isOwnChangeRequest('u-1', null, null)).toBe(false);
+  });
+});
+
+describe('ageFromDob', () => {
+  it('counts whole years, turning over on the birthday', () => {
+    expect(ageFromDob('1990-10-08', '2026-10-07')).toBe(35);
+    expect(ageFromDob('1990-10-08', '2026-10-08')).toBe(36);
+    expect(ageFromDob('1990-02-28', '2026-03-01')).toBe(36);
+  });
+
+  it('is unknown without a readable date of birth', () => {
+    expect(ageFromDob(null, '2026-10-08')).toBeNull();
+    expect(ageFromDob('08/10/1990', '2026-10-08')).toBeNull();
+  });
+});
+
+describe('ageFromDob on a PC behind the hospital (UAT-47)', () => {
+  withPcBehindHospital();
+
+  it('has the birthday on the hospital’s day, while the PC is still on the eve', () => {
+    expect(todayISO()).toBe(PC_DATE);
+    expect(ageFromDob('1990-10-08', todayIn(HOSPITAL_TIME_ZONE, Date.now()))).toBe(36);
+    expect(ageFromDob('1990-10-08', todayISO())).toBe(35);
   });
 });

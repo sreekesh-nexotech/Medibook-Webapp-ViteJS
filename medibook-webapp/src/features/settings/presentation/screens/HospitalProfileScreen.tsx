@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 
 import { PROFILE_TAB_BANNERS, PROFILE_TAB_HOLIDAYS, PROFILE_TAB_PARAM } from '@/app/router/paths';
 
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { addDaysISO, fmtDate, todayISO } from '@/shared/lib/format';
+import { fmtDate } from '@/shared/lib/format';
 import { describeFailure } from '@/shared/lib/serverErrors';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -52,11 +53,11 @@ import {
   HOLIDAY_SCOPE_OPTIONS,
   bannerStatusAt,
   bannerWindow,
-  closedDaysWithin,
   holidayAppliesTo,
   holidayDayCount,
   holidayScopeOf,
   moved,
+  upcomingClosures,
 } from '@/features/settings/application/store/profile.form';
 import {
   HolidayModal,
@@ -171,18 +172,15 @@ export function HospitalProfileScreen() {
 
   const holidaySort = useSort<Holiday>({ key: 'from', dir: 'asc' });
 
-  const today = todayISO();
+  // Upcoming and past are split on the hospital's today, not the PC's (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const now = new Date();
-  const horizonEnd = addDaysISO(today, HORIZON_DAYS);
-  const upcoming = holidays.filter((h) => h.to >= today && h.from <= horizonEnd);
   // Distinct whole-hospital days; department closures are counted apart (07·P-F3).
-  const closedDaysAhead = closedDaysWithin(
-    upcoming.filter((h) => h.departmentId === null),
-    today,
-    horizonEnd,
-  );
-  const departmentClosuresAhead = upcoming.filter((h) => h.departmentId !== null).length;
-  const nextClosure = [...upcoming].sort((a, b) => a.from.localeCompare(b.from))[0] ?? null;
+  const {
+    closedDays: closedDaysAhead,
+    departmentClosures: departmentClosuresAhead,
+    next: nextClosure,
+  } = upcomingClosures(holidays, today, HORIZON_DAYS);
 
   const statuses = new Map(banners.map((b) => [b.id, bannerStatusAt(b, now)]));
   const liveBanners = banners.filter((b) => statuses.get(b.id) === 'Live');

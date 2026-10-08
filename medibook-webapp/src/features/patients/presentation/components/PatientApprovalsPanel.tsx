@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { cn } from '@/shared/lib/cn';
 import { fmtDate } from '@/shared/lib/format';
+import { formatTimeIn, isoDayIn } from '@/shared/lib/hospitalTime';
 import { Badge } from '@/shared/ui/Badge';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { InfoDot } from '@/shared/ui/InfoDot';
@@ -21,10 +23,7 @@ import type {
 } from '@/features/patients/domain/entities/patients.entities';
 import { PatientChangeValues } from '@/features/patients/presentation/components/PatientChangeValues';
 import { PatientDecisionActions } from '@/features/patients/presentation/components/PatientDecisionActions';
-import {
-  APPROVAL_STATUS_BADGES,
-  formatTime,
-} from '@/features/patients/presentation/components/patientsFormat';
+import { APPROVAL_STATUS_BADGES } from '@/features/patients/presentation/components/patientsFormat';
 
 const PAGE_SIZE = 10;
 
@@ -93,6 +92,8 @@ function DecisionCell({ row }: { row: PatientApproval }) {
 export function PatientApprovalsPanel({ onOpenPatient }: PatientApprovalsPanelProps) {
   const [tab, setTab] = useState<StatusTab>('Pending');
   const [kindLabel, setKindLabel] = useState(ANY_KIND);
+  // When a request was made, on the hospital's calendar and clock (D-09, UAT-47).
+  const timeZone = useHospitalTimeZone();
   const [page, setPage] = useState(0);
 
   const params: PatientApprovalListParams = {
@@ -179,7 +180,8 @@ export function PatientApprovalsPanel({ onOpenPatient }: PatientApprovalsPanelPr
             <td className={cn(tdClass, 'align-top whitespace-nowrap')}>
               {row.requestedByName ?? 'Staff'}
               <div className="text-caption text-text-muted">
-                {fmtDate(row.requestedAt.slice(0, 10))} · {formatTime(row.requestedAt)}
+                {fmtDate(isoDayIn(row.requestedAt, timeZone))} ·{' '}
+                {formatTimeIn(row.requestedAt, timeZone)}
               </div>
             </td>
             <td className={cn(tdClass, 'align-top')}>

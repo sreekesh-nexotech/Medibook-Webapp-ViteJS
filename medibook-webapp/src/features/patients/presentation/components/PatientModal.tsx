@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { todayISO } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { email as emailRule, notFutureDate, required } from '@/shared/lib/validate';
 import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
@@ -87,20 +87,18 @@ const PINCODE_LENGTH = 6;
  * mobile or an international number with its country code; it is required on
  * a new record, and on an edit only when the record already has one (a phone
  * can be corrected, not silently dropped). Date of birth is optional, but
- * never in the future.
+ * never after `today`, the hospital's calendar day (D-09, UAT-47).
  */
-function validatorsFor(isPhoneRequired: boolean): FormValidators<PatientForm> {
+function validatorsFor(isPhoneRequired: boolean, today: string): FormValidators<PatientForm> {
   return {
     firstName: (value) => required(value, 'First name'),
     phone: (value) => phoneError(value, isPhoneRequired),
-    dob: (value) => (value.trim() === '' ? undefined : notFutureDate(value, 'Date of birth')),
+    dob: (value) =>
+      value.trim() === '' ? undefined : notFutureDate(value, 'Date of birth', today),
     email: (value) => (value.trim() === '' ? undefined : emailRule(value)),
     pincode: (value) => pincodeError(value),
   };
 }
-
-const PHONE_REQUIRED_VALIDATORS = validatorsFor(true);
-const PHONE_OPTIONAL_VALIDATORS = validatorsFor(false);
 
 function toForm(p: PatientRecord): PatientForm {
   return {
@@ -183,6 +181,9 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
   const createMutation = useCreatePatientMutation();
   const updateMutation = useUpdatePatientMutation();
   const [review, setReview] = useState<MatchReviewState | null>(null);
+  // A baby born today at the hospital is not "in the future" on a PC still on yesterday.
+  const { today } = useHospitalToday();
+  const validate = useMemo(() => validatorsFor(isPhoneRequired, today), [isPhoneRequired, today]);
 
   const save = async (v: PatientForm): Promise<void> => {
     const demographics = formToDemographics(v);
@@ -230,7 +231,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
 
   const form = useForm<PatientForm>({
     initial: patient ? toForm(patient) : BLANK,
-    validate: isPhoneRequired ? PHONE_REQUIRED_VALIDATORS : PHONE_OPTIONAL_VALIDATORS,
+    validate,
     onSubmit: save,
   });
   const reviewing = review !== null && review.key === matchKey(formToDemographics(form.values));
@@ -313,7 +314,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
             onChange={(v) => form.setField('dob', v)}
             onBlur={() => form.blurField('dob')}
             autoComplete="bday"
-            max={todayISO()}
+            max={today}
           />
         </Field>
         <Field label="Gender">

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { isFailure } from '@/core/error/failure';
 
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { todayISO } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { Field } from '@/shared/ui/Field';
 import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
@@ -131,6 +131,8 @@ export function NumberingModal({ series, onClose }: NumberingModalProps) {
   const update = useUpdateNumberingMutation();
   const savedPreview = useNumberingPreviewQuery(series.kind, series.version, true);
   const isMrn = series.kind === 'mrn';
+  // The draft sample's {YY}/{MM}/{FY} follow the hospital's today (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const validate = useMemo(() => validatorsFor(series), [series]);
   const form = useForm<NumberingForm>({
     initial: {
@@ -184,7 +186,7 @@ export function NumberingModal({ series, onClose }: NumberingModalProps) {
           padWidth: Number(v.padWidth),
           fyStartMonth: Number(v.fyStartMonth),
           seq: 1,
-          date: todayISO(),
+          date: today,
         })
       : null;
   const usesFiscalYear = v.format.includes('{FY}') || v.reset === 'fiscal_year';

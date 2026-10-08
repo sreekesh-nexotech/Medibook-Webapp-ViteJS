@@ -89,17 +89,20 @@ export function pincodeError(input: string): string | undefined {
   return PINCODE.test(value) ? undefined : 'Enter the 6-digit PIN code.';
 }
 
-/** Whole years from an ISO date of birth to today, or `null` when unknown. */
-export function ageFromDob(dob: string | null, today: Date = new Date()): number | null {
-  if (!dob) return null;
-  const born = new Date(`${dob}T00:00:00`);
-  if (Number.isNaN(born.getTime())) return null;
-  let age = today.getFullYear() - born.getFullYear();
-  const hadBirthday =
-    today.getMonth() > born.getMonth() ||
-    (today.getMonth() === born.getMonth() && today.getDate() >= born.getDate());
-  if (!hadBirthday) age -= 1;
-  return age;
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Whole years from an ISO date of birth to `today` (`yyyy-mm-dd`, the
+ * hospital's calendar day — D-09, UAT-47), or `null` when either is unknown.
+ */
+export function ageFromDob(dob: string | null, today: string): number | null {
+  const born = ISO_DAY.exec(dob ?? '');
+  const now = ISO_DAY.exec(today);
+  if (!born || !now) return null;
+  const [, by, bm, bd] = born.map(Number);
+  const [, ty, tm, td] = now.map(Number);
+  const hadBirthday = tm > bm || (tm === bm && td >= bd);
+  return ty - by - (hadBirthday ? 0 : 1);
 }
 
 /** Every structured address part, joined for display. */
@@ -216,13 +219,6 @@ export function ageText(age: number | null): string {
 
 export function paiseToRupees(paise: number): number {
   return paise / PAISE_PER_RUPEE;
-}
-
-/** Start time in the desk's locale, e.g. "10:30 am". */
-export function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 }
 
 const FIELD_LABELS: Readonly<Record<string, string>> = {

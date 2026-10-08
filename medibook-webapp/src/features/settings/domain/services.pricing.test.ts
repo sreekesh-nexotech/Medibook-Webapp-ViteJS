@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ServiceTaxRate } from '@/features/settings/domain/entities/services.entities';
+import type {
+  HospitalCoupon,
+  ServiceTaxRate,
+} from '@/features/settings/domain/entities/services.entities';
 import {
   chargedServiceRate,
   cheapestConsultationRupees,
   couponDiscount,
+  couponState,
   priceService,
 } from '@/features/settings/domain/services.pricing';
+import { todayISO } from '@/shared/lib/format';
+import { PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 const rate = (
   percent: number,
@@ -95,5 +101,58 @@ describe('cheapestConsultationRupees (decision 7)', () => {
     expect(cheapestConsultationRupees(doctors, ['cardio'])).toBe(600);
     expect(cheapestConsultationRupees(doctors, [])).toBe(500);
     expect(cheapestConsultationRupees(doctors, ['derm'])).toBeNull();
+  });
+});
+
+/** A coupon valid over whole hospital days in Kolkata: 1 Oct 00:00 to 8 Oct 00:00 IST. */
+const coupon = (overrides: Partial<HospitalCoupon> = {}): HospitalCoupon => ({
+  id: 'c-1',
+  code: 'DIWALI',
+  kind: 'percent',
+  value: 10,
+  validFrom: '2026-09-30T18:30:00Z',
+  validTo: '2026-10-07T18:30:00Z',
+  usageCap: null,
+  perUserCap: null,
+  usedCount: 0,
+  maxDiscountRupees: null,
+  minOrderRupees: 0,
+  departmentIds: [],
+  legacyServiceIds: [],
+  isActive: true,
+  version: 1,
+  ...overrides,
+});
+
+describe('couponState', () => {
+  const during = Date.parse('2026-10-03T06:00:00Z');
+
+  it('reads the validity instants the way the backend checks them', () => {
+    expect(couponState(coupon(), during)).toBe('Active');
+    expect(couponState(coupon(), Date.parse('2026-09-30T18:29:59Z'))).toBe('Scheduled');
+    expect(couponState(coupon(), Date.parse('2026-09-30T18:30:00Z'))).toBe('Active');
+    expect(couponState(coupon(), Date.parse('2026-10-07T18:30:00Z'))).toBe('Expired');
+  });
+
+  it('puts paused and used-up ahead of the window', () => {
+    expect(couponState(coupon({ isActive: false }), during)).toBe('Paused');
+    expect(couponState(coupon({ usageCap: 5, usedCount: 5 }), during)).toBe('Exhausted');
+  });
+});
+
+describe('couponState on a PC behind the hospital (UAT-47)', () => {
+  withPcBehindHospital();
+
+  it('shows a coupon that ended at the hospital’s midnight as expired, though the PC is still on its last day', () => {
+    expect(todayISO()).toBe(PC_DATE);
+    expect(couponState(coupon(), Date.now())).toBe('Expired');
+  });
+
+  it('keeps a coupon from the hospital’s tomorrow scheduled', () => {
+    const tomorrow = coupon({
+      validFrom: '2026-10-08T18:30:00Z',
+      validTo: '2026-10-15T18:30:00Z',
+    });
+    expect(couponState(tomorrow, Date.now())).toBe('Scheduled');
   });
 });

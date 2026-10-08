@@ -17,8 +17,6 @@ import {
   isoWeekdayLabel,
   minutesToTimeLabel,
   timeLabelToMinutes,
-  todayIso,
-  todayIsoIn,
 } from '@/features/doctors/domain/calendar';
 import { useHolidaysQuery } from '@/features/settings/application/queries/useHolidaysQuery';
 import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
@@ -34,6 +32,7 @@ import {
   type SlotCellView,
   type SlotRowView,
 } from '@/features/slots/presentation/components/slotsGridView';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { useCan } from '@/shared/hooks/usePermission';
 import { describeFailure } from '@/shared/lib/serverErrors';
 import { Button } from '@/shared/ui/Button';
@@ -81,12 +80,14 @@ export function SlotsScreen() {
   const hoursQuery = useHospitalHoursQuery();
   const profileQuery = useHospitalProfileQuery();
   const holidaysQuery = useHolidaysQuery();
-  const timeZone = profileQuery.data?.timezone ?? null;
-  // "Today" is the hospital's calendar day, not the browser's (D-09, UAT-47).
-  const today = todayIsoIn(timeZone);
+  // "Today" is the hospital's calendar day, not the PC's (D-09, UAT-47).
+  const { today, timeZone } = useHospitalToday();
   const canEdit = useCan('Doctors & Departments.edit');
 
-  const [date, setDate] = useState(todayIso);
+  // `null` = the hospital's today, so the grid opens on it and rolls over at midnight.
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const date = pickedDate ?? today;
+  const setDate = (next: string): void => setPickedDate(next === today ? null : next);
   const [deptF, setDeptF] = useState(ALL_DEPTS);
   const [doctorF, setDoctorF] = useState(ALL_DOCTORS);
   const [bulk, setBulk] = useState<{ doctorId: string | null } | null>(null);

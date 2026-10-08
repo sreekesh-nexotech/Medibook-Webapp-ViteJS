@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+import { todayIn } from '@/shared/lib/hospitalTime';
+
 import {
   dateRange,
   email,
@@ -12,6 +14,7 @@ import {
   positiveAmount,
   required,
 } from '@/shared/lib/validate';
+import { HOSPITAL_DATE, HOSPITAL_TIME_ZONE, PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 describe('required', () => {
   it('accepts any non-blank value', () => {
@@ -101,6 +104,27 @@ describe('notFutureDate', () => {
     );
     expect(notFutureDate('06-10-2026')).toBe('Date must be a valid date.');
     expect(notFutureDate('')).toBe('Date is required.');
+  });
+});
+
+describe('notFutureDate against the hospital’s today (UAT-47)', () => {
+  withPcBehindHospital();
+
+  it('accepts the hospital’s today even when the PC is still on the day before', () => {
+    const today = todayIn(HOSPITAL_TIME_ZONE, Date.now());
+    expect(today).toBe(HOSPITAL_DATE);
+    // A baby born today at the hospital: the PC's own date would call it the future.
+    expect(notFutureDate(HOSPITAL_DATE, 'Date of birth')).toBe(
+      'Date of birth cannot be in the future.',
+    );
+    expect(notFutureDate(HOSPITAL_DATE, 'Date of birth', today)).toBeUndefined();
+    expect(notFutureDate(PC_DATE, 'Date of birth', today)).toBeUndefined();
+  });
+
+  it('still refuses the hospital’s tomorrow', () => {
+    expect(notFutureDate('2026-10-09', 'Date of birth', HOSPITAL_DATE)).toBe(
+      'Date of birth cannot be in the future.',
+    );
   });
 });
 

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 
-import { timeLabelToMinutes, todayIso } from '@/features/doctors/domain/calendar';
+import { timeLabelToMinutes } from '@/features/doctors/domain/calendar';
 import type { DoctorDateException } from '@/features/doctors/domain/entities/doctors.types';
 import {
   useDeleteDateExceptionMutation,
   useSaveDateExceptionMutation,
 } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { describeFailure } from '@/shared/lib/serverErrors';
 import { fmtDate } from '@/shared/lib/format';
 import { required } from '@/shared/lib/validate';
@@ -92,9 +93,11 @@ function ExceptionModal({ doctorId, exception, onClose }: ExceptionModalProps) {
   const save = useSaveDateExceptionMutation();
   const confirm = useScheduleConfirm();
   const firstWindow = exception?.sessions[0];
+  // A new exception is for the hospital's today until changed (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const form = useForm<ExceptionForm>({
     initial: {
-      date: exception?.date ?? todayIso(),
+      date: exception?.date ?? today,
       kind: exception?.kind === 'closed' ? 'Closed all day' : 'Different hours',
       from: firstWindow ? hhmmToLabel(firstWindow.startsAt) : '10:00 am',
       to: firstWindow ? hhmmToLabel(firstWindow.endsAt) : '1:00 pm',

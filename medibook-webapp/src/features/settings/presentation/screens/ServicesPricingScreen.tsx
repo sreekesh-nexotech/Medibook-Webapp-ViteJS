@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 
+import { useNow } from '@/shared/hooks/useNow';
 import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate, money, todayISO } from '@/shared/lib/format';
+import { fmtDate, money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -94,6 +95,9 @@ const TAX_PREVIEW_AMOUNT = 1000;
 
 /** How many services the receipt preview shows. */
 const RECEIPT_PREVIEW_ROWS = 3;
+
+/** How often coupon states re-read the clock, so one expiring while open flips over. */
+const COUPON_STATE_TICK_MS = 60_000;
 
 function failureText(error: unknown, fallback: string): string {
   return describeFailure(error, fallback);
@@ -189,7 +193,8 @@ export function ServicesPricingScreen() {
   const taxes = useMemo(() => taxRatesQuery.data ?? [], [taxRatesQuery.data]);
   const coupons = useMemo(() => couponsQuery.data ?? [], [couponsQuery.data]);
   const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
-  const today = todayISO();
+  // Coupon states compare instants, refreshed each minute (D-09, UAT-47).
+  const now = useNow(COUPON_STATE_TICK_MS);
 
   const { can } = usePermission();
   const mayEdit = can('Hospital Settings.edit');
@@ -304,9 +309,9 @@ export function ServicesPricingScreen() {
           (dept === ANY_DEPT ||
             c.departmentIds.length === 0 ||
             (selectedDeptId !== null && c.departmentIds.includes(selectedDeptId))) &&
-          (state === ANY_STATE || couponState(c, today) === state),
+          (state === ANY_STATE || couponState(c, now) === state),
       ),
-    [coupons, deptNameById, ql, dept, selectedDeptId, state, today],
+    [coupons, deptNameById, ql, dept, selectedDeptId, state, now],
   );
 
   const orderedServices = serviceSort.sorted([...filteredServices], {
@@ -322,7 +327,7 @@ export function ServicesPricingScreen() {
     from: (c) => c.validFrom,
     used: (c) => c.usedCount,
     minOrder: (c) => c.minOrderRupees,
-    state: (c) => couponState(c, today),
+    state: (c) => couponState(c, now),
   });
 
   const servicePage = Math.min(
@@ -401,7 +406,7 @@ export function ServicesPricingScreen() {
       bookable.length === 0
         ? 0
         : Math.round(bookable.reduce((sum, s) => sum + s.priceRupees, 0) / bookable.length);
-    const liveCoupons = coupons.filter((c) => couponState(c, today) === 'Active');
+    const liveCoupons = coupons.filter((c) => couponState(c, now) === 'Active');
     // Only rates the backend actually charges (BE-10): an off or removed rate bills exempt.
     const taxed = bookable.filter(
       (s) => s.taxRateId !== null && chargedServiceRate(taxById.get(s.taxRateId) ?? null) !== null,
@@ -446,7 +451,7 @@ export function ServicesPricingScreen() {
         subClass: 'text-text-muted',
       },
     ];
-  }, [services, coupons, activeTaxes, taxById, today]);
+  }, [services, coupons, activeTaxes, taxById, now]);
 
   const exportServicesCsv = (): void => {
     downloadCsv('medibook-services-pricing.csv', [
@@ -506,7 +511,7 @@ export function ServicesPricingScreen() {
         c.departmentIds.length === 0
           ? 'All departments'
           : c.departmentIds.map((id) => deptName(id)).join(' | '),
-        couponState(c, today),
+        couponState(c, now),
       ]),
     ]);
     toast(`Exported ${orderedCoupons.length} coupons as CSV`, 'success');
@@ -854,7 +859,7 @@ export function ServicesPricingScreen() {
                 {couponRows.map((c) => {
                   const remaining =
                     c.usageCap === null ? null : Math.max(0, c.usageCap - c.usedCount);
-                  const cState = couponState(c, today);
+                  const cState = couponState(c, now);
                   return (
                     <tr key={c.id}>
                       <td className={tdClass}>

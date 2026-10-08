@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
-import { todayIso } from '@/features/doctors/domain/calendar';
 import type { DoctorLeaveEntry, LeaveKind } from '@/features/doctors/domain/entities/doctors.types';
 import {
   useDeleteLeaveMutation,
   useSaveLeaveMutation,
 } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { describeFailure } from '@/shared/lib/serverErrors';
 import { fmtDate } from '@/shared/lib/format';
 import { dateRange, required } from '@/shared/lib/validate';
@@ -79,10 +79,12 @@ interface LeaveModalProps {
 function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
   const save = useSaveLeaveMutation();
   const confirm = useScheduleConfirm();
+  // A new leave starts on the hospital's today, not the PC's (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const form = useForm<LeaveForm>({
     initial: {
-      from: leave?.dateFrom ?? todayIso(),
-      to: leave?.dateTo ?? todayIso(),
+      from: leave?.dateFrom ?? today,
+      to: leave?.dateTo ?? today,
       kind: leave?.kind ?? 'casual',
       reason: leave?.reason ?? '',
     },

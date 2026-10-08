@@ -6,6 +6,7 @@
  */
 
 import { toLocalISO } from '@/shared/lib/format';
+import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
   AffectedBooking,
@@ -77,6 +78,42 @@ export function closedDaysWithin(
     }
   }
   return days.size;
+}
+
+/** The upcoming-closures summary of the Holiday Calendar. */
+export interface UpcomingClosures {
+  /** Closures that end on or after `today` and start inside the window. */
+  readonly upcoming: readonly Holiday[];
+  /** Distinct whole-hospital closed days in the window (07·P-F3). */
+  readonly closedDays: number;
+  /** Department closures in the window, counted apart. */
+  readonly departmentClosures: number;
+  /** The earliest upcoming closure, if any. */
+  readonly next: Holiday | null;
+}
+
+/**
+ * Closures in the `horizonDays` from `today` — the hospital's calendar day
+ * (`useHospitalToday`, D-09, UAT-47), so a desk PC on another date neither
+ * drops today's closure nor counts yesterday's.
+ */
+export function upcomingClosures(
+  holidays: readonly Holiday[],
+  today: string,
+  horizonDays: number,
+): UpcomingClosures {
+  const horizonEnd = addIsoDays(today, horizonDays);
+  const upcoming = holidays.filter((h) => h.to >= today && h.from <= horizonEnd);
+  return {
+    upcoming,
+    closedDays: closedDaysWithin(
+      upcoming.filter((h) => h.departmentId === null),
+      today,
+      horizonEnd,
+    ),
+    departmentClosures: upcoming.filter((h) => h.departmentId !== null).length,
+    next: [...upcoming].sort((a, b) => a.from.localeCompare(b.from))[0] ?? null,
+  };
 }
 
 /** How many bookings to name in the confirm dialog before summarising the rest. */

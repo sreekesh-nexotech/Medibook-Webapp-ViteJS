@@ -6,11 +6,12 @@ import {
   WEEK_DAYS,
 } from '@/features/doctors/domain/calendar';
 import type {
+  DoctorScheduleHistory,
   DoctorStatus,
   LeaveKind,
   WeeklySession,
 } from '@/features/doctors/domain/entities/doctors.types';
-import { parseHundredths } from '@/shared/lib/format';
+import { fmtDate, parseHundredths } from '@/shared/lib/format';
 
 /**
  * Palette cycled for department swatches, in design-token order: blue, p-400,
@@ -354,4 +355,53 @@ export function weekErrors(week: readonly WeekDay[]): Readonly<Record<number, st
     else if (to <= from) out[i] = 'The end time must be after the start time.';
   });
   return out;
+}
+
+/* --------------------------------------------------------- schedule history */
+
+/** One past leave or date exception, as the history list shows it. */
+export interface ScheduleHistoryLine {
+  readonly key: string;
+  /** ISO date the entry ended — the list is newest first. */
+  readonly sortDate: string;
+  readonly when: string;
+  readonly what: string;
+}
+
+/**
+ * The leave and date exceptions that are over: ended before `today`, the
+ * hospital's calendar day (D-09, UAT-47) — the split the backend's schedule
+ * read makes with `local_today(hospital.timezone)`. Newest first.
+ */
+export function pastScheduleLines(
+  history: DoctorScheduleHistory,
+  today: string,
+): ScheduleHistoryLine[] {
+  return [
+    ...history.leaves
+      .filter((l) => l.dateTo < today)
+      .map((l) => ({
+        key: `leave:${l.id}`,
+        sortDate: l.dateTo,
+        when:
+          l.dateFrom === l.dateTo
+            ? fmtDate(l.dateFrom)
+            : `${fmtDate(l.dateFrom)} – ${fmtDate(l.dateTo)}`,
+        what: `${LEAVE_KIND_LABEL[l.kind]} leave${l.reason ? ` · ${l.reason}` : ''}`,
+      })),
+    ...history.dateExceptions
+      .filter((e) => e.date < today)
+      .map((e) => ({
+        key: `exception:${e.id}`,
+        sortDate: e.date,
+        when: fmtDate(e.date),
+        what: `${
+          e.kind === 'closed'
+            ? 'Closed all day'
+            : e.sessions
+                .map((w) => `${hhmmToLabel(w.startsAt)} – ${hhmmToLabel(w.endsAt)}`)
+                .join(', ')
+        }${e.note ? ` · ${e.note}` : ''}`,
+      })),
+  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
 }

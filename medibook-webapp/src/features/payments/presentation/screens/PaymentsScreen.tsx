@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { isFailure } from '@/core/error/failure';
 
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { useCan } from '@/shared/hooks/usePermission';
 import type { SortState } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
@@ -196,11 +197,14 @@ export function PaymentsScreen() {
     dateF === 'Custom range' && customFrom !== '' && customTo !== ''
       ? dateRangeError(customFrom, customTo)
       : undefined;
+  // The presets end on the hospital's today, not the PC's (D-09, UAT-47).
+  const { today: hospitalToday } = useHospitalToday();
   const range = rangeForWindow(
     dateF,
+    hospitalToday,
     customError ? undefined : { dateFrom: customFrom, dateTo: customTo },
   );
-  const today = rangeForWindow('Today');
+  const today = rangeForWindow('Today', hospitalToday);
   const departmentId = departments.find((d) => d.name === deptF)?.id ?? null;
   const doctorId = doctors.find((d) => d.name === docF)?.id ?? null;
   const channel = SOURCE_CHANNEL[sourceF] ?? null;

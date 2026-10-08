@@ -98,7 +98,7 @@ export function serviceTaxOptions(rates: readonly ServiceTaxRate[]): readonly Se
   return rates.filter((r) => r.isActive && appliesToServices(r));
 }
 
-/** Derived availability of a coupon on a given local day. */
+/** Derived availability of a coupon at a given instant. */
 export type CouponState = 'Active' | 'Scheduled' | 'Expired' | 'Exhausted' | 'Paused';
 
 /** ISO date-time → the local calendar day `yyyy-mm-dd`. */
@@ -132,11 +132,16 @@ export function dayEndExclusiveIso(day: string): string {
   return new Date(y, m - 1, d + 1).toISOString();
 }
 
-export function couponState(coupon: HospitalCoupon, today: string): CouponState {
+/**
+ * A coupon's state at the instant `now`, against its validity instants the way
+ * the backend checks them (`valid_from <= now < valid_to`). Instants need no
+ * calendar day, so the PC's date and zone cannot shift it (D-09, UAT-47).
+ */
+export function couponState(coupon: HospitalCoupon, now: number): CouponState {
   if (!coupon.isActive) return 'Paused';
   if (coupon.usageCap !== null && coupon.usedCount >= coupon.usageCap) return 'Exhausted';
-  if (lastValidDay(coupon.validTo) < today) return 'Expired';
-  if (localDay(coupon.validFrom) > today) return 'Scheduled';
+  if (Date.parse(coupon.validTo) <= now) return 'Expired';
+  if (Date.parse(coupon.validFrom) > now) return 'Scheduled';
   return 'Active';
 }
 

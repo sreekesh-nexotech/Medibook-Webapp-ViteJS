@@ -4,6 +4,7 @@
  * samples the read-only template preview renders with. Pure functions only.
  */
 import { fmtDate, toLocalISO } from '@/shared/lib/format';
+import { safeTimeZone } from '@/shared/lib/hospitalTime';
 
 import {
   PLACEHOLDERS,
@@ -17,6 +18,10 @@ import type {
   PatientChannel,
   RecipientSource,
 } from '@/features/messaging/domain/entities/messaging.entities';
+import type {
+  AppointmentStatus,
+  PatientAppointment,
+} from '@/features/patients/domain/entities/patients.entities';
 
 /** Patient-facing events, in the order the template library lists them. */
 export const PATIENT_TEMPLATE_EVENTS = [
@@ -166,15 +171,38 @@ export function messagingSampleValues(): Readonly<Record<string, string>> {
 }
 
 /**
- * An appointment time as the server writes it into a message
- * (`strftime("%I:%M %p")`, e.g. "10:30 AM"), so the preview matches the SMS.
+ * An appointment time as the server writes it into a message: in the
+ * hospital's zone (`messaging/services/context.py`, D-09) and as
+ * `strftime("%I:%M %p")`, e.g. "10:30 AM", so the preview matches the SMS.
  */
-export function templateTime(iso: string): string {
+export function templateTime(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: safeTimeZone(timeZone),
   });
+}
+
+/** Appointments still worth confirming or reminding about. */
+const MESSAGEABLE_STATUSES: ReadonlySet<AppointmentStatus> = new Set([
+  'pending_approval',
+  'scheduled',
+  'checked_in',
+]);
+
+/**
+ * The patient's appointments a desk message can be about: still active and
+ * on or after `today` — the hospital's calendar day (D-09, UAT-47) — soonest
+ * first.
+ */
+export function messageableAppointments(
+  items: readonly PatientAppointment[],
+  today: string,
+): readonly PatientAppointment[] {
+  return items
+    .filter((a) => MESSAGEABLE_STATUSES.has(a.status) && a.scheduledDate >= today)
+    .toSorted((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
 }
 
 /** Local wall-clock time of an ISO date-time, e.g. "10:30 am". */

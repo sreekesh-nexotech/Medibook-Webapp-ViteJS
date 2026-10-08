@@ -2,9 +2,10 @@ import { useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { usePermission } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
-import { fmtDate, todayISO } from '@/shared/lib/format';
+import { fmtDate } from '@/shared/lib/format';
 import { required } from '@/shared/lib/validate';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -152,7 +153,8 @@ export function PlanBilling() {
     pendingRequest && planNameOf(pendingRequest.toPlanId, pendingRequest.toPlanName);
   const decidedPlanName =
     latestDecided && planNameOf(latestDecided.toPlanId, latestDecided.toPlanName);
-  const today = todayISO();
+  // An invoice is due, and grace counts, on the hospital's calendar (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const latestInvoices = latestInvoicesQuery.data?.items ?? [];
   const dueInvoices = latestInvoices.filter(
     (i) => UNPAID_INVOICE_STATUSES.has(i.status) && i.dueAt <= today,

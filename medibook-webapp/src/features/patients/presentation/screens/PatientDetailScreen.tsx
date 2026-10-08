@@ -3,9 +3,11 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { useCan } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { fmtDate, money } from '@/shared/lib/format';
+import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -40,7 +42,6 @@ import {
   appointmentStatusBadge,
   displayPhone,
   formatAddress,
-  formatTime,
   genderLabel,
   paiseToRupees,
   patientSourceBadge,
@@ -84,6 +85,8 @@ export function PatientDetailScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const canBook = useCan('Appointments.add');
   const deletion = useDeletePatientMutation();
+  // Age and visit times on the hospital's calendar and clock (D-09, UAT-47).
+  const { today, timeZone } = useHospitalToday();
   const backToList = () => navigate(hospitalPath(hospitalRole, 'patients'));
 
   if (!mrn) {
@@ -131,7 +134,7 @@ export function PatientDetailScreen() {
   const totalBookings = historyQuery.data?.total ?? 0;
   // Cancelled, no-show and upcoming bookings are not visits.
   const completedVisits = list.filter((a) => a.status === 'completed').length;
-  const age = ageFromDob(p.dateOfBirth);
+  const age = ageFromDob(p.dateOfBirth, today);
   const phone = displayPhone(p.phone);
   const gender = genderLabel(p.gender);
   const address = formatAddress(p);
@@ -290,7 +293,7 @@ export function PatientDetailScreen() {
                       <td className={tdClass}>
                         {fmtDate(a.scheduledDate)}
                         <div className="text-caption text-text-muted">
-                          {formatTime(a.scheduledStartAt)}
+                          {formatTimeIn(a.scheduledStartAt, timeZone)}
                         </div>
                       </td>
                       <td className={tdClass}>

@@ -1,4 +1,5 @@
-import { fmtDate, todayISO } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { fmtDate } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Card } from '@/shared/ui/Card';
 import { Field } from '@/shared/ui/Field';
@@ -107,6 +108,8 @@ export function SettingsQueueSection({
   const doctors = useDoctorsQuery();
   const departments = useDepartmentsQuery();
   const templates = usePrintTemplatesQuery();
+  // The sample label's {DATE} is the hospital's today, as the backend renders it (D-09).
+  const { today } = useHospitalToday();
   const slipTemplates = (templates.data ?? []).filter((p) => p.kind === 'token_slip');
   const templateLabel = (id: string): string =>
     id === '' ? 'Hospital default' : (slipTemplates.find((p) => p.id === id)?.name ?? 'Unknown');
@@ -115,7 +118,6 @@ export function SettingsQueueSection({
   const sampleDepartment =
     (departments.data ?? []).find((d) => d.id === sampleDoctor?.departmentId) ??
     (departments.data ?? [])[0];
-  const today = todayISO();
   const sample = (source: 'online' | 'desk', seq: number) =>
     renderTokenLabel({
       format: t.format,

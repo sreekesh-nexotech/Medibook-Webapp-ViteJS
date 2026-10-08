@@ -35,30 +35,8 @@ export function toIsoDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Today as a local ISO date. */
-export function todayIso(): string {
-  return toIsoDate(new Date());
-}
-
-/**
- * Today's date in `timeZone` (the hospital's, D-09) as ISO `yyyy-mm-dd`;
- * the browser's own date when the zone is unknown or invalid.
- */
-export function todayIsoIn(timeZone: string | null | undefined, now: Date = new Date()): string {
-  if (!timeZone) return toIsoDate(now);
-  try {
-    // en-CA formats dates as yyyy-mm-dd.
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(now);
-  } catch (error) {
-    if (error instanceof RangeError) return toIsoDate(now);
-    throw error;
-  }
-}
+// "Today" is the hospital's calendar day (D-09, UAT-47): screens read it from
+// `useHospitalToday` (`@/shared/hooks/useHospitalTime`), never from the PC's clock.
 
 /** Parse ISO `yyyy-mm-dd` into a local-midnight `Date` (invalid input → null). */
 export function parseIsoDate(iso: string): Date | null {
