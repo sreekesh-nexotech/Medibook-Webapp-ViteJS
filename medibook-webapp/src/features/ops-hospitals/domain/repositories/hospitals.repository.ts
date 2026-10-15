@@ -2,6 +2,9 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  CommissionHistory,
+  FirstAdminInvitation,
+  FirstAdminResend,
   HospitalAppVisibility,
   HospitalCommissionChange,
   HospitalConvenienceFeeChange,
@@ -10,6 +13,7 @@ import type {
   HospitalListQuery,
   HospitalStatusCounts,
   HospitalSuspendReason,
+  PayoutBankAccount,
   PlatformHospital,
   PlatformHospitalDetail,
 } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
@@ -39,4 +43,18 @@ export interface HospitalsRepository {
     id: string,
     change: HospitalConvenienceFeeChange,
   ): Promise<Result<PlatformHospital>>;
+  /** Re-send (or re-address) the first administrator's invitation (CORE-04). */
+  resendAdminInvitation(
+    id: string,
+    resend: FirstAdminResend,
+  ): Promise<Result<FirstAdminInvitation>>;
+  /** Commission rates, scheduled first; `null` when the server has no history endpoint. */
+  getCommissionHistory(id: string): Promise<Result<CommissionHistory | null>>;
+  listBankAccounts(id: string): Promise<Result<readonly PayoutBankAccount[]>>;
+  /** Platform finance records the account as verified (idempotent). */
+  verifyBankAccount(
+    id: string,
+    accountId: string,
+    version: number,
+  ): Promise<Result<PayoutBankAccount>>;
 }

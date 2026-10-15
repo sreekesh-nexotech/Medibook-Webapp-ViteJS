@@ -1,7 +1,7 @@
 import type { OpsPermissionChecks, OpsPermissionKey } from '@/shared/hooks/useOpsPermission';
 
 import { OPS_NAV } from '@/app/layouts/ops-nav';
-import { opsPath, type OpsView } from '@/app/router/paths';
+import { OPS_BASE_PATH, opsPath, type OpsView } from '@/app/router/paths';
 
 /**
  * The permission each ops screen needs: the one its main read enforces on the
@@ -27,8 +27,12 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   'platform-user-detail': 'platform_users.view',
   notifications: 'settings.view',
   settings: 'settings.view',
-  account: null,
+  content: 'settings.view',
+  reviews: 'notifications.edit',
   support: 'support.view',
+  'message-templates': 'settings.view',
+  'onboarding-documents': 'settings.view',
+  account: null,
   'support-ticket': 'support.view',
 };
 
@@ -46,3 +50,7 @@ export function opsHomePath(checks: OpsPermissionChecks): string {
   }
   return opsPath('account');
 }
+
+/** The console's root, which sends each role to its own first screen. */
+export const OPS_HOME_PATH = OPS_BASE_PATH;
+

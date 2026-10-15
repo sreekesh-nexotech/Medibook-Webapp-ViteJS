@@ -27,20 +27,18 @@ import {
 export const profileRepository: ProfileRepository = {
   listHolidays: () => attempt(async () => (await listHolidays()).map(toHoliday)),
 
-  saveHoliday: (target, input, confirm, replayKey) =>
+  saveHoliday: (existing, input, mode) =>
     attempt(async () => {
       const body = toHolidayWriteRequest(input);
       return toScheduleChange(
-        target === null
-          ? await postHoliday(body, confirm, replayKey)
-          : await patchHoliday(target.id, body, confirm, target.version, replayKey),
+        existing === null
+          ? await postHoliday(body, mode)
+          : await patchHoliday(existing, body, mode),
       );
     }),
 
-  removeHoliday: (target, confirm, replayKey) =>
-    attempt(async () =>
-      toScheduleChange(await deleteHoliday(target.id, confirm, target.version, replayKey)),
-    ),
+  removeHoliday: (holiday, mode) =>
+    attempt(async () => toScheduleChange(await deleteHoliday(holiday, mode))),
 
   listBanners: () => attempt(async () => (await listBanners()).map(toHospitalBanner)),
 

@@ -4,6 +4,7 @@ import type {
   QueueSession,
   SessionCommand,
   SkipOutcome,
+  TokenCall,
   TokenCommand,
 } from '@/features/token-queue/domain/entities/tokenQueue.entities';
 
@@ -18,6 +19,8 @@ export interface TokenQueueRepository {
     tokenNo: number,
   ): Promise<Result<QueueSession>>;
   skip(sessionId: string, tokenNo: number): Promise<Result<SkipOutcome>>;
+  /** The session's latest call history, newest first. */
+  listCalls(sessionId: string): Promise<Result<readonly TokenCall[]>>;
   /** A session snapshot pushed over the queue WebSocket, or `null` when unreadable. */
   readPushedSession(data: unknown): QueueSession | null;
 }

@@ -6,13 +6,13 @@ import {
   SETTINGS_STALE_TIME_MS,
   settingsKeys,
 } from '@/features/settings/application/queries/settings.keys';
-import { fetchNumbering } from '@/features/settings/application/usecases/fetchNumbering';
+import { fetchNumberingSeries } from '@/features/settings/application/usecases/fetchNumberingSeries';
 
-/** The MRN, booking and receipt number series, with each one's next number. */
+/** The hospital's numbering series (MRN, booking ref, receipt). */
 export function useNumberingQuery(enabled = true) {
   return useQuery({
     queryKey: settingsKeys.numbering(),
-    queryFn: async () => unwrap(await fetchNumbering()),
+    queryFn: async () => unwrap(await fetchNumberingSeries()),
     staleTime: SETTINGS_STALE_TIME_MS,
     enabled,
   });

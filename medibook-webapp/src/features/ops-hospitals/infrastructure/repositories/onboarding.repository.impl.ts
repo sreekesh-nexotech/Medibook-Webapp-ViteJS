@@ -23,26 +23,47 @@ import {
 const REJECTED_STAGE = 'rejected';
 
 export const onboardingRepository: OnboardingRepository = {
-  listCases: () => attempt(async () => toPipeline(await listCases())),
+  listCases: (query) => attempt(async () => toPipeline(await listCases(query))),
 
   getCase: (caseId) => attempt(async () => toCaseDetail(await getCase(caseId))),
 
-  setStage: (caseId, stage) =>
-    attempt(async () => toCaseDetail(await patchCase(caseId, { stage }))),
+  setStage: (caseId, stage, version) =>
+    attempt(async () => toCaseDetail(await patchCase(caseId, { stage }, version))),
 
-  rejectCase: (caseId, reason) =>
+  rejectCase: (caseId, reason, version) =>
     attempt(async () =>
-      toCaseDetail(await patchCase(caseId, { stage: REJECTED_STAGE, rejection_reason: reason })),
+      toCaseDetail(
+        await patchCase(caseId, { stage: REJECTED_STAGE, rejection_reason: reason }, version),
+      ),
     ),
 
-  updateChecklistItem: (caseId, code, update) =>
+  updateCase: (caseId, changes, version) =>
+    attempt(async () =>
+      toCaseDetail(
+        await patchCase(
+          caseId,
+          {
+            ...(changes.notes !== undefined && { notes: changes.notes }),
+            ...(changes.assignedToId !== undefined && { assigned_to_id: changes.assignedToId }),
+          },
+          version,
+        ),
+      ),
+    ),
+
+  updateChecklistItem: (caseId, code, update, version) =>
     attempt(async () =>
       toChecklistItem(
-        await patchChecklistItem(caseId, code, {
-          status: update.status,
-          ...(update.note !== undefined && { note: update.note }),
-          ...(update.fileId !== undefined && { file_id: update.fileId }),
-        }),
+        await patchChecklistItem(
+          caseId,
+          code,
+          {
+            ...(update.status !== undefined && { status: update.status }),
+            ...(update.note !== undefined && { note: update.note }),
+            ...(update.fileId !== undefined && { file_id: update.fileId }),
+          },
+          version,
+        ),
       ),
     ),
 
@@ -59,9 +80,12 @@ export const onboardingRepository: OnboardingRepository = {
       return null;
     }),
 
-  goLive: (hospitalId) =>
+  goLive: (hospitalId, flags) =>
     attempt(async () => {
-      await postGoLive(hospitalId);
-      return null;
+      const hospital = await postGoLive(hospitalId, flags);
+      return {
+        appVisibility: hospital.app_visibility ?? null,
+        onlineBookingEnabled: hospital.online_booking_enabled ?? null,
+      };
     }),
 };

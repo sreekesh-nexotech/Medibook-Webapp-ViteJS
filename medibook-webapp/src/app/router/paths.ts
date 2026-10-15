@@ -49,6 +49,29 @@ export const AUTH_SURFACE_PARAM = 'surface';
 /** `AUTH_SURFACE_PARAM` value for the operations console. */
 export const AUTH_SURFACE_OPS = 'ops';
 
+/**
+ * The sign-in screen for `surface`. Operations exits (logout, idle sign-out,
+ * session expiry, a signed-out `/ops` visit) open the Operations tab, so the
+ * next sign-in goes to the right surface (UAT-44).
+ */
+export function loginPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_LOGIN_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_LOGIN_PATH;
+}
+
+/** The forgot-password screen for `surface` (emails come from that surface). */
+export function forgotPathFor(surface: ApiSurface): string {
+  return surface === 'platform'
+    ? `${AUTH_FORGOT_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
+    : AUTH_FORGOT_PATH;
+}
+
+/** The surface a `?surface=` value names (anything but `ops` is the hospital app). */
+export function surfaceFromParam(value: string | null): ApiSurface {
+  return value === AUTH_SURFACE_OPS ? 'platform' : 'hospital';
+}
+
 /*
  * Emailed report links. A large export or a scheduled report is emailed as
  * `{FRONTEND_HOSPITAL_URL}/reports/downloads/{file_id}` or
@@ -114,7 +137,7 @@ export type HospitalView =
   // ---- added this round (screens owned by the feature agents) ----
   /** Doctor slot templates + exceptions. Admin-only. */
   | 'slots'
-  /** Hospital profile: branches, holidays, banners. Admin-only. */
+  /** Hospital profile: holidays and banners (one hospital = one location, D-02). Admin-only. */
   | 'profile'
   /** Services & pricing, taxes, coupons. Admin-only. */
   | 'services'
@@ -173,6 +196,24 @@ export const BOOK_FOR_PATIENT_PARAM = 'patient';
 /** Query param carrying a department name from the front desk to Token Management. */
 export const TOKEN_DEPT_PARAM = 'dept';
 
+/** Query param opening the appointment list on one tab (a slug, e.g. `pending-payment`). */
+export const APPOINTMENTS_TAB_PARAM = 'tab';
+
+/** Query param opening the appointment list with one booking's drawer open. */
+export const APPOINTMENT_PARAM = 'appointment';
+
+/** The appointment list, optionally on a tab and/or with one booking open. */
+export function hospitalAppointmentsPath(
+  role: HospitalRole,
+  options: { readonly tab?: string; readonly appointmentId?: string } = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.tab) params.set(APPOINTMENTS_TAB_PARAM, options.tab);
+  if (options.appointmentId) params.set(APPOINTMENT_PARAM, options.appointmentId);
+  const query = params.toString();
+  return `${hospitalPath(role, 'appointments')}${query ? `?${query}` : ''}`;
+}
+
 /** New Appointment, pre-selecting the patient with this record id. */
 export function hospitalBookForPatientPath(role: HospitalRole, patientId: string): string {
   const query = new URLSearchParams({ [BOOK_FOR_PATIENT_PARAM]: patientId });
@@ -195,6 +236,17 @@ export function isRecordId(value: string): boolean {
   return RECORD_ID.test(value);
 }
 
+/** Query param selecting a tab of the Patients screen. */
+export const PATIENTS_TAB_PARAM = 'tab';
+
+/** `PATIENTS_TAB_PARAM` value of the patient approvals queue (D-29). */
+export const PATIENTS_APPROVALS_TAB = 'approvals';
+
+/** The Patients screen on its approvals queue. */
+export function hospitalPatientApprovalsPath(role: HospitalRole): string {
+  return `${hospitalPath(role, 'patients')}?${new URLSearchParams({ [PATIENTS_TAB_PARAM]: PATIENTS_APPROVALS_TAB })}`;
+}
+
 /** Token Management, filtered to one department. */
 export function hospitalTokenForDeptPath(role: HospitalRole, dept: string): string {
   return `${hospitalPath(role, 'token')}?${new URLSearchParams({ [TOKEN_DEPT_PARAM]: dept })}`;
@@ -211,6 +263,43 @@ export function hospitalSlotsPath(role: HospitalRole): string {
   return hospitalPath(role, 'slots');
 }
 
+export function hospitalProfilePath(role: HospitalRole): string {
+  return hospitalPath(role, 'profile');
+}
+
+/** Query parameter that opens a Hospital Profile tab (`holidays` | `banners`). */
+export const PROFILE_TAB_PARAM = 'tab';
+export const PROFILE_TAB_HOLIDAYS = 'holidays';
+export const PROFILE_TAB_BANNERS = 'banners';
+
+/** Hospital Profile › Holiday Calendar — where closures are maintained (UAT-73). */
+export function hospitalHolidaysPath(role: HospitalRole): string {
+  return `${hospitalProfilePath(role)}?${new URLSearchParams({ [PROFILE_TAB_PARAM]: PROFILE_TAB_HOLIDAYS })}`;
+}
+
+/** Query parameter that opens a doctor profile tab (`availability` | `reviews`). */
+export const DOCTOR_TAB_PARAM = 'tab';
+
+/** A doctor's profile on its Availability tab (UAT-73 "Edit availability"). */
+export function hospitalDoctorAvailabilityPath(role: HospitalRole, doctorId: string): string {
+  return `${hospitalPath(role, 'doctors')}/${encodeURIComponent(doctorId)}?${new URLSearchParams({ [DOCTOR_TAB_PARAM]: 'availability' })}`;
+}
+
+export function hospitalServicesPath(role: HospitalRole): string {
+  return hospitalPath(role, 'services');
+}
+
+export function hospitalMessagingPath(role: HospitalRole): string {
+  return hospitalPath(role, 'messaging');
+}
+
+export function hospitalAuditPath(role: HospitalRole): string {
+  return hospitalPath(role, 'audit');
+}
+
+export function hospitalBillingPath(role: HospitalRole): string {
+  return hospitalPath(role, 'billing');
+}
 export function hospitalAccountPath(role: HospitalRole): string {
   return hospitalPath(role, 'account');
 }
@@ -273,6 +362,16 @@ export type OpsView =
   | 'onboarding'
   /** Document/regulatory compliance per hospital. */
   | 'compliance'
+  /** Patient App Content (UAT report §8). */
+  | 'content'
+  /** Review Moderation (UAT report §8). */
+  | 'reviews'
+  /** Support Desk (UAT report §8). */
+  | 'support'
+  /** Message Templates (UAT report §8). */
+  | 'message-templates'
+  /** Onboarding Documents (UAT report §8). */
+  | 'onboarding-documents'
   /** The signed-in user's own account: name, password, sessions. */
   | 'account'
   /** Support tickets from hospitals and patients (OBS-02). */
@@ -310,8 +409,12 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   settings: 'settings',
   onboarding: 'onboarding',
   compliance: 'compliance',
-  account: 'account',
+  content: 'content',
+  reviews: 'reviews',
   support: 'support',
+  'message-templates': 'message-templates',
+  'onboarding-documents': 'onboarding-documents',
+  account: 'account',
   'support-ticket': 'support/:id',
 };
 
@@ -351,8 +454,47 @@ export function opsOnboardingPath(): string {
   return opsPath('onboarding');
 }
 
+/** Query param that opens one application on the onboarding pipeline (10·F13). */
+export const ONBOARDING_CASE_PARAM = 'case';
+
+/** The onboarding pipeline with `caseId` open. */
+export function opsOnboardingCasePath(caseId: string): string {
+  return `${opsPath('onboarding')}?${new URLSearchParams({ [ONBOARDING_CASE_PARAM]: caseId }).toString()}`;
+}
+
+/** Query param that filters the Billing screen to one hospital (11·R8). */
+export const BILLING_HOSPITAL_PARAM = 'hospital';
+
+/** The Billing screen filtered to one hospital. */
+export function opsBillingForHospitalPath(hospitalId: string): string {
+  return `${opsPath('billing')}?${new URLSearchParams({ [BILLING_HOSPITAL_PARAM]: hospitalId }).toString()}`;
+}
+
+/** `?hospital=<id>` on Settlements: the queue for one hospital. */
+export const SETTLEMENTS_HOSPITAL_PARAM = 'hospital';
+
+/** The Settlements screen filtered to one hospital. */
+export function opsSettlementsForHospitalPath(hospitalId: string): string {
+  return `${opsPath('settlements')}?${new URLSearchParams({ [SETTLEMENTS_HOSPITAL_PARAM]: hospitalId }).toString()}`;
+}
+
+export function opsCompliancePath(): string {
+  return opsPath('compliance');
+}
+
 export function opsAccountPath(): string {
   return opsPath('account');
+}
+
+/** Query param carrying a hospital filter into Compliance Logs (hospital profile → logs). */
+export const OPS_LOGS_HOSPITAL_PARAM = 'hospital_id';
+
+/** Compliance Logs, optionally narrowed to one hospital's entries. */
+export function opsLogsPath(hospitalId?: string): string {
+  const base = opsPath('logs');
+  return hospitalId
+    ? `${base}?${new URLSearchParams({ [OPS_LOGS_HOSPITAL_PARAM]: hospitalId }).toString()}`
+    : base;
 }
 
 /** Ops list views resolvable 1:1 from their first URL segment. */
@@ -371,6 +513,11 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'settings',
   'onboarding',
   'compliance',
+  'content',
+  'reviews',
+  'support',
+  'message-templates',
+  'onboarding-documents',
   'account',
   'support',
 ];

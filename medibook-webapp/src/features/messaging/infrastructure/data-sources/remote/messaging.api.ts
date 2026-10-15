@@ -1,6 +1,6 @@
 import { idempotencyKey } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, fetchAllPages } from '@/core/api/pagination';
 
 import type { PatientChannel } from '@/features/messaging/domain/entities/messaging.entities';
 import type {
@@ -9,6 +9,7 @@ import type {
 } from '@/features/messaging/infrastructure/data-sources/remote/messaging.request';
 import {
   deliveryPageResponseSchema,
+  deliveryResponseSchema,
   sendResponseSchema,
   templatePageResponseSchema,
   type DeliveryResponse,
@@ -34,14 +35,18 @@ export async function getDeliveries(params: DeliveryQueryParams) {
   return deliveryPageResponseSchema.parse(response.data);
 }
 
-/** `GET /hospital/messaging/deliveries` — every page from 1 onward. */
+/**
+ * `GET /hospital/messaging/deliveries` — every page from 1 onward; fails
+ * loudly past the paging cap rather than export a silent part (05 F23).
+ */
 export async function getAllDeliveries(params: DeliveryQueryParams): Promise<DeliveryResponse[]> {
-  const rows: DeliveryResponse[] = [];
-  for (let page = 1; ; page += 1) {
-    const body = await getDeliveries({ ...params, page });
-    rows.push(...body.results);
-    if (!body.has_next) return rows;
-  }
+  return fetchAllPages((page) => getDeliveries({ ...params, ...page }));
+}
+
+/** `GET /hospital/messaging/deliveries/{id}` — one delivery in full. */
+export async function getDelivery(id: string): Promise<DeliveryResponse> {
+  const response = await hospitalApi.get(`/messaging/deliveries/${encodeURIComponent(id)}`);
+  return deliveryResponseSchema.parse(response.data);
 }
 
 /** `POST /hospital/messaging/send` — idempotent on the caller's replay key. */

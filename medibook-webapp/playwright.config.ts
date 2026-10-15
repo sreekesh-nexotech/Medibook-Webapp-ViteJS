@@ -17,6 +17,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: 'e2e',
+  // The live UAT suite has its own config (`npm run uat`).
+  testIgnore: ['uat/**'],
   fullyParallel: false,
   workers: 1,
   retries: 0,

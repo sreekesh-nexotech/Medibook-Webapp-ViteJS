@@ -1,0 +1,58 @@
+{
+  "results": [
+    {
+      "id": "01a118b8-9513-7792-9977-6735e1356dde",
+      "credit_note_no": "CN-26-27-0001",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "hospital_name": "Lakeshore Multispeciality Hospital",
+      "subscription_id": "01a118b6-8f23-7ae1-ac5f-42f6a3754310",
+      "against_invoice_id": "01a118b7-ed1a-7ec1-b5b1-674a25c7dbba",
+      "issued_at": "2026-10-07T23:35:12.398556Z",
+      "reason": "Plan change Enterprise (monthly) → Growth (monthly)",
+      "subtotal_paise": 1266603,
+      "gst_paise": 228000,
+      "total_paise": 1494603,
+      "applied_paise": 1494603,
+      "remaining_paise": 0,
+      "lines": [
+        {
+          "line_type": "proration",
+          "tax_paise": 228000,
+          "description": "Unused 19 of 30 days — Enterprise (monthly)",
+          "tax_rate_bp": 1800,
+          "amount_paise": 1266603,
+          "invoice_tax_paise": 228000
+        }
+      ],
+      "hospital_snapshot": {
+        "city": "Kochi",
+        "name": "Lakeshore Multispeciality Hospital",
+        "email": "contact@lakeshore.medibook.example.com",
+        "gstin": "00AAAAA0000A0A0",
+        "state": "Kerala",
+        "pincode": "682040",
+        "legal_name": "Lakeshore Healthcare Pvt Ltd",
+        "phone_e164": "+910000000000",
+        "address_line1": "NH 66 Bypass, Maradu",
+        "address_line2": "Near Vyttila Hub",
+        "address_line3": null
+      },
+      "platform_snapshot": {
+        "city": "Kochi",
+        "gstin": "00AAAAA0000A0A0",
+        "state": "Kerala",
+        "pincode": "682042",
+        "legal_name": "Medibook Health Technologies Pvt Ltd",
+        "phone_e164": "+910000000000",
+        "address_line1": "4th Floor, Infopark Phase 2",
+        "address_line2": null,
+        "address_line3": null
+      },
+      "created_at": "2026-10-07T23:35:12.403039Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

@@ -1,12 +1,13 @@
 /**
  * The Hospital Settings screen's editable draft, and the pure mapping between
- * it and the server records (module H2). The screen edits labels ("30 days",
- * "8:00 am") because that is what its selects offer; this module is the one
- * place those labels become the numbers and `HH:MM` times the API takes.
+ * it and the server records (module H2). One draft per backend resource —
+ * profile, rulebook, hours, token policy — so each saves on its own and
+ * switching sections keeps every edit (07·F10).
  *
  * Pure functions and constants only: no React, no store, no I/O.
  */
 
+import { minutesToTimeLabel, timeLabelToMinutes } from '@/features/doctors/domain/calendar';
 import type {
   BankAccount,
   BankAccountInput,
@@ -15,10 +16,7 @@ import type {
   HospitalProfileChanges,
   HospitalRuleChanges,
   HospitalRuleSettings,
-  NumberingChanges,
-  NumberingKind,
-  NumberingReset,
-  NumberingSeries,
+  ReceiptPaper,
   TokenPolicy,
   TokenPolicyChanges,
   TokenReset,
@@ -26,21 +24,23 @@ import type {
 } from '@/features/settings/domain/entities/settings.entities';
 
 import {
-  durationCopy,
-  minutesToTimeLabel,
-  parseCount,
-  parseDurationMinutes,
-  parseTimeLabelMinutes,
+  bpToPercentInput,
+  formatError,
+  percentInputToBp,
+  TOKEN_LABEL_TOKENS,
 } from './settings.rules';
 
 /* ------------------------------------------------------------------ shapes */
 
 export interface ProfileForm {
   readonly name: string;
+  readonly legalName: string;
   readonly email: string;
   readonly phone: string;
-  /** Bound to `address_line1`. */
-  readonly address: string;
+  readonly website: string;
+  readonly address1: string;
+  readonly address2: string;
+  readonly address3: string;
   readonly city: string;
   readonly state: string;
   readonly pincode: string;
@@ -48,87 +48,69 @@ export interface ProfileForm {
   readonly lng: string;
   readonly logoFileId: string | null;
   readonly coverFileId: string | null;
+  readonly stampFileId: string | null;
+}
+
+/** One weekday: open or closed, and its own hours (07·F14, UAT-50). */
+export interface HoursDayForm {
+  readonly open: boolean;
+  /** Time labels ("9:00 am"). */
+  readonly from: string;
+  readonly to: string;
 }
 
 export interface HoursForm {
-  readonly open: string;
-  readonly close: string;
-  /** Open flags Mon..Sun (7 entries). */
-  readonly days: readonly boolean[];
+  /** Mon..Sun (7 entries). */
+  readonly days: readonly HoursDayForm[];
 }
 
+/** The rulebook as the form edits it: numbers are text until saved, switches are booleans. */
 export interface RulesForm {
-  readonly horizon: string;
-  readonly onlineApproval: boolean;
-  readonly holdTimeout: string;
-  readonly cancelBefore: string;
-  /** "100%" … "0%". */
-  readonly refundBefore: string;
-  readonly refundAfter: string;
-  readonly refundFee: boolean;
-  readonly feeValidity: string;
-  /** "3 missed calls". */
-  readonly noShowCalls: string;
-  /** "Until the token is called" / "30 min before the session". */
-  readonly tokenCancel: string;
-  /** Digits, 1–240. */
-  readonly consultMinutes: string;
-  readonly patientNotes: boolean;
-  readonly patientEditApproval: boolean;
-  readonly displayFullName: boolean;
+  readonly bookingWindowDays: string;
+  readonly onlineRequiresApproval: boolean;
+  readonly holdTimeoutMinutes: string;
+  readonly cancellationCutoffHours: string;
+  readonly refundBeforePct: string;
+  readonly refundAfterPct: string;
+  readonly refundIncludesConvenienceFee: boolean;
+  readonly followUpWindowDays: string;
+  readonly noShowCallAttempts: string;
+  /** Empty = tokens can be cancelled until they are called. */
+  readonly tokenCancelLimitMin: string;
+  readonly expectedConsultMinutes: string;
+  readonly patientNotesEnabled: boolean;
+  readonly receiptPaper: ReceiptPaper;
+  readonly receiptShowStaff: boolean;
+  readonly patientEditRequiresApproval: boolean;
+  readonly displayShowFullName: boolean;
+  /** `null` while the backend does not offer the setting (APPT-03). */
+  readonly deskPaymentMethods: readonly string[] | null;
 }
 
 export interface TokenForm {
-  /** A `TOKEN_SCOPE_OPTIONS` label. */
-  readonly scope: string;
-  /** A `TOKEN_RESET_OPTIONS` label. */
-  readonly reset: string;
+  /** Starts at the pending value when a change is scheduled (07·F4). */
+  readonly scope: TokenScope;
+  readonly reset: TokenReset;
   readonly format: string;
   readonly prefix: string;
   readonly onlineMarker: string;
   readonly offlineMarker: string;
   readonly separateRanges: boolean;
-  readonly onlineFrom: string;
-  readonly onlineTo: string;
-  readonly walkInFrom: string;
-  readonly walkInTo: string;
+  readonly onlineRangeStart: string;
+  readonly onlineRangeEnd: string;
+  readonly offlineRangeStart: string;
+  readonly offlineRangeEnd: string;
   readonly reuseCancelled: boolean;
+  /** Empty = the hospital's default token-slip template. */
+  readonly printTemplateId: string;
 }
 
-/** One number series' draft (MRN, booking or receipt). */
-export interface NumberingForm {
-  readonly format: string;
-  readonly prefix: string;
-  /** Digits, 1–12. */
-  readonly padWidth: string;
-  /** A `NUMBERING_RESET_OPTIONS` label. */
-  readonly reset: string;
-  /** A month name. */
-  readonly fyStartMonth: string;
-}
-
-export interface BankForm {
-  readonly accountName: string;
-  readonly bank: string;
-  /** A NEW account number; empty keeps the stored one (it is never returned). */
-  readonly account: string;
-  readonly ifsc: string;
-  readonly upi: string;
-}
-
-/**
- * One draft per backend resource, so each section saves on its own — each
- * number series is its own resource with its own version.
- */
+/** One draft per backend resource, so each section saves on its own. */
 export interface SettingsForm {
   readonly profile: ProfileForm;
   readonly hours: HoursForm;
   readonly rules: RulesForm;
   readonly token: TokenForm;
-  readonly bank: BankForm;
-  readonly mrn: NumberingForm;
-  readonly booking: NumberingForm;
-  readonly receipt: NumberingForm;
 }
 
 export type SettingsFormSection = keyof SettingsForm;
@@ -138,14 +120,7 @@ export const SETTINGS_FORM_SECTIONS: readonly SettingsFormSection[] = [
   'hours',
   'rules',
   'token',
-  'bank',
-  'mrn',
-  'booking',
-  'receipt',
 ];
-
-/** The series this screen manages, in display order. */
-export const NUMBERING_KINDS: readonly NumberingKind[] = ['mrn', 'booking', 'receipt'];
 
 /* ----------------------------------------------------------------- helpers */
 
@@ -154,24 +129,47 @@ const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
 const HH_MM_PAD = 2;
 
-/** Form defaults for a hospital whose hours were never set (the design's defaults). */
-const DEFAULT_OPEN_LABEL = '8:00 am';
-const DEFAULT_CLOSE_LABEL = '8:00 pm';
+/** Form defaults for a weekday the server has no hours for. */
+const DEFAULT_OPEN_LABEL = '9:00 am';
+const DEFAULT_CLOSE_LABEL = '6:00 pm';
 
-/**
- * Hold-timeout choices the backend accepts (2–15 minutes,
- * `HospitalSettingsUpdateRequest.hold_timeout_seconds`). Replaces the design's
- * 15/30/45 list, two of which the server would refuse.
- */
-export const HOLD_TIMEOUT_SERVER_OPTIONS = ['5 mins', '10 mins', '15 mins'] as const;
+/** Backend bounds (`HospitalSettingsUpdateSerializer`). */
+export const RULE_BOUNDS = {
+  bookingWindowDays: { min: 1, max: 180 },
+  holdTimeoutMinutes: { min: 2, max: 15 },
+  cancellationCutoffHours: { min: 0, max: 720 },
+  followUpWindowDays: { min: 0, max: 365 },
+  noShowCallAttempts: { min: 1, max: 10 },
+  tokenCancelLimitMin: { min: 0, max: 1440 },
+  expectedConsultMinutes: { min: 1, max: 240 },
+} as const;
 
-/** Follow-up window bounds (`follow_up_window_days`, 0..365). */
-export const FEE_VALIDITY_MAX_DAYS = 365;
+/** Hold-timeout choices, whole minutes the backend accepts (2–15). */
+export const HOLD_TIMEOUT_OPTIONS: readonly string[] = Array.from(
+  { length: RULE_BOUNDS.holdTimeoutMinutes.max - RULE_BOUNDS.holdTimeoutMinutes.min + 1 },
+  (_, i) => String(RULE_BOUNDS.holdTimeoutMinutes.min + i),
+);
 
-/** `options` plus `value` when the server holds a value the list does not offer. */
-export function withCurrent(options: readonly string[], value: string): readonly string[] {
-  return value === '' || options.includes(value) ? options : [...options, value];
-}
+/** No-show offer after 1–10 skips (Q27). */
+export const NO_SHOW_ATTEMPT_OPTIONS: readonly string[] = Array.from(
+  { length: RULE_BOUNDS.noShowCallAttempts.max },
+  (_, i) => String(i + 1),
+);
+
+export const RECEIPT_PAPER_OPTIONS: readonly ReceiptPaper[] = ['A5', '80mm', 'A4'];
+
+/** Desk methods a hospital can accept (`DESK_PAYMENT_METHOD_CHOICES`, APPT-03). */
+export const DESK_PAYMENT_METHODS: readonly { readonly value: string; readonly label: string }[] = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'card', label: 'Card' },
+  { value: 'pos', label: 'POS terminal' },
+  { value: 'netbanking', label: 'Net banking' },
+  { value: 'wallet', label: 'Wallet' },
+  { value: 'emi', label: 'EMI' },
+  { value: 'paylater', label: 'Pay later' },
+  { value: 'other', label: 'Other' },
+];
 
 function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -188,10 +186,6 @@ export function withoutSections(
     ...(edits.hours && keep('hours') && { hours: edits.hours }),
     ...(edits.rules && keep('rules') && { rules: edits.rules }),
     ...(edits.token && keep('token') && { token: edits.token }),
-    ...(edits.bank && keep('bank') && { bank: edits.bank }),
-    ...(edits.mrn && keep('mrn') && { mrn: edits.mrn }),
-    ...(edits.booking && keep('booking') && { booking: edits.booking }),
-    ...(edits.receipt && keep('receipt') && { receipt: edits.receipt }),
   };
 }
 
@@ -202,6 +196,31 @@ export function isSectionDirty(
   section: SettingsFormSection,
 ): boolean {
   return !sameJson(base[section], draft[section]);
+}
+
+/** The rulebook fields whose draft differs from the server. */
+export function dirtyRuleFields(base: RulesForm, draft: RulesForm): readonly (keyof RulesForm)[] {
+  return (Object.keys(draft) as (keyof RulesForm)[]).filter((k) => !sameJson(base[k], draft[k]));
+}
+
+function intText(n: number | null): string {
+  return n === null ? '' : String(n);
+}
+
+function textInt(s: string): number | null {
+  const t = s.trim();
+  return /^\d+$/.test(t) ? Number(t) : null;
+}
+
+/** A whole number in `[min, max]`, or the reason it is not. */
+export function boundedIntError(
+  text: string,
+  label: string,
+  { min, max }: { readonly min: number; readonly max: number },
+): string | undefined {
+  const n = textInt(text);
+  if (n === null) return `${label} must be a whole number.`;
+  return n >= min && n <= max ? undefined : `${label} must be between ${min} and ${max}.`;
 }
 
 /* ------------------------------------------------------------------- phone */
@@ -240,12 +259,22 @@ function coordValue(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Optional text: blank is sent as `null` (the backend stores no empty strings). */
+function optionalText(s: string): string | null {
+  const t = s.trim();
+  return t === '' ? null : t;
+}
+
 export function toProfileForm(p: HospitalProfile): ProfileForm {
   return {
     name: p.name,
+    legalName: p.legalName ?? '',
     email: p.email,
     phone: phoneForDisplay(p.phoneE164),
-    address: p.addressLine1,
+    website: p.website ?? '',
+    address1: p.addressLine1,
+    address2: p.addressLine2 ?? '',
+    address3: p.addressLine3 ?? '',
     city: p.city,
     state: p.state,
     pincode: p.pincode,
@@ -253,16 +282,25 @@ export function toProfileForm(p: HospitalProfile): ProfileForm {
     lng: coordCopy(p.lng),
     logoFileId: p.logoFileId,
     coverFileId: p.coverFileId,
+    stampFileId: p.stampFileId,
   };
 }
 
-/** Only the fields that changed, in API units. */
+/**
+ * Only the fields that changed, in API units. Coordinates are sent only
+ * when the user typed them — nothing on this screen invents a location
+ * (07·F1, UAT-28).
+ */
 export function profileChanges(base: ProfileForm, draft: ProfileForm): HospitalProfileChanges {
   return {
     ...(draft.name !== base.name && { name: draft.name.trim() }),
+    ...(draft.legalName !== base.legalName && { legalName: optionalText(draft.legalName) }),
     ...(draft.email !== base.email && { email: draft.email.trim() }),
     ...(draft.phone !== base.phone && { phoneE164: phoneToE164(draft.phone) }),
-    ...(draft.address !== base.address && { addressLine1: draft.address.trim() }),
+    ...(draft.website !== base.website && { website: optionalText(draft.website) }),
+    ...(draft.address1 !== base.address1 && { addressLine1: draft.address1.trim() }),
+    ...(draft.address2 !== base.address2 && { addressLine2: optionalText(draft.address2) }),
+    ...(draft.address3 !== base.address3 && { addressLine3: optionalText(draft.address3) }),
     ...(draft.city !== base.city && { city: draft.city.trim() }),
     ...(draft.state !== base.state && { state: draft.state.trim() }),
     ...(draft.pincode !== base.pincode && { pincode: draft.pincode.trim() }),
@@ -270,331 +308,288 @@ export function profileChanges(base: ProfileForm, draft: ProfileForm): HospitalP
     ...(draft.lng !== base.lng && { lng: coordValue(draft.lng) }),
     ...(draft.logoFileId !== base.logoFileId && { logoFileId: draft.logoFileId }),
     ...(draft.coverFileId !== base.coverFileId && { coverFileId: draft.coverFileId }),
+    ...(draft.stampFileId !== base.stampFileId && { stampFileId: draft.stampFileId }),
   };
 }
 
 /* ------------------------------------------------------------------- hours */
 
 function hhmmToLabel(hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number);
-  return minutesToTimeLabel((h ?? 0) * MINUTES_PER_HOUR + (m ?? 0));
+  return minutesToTimeLabel(timeLabelToMinutes(hhmm) ?? 0);
 }
 
-function labelToHhmm(label: string): string {
-  const total = parseTimeLabelMinutes(label);
+function labelToHhmm(label: string): string | null {
+  const total = timeLabelToMinutes(label);
+  if (total === null) return null;
   const h = Math.floor(total / MINUTES_PER_HOUR);
   const m = total % MINUTES_PER_HOUR;
   return `${String(h).padStart(HH_MM_PAD, '0')}:${String(m).padStart(HH_MM_PAD, '0')}`;
 }
 
-function openDaysOf(days: readonly HospitalHoursDay[]): readonly HospitalHoursDay[] {
-  return days.filter((d) => !d.isClosed && d.opensAt !== null && d.closesAt !== null);
-}
-
-/**
- * The week as the screen shows it: one open/close pair (the first open day's)
- * and the Mon..Sun open flags. A weekday the server has no row for is closed.
- */
+/** The week as the screen edits it — each weekday its own hours. Missing days are closed. */
 export function toHoursForm(days: readonly HospitalHoursDay[]): HoursForm {
-  const first = openDaysOf(days)[0];
   const byWeekday = new Map(days.map((d) => [d.weekday, d]));
   return {
-    open: first?.opensAt ? hhmmToLabel(first.opensAt) : DEFAULT_OPEN_LABEL,
-    close: first?.closesAt ? hhmmToLabel(first.closesAt) : DEFAULT_CLOSE_LABEL,
     days: Array.from({ length: DAYS_IN_WEEK }, (_, i) => {
       const d = byWeekday.get(i);
-      return d !== undefined && !d.isClosed;
+      const open = d !== undefined && !d.isClosed && d.opensAt !== null && d.closesAt !== null;
+      return {
+        open,
+        from: d?.opensAt ? hhmmToLabel(d.opensAt) : DEFAULT_OPEN_LABEL,
+        to: d?.closesAt ? hhmmToLabel(d.closesAt) : DEFAULT_CLOSE_LABEL,
+      };
     }),
   };
 }
 
-/** True when open days carry different times — saving makes them all the same. */
-export function hasMixedHours(days: readonly HospitalHoursDay[]): boolean {
-  const open = openDaysOf(days);
-  return open.some((d) => d.opensAt !== open[0]?.opensAt || d.closesAt !== open[0]?.closesAt);
+/** Per-day problems (index → message): an open day must close after it opens. */
+export function hoursErrors(form: HoursForm): Readonly<Record<number, string>> {
+  const out: Record<number, string> = {};
+  form.days.forEach((d, i) => {
+    if (!d.open) return;
+    const from = timeLabelToMinutes(d.from);
+    const to = timeLabelToMinutes(d.to);
+    if (from === null || to === null) out[i] = 'Pick an opening and a closing time.';
+    else if (to <= from) out[i] = 'Closing time must be after opening time.';
+  });
+  return out;
 }
 
-/** The full week the API takes: exactly one entry per weekday 0..6. */
+/** The full week the API takes: exactly one entry per weekday 0..6 (`PUT /hours`). */
 export function hoursFromForm(form: HoursForm): readonly HospitalHoursDay[] {
-  const opensAt = labelToHhmm(form.open);
-  const closesAt = labelToHhmm(form.close);
   return Array.from({ length: DAYS_IN_WEEK }, (_, weekday) => {
-    const isOpen = form.days[weekday] === true;
+    const d = form.days[weekday];
+    const isOpen = d?.open === true;
     return {
       weekday,
       isClosed: !isOpen,
-      opensAt: isOpen ? opensAt : null,
-      closesAt: isOpen ? closesAt : null,
+      opensAt: isOpen && d ? labelToHhmm(d.from) : null,
+      closesAt: isOpen && d ? labelToHhmm(d.to) : null,
     };
   });
 }
 
 /* ------------------------------------------------------------------- rules */
 
-const BASIS_POINTS_PER_PERCENT = 100;
-const UNTIL_CALLED = 'Until the token is called';
-const UNTIL_SESSION_STARTS = 'Until the session starts';
-const BEFORE_SESSION = 'before the session';
-const MAX_NO_SHOW_CALLS = 10;
-const TOKEN_CANCEL_CHOICES_MIN = [15, 30, 60, 120] as const;
-
-/** Refund shares offered (`refund_*_cutoff_bp`, 0–10000). */
-export const REFUND_OPTIONS = ['100%', '75%', '50%', '25%', '0%'] as const;
-
-/** Expected consultation bounds (`expected_consult_minutes`, 1–240). */
-export const CONSULT_MINUTES_MAX = 240;
-
-function hoursLabel(hours: number): string {
-  return hours === 1 ? '1 hour' : `${hours} hours`;
-}
-
-/** 10000 → "100%", 3333 → "33.33%". */
-export function refundLabel(bp: number): string {
-  const percent = bp / BASIS_POINTS_PER_PERCENT;
-  return `${Number.isInteger(percent) ? percent : percent.toFixed(2)}%`;
-}
-
-function refundBp(label: string): number {
-  const percent = Number.parseFloat(label);
-  return Number.isFinite(percent) ? Math.round(percent * BASIS_POINTS_PER_PERCENT) : 0;
-}
-
-function noShowCallsLabel(calls: number): string {
-  return calls === 1 ? '1 missed call' : `${calls} missed calls`;
-}
-
-/** Missed calls before the desk is offered a no-show (`no_show_call_attempts`, 1–10). */
-export const NO_SHOW_CALL_OPTIONS: readonly string[] = Array.from(
-  { length: MAX_NO_SHOW_CALLS },
-  (_, i) => noShowCallsLabel(i + 1),
-);
-
-function tokenCancelLabel(minutes: number | null): string {
-  if (minutes === null) return UNTIL_CALLED;
-  if (minutes === 0) return UNTIL_SESSION_STARTS;
-  return `${durationCopy(minutes)} ${BEFORE_SESSION}`;
-}
-
-/** How long a patient can cancel a token (`token_cancel_limit_min`, null or 0–1440). */
-export const TOKEN_CANCEL_OPTIONS: readonly string[] = [
-  UNTIL_CALLED,
-  UNTIL_SESSION_STARTS,
-  ...TOKEN_CANCEL_CHOICES_MIN.map(tokenCancelLabel),
-];
-
-/** "1 h 30 min before the session" → 90; the two fixed choices → null / 0. */
-export function tokenCancelMinutes(label: string): number | null {
-  if (label === UNTIL_CALLED) return null;
-  if (label === UNTIL_SESSION_STARTS) return 0;
-  const m = /^(?:(\d+) h)?\s*(?:(\d+) min)?/.exec(label);
-  return Number(m?.[1] ?? 0) * MINUTES_PER_HOUR + Number(m?.[2] ?? 0);
-}
-
 export function toRulesForm(r: HospitalRuleSettings): RulesForm {
   return {
-    horizon: `${r.bookingWindowDays} days`,
-    onlineApproval: r.onlineRequiresApproval,
-    holdTimeout: `${Math.round(r.holdTimeoutSeconds / SECONDS_PER_MINUTE)} mins`,
-    cancelBefore: hoursLabel(r.cancellationCutoffHours),
-    refundBefore: refundLabel(r.refundBeforeCutoffBp),
-    refundAfter: refundLabel(r.refundAfterCutoffBp),
-    refundFee: r.refundIncludesConvenienceFee,
-    feeValidity: String(r.followUpWindowDays),
-    noShowCalls: noShowCallsLabel(r.noShowCallAttempts),
-    tokenCancel: tokenCancelLabel(r.tokenCancelLimitMin),
-    consultMinutes: String(r.expectedConsultMinutes),
-    patientNotes: r.patientNotesEnabled,
-    patientEditApproval: r.patientEditRequiresApproval,
-    displayFullName: r.displayShowFullName,
+    bookingWindowDays: String(r.bookingWindowDays),
+    onlineRequiresApproval: r.onlineRequiresApproval,
+    holdTimeoutMinutes: String(Math.round(r.holdTimeoutSeconds / SECONDS_PER_MINUTE)),
+    cancellationCutoffHours: String(r.cancellationCutoffHours),
+    refundBeforePct: bpToPercentInput(r.refundBeforeCutoffBp),
+    refundAfterPct: bpToPercentInput(r.refundAfterCutoffBp),
+    refundIncludesConvenienceFee: r.refundIncludesConvenienceFee,
+    followUpWindowDays: String(r.followUpWindowDays),
+    noShowCallAttempts: String(r.noShowCallAttempts),
+    tokenCancelLimitMin: intText(r.tokenCancelLimitMin),
+    expectedConsultMinutes: intText(r.expectedConsultMinutes),
+    patientNotesEnabled: r.patientNotesEnabled,
+    receiptPaper: r.receiptPaper,
+    receiptShowStaff: r.receiptShowStaff,
+    patientEditRequiresApproval: r.patientEditRequiresApproval,
+    displayShowFullName: r.displayShowFullName,
+    deskPaymentMethods: r.deskPaymentMethods,
   };
 }
 
-/** Only the rules that changed, in API units. */
+/** Rulebook field → problem; empty when the draft can be saved. */
+export type RulesErrors = Partial<Record<keyof RulesForm, string>>;
+
+export function rulesErrors(r: RulesForm): RulesErrors {
+  const out: RulesErrors = {};
+  const check = (key: keyof RulesForm, message: string | undefined): void => {
+    if (message) out[key] = message;
+  };
+  check(
+    'bookingWindowDays',
+    boundedIntError(r.bookingWindowDays, 'Booking window', RULE_BOUNDS.bookingWindowDays),
+  );
+  check(
+    'cancellationCutoffHours',
+    boundedIntError(r.cancellationCutoffHours, 'Cut-off', RULE_BOUNDS.cancellationCutoffHours),
+  );
+  check(
+    'followUpWindowDays',
+    boundedIntError(r.followUpWindowDays, 'Follow-up window', RULE_BOUNDS.followUpWindowDays),
+  );
+  check(
+    'expectedConsultMinutes',
+    boundedIntError(
+      r.expectedConsultMinutes,
+      'Expected consultation time',
+      RULE_BOUNDS.expectedConsultMinutes,
+    ),
+  );
+  if (r.tokenCancelLimitMin.trim() !== '') {
+    check(
+      'tokenCancelLimitMin',
+      boundedIntError(r.tokenCancelLimitMin, 'Token cancel limit', RULE_BOUNDS.tokenCancelLimitMin),
+    );
+  }
+  if (percentInputToBp(r.refundBeforePct) === null) {
+    out.refundBeforePct = 'Enter a refund between 0 and 100%.';
+  }
+  if (percentInputToBp(r.refundAfterPct) === null) {
+    out.refundAfterPct = 'Enter a refund between 0 and 100%.';
+  }
+  if (r.deskPaymentMethods !== null && r.deskPaymentMethods.length === 0) {
+    out.deskPaymentMethods = 'Accept at least one payment method at the desk.';
+  }
+  return out;
+}
+
+/** Only the rules that changed, in API units. Call after `rulesErrors` is empty. */
 export function rulesChanges(base: RulesForm, draft: RulesForm): HospitalRuleChanges {
-  const changed = (k: keyof RulesForm): boolean => draft[k] !== base[k];
+  const changed = new Set(dirtyRuleFields(base, draft));
+  const int = (s: string): number => textInt(s) ?? 0;
   return {
-    ...(changed('horizon') && { bookingWindowDays: parseCount(draft.horizon, 1) }),
-    ...(changed('onlineApproval') && { onlineRequiresApproval: draft.onlineApproval }),
-    ...(changed('holdTimeout') && {
-      holdTimeoutSeconds: parseDurationMinutes(draft.holdTimeout, 0) * SECONDS_PER_MINUTE,
+    ...(changed.has('bookingWindowDays') && { bookingWindowDays: int(draft.bookingWindowDays) }),
+    ...(changed.has('onlineRequiresApproval') && {
+      onlineRequiresApproval: draft.onlineRequiresApproval,
     }),
-    ...(changed('cancelBefore') && {
-      cancellationCutoffHours: parseDurationMinutes(draft.cancelBefore, 0) / MINUTES_PER_HOUR,
+    ...(changed.has('holdTimeoutMinutes') && {
+      holdTimeoutSeconds: int(draft.holdTimeoutMinutes) * SECONDS_PER_MINUTE,
     }),
-    ...(changed('refundBefore') && { refundBeforeCutoffBp: refundBp(draft.refundBefore) }),
-    ...(changed('refundAfter') && { refundAfterCutoffBp: refundBp(draft.refundAfter) }),
-    ...(changed('refundFee') && { refundIncludesConvenienceFee: draft.refundFee }),
-    ...(changed('feeValidity') && { followUpWindowDays: parseCount(draft.feeValidity, 0) }),
-    ...(changed('noShowCalls') && { noShowCallAttempts: parseCount(draft.noShowCalls, 1) }),
-    ...(changed('tokenCancel') && { tokenCancelLimitMin: tokenCancelMinutes(draft.tokenCancel) }),
-    ...(changed('consultMinutes') && {
-      expectedConsultMinutes: parseCount(draft.consultMinutes, 1),
+    ...(changed.has('cancellationCutoffHours') && {
+      cancellationCutoffHours: int(draft.cancellationCutoffHours),
     }),
-    ...(changed('patientNotes') && { patientNotesEnabled: draft.patientNotes }),
-    ...(changed('patientEditApproval') && {
-      patientEditRequiresApproval: draft.patientEditApproval,
+    ...(changed.has('refundBeforePct') && {
+      refundBeforeCutoffBp: percentInputToBp(draft.refundBeforePct) ?? 0,
     }),
-    ...(changed('displayFullName') && { displayShowFullName: draft.displayFullName }),
+    ...(changed.has('refundAfterPct') && {
+      refundAfterCutoffBp: percentInputToBp(draft.refundAfterPct) ?? 0,
+    }),
+    ...(changed.has('refundIncludesConvenienceFee') && {
+      refundIncludesConvenienceFee: draft.refundIncludesConvenienceFee,
+    }),
+    ...(changed.has('followUpWindowDays') && { followUpWindowDays: int(draft.followUpWindowDays) }),
+    ...(changed.has('noShowCallAttempts') && { noShowCallAttempts: int(draft.noShowCallAttempts) }),
+    ...(changed.has('tokenCancelLimitMin') && {
+      tokenCancelLimitMin: textInt(draft.tokenCancelLimitMin),
+    }),
+    ...(changed.has('expectedConsultMinutes') && {
+      expectedConsultMinutes: int(draft.expectedConsultMinutes),
+    }),
+    ...(changed.has('patientNotesEnabled') && { patientNotesEnabled: draft.patientNotesEnabled }),
+    ...(changed.has('receiptPaper') && { receiptPaper: draft.receiptPaper }),
+    ...(changed.has('receiptShowStaff') && { receiptShowStaff: draft.receiptShowStaff }),
+    ...(changed.has('patientEditRequiresApproval') && {
+      patientEditRequiresApproval: draft.patientEditRequiresApproval,
+    }),
+    ...(changed.has('displayShowFullName') && { displayShowFullName: draft.displayShowFullName }),
+    ...(changed.has('deskPaymentMethods') &&
+      draft.deskPaymentMethods !== null && { deskPaymentMethods: draft.deskPaymentMethods }),
   };
 }
 
 /* ------------------------------------------------------------ token policy */
 
-const TOKEN_SCOPES: readonly (readonly [TokenScope, string])[] = [
-  ['hospital', 'One series for the hospital'],
-  ['department', 'One series per department'],
-  ['doctor', 'One series per doctor'],
-];
+const MAX_MARKER_LENGTH = 8;
+const MAX_PREFIX_LENGTH = 10;
 
-const TOKEN_RESETS: readonly (readonly [TokenReset, string])[] = [
-  ['session', 'Every session'],
-  ['day', 'Every day'],
-];
-
-export const TOKEN_SCOPE_OPTIONS: readonly string[] = TOKEN_SCOPES.map(([, label]) => label);
-export const TOKEN_RESET_OPTIONS: readonly string[] = TOKEN_RESETS.map(([, label]) => label);
-
-/** The label for a value; `pairs` lists every value, so the fallback never shows. */
-function labelOf<K extends string>(pairs: readonly (readonly [K, string])[], key: K): string {
-  return pairs.find(([k]) => k === key)?.[1] ?? key;
-}
-
-function keyOf<K extends string>(
-  pairs: readonly (readonly [K, string])[],
-  label: string,
-): K | null {
-  return pairs.find(([, l]) => l === label)?.[0] ?? null;
-}
-
-export function tokenScopeLabel(scope: TokenScope): string {
-  return labelOf(TOKEN_SCOPES, scope);
-}
-
-export function tokenResetLabel(reset: TokenReset): string {
-  return labelOf(TOKEN_RESETS, reset);
-}
-
-function numberCopy(n: number | null): string {
-  return n === null ? '' : String(n);
-}
-
-function rangeValue(text: string): number | null {
-  const t = text.trim();
-  return t === '' ? null : Number(t);
-}
-
-/**
- * The policy as the screen edits it. Scope and reset show the value that will
- * apply (a pending change, if any), so choosing today's value again cancels it.
- */
 export function toTokenForm(p: TokenPolicy): TokenForm {
   return {
-    scope: tokenScopeLabel(p.pendingScope ?? p.scope),
-    reset: tokenResetLabel(p.pendingReset ?? p.reset),
+    scope: p.pendingScope ?? p.scope,
+    reset: p.pendingReset ?? p.reset,
     format: p.format,
     prefix: p.prefix,
     onlineMarker: p.onlineMarker,
     offlineMarker: p.offlineMarker,
     separateRanges: p.separateRanges,
-    onlineFrom: numberCopy(p.onlineRangeStart),
-    onlineTo: numberCopy(p.onlineRangeEnd),
-    walkInFrom: numberCopy(p.offlineRangeStart),
-    walkInTo: numberCopy(p.offlineRangeEnd),
+    onlineRangeStart: intText(p.onlineRangeStart),
+    onlineRangeEnd: intText(p.onlineRangeEnd),
+    offlineRangeStart: intText(p.offlineRangeStart),
+    offlineRangeEnd: intText(p.offlineRangeEnd),
     reuseCancelled: p.reuseCancelled,
+    printTemplateId: p.printTemplateId ?? '',
   };
 }
 
-/** Only the policy fields that changed, in API units. */
+export type TokenErrors = Partial<Record<keyof TokenForm, string>>;
+
+/** The backend's token-policy checks (`policy_settings._validate`), before sending. */
+export function tokenErrors(t: TokenForm): TokenErrors {
+  const out: TokenErrors = {};
+  const format = formatError(t.format, TOKEN_LABEL_TOKENS);
+  if (format) out.format = format;
+  if (t.prefix.length > MAX_PREFIX_LENGTH)
+    out.prefix = `Use at most ${MAX_PREFIX_LENGTH} characters.`;
+  for (const key of ['onlineMarker', 'offlineMarker'] as const) {
+    const value = t[key].trim();
+    if (value === '') out[key] = 'Required.';
+    else if (value.length > MAX_MARKER_LENGTH)
+      out[key] = `Use at most ${MAX_MARKER_LENGTH} characters.`;
+  }
+  if (!t.separateRanges) return out;
+  const ranges = [
+    'onlineRangeStart',
+    'onlineRangeEnd',
+    'offlineRangeStart',
+    'offlineRangeEnd',
+  ] as const;
+  for (const key of ranges) {
+    const n = textInt(t[key]);
+    if (n === null || n < 1) out[key] = 'Enter a number of 1 or more.';
+  }
+  if (ranges.some((k) => out[k])) return out;
+  const [onS, onE, offS, offE] = ranges.map((k) => textInt(t[k]) ?? 0);
+  if (onS === undefined || onE === undefined || offS === undefined || offE === undefined)
+    return out;
+  if (onS >= onE) out.onlineRangeEnd = 'Must be greater than the start.';
+  if (offS >= offE) out.offlineRangeEnd = 'Must be greater than the start.';
+  if (!out.onlineRangeEnd && !out.offlineRangeEnd && !(onE < offS || offE < onS)) {
+    out.separateRanges = 'The online and desk ranges must not overlap.';
+  }
+  return out;
+}
+
+/**
+ * Only the token-policy fields that changed. `scope`/`reset` are compared
+ * with what will apply (the pending value when one is scheduled), so choosing
+ * the value in force again sends it — which cancels the pending change (07·F4).
+ */
 export function tokenChanges(base: TokenForm, draft: TokenForm): TokenPolicyChanges {
-  const changed = (k: keyof TokenForm): boolean => draft[k] !== base[k];
-  const scope = keyOf(TOKEN_SCOPES, draft.scope);
-  const reset = keyOf(TOKEN_RESETS, draft.reset);
   return {
-    ...(changed('scope') && scope && { scope }),
-    ...(changed('reset') && reset && { reset }),
-    ...(changed('format') && { format: draft.format.trim() }),
-    ...(changed('prefix') && { prefix: draft.prefix.trim() }),
-    ...(changed('onlineMarker') && { onlineMarker: draft.onlineMarker.trim() }),
-    ...(changed('offlineMarker') && { offlineMarker: draft.offlineMarker.trim() }),
-    ...(changed('separateRanges') && { separateRanges: draft.separateRanges }),
-    ...(changed('onlineFrom') && { onlineRangeStart: rangeValue(draft.onlineFrom) }),
-    ...(changed('onlineTo') && { onlineRangeEnd: rangeValue(draft.onlineTo) }),
-    ...(changed('walkInFrom') && { offlineRangeStart: rangeValue(draft.walkInFrom) }),
-    ...(changed('walkInTo') && { offlineRangeEnd: rangeValue(draft.walkInTo) }),
-    ...(changed('reuseCancelled') && { reuseCancelled: draft.reuseCancelled }),
-  };
-}
-
-/* --------------------------------------------------------------- numbering */
-
-const NUMBERING_RESETS: readonly (readonly [NumberingReset, string])[] = [
-  ['never', 'Never'],
-  ['fiscal_year', 'Every financial year'],
-  ['calendar_year', 'Every calendar year'],
-  ['monthly', 'Every month'],
-];
-
-export const NUMBERING_RESET_OPTIONS: readonly string[] = NUMBERING_RESETS.map(([, l]) => l);
-
-/** MRNs never restart (the backend refuses any other reset for them). */
-export const MRN_RESET_OPTIONS: readonly string[] = [labelOf(NUMBERING_RESETS, 'never')];
-
-export const MONTH_OPTIONS: readonly string[] = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-export function isFiscalReset(label: string): boolean {
-  return keyOf(NUMBERING_RESETS, label) === 'fiscal_year';
-}
-
-/** A blank draft, for a series the server did not list (it is never shown or saved). */
-const EMPTY_NUMBERING_FORM: NumberingForm = {
-  format: '',
-  prefix: '',
-  padWidth: '',
-  reset: '',
-  fyStartMonth: '',
-};
-
-export function toNumberingForm(series: NumberingSeries | undefined): NumberingForm {
-  if (!series) return EMPTY_NUMBERING_FORM;
-  return {
-    format: series.format,
-    prefix: series.prefix ?? '',
-    padWidth: String(series.padWidth),
-    reset: labelOf(NUMBERING_RESETS, series.reset),
-    fyStartMonth: MONTH_OPTIONS[series.fyStartMonth - 1] ?? '',
-  };
-}
-
-/** Only the series fields that changed, in API units. */
-export function numberingChanges(base: NumberingForm, draft: NumberingForm): NumberingChanges {
-  const changed = (k: keyof NumberingForm): boolean => draft[k] !== base[k];
-  const reset = keyOf(NUMBERING_RESETS, draft.reset);
-  const prefix = draft.prefix.trim();
-  return {
-    ...(changed('format') && { format: draft.format.trim() }),
-    ...(changed('prefix') && { prefix: prefix === '' ? null : prefix }),
-    ...(changed('padWidth') && { padWidth: parseCount(draft.padWidth, 1) }),
-    ...(changed('reset') && reset && { reset }),
-    ...(changed('fyStartMonth') && {
-      fyStartMonth: MONTH_OPTIONS.indexOf(draft.fyStartMonth) + 1,
+    ...(draft.scope !== base.scope && { scope: draft.scope }),
+    ...(draft.reset !== base.reset && { reset: draft.reset }),
+    ...(draft.format !== base.format && { format: draft.format.trim() }),
+    ...(draft.prefix !== base.prefix && { prefix: draft.prefix.trim() }),
+    ...(draft.onlineMarker !== base.onlineMarker && { onlineMarker: draft.onlineMarker.trim() }),
+    ...(draft.offlineMarker !== base.offlineMarker && {
+      offlineMarker: draft.offlineMarker.trim(),
+    }),
+    ...(draft.separateRanges !== base.separateRanges && { separateRanges: draft.separateRanges }),
+    ...(draft.onlineRangeStart !== base.onlineRangeStart && {
+      onlineRangeStart: textInt(draft.onlineRangeStart),
+    }),
+    ...(draft.onlineRangeEnd !== base.onlineRangeEnd && {
+      onlineRangeEnd: textInt(draft.onlineRangeEnd),
+    }),
+    ...(draft.offlineRangeStart !== base.offlineRangeStart && {
+      offlineRangeStart: textInt(draft.offlineRangeStart),
+    }),
+    ...(draft.offlineRangeEnd !== base.offlineRangeEnd && {
+      offlineRangeEnd: textInt(draft.offlineRangeEnd),
+    }),
+    ...(draft.reuseCancelled !== base.reuseCancelled && { reuseCancelled: draft.reuseCancelled }),
+    ...(draft.printTemplateId !== base.printTemplateId && {
+      printTemplateId: draft.printTemplateId === '' ? null : draft.printTemplateId,
     }),
   };
 }
 
 /* -------------------------------------------------------------------- bank */
+
+/** The draft of one payout account (add or edit). */
+export interface BankForm {
+  readonly accountName: string;
+  readonly bank: string;
+  /** A NEW account number; empty keeps the stored one (it is never returned). */
+  readonly account: string;
+  readonly ifsc: string;
+  readonly upi: string;
+}
 
 export function toBankForm(account: BankAccount | null): BankForm {
   return {
@@ -606,7 +601,7 @@ export function toBankForm(account: BankAccount | null): BankForm {
   };
 }
 
-/** The account to show and edit: the primary one, else the first. */
+/** The account payouts go to: the primary one, else the first. */
 export function payoutAccountOf(accounts: readonly BankAccount[]): BankAccount | null {
   return accounts.find((a) => a.isPrimary) ?? accounts[0] ?? null;
 }

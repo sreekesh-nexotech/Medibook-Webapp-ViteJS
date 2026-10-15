@@ -53,6 +53,8 @@ export const taxRateResponseSchema = z.object({
   applies_to: z.enum(['consultation', 'service', 'convenience_fee', 'all']),
   is_active: z.boolean(),
   is_platform_default: z.boolean(),
+  // BE-10: live services billing with this rate; optional for an older backend.
+  services_count: z.number().int().optional(),
   version: z.number().int(),
 });
 
@@ -133,6 +135,7 @@ export function toTaxRate(dto: TaxRateResponse): ServiceTaxRate {
     appliesTo: dto.applies_to,
     isActive: dto.is_active,
     isPlatformDefault: dto.is_platform_default,
+    servicesCount: dto.services_count ?? null,
     version: dto.version,
   };
 }
@@ -152,10 +155,9 @@ export function toCoupon(dto: CouponResponse): HospitalCoupon {
     usedCount: dto.used_count,
     maxDiscountRupees:
       dto.max_discount_paise == null ? null : dto.max_discount_paise / PAISE_PER_RUPEE,
-    onlineOnly: dto.applies_to_online_only ?? false,
     minOrderRupees: dto.min_order_paise / PAISE_PER_RUPEE,
     departmentIds: scopes.flatMap((s) => (s.department_id ? [s.department_id] : [])),
-    serviceIds: scopes.flatMap((s) => (s.service_id ? [s.service_id] : [])),
+    legacyServiceIds: scopes.flatMap((s) => (s.service_id ? [s.service_id] : [])),
     isActive: dto.is_active,
     version: dto.version,
   };

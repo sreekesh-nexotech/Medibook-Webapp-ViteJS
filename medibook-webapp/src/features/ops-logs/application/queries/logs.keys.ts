@@ -5,4 +5,5 @@ export const logsKeys = {
   all: ['ops-logs'] as const,
   lists: () => [...logsKeys.all, 'list'] as const,
   list: (query: AuditLogQuery) => [...logsKeys.lists(), query] as const,
+  retention: () => [...logsKeys.all, 'retention'] as const,
 };

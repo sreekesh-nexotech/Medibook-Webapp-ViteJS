@@ -2,9 +2,13 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  PatientApproval,
+  PatientApprovalListParams,
   PatientAppointmentHistory,
   PatientChangeDecision,
+  PatientCreateInput,
   PatientCreateOutcome,
+  PatientDeleteOutcome,
   PatientDemographics,
   PatientEditOutcome,
   PatientListParams,
@@ -19,17 +23,21 @@ export interface PatientsRepository {
   /** The full record (incl. any pending change request) with this record id. */
   getPatientById(id: string): Promise<Result<PatientRecord>>;
   /** Mints an MRN, or returns the existing record when the person is already registered. */
-  createPatient(demographics: PatientDemographics): Promise<Result<PatientCreateOutcome>>;
+  createPatient(input: PatientCreateInput): Promise<Result<PatientCreateOutcome>>;
   /** Applies at once, or becomes a change request when the hospital requires approval. */
   updatePatient(
     id: string,
     changes: Partial<PatientDemographics>,
     version: number,
   ): Promise<Result<PatientEditOutcome>>;
+  /** Soft-deletes at once, or becomes a change request when the hospital requires approval. */
+  deletePatient(id: string, version: number): Promise<Result<PatientDeleteOutcome>>;
   /** The latest `limit` appointments, plus the total on record. */
   listPatientAppointments(id: string, limit: number): Promise<Result<PatientAppointmentHistory>>;
   /** Consultations the patient actually attended here (completed appointments). */
   countCompletedVisits(id: string): Promise<Result<number>>;
+  /** One page of the approvals queue. */
+  listApprovals(params: PatientApprovalListParams): Promise<Result<Page<PatientApproval>>>;
   approvePatientChange(requestId: string): Promise<Result<PatientChangeDecision>>;
   rejectPatientChange(requestId: string, note: string): Promise<Result<PatientChangeDecision>>;
 }

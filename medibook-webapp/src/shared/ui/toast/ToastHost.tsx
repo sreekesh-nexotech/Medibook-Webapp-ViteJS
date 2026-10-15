@@ -15,7 +15,7 @@ const TOAST_TINTS: Record<ToastType, { bg: string; icon: IconName }> = {
  * Global toast host — fixed bottom-center pill stack, rendered once per shell.
  * Both groups are live regions that exist before any toast arrives, so screen
  * readers announce each one: errors at once (`role="alert"`), the rest
- * politely (A11Y-03). Errors carry a Dismiss button and stay until used.
+ * politely (`role="status"`, UAT-76, A11Y-03, 01·F34).
  */
 export function ToastHost() {
   const items = useToastStore((s) => s.items);

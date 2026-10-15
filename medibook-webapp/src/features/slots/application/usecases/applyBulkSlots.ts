@@ -9,6 +9,7 @@ import { slotsRepository } from '@/features/slots/infrastructure/repositories/sl
 export function applyBulkSlots(
   request: BulkSlotRequest,
   idempotencyKey: string,
+  previewToken: string | null,
 ): Promise<Result<BulkSlotResult>> {
-  return slotsRepository.applyBulk(request, idempotencyKey);
+  return slotsRepository.applyBulk(request, idempotencyKey, previewToken);
 }

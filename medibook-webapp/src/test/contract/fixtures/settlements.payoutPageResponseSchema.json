@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "id": "01a118b8-8edd-7441-8e22-bda33a7004e6",
+      "payout_run_id": "01a118b8-8edc-76f2-855d-9e3471530b8e",
+      "run_no": null,
+      "settlement_period_id": "01a118b8-8eab-7352-b19c-3d33f4f3d1c6",
+      "period_start": "2026-09-01",
+      "period_end": "2026-09-30",
+      "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+      "bank_account_id": "01a118b6-9ed5-76a1-80c3-9fa68c6eeda3",
+      "bank_account_last4": "0000",
+      "amount_paise": 3297728,
+      "status": "released",
+      "utr_ref": "HDFCN01A118B88EDD",
+      "released_at": "2026-10-07T23:35:10.834700Z",
+      "released_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+      "failure_reason": null,
+      "notes": null,
+      "created_at": "2026-10-07T23:35:10.813836Z",
+      "updated_at": "2026-10-07T23:35:10.834716Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

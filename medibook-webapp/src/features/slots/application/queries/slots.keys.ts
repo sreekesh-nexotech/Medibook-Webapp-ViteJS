@@ -10,5 +10,8 @@ export const slotsKeys = {
   grid: (params: SlotGridParams) => [...slotsKeys.grids(), params] as const,
   bulkPreviews: () => [...slotsKeys.all, 'bulk-preview'] as const,
   bulkPreview: (request: BulkSlotRequest) => [...slotsKeys.bulkPreviews(), request] as const,
-  latestRun: () => [...slotsKeys.all, 'generation-runs', 'latest'] as const,
+  runs: () => [...slotsKeys.all, 'generation-runs'] as const,
+  latestRun: () => [...slotsKeys.runs(), 'latest'] as const,
+  runPage: (doctorId: string | null, page: number) =>
+    [...slotsKeys.runs(), 'page', doctorId, page] as const,
 };

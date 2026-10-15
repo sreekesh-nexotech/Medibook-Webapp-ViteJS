@@ -12,7 +12,8 @@ import type { DashboardPeriod } from '@/features/dashboard/domain/entities/dashb
 /**
  * Hospital overview for one period. The previous period's figures stay on
  * screen while a newly picked one loads, instead of flashing to skeletons.
- * `enabled: false` makes no request (a role that does not need it, PERF-04).
+ * `enabled: false` makes no request (a role that does not need it, PERF-04),
+ * or lets the shell's bell skip it when the server feed is available.
  */
 export function useAdminDashboardQuery(period: DashboardPeriod, enabled = true) {
   return useQuery({

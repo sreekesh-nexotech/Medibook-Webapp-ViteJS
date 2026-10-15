@@ -56,6 +56,10 @@ export interface StaffRole {
   readonly id: string;
   readonly code: StaffRoleCode;
   readonly name: string;
+  /** One-line summary the hospital admin may edit (USR-02); `null` when none is set. */
+  readonly description: string | null;
+  /** Row version for `If-Match` on edits; `null` on an older backend. */
+  readonly version: number | null;
   readonly isSystem: boolean;
   /** False for `admin`, which always holds every permission. */
   readonly editable: boolean;

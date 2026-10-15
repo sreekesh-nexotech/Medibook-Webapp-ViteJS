@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
-import { money, moneyFromPaise, parseHundredths, rupeesFromPaise } from '@/shared/lib/format';
+import { useActionKeys } from '@/shared/hooks/useActionKeys';
+import { money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { Field } from '@/shared/ui/Field';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -18,6 +19,8 @@ import type {
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { useCollectPaymentMutation } from '@/features/appointments/application/queries/appointments.mutations';
 import {
+  acceptedMethodsOf,
+  deskErrorText,
   DESK_METHODS,
   methodLabel,
 } from '@/features/appointments/presentation/components/appointments.view';
@@ -25,8 +28,11 @@ import {
 /** Rupee amounts are compared at paise precision. */
 const PAISE_PER_RUPEE = 100;
 
-/** The backend's answer when a cash line has no open cash session (D-28). */
-const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
+/** The backend's limit on a payment reference (`PaymentLineSerializer`). */
+const REFERENCE_MAX = 200;
+
+/** This modal's one action: one key for every retry of it (UAT-16). */
+const COLLECT_ACTION = 'collect';
 
 interface Line {
   readonly key: number;
@@ -46,7 +52,9 @@ interface AppointmentPaymentModalProps {
  * Collect a walk-in's fee at the desk (D-27): one or more lines across cash,
  * UPI and card that must add up to the amount due. Cash lines are taken into
  * the receptionist's open cash session; without one the backend refuses and
- * this says so. Online bookings are prepaid and never come here (Q89).
+ * this says so. Online bookings are prepaid and ₹0 walk-ins owe nothing, so
+ * neither comes here (Q89, UAT-12). Every retry of one collection carries the
+ * same `Idempotency-Key`, so a lost answer never charges twice (UAT-16).
  */
 export function AppointmentPaymentModal({ appt, onClose, onPaid }: AppointmentPaymentModalProps) {
   if (!appt) return null;
@@ -63,21 +71,17 @@ function PaymentForm({
   onPaid: (receipt: DeskReceipt) => void;
 }) {
   const collect = useCollectPaymentMutation();
+  const actionKeys = useActionKeys();
   const due = appt.totalRupees;
-  const duePaise = Math.round(due * PAISE_PER_RUPEE);
   const [lines, setLines] = useState<readonly Line[]>([
-    { key: 1, method: 'cash', amount: rupeesFromPaise(duePaise), reference: '' },
+    { key: 1, method: 'cash', amount: String(due), reference: '' },
   ]);
   const [error, setError] = useState<string | null>(null);
-  /** Set the moment Record is pressed, so a double click sends one request (DATA-11). */
-  const inFlight = useRef(false);
-  const busy = collect.isPending;
+  // Narrowed to what the hospital accepts once the backend says (APPT-03).
+  const [methods, setMethods] = useState<readonly PaymentMethod[]>(DESK_METHODS);
 
-  // Every line in integer paise, parsed from the digits typed; `null` when the
-  // text is not an amount with at most two decimals (DATA-09).
-  const parsed = lines.map((l) => ({ ...l, paise: parseHundredths(l.amount) }));
-  const enteredPaise = parsed.reduce((sum, l) => sum + (l.paise ?? 0), 0);
-  const remainingPaise = duePaise - enteredPaise;
+  const entered = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+  const remaining = Math.round((due - entered) * PAISE_PER_RUPEE) / PAISE_PER_RUPEE;
 
   const update = (key: number, patch: Partial<Line>): void =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -87,49 +91,53 @@ function PaymentForm({
       ...ls,
       {
         key: Math.max(...ls.map((l) => l.key)) + 1,
-        method: 'upi',
-        amount: remainingPaise > 0 ? rupeesFromPaise(remainingPaise) : '',
+        method: methods.find((m) => m !== 'cash') ?? methods[0] ?? 'upi',
+        amount: remaining > 0 ? String(remaining) : '',
         reference: '',
       },
     ]);
 
   const submit = (): void => {
-    if (inFlight.current) return;
-    const valid = parsed.flatMap((l) =>
-      l.paise !== null && l.paise > 0
-        ? [{ method: l.method, amountPaise: l.paise, reference: l.reference.trim() }]
-        : [],
-    );
-    if (valid.length !== parsed.length) {
-      setError('Every line needs an amount greater than zero, with at most two decimals.');
+    if (lines.some((l) => !(Number(l.amount) > 0))) {
+      setError('Every line needs an amount greater than zero.');
       return;
     }
-    if (remainingPaise !== 0) {
+    if (remaining !== 0) {
       setError(
-        `The lines must add up to ${money(due)} — ${moneyFromPaise(Math.abs(remainingPaise))} ${remainingPaise > 0 ? 'still to collect' : 'too much'}.`,
+        `The lines must add up to ${money(due)} — ${money(Math.abs(remaining))} ${remaining > 0 ? 'still to collect' : 'too much'}.`,
       );
       return;
     }
     setError(null);
-    inFlight.current = true;
     collect.mutate(
-      { id: appt.id, lines: valid },
       {
-        onSettled: () => {
-          inFlight.current = false;
-        },
+        id: appt.id,
+        idempotencyKey: actionKeys.keyFor(COLLECT_ACTION),
+        lines: lines.map((l) => ({
+          method: l.method,
+          amountRupees: Number(l.amount),
+          reference: l.reference.trim(),
+        })),
+      },
+      {
         onSuccess: (receipt) => {
+          actionKeys.settle(COLLECT_ACTION);
           toast(`Payment of ${money(due)} recorded`, 'success');
           onPaid(receipt);
         },
         onError: (failure) => {
-          const message =
-            isFailure(failure) && failure.code === CASH_SESSION_REQUIRED
-              ? 'Open your cash drawer on the Payments screen before taking cash, or collect by UPI or card.'
-              : isFailure(failure)
-                ? failure.message
-                : 'Could not record the payment.';
-          setError(message);
+          if (!isFailure(failure)) {
+            setError('Could not record the payment.');
+            return;
+          }
+          const accepted = acceptedMethodsOf(failure);
+          if (accepted) {
+            setMethods(accepted);
+            setLines((ls) =>
+              ls.map((l) => (accepted.includes(l.method) ? l : { ...l, method: accepted[0] })),
+            );
+          }
+          setError(deskErrorText(failure, 'Could not record the payment.'));
         },
       },
     );
@@ -139,15 +147,14 @@ function PaymentForm({
     <Modal
       open
       onClose={onClose}
-      dismissible={!busy}
       title="Collect Payment"
       width={560}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={busy}>
+          <Button variant="secondary" onClick={onClose} disabled={collect.isPending}>
             Cancel
           </Button>
-          <Button icon="indian-rupee" onClick={submit} busy={busy}>
+          <Button icon="indian-rupee" onClick={submit} busy={collect.isPending}>
             Record {money(due)}
           </Button>
         </>
@@ -162,10 +169,10 @@ function PaymentForm({
             <Field label="Method" className="flex-1">
               <Select
                 value={methodLabel(l.method)}
-                options={DESK_METHODS.map(methodLabel)}
+                options={methods.map(methodLabel)}
                 onChange={(label) =>
                   update(l.key, {
-                    method: DESK_METHODS.find((m) => methodLabel(m) === label) ?? 'cash',
+                    method: methods.find((m) => methodLabel(m) === label) ?? l.method,
                   })
                 }
               />
@@ -180,6 +187,7 @@ function PaymentForm({
             <Field label="Reference" className="flex-1">
               <TextInput
                 value={l.reference}
+                maxLength={REFERENCE_MAX}
                 placeholder={l.method === 'cash' ? 'Optional' : 'UPI / card ref.'}
                 onChange={(v) => update(l.key, { reference: v })}
               />
@@ -202,7 +210,7 @@ function PaymentForm({
           Split payment
         </Button>
         <span className="text-body text-text-muted tabular-nums">
-          Due {money(due)} · entered {moneyFromPaise(enteredPaise)}
+          Due {money(due)} · entered {money(entered)}
         </span>
       </div>
       {error && (

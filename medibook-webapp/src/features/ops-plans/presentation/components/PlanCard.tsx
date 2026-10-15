@@ -1,5 +1,3 @@
-import { useNavigate } from 'react-router-dom';
-
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
@@ -8,16 +6,18 @@ import { IconBtn } from '@/shared/ui/IconBtn';
 import { CanOps } from '@/shared/ui/CanOps';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
-import { opsPath } from '@/app/router/paths';
-
 import { usePlanSubscriberCountQuery } from '@/features/ops-plans/application/queries/usePlanSubscriberCountQuery';
 import {
   PLAN_LIMIT_META,
+  bpToPercentText,
   formatLimit,
+  trialLabel,
   yearlyDiscountPct,
 } from '@/features/ops-plans/application/store/plans.limits';
 import {
   CATALOG_LIMIT_KEYS,
+  HARD_LIMIT_OF,
+  type CatalogLimitKey,
   type CatalogPlan,
 } from '@/features/ops-plans/domain/entities/plans.catalog';
 
@@ -27,9 +27,18 @@ interface PlanCardProps {
   /** Delete was pressed; `subscribers` is `null` while the count is unknown. */
   onDelete: (plan: CatalogPlan, subscribers: number | null) => void;
   onArchive: (plan: CatalogPlan, subscribers: number | null) => void;
+  onUnarchive: (plan: CatalogPlan) => void;
+  /** Open the list of hospitals on the plan. */
+  onSubscribers: (plan: CatalogPlan) => void;
 }
 
-/** "3 hospitals on this plan", or what to say while the count is loading or failed. */
+/** Users and doctors either refuse at the cap or only warn; storage always refuses past it. */
+function enforcementNote(plan: CatalogPlan, key: CatalogLimitKey): string | null {
+  if (key === 'storageGb' || plan.limits[key] === null) return null;
+  return plan.hardLimits.includes(HARD_LIMIT_OF[key]) ? null : 'warns only';
+}
+
+/** "3 hospitals on this plan" (live subscriptions), or what to say while loading or failed. */
 function subscriberLine(count: number | undefined, isLoading: boolean): string {
   if (isLoading) return 'Counting hospitals on this plan…';
   if (count === undefined) return 'Hospital count unavailable';
@@ -38,12 +47,19 @@ function subscriberLine(count: number | undefined, isLoading: boolean): string {
 }
 
 /**
- * One plan tier in the catalog grid: price, yearly option, the three
- * ceilings the backend stores, the extra feature line, and its actions. Owns
- * its subscriber-count query so each card loads its count independently.
+ * One plan tier in the catalog grid: price, yearly option, GST and trial, the
+ * three ceilings the backend stores (and whether each refuses or warns), the
+ * extra feature line, and its actions. Owns its subscriber-count query so
+ * each card loads its count independently.
  */
-export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
-  const navigate = useNavigate();
+export function PlanCard({
+  plan,
+  onEdit,
+  onDelete,
+  onArchive,
+  onUnarchive,
+  onSubscribers,
+}: PlanCardProps) {
   const subscribers = usePlanSubscriberCountQuery(plan.id);
   const count = subscribers.data;
   const knownCount = count ?? null;
@@ -89,6 +105,10 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
         </div>
       </div>
       <span className="text-caption text-text-muted">
+        {plan.gstRateBp > 0 ? `+ ${bpToPercentText(plan.gstRateBp)}% GST` : 'No GST'} ·{' '}
+        {trialLabel(plan.trialDays)}
+      </span>
+      <span className="text-caption text-text-muted">
         {subscriberLine(count, subscribers.isLoading)}
       </span>
       <div className="bg-border-soft h-px" />
@@ -98,6 +118,12 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
             <dt className="text-caption text-text-muted truncate">{PLAN_LIMIT_META[key].label}</dt>
             <dd className="text-body text-text-strong truncate font-medium tabular-nums">
               {formatLimit(plan.limits[key], key === 'storageGb' ? 'GB' : undefined)}
+              {enforcementNote(plan, key) && (
+                <span className="text-caption text-text-muted font-normal">
+                  {' '}
+                  · {enforcementNote(plan, key)}
+                </span>
+              )}
             </dd>
           </div>
         ))}
@@ -112,11 +138,7 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
         </>
       )}
       <div className="mt-auto flex items-center gap-2">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onClick={() => navigate(`${opsPath('hospitals')}?plan=${encodeURIComponent(plan.name)}`)}
-        >
+        <Button variant="secondary" className="flex-1" onClick={() => onSubscribers(plan)}>
           View Hospitals
         </Button>
         {/* SEC-05: editing and archiving need plans.edit; deleting needs plans.del. */}
@@ -130,8 +152,8 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
             onClick={() => onEdit(plan)}
           />
         </CanOps>
-        {plan.isActive && (
-          <CanOps perm="plans.edit">
+        <CanOps perm="plans.edit">
+          {plan.isActive ? (
             <IconBtn
               name="circle-slash"
               label="Archive plan"
@@ -140,8 +162,17 @@ export function PlanCard({ plan, onEdit, onDelete, onArchive }: PlanCardProps) {
               title="Archive plan — close it to new subscriptions"
               onClick={() => onArchive(plan, knownCount)}
             />
-          </CanOps>
-        )}
+          ) : (
+            <IconBtn
+              name="rotate-ccw"
+              label="Restore plan"
+              box={40}
+              size={16}
+              title="Restore plan — open it to new subscriptions again"
+              onClick={() => onUnarchive(plan)}
+            />
+          )}
+        </CanOps>
         <CanOps perm="plans.del">
           <IconBtn
             name="trash-2"

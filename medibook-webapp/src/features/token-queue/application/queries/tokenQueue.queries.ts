@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { unwrap } from '@/core/error/failure';
 
 import { tokenQueueKeys } from '@/features/token-queue/application/queries/tokenQueue.keys';
+import { fetchSessionCalls } from '@/features/token-queue/application/usecases/tokenQueue.fetchSessionCalls';
 import { fetchSessions } from '@/features/token-queue/application/usecases/tokenQueue.fetchSessions';
 
 /**
@@ -19,5 +20,15 @@ export function useQueueSessionsQuery(date: string) {
     queryFn: async () => unwrap(await fetchSessions(date)),
     staleTime: SESSIONS_STALE_TIME_MS,
     refetchInterval: SESSIONS_REFETCH_MS,
+  });
+}
+
+/** One session's call history while its drawer is open; `null` stays idle. */
+export function useSessionCallsQuery(sessionId: string | null) {
+  return useQuery({
+    queryKey: tokenQueueKeys.calls(sessionId ?? ''),
+    queryFn: async () => unwrap(await fetchSessionCalls(sessionId ?? '')),
+    enabled: sessionId !== null,
+    staleTime: SESSIONS_STALE_TIME_MS,
   });
 }

@@ -18,6 +18,7 @@ import type { HospitalSession } from '@/features/auth/domain/entities/auth.types
 import { useHospitalImageUrlQuery } from '@/features/settings/application/queries/useHospitalImageUrlQuery';
 
 import { ErrorBoundary } from './ErrorBoundary';
+import { HospitalStateBanner } from './HospitalStateBanner';
 import { IdleWarningModal } from './IdleWarningModal';
 import { ConnectionNotice } from './ConnectionNotice';
 import {
@@ -54,12 +55,14 @@ interface HospitalShellProps {
 
 /** Hospital app frame: sidebar + topbar + per-view error boundary (design `AppShell`). */
 export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
-  // SEC-01: background polls keep the server session alive, so the tab signs
-  // itself out after the idle limit with no keyboard, mouse or touch input.
-  const idle = useIdleTimeout({ minutes: DEFAULT_IDLE_MINUTES, onTimeout: onLogout });
+  // SEC-01: the shell signs out after the idle limit with no keyboard, mouse
+  // or touch input in any hospital tab (UAT-04). The limit is the server's
+  // (`/hospital/me` `session_timeout_min`, BE-21) when it reports one.
+  const idleMinutes = session.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES;
+  const idle = useIdleTimeout({ minutes: idleMinutes, surface: 'hospital', onTimeout: onLogout });
   const location = useLocation();
   const navigate = useNavigate();
-  const { canViewModule } = usePermission();
+  const { canViewModule, writeBlock } = usePermission();
   const hospitalName = session.hospital.name;
   const { user } = session;
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
@@ -131,6 +134,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           subtitle={subFor(role, view, user.firstName)}
           onBack={onBack}
           role={role}
+          readScope={`${session.hospital.id}:${user.id}`}
           userName={userName}
           roleName={session.role.name}
           onAccount={handleAccount}
@@ -139,6 +143,12 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
         <ConnectionNotice />
+        <HospitalStateBanner
+          block={writeBlock}
+          onOpenBilling={
+            canViewModule('Billing & Settlements') ? () => handleNavigate('settlements') : undefined
+          }
+        />
         <main
           id={MAIN_CONTENT_ID}
           tabIndex={-1}
@@ -171,7 +181,7 @@ export function HospitalShell({ role, session, onLogout }: HospitalShellProps) {
       <IdleWarningModal
         open={idle.warning}
         secondsLeft={idle.secondsLeft}
-        minutes={DEFAULT_IDLE_MINUTES}
+        minutes={idleMinutes}
         onStay={idle.stayActive}
         onSignOut={onLogout}
       />

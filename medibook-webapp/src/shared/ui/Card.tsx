@@ -12,20 +12,34 @@ interface CardProps {
   /** Elevate to shadow-pop on hover (prototype's JS boxShadow swap). */
   hover?: boolean;
   className?: string;
+  /** Accessible name of a clickable card (e.g. "Open pending approvals"). */
+  ariaLabel?: string;
 }
 
-/** Enter or Space on a clickable card clicks it, like a button (A11Y-01). */
+/** Enter or Space on a clickable card clicks it, like a button (A11Y-01, UAT-76, 01·F31). */
 function clickOnKey(e: KeyboardEvent<HTMLDivElement>): void {
   if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
   e.preventDefault();
   e.currentTarget.click();
 }
 
-export function Card({ children, style, pad = 20, onClick, hover, className }: CardProps) {
+export function Card({
+  children,
+  style,
+  pad = 20,
+  onClick,
+  hover,
+  className,
+  ariaLabel,
+}: CardProps) {
+  const isClickable = onClick !== undefined;
   return (
     <div
       onClick={onClick}
-      {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: clickOnKey } : {})}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? ariaLabel : undefined}
+      onKeyDown={isClickable ? clickOnKey : undefined}
       className={cn(
         'border-border shadow-card rounded-xl border bg-white transition-shadow duration-150',
         hover && 'hover:shadow-pop',

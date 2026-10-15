@@ -8,4 +8,5 @@ export const billingKeys = {
   invoice: (invoiceId: string) => [...billingKeys.all, 'invoice', invoiceId] as const,
   plans: () => [...billingKeys.all, 'plans'] as const,
   planChangeRequests: () => [...billingKeys.all, 'plan-change-requests'] as const,
+  creditNotes: () => [...billingKeys.all, 'credit-notes'] as const,
 };

@@ -10,10 +10,9 @@ interface InfoDotProps {
 
 /**
  * Small 'i' info dot with a tooltip — explains why a field/data matters
- * (e.g. mobile-app impact). The dot is a button, so the tip opens on keyboard
- * focus as well as on hover, stays while the pointer moves onto it, and
- * Escape closes it; screen readers read the text as the dot's description
- * (A11Y-01).
+ * (e.g. mobile-app impact). The dot is a focusable button: the tooltip opens
+ * on hover or keyboard focus, closes on Escape, and is announced through
+ * `aria-describedby` (A11Y-01, UAT-76, 01·F31).
  */
 export function InfoDot({ text, size = 15 }: InfoDotProps) {
   const [open, setOpen] = useState(false);

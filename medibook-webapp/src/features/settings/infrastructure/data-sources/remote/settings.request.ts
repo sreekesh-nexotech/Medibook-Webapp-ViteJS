@@ -3,11 +3,7 @@ import type {
   HospitalHoursDay,
   HospitalProfileChanges,
   HospitalRuleChanges,
-  NumberingChanges,
-  NumberingReset,
   TokenPolicyChanges,
-  TokenReset,
-  TokenScope,
 } from '@/features/settings/domain/entities/settings.entities';
 
 /**
@@ -19,9 +15,13 @@ import type {
 
 export interface HospitalProfilePatchRequest {
   readonly name?: string;
+  readonly legal_name?: string | null;
   readonly email?: string;
   readonly phone_e164?: string;
+  readonly website?: string | null;
   readonly address_line1?: string;
+  readonly address_line2?: string | null;
+  readonly address_line3?: string | null;
   readonly city?: string;
   readonly state?: string;
   readonly pincode?: string;
@@ -29,14 +29,19 @@ export interface HospitalProfilePatchRequest {
   readonly lng?: number | null;
   readonly logo_file_id?: string | null;
   readonly cover_file_id?: string | null;
+  readonly stamp_file_id?: string | null;
 }
 
 export function toProfilePatchRequest(c: HospitalProfileChanges): HospitalProfilePatchRequest {
   return {
     ...(c.name !== undefined && { name: c.name }),
+    ...(c.legalName !== undefined && { legal_name: c.legalName }),
     ...(c.email !== undefined && { email: c.email }),
     ...(c.phoneE164 !== undefined && { phone_e164: c.phoneE164 }),
+    ...(c.website !== undefined && { website: c.website }),
     ...(c.addressLine1 !== undefined && { address_line1: c.addressLine1 }),
+    ...(c.addressLine2 !== undefined && { address_line2: c.addressLine2 }),
+    ...(c.addressLine3 !== undefined && { address_line3: c.addressLine3 }),
     ...(c.city !== undefined && { city: c.city }),
     ...(c.state !== undefined && { state: c.state }),
     ...(c.pincode !== undefined && { pincode: c.pincode }),
@@ -44,9 +49,11 @@ export function toProfilePatchRequest(c: HospitalProfileChanges): HospitalProfil
     ...(c.lng !== undefined && { lng: c.lng }),
     ...(c.logoFileId !== undefined && { logo_file_id: c.logoFileId }),
     ...(c.coverFileId !== undefined && { cover_file_id: c.coverFileId }),
+    ...(c.stampFileId !== undefined && { stamp_file_id: c.stampFileId }),
   };
 }
 
+/** `HospitalSettingsUpdateSerializer` — every field optional; omitted keeps its value. */
 export interface HospitalSettingsPutRequest {
   readonly booking_window_days?: number;
   readonly online_requires_approval?: boolean;
@@ -60,10 +67,14 @@ export interface HospitalSettingsPutRequest {
   readonly token_cancel_limit_min?: number | null;
   readonly expected_consult_minutes?: number;
   readonly patient_notes_enabled?: boolean;
+  readonly receipt_paper?: string;
+  readonly receipt_show_staff?: boolean;
   readonly patient_edit_requires_approval?: boolean;
   readonly display_show_full_name?: boolean;
+  readonly desk_payment_methods?: readonly string[];
 }
 
+/** Only the keys present in `c` are sent. */
 export function toSettingsPutRequest(c: HospitalRuleChanges): HospitalSettingsPutRequest {
   return {
     ...(c.bookingWindowDays !== undefined && { booking_window_days: c.bookingWindowDays }),
@@ -84,21 +95,23 @@ export function toSettingsPutRequest(c: HospitalRuleChanges): HospitalSettingsPu
     ...(c.followUpWindowDays !== undefined && { follow_up_window_days: c.followUpWindowDays }),
     ...(c.noShowCallAttempts !== undefined && { no_show_call_attempts: c.noShowCallAttempts }),
     ...(c.tokenCancelLimitMin !== undefined && { token_cancel_limit_min: c.tokenCancelLimitMin }),
-    ...(c.expectedConsultMinutes !== undefined && {
-      expected_consult_minutes: c.expectedConsultMinutes,
-    }),
+    ...(c.expectedConsultMinutes !== undefined &&
+      c.expectedConsultMinutes !== null && { expected_consult_minutes: c.expectedConsultMinutes }),
     ...(c.patientNotesEnabled !== undefined && { patient_notes_enabled: c.patientNotesEnabled }),
+    ...(c.receiptPaper !== undefined && { receipt_paper: c.receiptPaper }),
+    ...(c.receiptShowStaff !== undefined && { receipt_show_staff: c.receiptShowStaff }),
     ...(c.patientEditRequiresApproval !== undefined && {
       patient_edit_requires_approval: c.patientEditRequiresApproval,
     }),
     ...(c.displayShowFullName !== undefined && { display_show_full_name: c.displayShowFullName }),
+    ...(c.deskPaymentMethods !== undefined && { desk_payment_methods: c.deskPaymentMethods }),
   };
 }
 
-/** `TokenPolicyUpdateRequest` — never `version`, `pending` or other read-only keys (a 400). */
+/** `TokenPolicyUpdateSerializer` — omitted fields keep their value. */
 export interface TokenPolicyPutRequest {
-  readonly scope?: TokenScope;
-  readonly reset?: TokenReset;
+  readonly scope?: string;
+  readonly reset?: string;
   readonly format?: string;
   readonly prefix?: string;
   readonly online_marker?: string;
@@ -109,6 +122,7 @@ export interface TokenPolicyPutRequest {
   readonly offline_range_start?: number | null;
   readonly offline_range_end?: number | null;
   readonly reuse_cancelled?: boolean;
+  readonly print_template_id?: string | null;
 }
 
 export function toTokenPolicyPutRequest(c: TokenPolicyChanges): TokenPolicyPutRequest {
@@ -125,26 +139,7 @@ export function toTokenPolicyPutRequest(c: TokenPolicyChanges): TokenPolicyPutRe
     ...(c.offlineRangeStart !== undefined && { offline_range_start: c.offlineRangeStart }),
     ...(c.offlineRangeEnd !== undefined && { offline_range_end: c.offlineRangeEnd }),
     ...(c.reuseCancelled !== undefined && { reuse_cancelled: c.reuseCancelled }),
-  };
-}
-
-/** `NumberingSeriesUpdateRequest` — `editable_by` and `gapless` are Medibook's (a 400 here). */
-export interface NumberingPutRequest {
-  readonly format?: string;
-  readonly prefix?: string;
-  readonly pad_width?: number;
-  readonly reset?: NumberingReset;
-  readonly fy_start_month?: number;
-}
-
-export function toNumberingPutRequest(c: NumberingChanges): NumberingPutRequest {
-  return {
-    ...(c.format !== undefined && { format: c.format }),
-    // The server stores an empty prefix as no prefix.
-    ...(c.prefix !== undefined && { prefix: c.prefix ?? '' }),
-    ...(c.padWidth !== undefined && { pad_width: c.padWidth }),
-    ...(c.reset !== undefined && { reset: c.reset }),
-    ...(c.fyStartMonth !== undefined && { fy_start_month: c.fyStartMonth }),
+    ...(c.printTemplateId !== undefined && { print_template_id: c.printTemplateId }),
   };
 }
 

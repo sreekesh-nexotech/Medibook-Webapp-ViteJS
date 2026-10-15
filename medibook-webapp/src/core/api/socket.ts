@@ -5,6 +5,7 @@ import type { ApiSurface } from '@/core/api/surface';
 import { getAccessToken, onSessionExpired } from '@/core/api/tokens';
 import {
   WS_BEARER_SUBPROTOCOL,
+  WS_CLOSE_FORBIDDEN,
   WS_CLOSE_NORMAL,
   WS_CLOSE_UNAUTHORIZED,
   WS_PING_INTERVAL_MS,
@@ -23,16 +24,18 @@ import { WS_BASE_URL } from '@/core/config/env';
  * - The client pings every 30 s (the server drops sockets idle for 5 min).
  * - Frames are `{type, data, ts}`, validated before they reach a listener;
  *   `pong` frames and anything malformed are dropped.
- * - On an unexpected close it reconnects with exponential backoff. A 4401
- *   (bad token) refreshes the token first; if that fails, it stops.
+ * - On an unexpected close it reconnects with exponential backoff.
+ * - The server refuses a socket by *accepting* it and then closing it, so an
+ *   `open` event proves nothing (UAT-43, SEC-07-B). The connection only counts
+ *   as established once the first real frame (a push or a `pong`) arrives;
+ *   only then are the backoff and the auth-retry guard reset.
  * - Two pings with nothing back mean the line is dead even without a close
  *   event: the socket is dropped and reopened (RUN-07).
- * - The server refuses a bad token before accepting, which the browser only
- *   reports as an abnormal close. Three refusals in a row while online
- *   refresh the token once; if they continue, the status is `unauthorized`
- *   ("Live updates off") instead of reconnecting forever.
- * - The socket closes when its session ends, and retries at once when the
- *   browser comes back online.
+ * - 4401 (bad or expired token): refresh the token once, then reconnect after
+ *   the backoff delay. A second 4401 before any frame arrived stops with
+ *   `unauthorized` — a refused socket must never loop refresh + reconnect.
+ * - 4403 (the role may not open this channel): stop with `forbidden`; no
+ *   refresh or retry can change the answer.
  * - Every real operation stays REST — the only frame sent is `ping`.
  */
 
@@ -45,7 +48,15 @@ export const socketFrameSchema = z.object({
 /** One server push. `data` is validated by the feature that owns the channel. */
 export type SocketFrame = z.infer<typeof socketFrameSchema>;
 
-export type SocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed' | 'unauthorized';
+/**
+ * - `connecting`: handshake in progress; `open`: the server has sent a frame.
+ * - `reconnecting`: waiting out the backoff before the next attempt.
+ * - `closed`: closed by the caller. `unauthorized`: the token was refused
+ *   twice in a row (sign-in needed). `forbidden`: the role may not use this
+ *   channel (4403). The last three are final.
+ */
+export type SocketStatus =
+  'connecting' | 'open' | 'reconnecting' | 'closed' | 'unauthorized' | 'forbidden';
 
 export interface SocketOptions {
   /** Channel path below `/ws`, e.g. `/hospital/queue`. */
@@ -97,6 +108,8 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
   let isClosedByUser = false;
+  let isStopped = false;
+  /** Set when a 4401 triggered a refresh; cleared only by a real frame. */
   let hasRetriedAuth = false;
   let missedPongs = 0;
   let failedOpens = 0;
@@ -104,6 +117,12 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
   const stopPing = () => {
     if (pingTimer !== null) clearInterval(pingTimer);
     pingTimer = null;
+  };
+
+  /** Give up for good with a final status (no reconnect). */
+  const stop = (status: 'unauthorized' | 'forbidden') => {
+    isStopped = true;
+    onStatus?.(status);
   };
 
   const scheduleReconnect = () => {
@@ -132,44 +151,39 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
     attempt = 0;
     void connect();
   };
-  window.addEventListener('online', onOnline);
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', onOnline);
+  }
 
   const handleUnauthorized = async () => {
     if (hasRetriedAuth) {
-      onStatus?.('unauthorized');
+      stop('unauthorized');
       return;
     }
     hasRetriedAuth = true;
     const token = await refreshAccessToken(surface).catch(() => null);
     if (isClosedByUser) return;
-    if (token) {
-      void connect();
-    } else {
-      onStatus?.('unauthorized');
-    }
+    if (token) scheduleReconnect();
+    else stop('unauthorized');
   };
 
   async function connect(): Promise<void> {
-    if (isClosedByUser) return;
+    if (isClosedByUser || isStopped) return;
     const token = getAccessToken(surface) ?? (await refreshAccessToken(surface).catch(() => null));
     if (isClosedByUser) return;
     if (!token) {
-      onStatus?.('unauthorized');
+      stop('unauthorized');
       return;
     }
 
     onStatus?.('connecting');
     const ws = new WebSocket(socketUrl(path), [WS_BEARER_SUBPROTOCOL, token]);
     socket = ws;
-    let opened = false;
+    let hasFrame = false;
 
     ws.onopen = () => {
-      opened = true;
-      attempt = 0;
-      failedOpens = 0;
       missedPongs = 0;
-      hasRetriedAuth = false;
-      onStatus?.('open');
+      failedOpens = 0;
       pingTimer = setInterval(() => {
         if (missedPongs >= MAX_MISSED_PONGS) {
           stopPing();
@@ -181,13 +195,21 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
         missedPongs += 1;
         ws.send(PING_FRAME);
       }, WS_PING_INTERVAL_MS);
+      // Ask for a pong at once, so a healthy socket proves itself without
+      // waiting a whole ping interval for the first frame.
+      ws.send(PING_FRAME);
     };
 
     ws.onmessage = (event: MessageEvent<unknown>) => {
       const frame = parseFrame(event.data);
       if (!frame) return;
-      // Any frame proves the line is alive, not only a pong.
       missedPongs = 0;
+      if (!hasFrame) {
+        hasFrame = true;
+        attempt = 0;
+        hasRetriedAuth = false;
+        onStatus?.('open');
+      }
       if (frame.type !== PONG_TYPE) onFrame(frame);
     };
 
@@ -198,11 +220,16 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
         onStatus?.('closed');
         return;
       }
+      if (event.code === WS_CLOSE_FORBIDDEN) {
+        stop('forbidden');
+        return;
+      }
       if (event.code === WS_CLOSE_UNAUTHORIZED) {
         void handleUnauthorized();
         return;
       }
-      if (!opened && navigator.onLine) {
+      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+      if (!hasFrame && isOnline) {
         failedOpens += 1;
         if (failedOpens >= MAX_FAILED_OPENS) {
           failedOpens = 0;
@@ -219,7 +246,9 @@ export function openSocket({ path, surface, onFrame, onStatus }: SocketOptions):
     isClosedByUser = true;
     stopPing();
     if (retryTimer !== null) clearTimeout(retryTimer);
-    window.removeEventListener('online', onOnline);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', onOnline);
+    }
     stopListening();
     socket?.close(WS_CLOSE_NORMAL);
     onStatus?.('closed');

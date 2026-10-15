@@ -1,20 +1,11 @@
 import { isFailure } from '@/core/error/failure';
 import { useDoctorScheduleHistoryQuery } from '@/features/doctors/application/queries/useDoctorScheduleHistoryQuery';
-import { todayIso } from '@/features/doctors/domain/calendar';
-import { fmtDate } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { InfoDot } from '@/shared/ui/InfoDot';
 import { SkeletonLine } from '@/shared/ui/Skeleton';
 
-import { hhmmToLabel, LEAVE_KIND_LABEL } from './doctors.view';
-
-interface HistoryLine {
-  readonly key: string;
-  /** ISO date the entry ended — the list is newest first. */
-  readonly sortDate: string;
-  readonly when: string;
-  readonly what: string;
-}
+import { pastScheduleLines } from './doctors.view';
 
 interface ScheduleHistoryProps {
   doctorId: string;
@@ -27,7 +18,8 @@ interface ScheduleHistoryProps {
  */
 export function ScheduleHistory({ doctorId }: ScheduleHistoryProps) {
   const query = useDoctorScheduleHistoryQuery(doctorId);
-  const today = todayIso();
+  // "Over" means before the hospital's today, not the PC's (D-09, UAT-47).
+  const { today } = useHospitalToday();
 
   if (query.isPending) return <SkeletonLine />;
   if (query.isError) {
@@ -41,33 +33,7 @@ export function ScheduleHistory({ doctorId }: ScheduleHistoryProps) {
     );
   }
 
-  const lines: HistoryLine[] = [
-    ...query.data.leaves
-      .filter((l) => l.dateTo < today)
-      .map((l) => ({
-        key: `leave:${l.id}`,
-        sortDate: l.dateTo,
-        when:
-          l.dateFrom === l.dateTo
-            ? fmtDate(l.dateFrom)
-            : `${fmtDate(l.dateFrom)} – ${fmtDate(l.dateTo)}`,
-        what: `${LEAVE_KIND_LABEL[l.kind]} leave${l.reason ? ` · ${l.reason}` : ''}`,
-      })),
-    ...query.data.dateExceptions
-      .filter((e) => e.date < today)
-      .map((e) => ({
-        key: `exception:${e.id}`,
-        sortDate: e.date,
-        when: fmtDate(e.date),
-        what: `${
-          e.kind === 'closed'
-            ? 'Closed all day'
-            : e.sessions
-                .map((w) => `${hhmmToLabel(w.startsAt)} – ${hhmmToLabel(w.endsAt)}`)
-                .join(', ')
-        }${e.note ? ` · ${e.note}` : ''}`,
-      })),
-  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+  const lines = pastScheduleLines(query.data, today);
 
   return (
     <div>

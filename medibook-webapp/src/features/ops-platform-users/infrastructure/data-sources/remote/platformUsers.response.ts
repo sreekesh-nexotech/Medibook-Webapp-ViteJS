@@ -24,6 +24,8 @@ export const platformUserSummaryResponseSchema = z.object({
   deletion_requested_at: z.string().nullable(),
   last_login_at: z.string().nullable(),
   created_at: z.string(),
+  // B2 (BE-31): booking count on list rows; absent on older backends.
+  booking_count: z.number().int().nullable().optional(),
 });
 
 export const platformUsersPageResponseSchema = paginatedSchema(platformUserSummaryResponseSchema);
@@ -57,8 +59,16 @@ const deviceResponseSchema = z.object({
   last_seen_at: z.string().nullable(),
 });
 
+const profileResponseSchema = z.object({
+  date_of_birth: z.string().nullable(),
+  gender: z.string().nullable(),
+  marketing_opt_in: z.boolean(),
+});
+
 /** `users_admin.detail()` — `GET /platform/users/{id}`. */
 export const platformUserDetailResponseSchema = platformUserSummaryResponseSchema.extend({
+  profile: profileResponseSchema.nullable().optional(),
+  deletion_due_at: z.string().nullable().optional(),
   phone_verified_at: z.string().nullable(),
   email_verified_at: z.string().nullable(),
   has_password: z.boolean(),
@@ -86,6 +96,7 @@ export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): Platfor
     deletionRequestedAt: dto.deletion_requested_at,
     lastLoginAt: dto.last_login_at,
     createdAt: dto.created_at,
+    bookingCount: dto.booking_count ?? null,
   };
 }
 
@@ -135,5 +146,13 @@ export function toPlatformUserDetail(dto: PlatformUserDetailResponse): PlatformU
     bookings: dto.bookings.map(toBooking),
     devices: dto.devices.map(toDevice),
     activeSessions: dto.active_sessions,
+    profile: dto.profile
+      ? {
+          dateOfBirth: dto.profile.date_of_birth,
+          gender: dto.profile.gender,
+          marketingOptIn: dto.profile.marketing_opt_in,
+        }
+      : null,
+    deletionDueAt: dto.deletion_due_at ?? null,
   };
 }

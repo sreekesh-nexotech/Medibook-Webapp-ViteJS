@@ -1,10 +1,12 @@
 import { ifMatch } from '@/core/api/headers';
 import { platformApi } from '@/core/api/http';
+import { fetchAllPages } from '@/core/api/pagination';
 
 import type {
   HospitalAppVisibility,
   HospitalCommissionChange,
   HospitalConvenienceFeeChange,
+  FirstAdminResend,
   HospitalCreateInput,
   HospitalLifecycle,
   HospitalListQuery,
@@ -13,10 +15,17 @@ import type {
 import type { HospitalPatchRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import { toHospitalCreateRequest } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.request';
 import type {
+  CommissionHistoryResponse,
+  FirstAdminInvitationResponse,
   HospitalDetailResponse,
   HospitalResponse,
+  PayoutBankAccountResponse,
 } from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.response';
 import {
+  commissionHistoryResponseSchema,
+  firstAdminInvitationResponseSchema,
+  payoutBankAccountPageResponseSchema,
+  payoutBankAccountResponseSchema,
   hospitalCreatedResponseSchema,
   hospitalDetailResponseSchema,
   hospitalPageResponseSchema,
@@ -135,4 +144,51 @@ export async function postSetConvenienceFee(
     { kind: change.kind, value: change.value },
   );
   return hospitalResponseSchema.parse(response.data);
+}
+
+/**
+ * `POST /platform/hospitals/{id}/admin-invitation` (CORE-04, `hospitals.edit`):
+ * re-issue the first administrator's invitation with a fresh 7-day expiry,
+ * optionally to a corrected address. `409 STATE_CONFLICT` once one accepted.
+ */
+export async function postAdminInvitation(
+  id: string,
+  resend: FirstAdminResend,
+): Promise<FirstAdminInvitationResponse> {
+  const response = await platformApi.post(`/hospitals/${encodeURIComponent(id)}/admin-invitation`, {
+    ...(resend.email !== undefined && { email: resend.email }),
+    ...(resend.firstName !== undefined && { first_name: resend.firstName }),
+    ...(resend.lastName !== undefined && { last_name: resend.lastName }),
+  });
+  return firstAdminInvitationResponseSchema.parse(response.data);
+}
+
+/** `GET /platform/hospitals/{id}/commission-history` (API-01, `hospitals.view`). */
+export async function getCommissionHistory(id: string): Promise<CommissionHistoryResponse> {
+  const response = await platformApi.get(`/hospitals/${encodeURIComponent(id)}/commission-history`);
+  return commissionHistoryResponseSchema.parse(response.data);
+}
+
+/** `GET /platform/hospitals/{id}/bank-accounts` (M-45, `billing.view`) — primary first. */
+export async function getBankAccounts(id: string): Promise<PayoutBankAccountResponse[]> {
+  return fetchAllPages(async (params) => {
+    const response = await platformApi.get(`/hospitals/${encodeURIComponent(id)}/bank-accounts`, {
+      params,
+    });
+    return payoutBankAccountPageResponseSchema.parse(response.data);
+  });
+}
+
+/** `POST /platform/hospitals/{id}/bank-accounts/{account}/verify` (M-45, `billing.edit`). */
+export async function postVerifyBankAccount(
+  id: string,
+  accountId: string,
+  version: number,
+): Promise<PayoutBankAccountResponse> {
+  const response = await platformApi.post(
+    `/hospitals/${encodeURIComponent(id)}/bank-accounts/${encodeURIComponent(accountId)}/verify`,
+    null,
+    { headers: ifMatch(version) },
+  );
+  return payoutBankAccountResponseSchema.parse(response.data);
 }

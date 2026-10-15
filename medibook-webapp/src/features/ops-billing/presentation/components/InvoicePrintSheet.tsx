@@ -7,6 +7,7 @@ import {
   dateOf,
   fmtDateTime,
   gstLabel,
+  ratePercent,
   rupees,
 } from '@/features/ops-billing/presentation/components/billingView';
 
@@ -89,6 +90,8 @@ export function InvoicePrintSheet({ invoice, planName }: InvoicePrintSheetProps)
         <thead>
           <tr>
             <th className={cn(headClass, 'text-left')}>Description</th>
+            <th className={cn(headClass, 'text-right')}>Taxable value</th>
+            <th className={cn(headClass, 'text-right')}>GST</th>
             <th className={cn(headClass, 'text-right')}>Amount</th>
           </tr>
         </thead>
@@ -98,6 +101,14 @@ export function InvoicePrintSheet({ invoice, planName }: InvoicePrintSheetProps)
               <td className={rowClass}>{line.description}</td>
               <td className={cn(rowClass, 'text-right tabular-nums')}>
                 {rupees(line.amountPaise)}
+              </td>
+              <td className={cn(rowClass, 'text-right tabular-nums')}>
+                {line.taxRateBp > 0
+                  ? `${rupees(line.taxPaise)} at ${ratePercent(line.taxRateBp)}`
+                  : '—'}
+              </td>
+              <td className={cn(rowClass, 'text-right tabular-nums')}>
+                {rupees(line.amountPaise + line.taxPaise)}
               </td>
             </tr>
           ))}

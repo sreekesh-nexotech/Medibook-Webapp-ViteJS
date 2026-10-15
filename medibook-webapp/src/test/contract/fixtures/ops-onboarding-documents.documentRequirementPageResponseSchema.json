@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "id": "01a1174b-5cb0-7e83-a9fe-157757f2ac49",
+      "code": "reg_certificate",
+      "name": "Registration certificate",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 0,
+      "created_at": "2026-10-07T16:56:17.328672Z",
+      "updated_at": "2026-10-07T16:56:17.328679Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174b-5cba-7d82-b34d-a67385df007d",
+      "code": "gst_certificate",
+      "name": "GST certificate",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 1,
+      "created_at": "2026-10-07T16:56:17.338814Z",
+      "updated_at": "2026-10-07T16:56:17.338820Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174b-5cbd-7830-b9de-ebc0ad36413c",
+      "code": "pan",
+      "name": "PAN",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 2,
+      "created_at": "2026-10-07T16:56:17.341715Z",
+      "updated_at": "2026-10-07T16:56:17.341720Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174b-5cc7-7231-9502-81b2d4ccab72",
+      "code": "address_proof",
+      "name": "Address proof",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 3,
+      "created_at": "2026-10-07T16:56:17.351272Z",
+      "updated_at": "2026-10-07T16:56:17.351278Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174b-5cc9-7a11-ac0d-f26800fc3fb9",
+      "code": "bank_proof",
+      "name": "Bank proof",
+      "description": null,
+      "is_required_default": true,
+      "sort_order": 4,
+      "created_at": "2026-10-07T16:56:17.353069Z",
+      "updated_at": "2026-10-07T16:56:17.353074Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 7,
+  "has_next": true
+}

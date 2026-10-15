@@ -9,14 +9,16 @@ import { setOnboardingStage } from '@/features/ops-hospitals/application/usecase
 interface SetStageInput {
   readonly caseId: string;
   readonly stage: ManualOnboardingStage;
+  /** The case version (`If-Match`). */
+  readonly version: number | null;
 }
 
-/** Move a case between the stages ops sets by hand. */
+/** Move a case between the stages ops sets by hand — also re-opens a rejected case. */
 export function useSetOnboardingStageMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ caseId, stage }: SetStageInput) =>
-      unwrap(await setOnboardingStage(caseId, stage)),
+    mutationFn: async ({ caseId, stage, version }: SetStageInput) =>
+      unwrap(await setOnboardingStage(caseId, stage, version)),
     onSettled: () => invalidateOnboarding(queryClient),
   });
 }

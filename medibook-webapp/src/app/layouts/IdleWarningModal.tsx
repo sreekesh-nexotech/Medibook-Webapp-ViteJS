@@ -43,7 +43,8 @@ export function IdleWarningModal({
       <p className="text-body-lg text-text-body m-0 leading-[1.6]">
         This screen signs out in{' '}
         <span className="text-text-strong font-semibold tabular-nums">{secondsLeft}s</span> because
-        nobody has used it for a while. Screens sign out after {minutes} minutes without use.
+        Medibook has not been used in any tab for a while. You are signed out after {minutes}{' '}
+        minutes without use.
       </p>
     </Modal>
   );

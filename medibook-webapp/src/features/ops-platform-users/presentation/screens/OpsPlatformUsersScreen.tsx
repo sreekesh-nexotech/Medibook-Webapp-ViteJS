@@ -14,9 +14,12 @@ import {
   ACCOUNT_STATUS_PILLS,
   NO_VALUE,
   formatDate,
+  searchHint,
   userName,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { useSort } from '@/shared/hooks/useSort';
+import { addDaysISO, todayISO } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
@@ -35,15 +38,18 @@ const OPS_PU_PAGE = 6;
 /** Wait this long after the last keystroke before searching the server. */
 const SEARCH_DEBOUNCE_MS = 300;
 
-/**
- * Patient accounts carry no city or booking count, and the server can't count
- * monthly-active or new accounts (PRD-05-B), so those columns and tiles are
- * left out rather than shown as dashes.
- */
-const PU_COLUMNS = ['User', 'Phone', 'Joined', 'Status', 'Action'] as const;
+/** No City column: the backend holds no city for a patient account (13·Platform Users F1). */
+const PU_COLUMNS = ['User', 'Phone', 'Bookings', 'Joined', 'Status', 'Action'] as const;
 
-/** The one column the server can sort — registration date. */
+/** Columns the server sorts: registration date, and booking count (B2, BE-31). */
 const JOINED_SORT_KEY = 'joined';
+const BOOKINGS_SORT_KEY = 'bookings';
+
+/** Days counted as "this week" for the New This Week tile. */
+const NEW_WINDOW_DAYS = 7;
+
+/** Days counted for the Monthly Active tile (signed in within them). */
+const ACTIVE_WINDOW_DAYS = 30;
 
 const ALL_STATUSES_LABEL = 'Status: All';
 
@@ -55,6 +61,9 @@ const STATUS_FILTERS: readonly (readonly [string, PlatformUserStatus])[] = [
   ['Deleted', 'deleted'],
 ];
 
+/** Sub-line for tiles the backend has no figure for yet. */
+const NOT_AVAILABLE_SUB = 'Not available yet';
+
 /** A count tile's value: the number, or an em dash while loading or on error. */
 function countValue(count: number | undefined): string {
   return count === undefined ? NO_VALUE : count.toLocaleString('en-IN');
@@ -63,6 +72,7 @@ function countValue(count: number | undefined): string {
 /** Platform users — patient accounts from the Medibook mobile app (design `OpsPlatformUsers`). */
 export function OpsPlatformUsersScreen() {
   const navigate = useNavigate();
+  const unmasked = useOpsPermission().can('platform_users.edit');
 
   const [q, setQ] = useState('');
   const [searchQ, setSearchQ] = useState('');
@@ -79,13 +89,33 @@ export function OpsPlatformUsersScreen() {
   const params: PlatformUserListParams = {
     q: searchQ,
     statuses: status ? [status] : [],
-    sort: sort.key === JOINED_SORT_KEY ? (sort.dir === 'asc' ? 'created_at' : '-created_at') : null,
+    sort:
+      sort.key === JOINED_SORT_KEY
+        ? sort.dir === 'asc'
+          ? 'created_at'
+          : '-created_at'
+        : sort.key === BOOKINGS_SORT_KEY
+          ? sort.dir === 'asc'
+            ? 'booking_count'
+            : '-booking_count'
+          : null,
     page: page + 1,
     pageSize: OPS_PU_PAGE,
   };
   const list = usePlatformUsersQuery(params);
-  const registered = usePlatformUserCountQuery(null);
-  const blockedCount = usePlatformUserCountQuery('blocked');
+  const registered = usePlatformUserCountQuery({ status: null, createdFrom: null });
+  const blockedCount = usePlatformUserCountQuery({ status: 'blocked', createdFrom: null });
+  // B2's `created_from` (BE-31); an older backend answers 400 and the tile says so.
+  const newThisWeek = usePlatformUserCountQuery({
+    status: null,
+    createdFrom: addDaysISO(todayISO(), -NEW_WINDOW_DAYS),
+  });
+  // B2's `last_login_from` (BE-31): accounts that signed in within the window.
+  const monthlyActive = usePlatformUserCountQuery({
+    status: null,
+    createdFrom: null,
+    lastLoginFrom: addDaysISO(todayISO(), -ACTIVE_WINDOW_DAYS),
+  });
 
   const kpis: readonly StatCardData[] = [
     {
@@ -95,6 +125,28 @@ export function OpsPlatformUsersScreen() {
       sub: 'All patient accounts',
       iconClass: 'bg-blue-soft-bg text-text-navy',
       valueClass: 'text-text-navy',
+      subClass: 'text-text-muted',
+    },
+    {
+      icon: 'trending-up',
+      label: 'Monthly Active',
+      value: countValue(monthlyActive.data),
+      sub: monthlyActive.isError
+        ? NOT_AVAILABLE_SUB
+        : `Signed in within the last ${ACTIVE_WINDOW_DAYS} days`,
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
+      subClass: 'text-text-muted',
+    },
+    {
+      icon: 'user-plus',
+      label: 'New This Week',
+      value: countValue(newThisWeek.data),
+      sub: newThisWeek.isError
+        ? NOT_AVAILABLE_SUB
+        : `Registered in the last ${NEW_WINDOW_DAYS} days`,
+      iconClass: 'bg-blue-soft-bg text-blue',
+      valueClass: 'text-blue',
       subClass: 'text-text-muted',
     },
     {
@@ -136,7 +188,12 @@ export function OpsPlatformUsersScreen() {
   };
 
   const handleRefresh = async (): Promise<void> => {
-    await Promise.all([list.refetch(), registered.refetch(), blockedCount.refetch()]);
+    await Promise.all([
+      list.refetch(),
+      registered.refetch(),
+      blockedCount.refetch(),
+      newThisWeek.refetch(),
+    ]);
   };
 
   const tableState: TableStateSpec | undefined = list.isPending
@@ -169,13 +226,14 @@ export function OpsPlatformUsersScreen() {
         ))}
       </div>
       <Card>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col gap-1.5">
           <SearchField
             value={q}
             onChange={reset(setQ)}
-            placeholder="Search email or phone"
+            placeholder={unmasked ? 'Search email or phone' : 'Exact email or phone number'}
             aria-label="Search patient accounts by email or phone"
           />
+          <span className="text-caption text-text-muted">{searchHint(unmasked)}</span>
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={handleRefresh} title="Refresh patient accounts" />
@@ -198,7 +256,8 @@ export function OpsPlatformUsersScreen() {
         <TableShell
           columns={PU_COLUMNS}
           scrollLabel="Patient accounts"
-          sortKeys={{ Joined: JOINED_SORT_KEY }}
+          rightCols={['Bookings']}
+          sortKeys={{ Joined: JOINED_SORT_KEY, Bookings: BOOKINGS_SORT_KEY }}
           sort={sort}
           onSort={handleSort}
           state={tableState}
@@ -216,9 +275,19 @@ export function OpsPlatformUsersScreen() {
                   <OpsPerson row={{ name, email: u.email ?? NO_VALUE }} />
                 </td>
                 <td className={`${tdClass} tabular-nums`}>{u.phone ?? NO_VALUE}</td>
+                <td className={`${tdClass} text-right tabular-nums`}>
+                  {u.bookingCount === null ? NO_VALUE : u.bookingCount.toLocaleString('en-IN')}
+                </td>
                 <td className={tdClass}>{formatDate(u.createdAt)}</td>
                 <td className={tdClass}>
-                  <Badge status={pill.badge}>{pill.label}</Badge>
+                  <div className="flex flex-col items-start gap-1">
+                    <Badge status={pill.badge}>{pill.label}</Badge>
+                    {u.status === 'pending_deletion' && u.deletionRequestedAt && (
+                      <span className="text-caption text-text-muted">
+                        Requested {formatDate(u.deletionRequestedAt)}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className={tdClass} onClick={(e) => e.stopPropagation()}>
                   <IconBtn

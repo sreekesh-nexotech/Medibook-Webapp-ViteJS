@@ -1,117 +1,182 @@
 import { useState } from 'react';
-import { formatInstant } from '@/shared/lib/format';
+import { useSearchParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
 import { useSort } from '@/shared/hooks/useSort';
+import { downloadTextFile } from '@/shared/lib/download';
+import { todayISO } from '@/shared/lib/format';
+import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { ClearChip } from '@/shared/ui/ClearChip';
 import { FilterSelect } from '@/shared/ui/FilterSelect';
+import { InfoDot } from '@/shared/ui/InfoDot';
+import type { OpsTint } from '@/shared/ui/OpsConfirm';
 import { OpsEntity } from '@/shared/ui/OpsEntity';
 import { Pager } from '@/shared/ui/Pager';
 import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
+import { TextInput } from '@/shared/ui/TextInput';
+import { ToggleChip } from '@/shared/ui/ToggleChip';
+import { toast } from '@/shared/ui/toast/toast.store';
 
+import { OPS_LOGS_HOSPITAL_PARAM } from '@/app/router/paths';
+
+import { useHospitalOptionsQuery } from '@/features/ops-hospitals/application/queries/useHospitalOptionsQuery';
+import {
+  AUDIT_PRINCIPALS,
+  LOG_SEVERITIES,
+  type LogSeverity,
+} from '@/features/ops-logs/application/store/logs.types';
+import { useExportLogsMutation } from '@/features/ops-logs/application/queries/useExportLogsMutation';
+import { useLogRetentionQuery } from '@/features/ops-logs/application/queries/useLogRetentionQuery';
 import { useLogsQuery } from '@/features/ops-logs/application/queries/useLogsQuery';
 import { useRefreshLogs } from '@/features/ops-logs/application/queries/useRefreshLogs';
-import type { AuditLogEntry } from '@/features/ops-logs/domain/entities/logs.types';
-import { LogActor, type PickedActor } from '@/features/ops-logs/presentation/components/LogActor';
+import type {
+  AuditLogEntry,
+  AuditLogFilters,
+  AuditPrincipal,
+} from '@/features/ops-logs/domain/entities/logs.types';
+import { LogEntryDrawer } from '@/features/ops-logs/presentation/components/LogEntryDrawer';
 import {
-  RESOURCE_MENU,
-  isListedResource,
-  resourceName,
-  resourceTypeOf,
-} from '@/features/ops-logs/presentation/components/logResources';
-import { formatLogTime, requestOf } from '@/features/ops-logs/presentation/components/logs.format';
+  actorLabel,
+  formatLogTime,
+  isUuid,
+  LOG_MODULE_LABEL,
+  LOG_SEARCH_HINT,
+  logRetentionText,
+  logsExportFileName,
+  logsExportMessage,
+  moduleLabel,
+  narrowingPrincipals,
+  PRINCIPAL_LABEL,
+  SEVERITY_LABEL,
+} from '@/features/ops-logs/presentation/components/logs.format';
 import { useLogsDebouncedValue } from '@/features/ops-logs/presentation/hooks/useLogsDebouncedValue';
 
-const OPS_LOG_PAGE = 7;
+const OPS_LOG_PAGE = 10;
 
-/** Typing pause before the search box is sent as `?q=`. */
+/** Typing pause before the search, actor and action boxes are sent. */
 const SEARCH_DEBOUNCE_MS = 350;
 
-/** Shown for a missing IP or an unknown refresh time. */
+/** Shown for a missing value or an unknown refresh time. */
 const NONE = '—';
 
-/**
- * The trail records no severity, so there is no severity column: every row is
- * a change that succeeded (the backend records nothing for refused requests).
- */
-const LOG_COLUMNS = ['Action', 'Who', 'Resource', 'IP Address', 'Timestamp'] as const;
+const SEV_TINT: Record<LogSeverity, OpsTint> = {
+  critical: 'danger',
+  warning: 'warning',
+  info: 'info',
+};
 
-/** Who acted (`principal` on the server), in menu order. */
-const WHO_FILTERS: readonly (readonly [string, string])[] = [
-  ['Medibook staff', 'platform'],
-  ['Hospital staff', 'hospital'],
-  ['Patients', 'patient'],
-  ['Display screens', 'display'],
-  ['System', 'system'],
-];
-const WHO_ALL = 'Who: All';
-const RESOURCE_ALL = 'Resource: All';
+const LOG_COLUMNS = [
+  'Action',
+  'Module',
+  'Hospital',
+  'IP Address',
+  'Timestamp',
+  'Severity',
+] as const;
+
+const ALL_SEVERITIES = 'Severity: All';
+const ALL_MODULES = 'Module: All';
+const ALL_HOSPITALS = 'Hospital: All';
+
+const MODULE_CODES = Object.keys(LOG_MODULE_LABEL);
 
 const dateInputClass =
   'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
 
-/**
- * Compliance logs — the platform audit trail (design `OpsLogs`, Ops.jsx). Every
- * filter is sent to `/platform/logs` (PRD-08): who acted, one person (picked
- * from a row), one resource type, dates and an exact-match search.
- */
+const refreshedAt = (at: number): string =>
+  at
+    ? new Date(at).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : NONE;
+
+/** Compliance logs — the platform audit trail (design `OpsLogs`, Ops.jsx; UAT-53). */
 export function OpsLogsScreen() {
+  const [searchParams] = useSearchParams();
   const [q, setQ] = useState('');
-  const [whoF, setWhoF] = useState(WHO_ALL);
-  const [actor, setActor] = useState<PickedActor | null>(null);
-  /** One resource type, from the menu or a row. */
-  const [resource, setResource] = useState<string | null>(null);
+  const [severity, setSeverity] = useState<LogSeverity | ''>('');
+  const [module, setModule] = useState('');
+  const [principals, setPrincipals] = useState<readonly AuditPrincipal[]>([]);
+  const [hospitalId, setHospitalId] = useState(searchParams.get(OPS_LOGS_HOSPITAL_PARAM) ?? '');
+  const [actor, setActor] = useState('');
+  const [action, setAction] = useState('');
   const [dateF, setDateF] = useState('');
   const [dateT, setDateT] = useState('');
   const [page, setPage] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [openEntry, setOpenEntry] = useState<AuditLogEntry | null>(null);
   const { sort, onSort } = useSort<AuditLogEntry>();
   const refreshLogs = useRefreshLogs();
+  const exportLogs = useExportLogsMutation();
+  const hospitals = useHospitalOptionsQuery();
+  const retention = useLogRetentionQuery();
 
-  const ql = q.trim();
-  const debouncedQ = useLogsDebouncedValue(ql, SEARCH_DEBOUNCE_MS);
-  const principal = WHO_FILTERS.find(([label]) => label === whoF)?.[1];
-  const logsQuery = useLogsQuery({
-    page: page + 1,
-    pageSize: OPS_LOG_PAGE,
+  const debouncedQ = useLogsDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
+  const debouncedActor = useLogsDebouncedValue(actor.trim(), SEARCH_DEBOUNCE_MS);
+  const debouncedAction = useLogsDebouncedValue(action.trim(), SEARCH_DEBOUNCE_MS);
+  const actorInvalid = debouncedActor !== '' && !isUuid(debouncedActor);
+
+  const filters: AuditLogFilters = {
     ...(dateF ? { dateFrom: dateF } : {}),
     ...(dateT ? { dateTo: dateT } : {}),
     ...(debouncedQ ? { q: debouncedQ } : {}),
+    ...(debouncedActor && !actorInvalid ? { actorUserId: debouncedActor } : {}),
+    ...(debouncedAction ? { action: debouncedAction } : {}),
+    ...(hospitalId ? { hospitalId } : {}),
+    ...(module ? { module } : {}),
+    ...(severity ? { severity } : {}),
+    principals: narrowingPrincipals(principals, AUDIT_PRINCIPALS),
+  };
+  const logsQuery = useLogsQuery({
+    ...filters,
+    page: page + 1,
+    pageSize: OPS_LOG_PAGE,
     ...(sort.key === 'time' ? { sortDir: sort.dir } : {}),
-    ...(principal ? { principal } : {}),
-    ...(actor ? { actorUserId: actor.id } : {}),
-    ...(resource ? { resourceType: resource } : {}),
   });
   const total = logsQuery.data?.total ?? 0;
   const rows = logsQuery.data?.items ?? [];
   const pg = Math.min(page, Math.max(0, Math.ceil(total / OPS_LOG_PAGE) - 1));
+  const hospitalName = (id: string | null, fromRow: string | null): string =>
+    fromRow ?? (id ? (hospitals.options.find((h) => h.id === id)?.name ?? NONE) : 'Platform');
 
   const reset =
-    (fn: (v: string) => void) =>
-    (v: string): void => {
+    <T,>(fn: (v: T) => void) =>
+    (v: T): void => {
       fn(v);
       setPage(0);
     };
-  const pickActor = (picked: PickedActor | null): void => {
-    setActor(picked);
-    setPage(0);
-  };
-  const pickResource = (type: string | null): void => {
-    setResource(type);
-    setPage(0);
-  };
-  const filtersActive = Boolean(ql || whoF !== WHO_ALL || actor || resource || dateF || dateT);
+  const filtersActive = Boolean(
+    q.trim() ||
+    severity ||
+    module ||
+    principals.length > 0 ||
+    hospitalId ||
+    actor.trim() ||
+    action.trim() ||
+    dateF ||
+    dateT,
+  );
   const clearAll = (): void => {
     setQ('');
-    setWhoF(WHO_ALL);
-    setActor(null);
-    setResource(null);
+    setSeverity('');
+    setModule('');
+    setPrincipals([]);
+    setHospitalId('');
+    setActor('');
+    setAction('');
     setDateF('');
     setDateT('');
+    setPage(0);
+  };
+
+  const togglePrincipal = (p: AuditPrincipal, on: boolean): void => {
+    setPrincipals((current) => (on ? [...current, p] : current.filter((x) => x !== p)));
     setPage(0);
   };
 
@@ -123,11 +188,23 @@ export function OpsLogsScreen() {
     setRefreshing(false);
   };
 
-  // A request row's resource (a view name) isn't in the menu; list it while it is picked.
-  const resourceOptions =
-    resource && !isListedResource(resource)
-      ? [RESOURCE_ALL, resourceName(resource)]
-      : [RESOURCE_ALL];
+  const handleExport = (): void => {
+    exportLogs.mutate(filters, {
+      onSuccess: ({ csv, truncated, rowLimit }) => {
+        downloadTextFile(logsExportFileName(todayISO()), csv, 'text/csv;charset=utf-8');
+        toast(logsExportMessage(truncated, rowLimit), truncated ? 'info' : 'success');
+      },
+      onError: (failure) =>
+        toast(
+          isFailure(failure) && failure.kind === 'notFound'
+            ? 'Log export is not available on this server yet.'
+            : isFailure(failure)
+              ? failure.message
+              : 'The export failed. Please try again.',
+          'error',
+        ),
+    });
+  };
 
   const tableState: TableStateSpec | undefined =
     logsQuery.isPending || refreshing
@@ -145,7 +222,7 @@ export function OpsLogsScreen() {
               icon: 'scroll-text',
               title: filtersActive ? 'No results match your filters.' : 'No audit entries yet.',
               message: filtersActive
-                ? 'Widen the date range, or clear the filters to see the whole trail.'
+                ? 'Search matches exact codes and ids only. Widen the date range, or clear the filters to see the whole trail.'
                 : 'Sensitive actions across the platform are written here as they happen.',
               ...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
             }
@@ -154,68 +231,115 @@ export function OpsLogsScreen() {
   return (
     <div className="flex flex-col gap-5">
       <Card>
-        <div className="mb-4">
-          <SearchField
-            value={q}
-            onChange={reset(setQ)}
-            placeholder="Exact action, request ID or user ID"
-            aria-label="Search the audit trail by exact action code, request ID or user ID"
-          />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="min-w-72 flex-1">
+            <SearchField
+              value={q}
+              onChange={reset(setQ)}
+              placeholder="Exact action code, request id or UUID"
+              aria-label="Search the audit trail by exact action code, request id or UUID"
+            />
+          </div>
+          <InfoDot text={LOG_SEARCH_HINT} />
+          <Button
+            variant="secondary"
+            icon="download"
+            busy={exportLogs.isPending}
+            onClick={handleExport}
+          >
+            Export CSV
+          </Button>
         </div>
-        <div className="mb-4.5 flex flex-wrap items-center gap-3">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={handleRefresh} title="Refresh audit trail" />
           <FilterSelect
-            value={whoF}
-            aria-label="Filter by who acted"
-            options={[WHO_ALL, ...WHO_FILTERS.map(([label]) => label)]}
-            onChange={reset(setWhoF)}
+            value={severity ? SEVERITY_LABEL[severity] : ALL_SEVERITIES}
+            aria-label="Filter by severity"
+            options={[ALL_SEVERITIES, ...LOG_SEVERITIES.map((s) => SEVERITY_LABEL[s])]}
+            onChange={(v) =>
+              reset(setSeverity)(LOG_SEVERITIES.find((s) => SEVERITY_LABEL[s] === v) ?? '')
+            }
           />
           <FilterSelect
-            value={resource ? resourceName(resource) : RESOURCE_ALL}
-            aria-label="Filter by resource"
-            options={resourceOptions}
-            groups={RESOURCE_MENU}
-            onChange={(label) => {
-              if (label === RESOURCE_ALL) pickResource(null);
-              else pickResource(resourceTypeOf(label) ?? resource);
-            }}
+            value={module ? moduleLabel(module) : ALL_MODULES}
+            aria-label="Filter by module"
+            options={[ALL_MODULES, ...MODULE_CODES.map((m) => moduleLabel(m))]}
+            onChange={(v) => reset(setModule)(MODULE_CODES.find((m) => moduleLabel(m) === v) ?? '')}
           />
-          {actor && <ClearChip label={`Actor: ${actor.name}`} onClick={() => pickActor(null)} />}
+          {hospitals.canView && (
+            <FilterSelect
+              value={hospitals.options.find((h) => h.id === hospitalId)?.name ?? ALL_HOSPITALS}
+              aria-label="Filter by hospital"
+              options={[ALL_HOSPITALS, ...hospitals.options.map((h) => h.name)]}
+              onChange={(v) =>
+                reset(setHospitalId)(hospitals.options.find((h) => h.name === v)?.id ?? '')
+              }
+            />
+          )}
           <input
             type="date"
             value={dateF}
+            max={dateT || undefined}
             onChange={(e) => reset(setDateF)(e.target.value)}
-            title="From date"
+            title="From date (IST)"
             aria-label="From date"
             className={dateInputClass}
           />
           <input
             type="date"
             value={dateT}
+            min={dateF || undefined}
             onChange={(e) => reset(setDateT)(e.target.value)}
-            title="To date"
+            title="To date (IST)"
             aria-label="To date"
             className={dateInputClass}
           />
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-caption text-text-muted mr-1">Account type</span>
+          {AUDIT_PRINCIPALS.map((p) => (
+            <ToggleChip
+              key={p}
+              pressed={principals.includes(p)}
+              onChange={(on) => togglePrincipal(p, on)}
+            >
+              {PRINCIPAL_LABEL[p]}
+            </ToggleChip>
+          ))}
+        </div>
+        <div className="mb-4.5 flex flex-wrap items-start gap-3">
+          <div className="w-80">
+            <TextInput
+              value={actor}
+              onChange={reset(setActor)}
+              placeholder="Actor user id (UUID)"
+              aria-label="Filter by actor user id"
+              invalid={actorInvalid}
+            />
+            {actorInvalid && (
+              <span className="text-caption text-d-600">Paste the full user id (a UUID).</span>
+            )}
+          </div>
+          <div className="w-72">
+            <TextInput
+              value={action}
+              onChange={reset(setAction)}
+              placeholder="Exact action, e.g. user.blocked"
+              aria-label="Filter by exact action code"
+            />
+          </div>
           {filtersActive && (
             <button
               type="button"
               onClick={clearAll}
-              className="text-body text-blue cursor-pointer border-none bg-transparent p-0"
+              className="text-body text-blue mt-3 cursor-pointer border-none bg-transparent p-0"
             >
               Clear all
             </button>
           )}
           <div className="flex-1"></div>
-          <span className="text-caption text-text-muted">
-            Retention: 365 days · updated{' '}
-            {logsQuery.dataUpdatedAt
-              ? formatInstant(logsQuery.dataUpdatedAt, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                })
-              : NONE}
+          <span className="text-caption text-text-muted mt-3">
+            {logRetentionText(retention.data)} · updated {refreshedAt(logsQuery.dataUpdatedAt)}
           </span>
         </div>
         <TableShell
@@ -226,35 +350,39 @@ export function OpsLogsScreen() {
           onSort={onSort}
           state={tableState}
         >
-          {rows.map((l) => {
-            const request = requestOf(l.method, l.path);
-            return (
-              <tr key={l.id}>
-                <td className={`${tdClass} max-w-90`}>
+          {rows.map((l) => (
+            <tr
+              key={l.id}
+              onClick={() => setOpenEntry(l)}
+              className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+            >
+              <td className={`${tdClass} max-w-90`}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenEntry(l);
+                  }}
+                  className="w-full cursor-pointer border-none bg-transparent p-0 text-left"
+                  aria-label={`Open entry ${l.action}`}
+                >
                   <OpsEntity
                     icon="scroll-text"
+                    tint={l.severity ? SEV_TINT[l.severity] : 'neutral'}
                     title={l.action}
-                    sub={<span title={request}>{request}</span>}
+                    sub={actorLabel(l)}
                   />
-                </td>
-                <td className={tdClass}>
-                  <LogActor entry={l} onPick={pickActor} />
-                </td>
-                <td className={tdClass}>
-                  <button
-                    type="button"
-                    title="Show only this resource"
-                    onClick={() => pickResource(l.resourceType)}
-                    className="text-text-body hover:text-blue cursor-pointer text-left underline-offset-2 hover:underline"
-                  >
-                    {resourceName(l.resourceType)}
-                  </button>
-                </td>
-                <td className={`${tdClass} tabular-nums`}>{l.ip ?? NONE}</td>
-                <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
-              </tr>
-            );
-          })}
+                </button>
+              </td>
+              <td className={tdClass}>{l.module ? moduleLabel(l.module) : l.resourceType}</td>
+              <td className={tdClass}>{hospitalName(l.hospitalId, l.hospitalName)}</td>
+              <td className={`${tdClass} tabular-nums`}>{l.ip ?? NONE}</td>
+              <td className={tdClass}>{formatLogTime(l.occurredAt)}</td>
+              <td className={tdClass}>
+                {l.severity ? <Badge status={SEVERITY_LABEL[l.severity]} /> : NONE}
+              </td>
+            </tr>
+          ))}
         </TableShell>
         <Pager
           total={total}
@@ -264,6 +392,24 @@ export function OpsLogsScreen() {
           noun="log entries"
         />
       </Card>
+      <LogEntryDrawer
+        entry={openEntry}
+        onClose={() => setOpenEntry(null)}
+        onFilterActor={(id) => {
+          setActor(id);
+          setPage(0);
+          setOpenEntry(null);
+        }}
+        {...(hospitals.canView
+          ? {
+              onFilterHospital: (id: string) => {
+                setHospitalId(id);
+                setPage(0);
+                setOpenEntry(null);
+              },
+            }
+          : {})}
+      />
     </div>
   );
 }

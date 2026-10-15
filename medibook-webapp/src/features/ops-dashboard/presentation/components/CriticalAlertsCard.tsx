@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -9,6 +10,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
 import { opsPath } from '@/app/router/paths';
+import { canOpenOpsView } from '@/app/router/opsAccess';
 
 import type {
   OpsAlertHospital,
@@ -41,7 +43,12 @@ interface CriticalAlertsCardProps {
  */
 export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
   const navigate = useNavigate();
+  const checks = useOpsPermission();
   const views = alerts.map(toAlertView);
+  // Only offer a way into a screen the role can open (UAT-35): a dashboard
+  // viewer without `hospitals.view` still reads the alert, just not the links.
+  const canOpenHospitals = canOpenOpsView('hospitals', checks);
+  const canOpenLogs = canOpenOpsView('logs', checks);
 
   return (
     <Card>
@@ -53,7 +60,9 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
         {views.map((a, ai) => {
           const t = ALERT_SEV_TINT[a.sev];
           const notLast = ai < views.length - 1;
-          const links = a.hospitals.slice(0, MAX_ALERT_HOSPITAL_LINKS);
+          const links = canOpenHospitals ? a.hospitals.slice(0, MAX_ALERT_HOSPITAL_LINKS) : [];
+          const action = a.action && canOpenOpsView('onboarding', checks) ? a.action : undefined;
+          const more = canOpenHospitals ? a.moreHospitals : 0;
           return (
             <div
               key={a.key}
@@ -74,7 +83,7 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
               <div className="min-w-0 flex-1">
                 <div className="text-body text-text-strong font-medium">{a.title}</div>
                 <div className="text-caption text-text-muted">{a.sub}</div>
-                {(links.length > 0 || a.action) && (
+                {(links.length > 0 || action || more > 0) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {links.map((h) => (
                       <Button
@@ -86,13 +95,18 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
                         {hospitalLabel(h)}
                       </Button>
                     ))}
-                    {a.action && (
+                    {more > 0 && (
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => a.action && navigate(a.action.to)}
+                        variant="ghost"
+                        onClick={() => navigate(opsPath('hospitals'))}
                       >
-                        {a.action.label}
+                        {`+${more} more in Hospitals`}
+                      </Button>
+                    )}
+                    {action && (
+                      <Button size="sm" variant="secondary" onClick={() => navigate(action.to)}>
+                        {action.label}
                       </Button>
                     )}
                   </div>
@@ -106,8 +120,9 @@ export function CriticalAlertsCard({ alerts }: CriticalAlertsCardProps) {
             icon="circle-check"
             title="No critical alerts."
             message="No hospital is past due, cash desks are reconciled and onboarding is moving. New problems show up here as they happen."
-            actionLabel="Open compliance logs"
-            onAction={() => navigate(opsPath('logs'))}
+            {...(canOpenLogs
+              ? { actionLabel: 'Open compliance logs', onAction: () => navigate(opsPath('logs')) }
+              : {})}
           />
         )}
       </div>

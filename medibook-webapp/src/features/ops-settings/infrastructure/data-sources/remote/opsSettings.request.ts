@@ -1,4 +1,5 @@
 import type {
+  FeatureFlagChanges,
   PlatformSettingsValues,
   TaxRateValues,
 } from '@/features/ops-settings/domain/entities/opsSettings.entity';
@@ -31,10 +32,24 @@ export interface PlatformSettingsRequest {
   readonly session_timeout_min: number;
   readonly min_app_version_android: string | null;
   readonly min_app_version_ios: string | null;
+  readonly payout_four_eyes?: boolean;
+  readonly max_pending_bookings_per_user?: number;
+  readonly max_bookings_per_person_doctor_day?: number;
 }
 
+/**
+ * The record to `PUT`. A setting the server did not send (`null`) is left
+ * out, so an older backend never sees a field it would reject as unknown.
+ */
 export function toPlatformSettingsRequest(v: PlatformSettingsValues): PlatformSettingsRequest {
   return {
+    ...(v.payoutFourEyes !== null ? { payout_four_eyes: v.payoutFourEyes } : {}),
+    ...(v.maxPendingBookingsPerUser !== null
+      ? { max_pending_bookings_per_user: v.maxPendingBookingsPerUser }
+      : {}),
+    ...(v.maxBookingsPerPersonDoctorDay !== null
+      ? { max_bookings_per_person_doctor_day: v.maxBookingsPerPersonDoctorDay }
+      : {}),
     convenience_fee_tax_rate_bp: v.convenienceFeeTaxRateBp,
     platform_gstin: v.gstin,
     platform_legal_name: v.legalName,
@@ -92,6 +107,9 @@ export const PLATFORM_SETTINGS_FIELD: Readonly<Record<string, keyof PlatformSett
   session_timeout_min: 'sessionTimeoutMin',
   min_app_version_android: 'minAppVersionAndroid',
   min_app_version_ios: 'minAppVersionIos',
+  payout_four_eyes: 'payoutFourEyes',
+  max_pending_bookings_per_user: 'maxPendingBookingsPerUser',
+  max_bookings_per_person_doctor_day: 'maxBookingsPerPersonDoctorDay',
 };
 
 /** `ConfigTaxRateRequest` / `PatchedConfigTaxRateRequest`. */
@@ -124,3 +142,12 @@ export const TAX_RATE_FIELD: Readonly<Record<string, keyof TaxRateValues>> = {
   applies_to: 'appliesTo',
   is_active: 'isActive',
 };
+
+/** `PATCH /platform/feature-flags/{key}` body: only the fields that change. */
+export function toFeatureFlagPatchBody(changes: FeatureFlagChanges): Record<string, unknown> {
+  return {
+    ...(changes.enabled !== undefined ? { enabled: changes.enabled } : {}),
+    ...(changes.description !== undefined ? { description: changes.description } : {}),
+    ...(changes.isPublic !== undefined ? { is_public: changes.isPublic } : {}),
+  };
+}

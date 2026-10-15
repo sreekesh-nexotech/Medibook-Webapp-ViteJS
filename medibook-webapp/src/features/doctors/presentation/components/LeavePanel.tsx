@@ -1,12 +1,13 @@
 import { useState } from 'react';
 
-import { todayIso } from '@/features/doctors/domain/calendar';
 import type { DoctorLeaveEntry, LeaveKind } from '@/features/doctors/domain/entities/doctors.types';
 import {
   useDeleteLeaveMutation,
   useSaveLeaveMutation,
 } from '@/features/doctors/application/queries/useScheduleMutations';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { fmtDate } from '@/shared/lib/format';
 import { dateRange, required } from '@/shared/lib/validate';
 import { Button } from '@/shared/ui/Button';
@@ -14,6 +15,7 @@ import { Can } from '@/shared/ui/Can';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { Field } from '@/shared/ui/Field';
+import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { IconBtn } from '@/shared/ui/IconBtn';
@@ -21,8 +23,6 @@ import { InfoDot } from '@/shared/ui/InfoDot';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
-
-import { isFailure } from '@/core/error/failure';
 
 import { LEAVE_KIND_LABEL } from './doctors.view';
 import { ScheduleChangeModal } from './ScheduleChangeModal';
@@ -38,8 +38,16 @@ function kindFromLabel(label: string): LeaveKind {
 }
 
 function failureText(error: unknown, fallback: string): string {
-  return isFailure(error) ? error.message : fallback;
+  return describeFailure(error, fallback);
 }
+
+/** Server field → leave form field (UAT-48). */
+const LEAVE_SERVER_FIELDS = {
+  date_from: 'from',
+  date_to: 'to',
+  leave_type: 'kind',
+  reason: 'reason',
+} as const;
 
 function rangeLabel(from: string, to: string): string {
   return from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)}`;
@@ -71,20 +79,22 @@ interface LeaveModalProps {
 function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
   const save = useSaveLeaveMutation();
   const confirm = useScheduleConfirm();
+  // A new leave starts on the hospital's today, not the PC's (D-09, UAT-47).
+  const { today } = useHospitalToday();
   const form = useForm<LeaveForm>({
     initial: {
-      from: leave?.dateFrom ?? todayIso(),
-      to: leave?.dateTo ?? todayIso(),
+      from: leave?.dateFrom ?? today,
+      to: leave?.dateTo ?? today,
       kind: leave?.kind ?? 'casual',
       reason: leave?.reason ?? '',
     },
     validate: LEAVE_VALIDATORS,
     onSubmit: (values) =>
       confirm.run({
-        attempt: (isConfirmed) =>
+        attempt: (mode) =>
           save.mutateAsync({
             doctorId,
-            confirm: isConfirmed,
+            mode,
             existing: leave ? { id: leave.id, version: leave.version } : undefined,
             input: {
               kind: values.kind,
@@ -97,7 +107,16 @@ function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
           toast(leave ? 'Leave updated' : 'Leave added', 'success');
           onClose();
         },
-        onError: (error) => toast(failureText(error, 'Could not save the leave.'), 'error', error),
+        onError: (error) =>
+          toast(
+            form.applyServerErrors(
+              error,
+              { fields: LEAVE_SERVER_FIELDS },
+              'Could not save the leave.',
+            ),
+            'error',
+            error,
+          ),
       }),
   });
   return (
@@ -113,6 +132,7 @@ function LeaveModal({ doctorId, leave, onClose }: LeaveModalProps) {
         busy={form.submitting || confirm.modal.isApplying}
       >
         <div className="flex flex-col gap-4.5">
+          <FormErrorSummary messages={form.serverSummary} />
           <div className="grid grid-cols-2 gap-4.5">
             <Field label="From" required error={form.errorFor('from')}>
               <TextInput
@@ -179,12 +199,11 @@ export function LeavePanel({ doctorId, leave }: LeavePanelProps) {
     const target = removing;
     setRemoving(null);
     void confirm.run({
-      attempt: (isConfirmed) =>
+      attempt: (mode) =>
         remove.mutateAsync({
           doctorId,
-          leaveId: target.id,
-          version: target.version,
-          confirm: isConfirmed,
+          leave: { id: target.id, version: target.version },
+          mode,
         }),
       onApplied: () => toast('Leave removed', 'info'),
       onError: (error) => toast(failureText(error, 'Could not remove the leave.'), 'error', error),

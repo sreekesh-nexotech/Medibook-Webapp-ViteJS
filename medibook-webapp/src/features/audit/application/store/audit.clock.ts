@@ -17,3 +17,10 @@ export function localDateIso(d: Date = new Date()): string {
 export function localTimeHm(d: Date = new Date()): string {
   return calendarTimeHm(d);
 }
+
+/** Weekday index of an ISO date, 0 = Monday … 6 = Sunday. */
+export function isoWeekdayIndex(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  const at = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  return (at.getDay() + 6) % 7;
+}

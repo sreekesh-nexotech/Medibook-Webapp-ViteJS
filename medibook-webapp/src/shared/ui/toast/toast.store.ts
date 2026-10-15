@@ -13,9 +13,16 @@ export interface ToastItem {
   readonly reference: string | null;
 }
 
-/** How long a success or info toast stays on screen (prototype's ToastHost timeout). */
-const TOAST_DURATION_MS = 2800;
-/** Error toasts stay until dismissed; past this many, the oldest goes. */
+/**
+ * How long a toast stays on screen (UAT-76, A11Y-03, 01·F34): confirmations stay 5 s, errors 8 s.
+ */
+export const TOAST_DURATION_MS: Readonly<Record<ToastType, number>> = {
+  success: 5000,
+  info: 5000,
+  error: 8000,
+};
+
+/** Error toasts stay until dismissed or timeout; past this many, the oldest goes. */
 const MAX_ERROR_TOASTS = 3;
 
 interface ToastState {
@@ -41,13 +48,9 @@ export const useToastStore = create<ToastState & ToastActions>()((set) => ({
       const drop = new Set(errors.slice(0, -MAX_ERROR_TOASTS).map((t) => t.id));
       return { items: items.filter((t) => !drop.has(t.id)) };
     });
-    // An error waits for the user: they may need to read it or its reference
-    // out to support (A11Y-03).
-    if (type !== 'error') {
-      setTimeout(() => {
-        set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
-      }, TOAST_DURATION_MS);
-    }
+    setTimeout(() => {
+      set((s) => ({ items: s.items.filter((x) => x.id !== id) }));
+    }, TOAST_DURATION_MS[type]);
   },
   dismiss: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
 }));
@@ -55,9 +58,9 @@ export const useToastStore = create<ToastState & ToastActions>()((set) => ({
 /**
  * Drop-in replacement for the prototype's global `window.toast(msg, type)` —
  * store actions and components call this exactly where the design fired it.
- * A success or info toast leaves after 2.8s; an error stays until dismissed.
- * For an error, pass what failed as `cause`: a failed request adds its support
- * reference.
+ * The toast auto-dismisses (5 s, errors 8 s) and is announced by screen
+ * readers through the host's live regions. For an error, pass what failed as `cause`:
+ * a failed request adds its support reference.
  */
 export function toast(msg: string, type: ToastType = 'success', cause?: unknown): void {
   useToastStore.getState().show(msg, type, type === 'error' ? referenceOf(cause) : null);

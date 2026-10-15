@@ -32,13 +32,19 @@ export const APPLIES_TO_LABEL: Readonly<Record<TaxAppliesTo, string>> = {
   all: 'All',
 };
 
-/** The Applies To select's options, in the backend's order. */
-export const APPLIES_TO_OPTIONS: readonly TaxAppliesTo[] = [
-  'consultation',
-  'service',
-  'convenience_fee',
-  'all',
-];
+/**
+ * What a new or edited rate may apply to. The convenience-fee GST is the
+ * platform setting, not a tax-rate row (BE-18), so `convenience_fee` is no
+ * longer offered — an old row that has it keeps showing it until changed.
+ */
+export const APPLIES_TO_OPTIONS: readonly TaxAppliesTo[] = ['consultation', 'service', 'all'];
+
+/** The Applies To choices for a rate currently set to `current`. */
+export function appliesToOptionsFor(current: TaxAppliesTo): readonly TaxAppliesTo[] {
+  return APPLIES_TO_OPTIONS.includes(current)
+    ? APPLIES_TO_OPTIONS
+    : [current, ...APPLIES_TO_OPTIONS];
+}
 
 /** Session timeout as the select spells it: `30` → `"30 min"`. */
 export function timeoutLabel(minutes: number): string {
@@ -47,3 +53,31 @@ export function timeoutLabel(minutes: number): string {
 
 /** The Session Timeout select's standard choices (a stored value off this list is added). */
 export const SESSION_TIMEOUT_OPTIONS: readonly string[] = ['15 min', '30 min', '60 min'];
+
+/** Services named in a `TAX_RATE_IN_USE` refusal before "and N more". */
+const IN_USE_NAMES = 3;
+
+/**
+ * The message for a refused tax-rate change (B4 `409 TAX_RATE_IN_USE`:
+ * hospital services still link the rate), naming a few of them; `null` for
+ * any other failure.
+ */
+export function taxRateInUseMessage(
+  code: string | null,
+  meta: Readonly<Record<string, unknown>>,
+): string | null {
+  if (code !== 'TAX_RATE_IN_USE') return null;
+  const services = Array.isArray(meta.services) ? meta.services : [];
+  const names = services
+    .map((s: unknown) =>
+      typeof s === 'object' && s !== null && 'name' in s && typeof s.name === 'string'
+        ? s.name
+        : null,
+    )
+    .filter((n): n is string => n !== null);
+  const count = typeof meta.service_count === 'number' ? meta.service_count : names.length;
+  const shown = names.slice(0, IN_USE_NAMES).join(', ');
+  const more = count > IN_USE_NAMES ? ` and ${count - IN_USE_NAMES} more` : '';
+  const list = shown ? ` (${shown}${more})` : '';
+  return `${count} hospital ${count === 1 ? 'service still uses' : 'services still use'} this rate${list}. Hospitals must move ${count === 1 ? 'it' : 'them'} to another rate first.`;
+}

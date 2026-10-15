@@ -9,14 +9,11 @@ import type {
   HospitalProfileChanges,
   HospitalRuleChanges,
   HospitalRuleSettings,
-  NumberingChanges,
-  NumberingKind,
-  NumberingSeries,
   TokenPolicy,
   TokenPolicyChanges,
 } from '@/features/settings/domain/entities/settings.entities';
 
-/** Hospital Settings (H2): profile, rules, hours, token policy, numbering and payout account. */
+/** Hospital Settings (H2): profile, rules, hours, token policy and payout account. */
 export interface SettingsRepository {
   getProfile(): Promise<Result<HospitalProfile>>;
   /** Patch the profile; `version` guards against a concurrent edit. */
@@ -33,17 +30,8 @@ export interface SettingsRepository {
   replaceHours(days: readonly HospitalHoursDay[]): Promise<Result<readonly HospitalHoursDay[]>>;
 
   getTokenPolicy(): Promise<Result<TokenPolicy>>;
-  /** Scope and reset changes apply from tomorrow (hospital-local); the rest at once. */
+  /** `scope`/`reset` changes apply from tomorrow (hospital-local); the rest now. */
   updateTokenPolicy(changes: TokenPolicyChanges, version: number): Promise<Result<TokenPolicy>>;
-
-  /** The MRN, booking and receipt number series. */
-  listNumbering(): Promise<Result<readonly NumberingSeries[]>>;
-  /** A new format applies to numbers issued from now on; issued numbers never change. */
-  updateNumbering(
-    kind: NumberingKind,
-    changes: NumberingChanges,
-    version: number,
-  ): Promise<Result<NumberingSeries>>;
 
   listBankAccounts(): Promise<Result<readonly BankAccount[]>>;
   createBankAccount(input: BankAccountInput): Promise<Result<BankAccount>>;
@@ -52,6 +40,9 @@ export interface SettingsRepository {
     input: BankAccountInput,
     version: number,
   ): Promise<Result<BankAccount>>;
+  deleteBankAccount(id: string, version: number): Promise<Result<null>>;
+  /** Make this the payout account (admin role only, decision 4). */
+  makeBankAccountPrimary(id: string): Promise<Result<BankAccount>>;
 
   /** Upload a hospital image; resolves to the stored file id to attach to the profile. */
   uploadImage(file: File, purpose: HospitalImagePurpose): Promise<Result<string>>;

@@ -3,13 +3,18 @@ import { useMemo, useState } from 'react';
 import { isFailure } from '@/core/error/failure';
 
 import { useDeactivateOpsStaffMutation } from '@/features/ops-users/application/queries/useDeactivateOpsStaffMutation';
+import { useDeleteOpsRoleMutation } from '@/features/ops-users/application/queries/useDeleteOpsRoleMutation';
 import { useOpsPermissionsQuery } from '@/features/ops-users/application/queries/useOpsPermissionsQuery';
 import { useOpsRolesQuery } from '@/features/ops-users/application/queries/useOpsRolesQuery';
 import { useOpsStaffQuery } from '@/features/ops-users/application/queries/useOpsStaffQuery';
 import { useOpsUsersAccess } from '@/features/ops-users/application/queries/useOpsUsersAccess';
 import { useReactivateOpsStaffMutation } from '@/features/ops-users/application/queries/useReactivateOpsStaffMutation';
+import { useResendOpsStaffInviteMutation } from '@/features/ops-users/application/queries/useResendOpsStaffInviteMutation';
 import { useUnlockOpsStaffMutation } from '@/features/ops-users/application/queries/useUnlockOpsStaffMutation';
-import type { OpsStaffMember } from '@/features/ops-users/domain/entities/opsUsers.types';
+import type {
+  OpsStaffMember,
+  OpsStaffRole,
+} from '@/features/ops-users/domain/entities/opsUsers.types';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -38,6 +43,8 @@ import {
   type ModuleAccess,
 } from '../components/opsUsers.display';
 import { OpsRoleAnnotation } from '../components/OpsRoleAnnotation';
+import { OpsRoleEditorModal } from '../components/OpsRoleEditorModal';
+import { assignableRoles, canManageMember, isGridLocked } from '../components/opsRoles.rules';
 
 /** No 2FA column: two-factor sign-in is off by design in this phase (Q64, PRD-05). */
 const USER_COLUMNS = ['User', 'Role', 'Last Active', 'Status', 'Action'] as const;
@@ -47,6 +54,10 @@ type EditorState = { readonly kind: 'new' } | { readonly kind: 'edit'; readonly 
 
 /** The access-changing action awaiting confirmation. */
 type PendingAction = { readonly kind: 'deactivate' | 'reactivate'; readonly id: string } | null;
+
+/** The role editor: a new role, or an existing one. */
+type RoleEditorState =
+  { readonly kind: 'new' } | { readonly kind: 'edit'; readonly id: string } | null;
 
 /** Check glyph (full access), em-dash (no access) or the actions held, for one matrix cell. */
 function mark(access: ModuleAccess) {
@@ -77,9 +88,13 @@ export function OpsUsersScreen() {
   const deactivate = useDeactivateOpsStaffMutation();
   const reactivate = useReactivateOpsStaffMutation();
   const unlock = useUnlockOpsStaffMutation();
+  const resend = useResendOpsStaffInviteMutation();
+  const deleteRole = useDeleteOpsRoleMutation();
   const [q, setQ] = useState('');
   const [editor, setEditor] = useState<EditorState>(null);
   const [pending, setPending] = useState<PendingAction>(null);
+  const [roleEditor, setRoleEditor] = useState<RoleEditorState>(null);
+  const [roleToDelete, setRoleToDelete] = useState<OpsStaffRole | null>(null);
 
   const users: readonly OpsStaffMember[] = staffQuery.data?.items ?? [];
   const roles = rolesQuery.data ?? [];
@@ -161,6 +176,46 @@ export function OpsUsersScreen() {
           ? { kind: 'empty', icon: 'shield-check', title: 'No permissions are defined.' }
           : undefined;
 
+  const doResend = (u: OpsStaffMember) =>
+    resend.mutate(u.id, {
+      onSuccess: () => toast(`A new set-password email is on its way to ${u.email}.`, 'success'),
+      onError: (f) => failToast(f, 'Could not re-send the invitation.'),
+    });
+
+  const confirmDeleteRole = () => {
+    if (!roleToDelete) return;
+    deleteRole.mutate(
+      { id: roleToDelete.id, version: roleToDelete.version },
+      {
+        onSuccess: () => {
+          toast(`${roleToDelete.name} deleted.`, 'success');
+          setRoleToDelete(null);
+        },
+        onError: (f) => {
+          const inUse =
+            isFailure(f) && f.code === 'ROLE_IN_USE' && typeof f.meta.user_count === 'number'
+              ? f.meta.user_count
+              : null;
+          if (inUse === null) {
+            failToast(f, 'Could not delete this role.');
+            return;
+          }
+          toast(
+            `${roleToDelete.name} is held by ${inUse} ${inUse === 1 ? 'person' : 'people'}. Move them to another role first.`,
+            'error',
+          );
+        },
+      },
+    );
+  };
+  const editingRole =
+    roleEditor?.kind === 'edit' ? (roles.find((r) => r.id === roleEditor.id) ?? null) : null;
+  const roleEditorKey = roleEditor
+    ? roleEditor.kind === 'edit'
+      ? `role-${roleEditor.id}`
+      : 'role-new'
+    : 'role-closed';
+
   const doUnlock = (u: OpsStaffMember) =>
     unlock.mutate(u.id, {
       onSuccess: () => toast(`${u.name} can sign in again.`),
@@ -213,7 +268,8 @@ export function OpsUsersScreen() {
         <TableShell columns={USER_COLUMNS} scrollLabel="Internal users" state={tableState}>
           {filtered.map((u) => {
             const locked = isLocked(u);
-            const isSelf = u.userId === access.selfUserId;
+            // B2 ceilings: never your own row, never a member whose role reaches past yours.
+            const manageable = canManageMember(u, roles, access.held, access.selfUserId);
             return (
               <tr key={u.id}>
                 <td className={tdClass}>
@@ -228,7 +284,7 @@ export function OpsUsersScreen() {
                   </div>
                 </td>
                 <td className={tdClass}>
-                  {access.canEdit ? (
+                  {access.canEdit && manageable ? (
                     <div className="flex gap-2">
                       {u.status !== 'deactivated' && (
                         <IconBtn
@@ -251,6 +307,18 @@ export function OpsUsersScreen() {
                           onClick={() => doUnlock(u)}
                         />
                       )}
+                      {u.status === 'invited' && (
+                        <IconBtn
+                          name="send"
+                          box={36}
+                          size={15}
+                          label="Re-send invitation"
+                          title={`Email ${u.name} a new set-password link`}
+                          busy={resend.isPending && resend.variables === u.id}
+                          disabled={resend.isPending}
+                          onClick={() => doResend(u)}
+                        />
+                      )}
                       {u.status === 'deactivated' ? (
                         <IconBtn
                           name="user-check"
@@ -261,21 +329,30 @@ export function OpsUsersScreen() {
                           onClick={() => setPending({ kind: 'reactivate', id: u.id })}
                         />
                       ) : (
-                        !isSelf && (
-                          <IconBtn
-                            name="user-x"
-                            box={36}
-                            size={15}
-                            color="var(--color-d-600)"
-                            label="Deactivate user"
-                            title={`Deactivate ${u.name}`}
-                            onClick={() => setPending({ kind: 'deactivate', id: u.id })}
-                          />
-                        )
+                        <IconBtn
+                          name="user-x"
+                          box={36}
+                          size={15}
+                          color="var(--color-d-600)"
+                          label="Deactivate user"
+                          title={`Deactivate ${u.name}`}
+                          onClick={() => setPending({ kind: 'deactivate', id: u.id })}
+                        />
                       )}
                     </div>
                   ) : (
-                    <span className="text-text-muted">—</span>
+                    <span
+                      className="text-text-muted"
+                      title={
+                        access.canEdit
+                          ? u.userId === access.selfUserId
+                            ? 'You cannot change your own access'
+                            : 'This person’s role reaches further than yours'
+                          : undefined
+                      }
+                    >
+                      —
+                    </span>
                   )}
                 </td>
               </tr>
@@ -289,16 +366,57 @@ export function OpsUsersScreen() {
         )}
       </Card>
       <Card>
-        <SectionTitle className="mb-1.5">Role Permissions</SectionTitle>
+        <div className="mb-1.5 flex flex-wrap items-center gap-3">
+          <SectionTitle>Role Permissions</SectionTitle>
+          <div className="flex-1"></div>
+          {access.canAdd && (
+            <Button
+              size="sm"
+              icon="plus"
+              disabled={Boolean(rolesState)}
+              onClick={() => setRoleEditor({ kind: 'new' })}
+            >
+              New Role
+            </Button>
+          )}
+        </div>
         <div className="text-caption text-text-muted mb-4">
           Each role grants a set of module permissions — assign the narrowest one that covers the
-          job. Patient account detail requires its own permission, separate from the account list.
-          Every detail view is written to Compliance Logs.
+          job. Every patient-account detail view is written to Compliance Logs. System roles can be
+          edited but not deleted; the owner role always holds everything.
         </div>
         {!rolesState && (
-          <div className="mb-4.5 grid gap-3 lg:grid-cols-2">
+          <div className="mb-4.5 grid grid-cols-1 gap-3 md:grid-cols-2">
             {roles.map((r) => (
-              <OpsRoleAnnotation key={r.id} role={r} modules={modules} />
+              <div key={r.id} className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <OpsRoleAnnotation role={r} modules={modules} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {access.canEdit && (
+                    <IconBtn
+                      name="pencil"
+                      box={34}
+                      size={14}
+                      label={isGridLocked(r) ? 'Rename role' : 'Edit role'}
+                      title={`Edit ${r.name}`}
+                      onClick={() => setRoleEditor({ kind: 'edit', id: r.id })}
+                    />
+                  )}
+                  {access.canDelete && !r.isSystem && (
+                    <IconBtn
+                      name="trash-2"
+                      box={34}
+                      size={14}
+                      color="var(--color-d-500)"
+                      label="Delete role"
+                      title={ct(r.id) > 0 ? `${r.name} is in use` : `Delete ${r.name}`}
+                      disabled={ct(r.id) > 0}
+                      onClick={() => setRoleToDelete(r)}
+                    />
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -325,7 +443,7 @@ export function OpsUsersScreen() {
         key={editorKey}
         open={editor != null}
         user={editingUser}
-        roles={roles}
+        roles={assignableRoles(roles, access.held)}
         modules={modules}
         onClose={() => setEditor(null)}
         onDone={() => {
@@ -343,7 +461,9 @@ export function OpsUsersScreen() {
           target
             ? isDeactivating
               ? `${target.name} loses access and is signed out everywhere. You can reactivate them later.`
-              : `${target.name} gets access again with their ${target.role.name} role.`
+              : target.lastLoginAt === null
+                ? `${target.name} comes back as Pending with the ${target.role.name} role — they never set a password, so re-send the invitation to email them a new link.`
+                : `${target.name} gets access again with their ${target.role.name} role.`
             : ''
         }
         confirmLabel={
@@ -358,6 +478,32 @@ export function OpsUsersScreen() {
         confirmVariant={isDeactivating ? 'danger' : 'primary'}
         busy={confirmBusy}
         onConfirm={confirmPending}
+      />
+      {roleEditor && (
+        <OpsRoleEditorModal
+          key={roleEditorKey}
+          role={editingRole}
+          roles={roles}
+          modules={modules}
+          held={access.held}
+          onClose={() => setRoleEditor(null)}
+        />
+      )}
+      <OpsConfirm
+        open={roleToDelete !== null}
+        onClose={() => setRoleToDelete(null)}
+        icon="trash-2"
+        tone="danger"
+        title="Delete this role?"
+        body={
+          roleToDelete
+            ? `${roleToDelete.name} is removed from the role list. Nobody holds it now; it is kept on record.`
+            : ''
+        }
+        confirmLabel={deleteRole.isPending ? 'Deleting…' : 'Delete Role'}
+        confirmVariant="danger"
+        busy={deleteRole.isPending}
+        onConfirm={confirmDeleteRole}
       />
     </div>
   );

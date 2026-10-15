@@ -14,7 +14,7 @@ export interface AppConfig {
   readonly otpLength: number;
   /** Platform support phone in E.164, when configured (Platform Settings). */
   readonly supportPhoneE164: string | null;
-  /** Platform support email, once the backend sends one (OBS-06-B). */
+  /** Platform support email, when configured (BE-34, OBS-06-B). */
   readonly supportEmail: string | null;
   /** Current version number of each legal document, by slug. */
   readonly legalVersions: Readonly<Record<string, number>>;
@@ -28,8 +28,8 @@ export const appConfigResponseSchema = z.object({
   feature_flags_public: z.record(z.string(), z.boolean()),
   otp_length: z.number().int().positive(),
   support_contacts: z.object({
-    phone_e164: z.string().optional(),
-    email: z.string().optional(),
+    phone_e164: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
   }),
   // `LegalDocument.version` is an integer column (backend `platform/models/legal_document.py`).
   legal_versions: z.record(z.string(), z.number().int()),

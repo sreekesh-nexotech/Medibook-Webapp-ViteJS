@@ -7,8 +7,12 @@ export interface OpsUsersAccess {
   readonly canAdd: boolean;
   /** `staff.edit` — change roles, deactivate, reactivate, unlock. */
   readonly canEdit: boolean;
+  /** `staff.del` — delete custom roles. */
+  readonly canDelete: boolean;
   /** The signed-in user's id, so they are never offered "deactivate yourself". */
   readonly selfUserId: string | null;
+  /** Every permission the signed-in user holds — the ceiling for roles they grant (B2, M-07). */
+  readonly held: ReadonlySet<string>;
 }
 
 /**
@@ -22,6 +26,8 @@ export function useOpsUsersAccess(): OpsUsersAccess {
   return {
     canAdd: held.has('staff.add'),
     canEdit: held.has('staff.edit'),
+    canDelete: held.has('staff.del'),
     selfUserId: session?.user.id ?? null,
+    held,
   };
 }

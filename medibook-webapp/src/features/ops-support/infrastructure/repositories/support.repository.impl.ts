@@ -25,8 +25,17 @@ import {
 const COUNT_PAGE_SIZE = 1;
 
 export const supportRepository: SupportRepository = {
-  listTickets: (params) =>
-    attempt(async () => toPage(await getTickets(toTicketListQuery(params)), toSupportTicket)),
+  listTickets: (query) =>
+    attempt(async () => {
+      const q =
+        'ticketNo' in query &&
+        typeof query.ticketNo === 'string' &&
+        'sort' in query &&
+        typeof query.sort === 'string'
+          ? toTicketListQuery(query as any)
+          : (query as any);
+      return toPage(await getTickets(q), toSupportTicket);
+    }),
 
   countTickets: (statuses) =>
     attempt(async () => {
@@ -46,10 +55,12 @@ export const supportRepository: SupportRepository = {
       toSupportTicketDetail(await patchTicket(id, toTicketUpdateRequest(changes), version)),
     ),
 
-  attachmentUrl: (fileId) => attempt(async () => unwrap(await getFileUrl(fileId)).url),
+  reply: (id, reply) => attempt(async () => toTicketMessage(await postTicketMessage(id, reply))),
 
   replyToTicket: (id, reply) =>
     attempt(async () =>
       toTicketMessage(await postTicketMessage(id, toTicketMessageRequest(reply))),
     ),
+
+  attachmentUrl: (fileId) => attempt(async () => unwrap(await getFileUrl(fileId)).url),
 };

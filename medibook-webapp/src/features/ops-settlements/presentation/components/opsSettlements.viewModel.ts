@@ -1,5 +1,6 @@
 import { isFailure } from '@/core/error/failure';
 
+import { downloadFromUrl } from '@/shared/lib/download';
 import { fmtDate } from '@/shared/lib/format';
 import type { OpsTint } from '@/shared/ui/OpsConfirm';
 
@@ -7,7 +8,10 @@ import type {
   Payout,
   PayoutRun,
   PayoutRunStatus,
+  PeriodBreakdown,
+  SettlementFile,
   SettlementPeriod,
+  StatementPdf,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 
 /**
@@ -47,6 +51,24 @@ export interface LedgerRow {
   readonly releasable: boolean;
 }
 
+/**
+ * A payout that can actually be released: an account was captured and is
+ * still verified (M-45 — the backend refuses a release to an account whose
+ * verification was lost). `null` verification (older backend) is not held
+ * against it.
+ */
+export function canReleaseTo(payout: Payout | null): boolean {
+  return payout !== null && payout.hasBankAccount && payout.bankAccountVerified !== false;
+}
+
+/** Why a releasable row's money cannot go out, or `null` when it can. */
+export function releaseBlocker(payout: Payout | null): string | null {
+  if (!payout) return null;
+  if (!payout.hasBankAccount) return 'no payout account';
+  if (payout.bankAccountVerified === false) return 'account no longer verified';
+  return null;
+}
+
 /** Runs whose payouts can be released (`services/payouts.py` `release_run`). */
 const RELEASABLE_RUN: ReadonlySet<PayoutRunStatus> = new Set([
   'approved',
@@ -77,8 +99,9 @@ function rowStatus(
 }
 
 /**
- * One row per closed, held or paid period (open periods are still accruing
- * and are not statements yet), joined to its payout and run.
+ * One row per closed, held or paid period, joined to its payout and run.
+ * Periods are only created closed now (decision 11); a legacy `open` row is
+ * not a statement and is left out.
  */
 export function buildRows(
   periods: readonly SettlementPeriod[],
@@ -172,9 +195,137 @@ export function bankLabel(payout: Payout | null): string | null {
   return payout?.bankAccountLast4 ? `A/c ····${payout.bankAccountLast4}` : null;
 }
 
-/** First field message of a 400, else the failure's own message, else `fallback`. */
+/** Run skip reasons (M-45), as ops read them. */
+const RUN_SKIP_LABELS: Readonly<Record<string, string>> = {
+  no_primary_bank_account: 'no primary payout account',
+  bank_account_unverified: 'payout account not verified yet',
+};
+
+export function runSkipLabel(reason: string): string {
+  return RUN_SKIP_LABELS[reason] ?? reason.replace(/_/g, ' ');
+}
+
+/** Period-close skip reasons. */
+const CLOSE_SKIP_LABELS: Readonly<Record<string, string>> = {
+  overlaps_existing_period: 'already has a period overlapping these dates',
+};
+
+export function closeSkipLabel(reason: string): string {
+  return CLOSE_SKIP_LABELS[reason] ?? reason.replace(/_/g, ' ');
+}
+
+/** Decision 3: with `payout_four_eyes` on, the run's creator may not approve or release it. */
+export function isFourEyesRefusal(error: unknown): boolean {
+  return (
+    isFailure(error) && error.code === 'PERMISSION_DENIED' && error.meta.rule === 'payout_four_eyes'
+  );
+}
+
+const FOUR_EYES_MESSAGE =
+  'Four-eyes approval is on: someone other than the person who created this run must approve and release it.';
+
+/**
+ * First field message of a 400, else a message for the refusals this screen
+ * knows (four-eyes, a run with nothing payable), else the failure's own
+ * message, else `fallback`.
+ */
 export function failureText(error: unknown, fallback: string): string {
   if (!isFailure(error)) return fallback;
+  if (isFourEyesRefusal(error)) return FOUR_EYES_MESSAGE;
+  const skipped = error.meta.skipped;
+  if (error.code === 'STATE_CONFLICT' && Array.isArray(skipped) && skipped.length > 0) {
+    return `No payout run was created: none of the ${skipped.length} statement${
+      skipped.length === 1 ? '' : 's'
+    } in that window can be paid until the hospital's primary payout account is verified.`;
+  }
   const firstField = Object.values(error.fieldErrors)[0]?.[0];
   return firstField ?? error.message;
+}
+
+export interface BreakdownLine {
+  readonly label: string;
+  /** Signed rupees: deductions are negative. */
+  readonly rupees: number;
+  readonly strong?: boolean;
+}
+
+/**
+ * The drawer's statement lines, top to bottom: what came in, what came off,
+ * and the payable. Lines that are zero and optional are left out.
+ */
+export function breakdownLines(
+  b: PeriodBreakdown,
+  adjustmentsRupees: number,
+  tdsRupees: number,
+  netPayableRupees: number,
+): BreakdownLine[] {
+  const lines: BreakdownLine[] = [
+    { label: 'Gross collected', rupees: b.grossRupees },
+    { label: 'Refunds', rupees: -b.refundsRupees },
+    { label: 'Gateway fees', rupees: -b.gatewayFeesRupees },
+    { label: 'Platform commission', rupees: -b.commissionRupees },
+  ];
+  if (b.commissionGstRupees !== 0) {
+    lines.push({ label: 'GST on commission', rupees: -b.commissionGstRupees });
+  }
+  if (b.carriedAdjustmentsRupees !== 0) {
+    lines.push({ label: 'Adjustments carried in', rupees: b.carriedAdjustmentsRupees });
+  }
+  lines.push({ label: 'Ledger net', rupees: b.ledgerNetRupees, strong: true });
+  if (adjustmentsRupees !== 0) lines.push({ label: 'Adjustments', rupees: adjustmentsRupees });
+  if (tdsRupees !== 0) lines.push({ label: 'TDS', rupees: -tdsRupees });
+  lines.push({ label: 'Net payable', rupees: netPayableRupees, strong: true });
+  return lines;
+}
+
+/** `true` / `false` from the backend's reconciliation, or computed on an older backend. */
+export function isReconciled(
+  b: PeriodBreakdown,
+  adjustmentsRupees: number,
+  tdsRupees: number,
+  netPayableRupees: number,
+): boolean {
+  if (b.reconciled !== null) return b.reconciled;
+  const expected = b.ledgerNetRupees + adjustmentsRupees - tdsRupees;
+  return Math.round(expected * 100) === Math.round(netPayableRupees * 100);
+}
+
+/** `"1,250.50"` → 1250.5; `undefined` unless an amount above zero with at most two decimals. */
+export function parseAdjustmentAmount(raw: string): number | undefined {
+  const text = raw.replace(/,/g, '').trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return undefined;
+  const n = Number(text);
+  return n > 0 ? n : undefined;
+}
+
+/** How long a downloaded file's object URL is kept alive. */
+const REVOKE_DELAY_MS = 10_000;
+
+/** Hand a server-rendered file (export, PDF bytes) to the browser's download. */
+export function saveSettlementFile(file: SettlementFile): void {
+  const url = URL.createObjectURL(file.blob);
+  downloadFromUrl(url, file.filename);
+  // Revoking in the same tick can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+}
+
+/** Open a statement PDF: follow the signed link (SET-02), or save the bytes. */
+export function openStatementPdf(pdf: StatementPdf): void {
+  if (pdf.kind === 'url') downloadFromUrl(pdf.url, `${pdf.statementNo}.pdf`);
+  else saveSettlementFile(pdf.file);
+}
+
+const HTTP_NOT_IMPLEMENTED = 501;
+
+/** The server cannot render PDFs here (`501 NOT_IMPLEMENTED_YET`). */
+export function isNotImplemented(error: unknown): boolean {
+  return isFailure(error) && error.status === HTTP_NOT_IMPLEMENTED;
+}
+
+/** The month before `todayIso`, as `YYYY-MM` — the usual month to issue statements for. */
+export function previousMonth(todayIso: string): string {
+  const [y, m] = todayIso.split('-').map(Number);
+  const year = y ?? 1970;
+  const month = m ?? 1;
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
 }

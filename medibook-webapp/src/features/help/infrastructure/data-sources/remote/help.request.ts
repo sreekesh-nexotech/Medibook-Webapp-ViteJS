@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-import type { NewSupportTicket } from '@/features/help/domain/entities/help.types';
+import type {
+  NewSupportTicket,
+  NewTicketMessage,
+  TicketListQuery,
+} from '@/features/help/domain/entities/help.types';
 import {
   SUPPORT_TICKET_CATEGORIES,
   TICKET_DESCRIPTION_MAX,
@@ -25,5 +29,28 @@ export function toRaiseTicketRequest(input: NewSupportTicket): RaiseTicketReques
     category: input.category,
     subject: input.subject.trim(),
     description: input.description.trim(),
+  };
+}
+
+/** `POST …/support/tickets/{id}/messages` body (`TicketMessageSerializer`). */
+export interface TicketMessageRequest {
+  readonly body: string;
+  readonly attachment_file_ids?: readonly string[];
+}
+
+export function toTicketMessageRequest(input: NewTicketMessage): TicketMessageRequest {
+  return {
+    body: input.body.trim(),
+    ...(input.attachmentFileIds.length > 0 ? { attachment_file_ids: input.attachmentFileIds } : {}),
+  };
+}
+
+/** Query params of the ticket list (allowlisted in `hospital_ticket_list.py`). */
+export function toTicketListParams(query: TicketListQuery): Record<string, string | number> {
+  return {
+    page: query.page,
+    page_size: query.pageSize,
+    sort: '-updated_at',
+    ...(query.status ? { status: query.status } : {}),
   };
 }

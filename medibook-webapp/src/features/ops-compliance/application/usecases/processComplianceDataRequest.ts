@@ -5,6 +5,7 @@ import { complianceRepository } from '@/features/ops-compliance/infrastructure/r
 
 export function processComplianceDataRequest(
   id: string,
+  notes?: string,
 ): Promise<Result<DataRequestProcessOutcome>> {
-  return complianceRepository.processDataRequest(id);
+  return complianceRepository.processDataRequest(id, notes);
 }

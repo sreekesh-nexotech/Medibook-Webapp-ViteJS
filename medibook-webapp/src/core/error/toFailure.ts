@@ -23,6 +23,34 @@ const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
 };
 
 /**
+ * Codes whose server sentence is replaced with one that says what still
+ * works. The tenant gate refuses every hospital write with these before RBAC
+ * runs (D-30, `subscriptions/services/gate.py`), so the user must not read
+ * them as a permission problem (UAT-38).
+ */
+export const HOSPITAL_WRITE_BLOCK_CODES = ['HOSPITAL_READ_ONLY', 'HOSPITAL_SUSPENDED'] as const;
+
+export type HospitalWriteBlockCode = (typeof HOSPITAL_WRITE_BLOCK_CODES)[number];
+
+const CODE_MESSAGES: Readonly<Record<HospitalWriteBlockCode, string>> = {
+  HOSPITAL_READ_ONLY:
+    "This hospital is read-only until its Medibook subscription is paid. You can still view everything; changes can't be saved.",
+  HOSPITAL_SUSPENDED:
+    "This hospital is suspended by Medibook operations. You can still view everything; changes can't be saved. Contact support@medibook.in.",
+};
+
+/** Whether `failure` is the tenant gate refusing a write (read-only or suspended hospital). */
+export function isHospitalWriteBlock(failure: Failure): boolean {
+  return (HOSPITAL_WRITE_BLOCK_CODES as readonly (string | null)[]).includes(failure.code);
+}
+
+function codeMessage(code: string | undefined): string | undefined {
+  return code !== undefined && code in CODE_MESSAGES
+    ? CODE_MESSAGES[code as HospitalWriteBlockCode]
+    : undefined;
+}
+
+/**
  * The backend's single error envelope `{code, message, errors, request_id,
  * meta}` (backend `core/exceptions.py`). Lenient: every field is optional so a
  * proxy's HTML error page still maps to a status-based failure.
@@ -58,15 +86,42 @@ function kindForStatus(status: number): FailureKind {
   return 'unknown';
 }
 
-/** DRF nests messages as strings, lists, or objects; flatten to string lists. */
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Collect the messages under `path` into `out`. DRF nests them three ways:
+ * a string or a list of strings (`{code: ["Already exists."]}`), an object
+ * for a nested serializer (`{booking: {prefix: […]}}`), and a list with one
+ * entry per item for a list serializer (`{lines: [{}, {amount_paise: […]}]}`).
+ * Nested messages land under a dotted path (`booking.prefix`,
+ * `lines.1.amount_paise`) so a form can tell which control is wrong (UAT-48).
+ */
+function collectFieldErrors(path: string, value: unknown, out: Record<string, string[]>): void {
+  if (typeof value === 'string') {
+    (out[path] ??= []).push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      if (typeof item === 'string') collectFieldErrors(path, item, out);
+      else collectFieldErrors(`${path}.${index}`, item, out);
+    });
+    return;
+  }
+  if (isRecord(value)) {
+    for (const [key, nested] of Object.entries(value)) {
+      collectFieldErrors(path === '' ? key : `${path}.${key}`, nested, out);
+    }
+  }
+}
+
+/** DRF nests messages as strings, lists, or objects; flatten to dotted-path string lists. */
 function toFieldErrors(raw: Readonly<Record<string, unknown>> | undefined): FieldErrors {
   if (!raw) return {};
-  const out: Record<string, readonly string[]> = {};
-  for (const [field, value] of Object.entries(raw)) {
-    const list = Array.isArray(value) ? value : [value];
-    const messages = list.filter((m): m is string => typeof m === 'string');
-    if (messages.length > 0) out[field] = messages;
-  }
+  const out: Record<string, string[]> = {};
+  collectFieldErrors('', raw, out);
   return out;
 }
 
@@ -125,7 +180,9 @@ export function toFailure(error: unknown): Failure {
     return failure(kind, {
       status: response.status,
       code: body.code ?? null,
-      message: !isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind],
+      message:
+        codeMessage(body.code) ??
+        (!isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind]),
       fieldErrors: toFieldErrors(body.errors),
       requestId: requestIdOf(error, body.request_id),
       meta: body.meta ?? {},

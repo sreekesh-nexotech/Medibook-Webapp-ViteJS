@@ -19,6 +19,8 @@
  *   FIXTURE_PASSWORD=… \
  *   node scripts/record-api-fixtures.mjs
  *
+ * Add `FIXTURE_ONLY=<key>,<key>` to rewrite only those fixtures.
+ *
  * Use a hospital admin (every hospital endpoint) and a platform owner.
  *
  * After changing the scrubbing rules, apply them to the committed fixtures
@@ -37,7 +39,6 @@ import { fileURLToPath } from 'node:url';
 const OUT_DIR = fileURLToPath(new URL('../src/test/contract/fixtures/', import.meta.url));
 const LIST = { page_size: 5 };
 const WIDE_DATES = { date_from: '2026-01-01', date_to: '2026-12-31' };
-
 function required(name) {
   const value = process.env[name];
   if (!value) {
@@ -143,6 +144,11 @@ const SPEC = [
     path: '/hospital/dashboard/reception',
   },
   {
+    key: 'notifications.hospitalAlertFeedResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/notifications',
+  },
+  {
     key: 'patients.hospitalPatientPageResponseSchema',
     surface: 'hospital',
     path: '/hospital/patients',
@@ -162,11 +168,44 @@ const SPEC = [
     needs: (fx) => ({ id: first(fx, 'patients.hospitalPatientPageResponseSchema')?.id }),
   },
   {
+    key: 'patients.approvalRequestPageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/patient-approvals',
+    params: LIST,
+  },
+  {
     key: 'token-queue.sessionPageSchema',
     surface: 'hospital',
     path: '/hospital/sessions',
     params: { ...LIST, date: new Date().toISOString().slice(0, 10) },
   },
+  {
+    key: 'token-queue.tokenCallPageSchema',
+    surface: 'hospital',
+    path: '/hospital/sessions/{id}/calls',
+    params: LIST,
+    needs: (fx) => ({
+      id: (
+        first(fx, 'token-queue.sessionPageSchema', (s) => s.last_called_token_no != null) ??
+        first(fx, 'token-queue.sessionPageSchema')
+      )?.id,
+    }),
+  },
+
+  // hospital: help & support
+  {
+    key: 'help.supportTicketPageSchema',
+    surface: 'hospital',
+    path: '/hospital/support/tickets',
+    params: LIST,
+  },
+  {
+    key: 'help.supportTicketDetailSchema',
+    surface: 'hospital',
+    path: '/hospital/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'help.supportTicketPageSchema')?.id }),
+  },
+  { key: 'help.faqFeedSchema', surface: 'hospital', path: '/hospital/content/faqs' },
 
   // hospital: payments and cash
   {
@@ -215,6 +254,18 @@ const SPEC = [
     surface: 'hospital',
     path: '/hospital/doctors/{id}/schedule',
     needs: (fx) => ({ id: first(fx, 'doctors.doctorPageSchema')?.id }),
+  },
+  {
+    key: 'doctors.doctorReviewPageSchema',
+    surface: 'hospital',
+    path: '/hospital/doctors/{id}/reviews',
+    params: LIST,
+    needs: (fx) => ({
+      id: (
+        first(fx, 'doctors.doctorPageSchema', (d) => d.rating_count > 0) ??
+        first(fx, 'doctors.doctorPageSchema')
+      )?.id,
+    }),
   },
   {
     key: 'slots.slotGridPageResponseSchema',
@@ -279,6 +330,34 @@ const SPEC = [
     path: '/hospital/billing/bank-accounts',
     params: LIST,
   },
+  {
+    key: 'settings.settingsCounterPageSchema',
+    surface: 'hospital',
+    path: '/hospital/counters',
+    params: { page_size: 100 },
+  },
+  {
+    key: 'settings.numberingListResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/numbering',
+  },
+  {
+    key: 'settings.numberingPreviewResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/numbering/receipt/preview',
+  },
+  {
+    key: 'settings.printTemplatePageSchema',
+    surface: 'hospital',
+    path: '/hospital/print-templates',
+    params: LIST,
+  },
+  {
+    key: 'settings.displayDevicePageSchema',
+    surface: 'hospital',
+    path: '/hospital/display-devices',
+    params: LIST,
+  },
 
   // hospital: billing, settlements, reports, messaging, audit, users
   {
@@ -327,6 +406,18 @@ const SPEC = [
     key: 'settlements.statementPageResponseSchema',
     surface: 'hospital',
     path: '/hospital/statements',
+    params: LIST,
+  },
+  {
+    key: 'settlements.payoutPageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/settlements/payouts',
+    params: LIST,
+  },
+  {
+    key: 'settlements.creditNotePageResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/billing/credit-notes',
     params: LIST,
   },
   { key: 'reports.reportCatalogResponseSchema', surface: 'hospital', path: '/hospital/reports' },
@@ -400,6 +491,25 @@ const SPEC = [
     }),
   },
   {
+    key: 'ops-hospitals.numberingSeriesResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/numbering/booking',
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
+    key: 'ops-hospitals.commissionHistoryResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/commission-history',
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
+    key: 'ops-hospitals.payoutBankAccountPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/hospitals/{id}/bank-accounts',
+    params: LIST,
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.id }),
+  },
+  {
     key: 'ops-hospitals.caseListResponseSchema',
     surface: 'platform',
     path: '/platform/onboarding/cases',
@@ -438,6 +548,13 @@ const SPEC = [
     needs: (fx) => ({ id: first(fx, 'ops-plans.planPageResponseSchema')?.id }),
   },
   {
+    key: 'ops-plans.subscriberRowsPageSchema',
+    surface: 'platform',
+    path: '/platform/plans/{id}/subscribers',
+    params: { ...LIST, status: 'trialing,active,past_due,grace,read_only' },
+    needs: (fx) => ({ id: first(fx, 'ops-plans.planPageResponseSchema')?.id }),
+  },
+  {
     key: 'ops-billing.invoicePageSchema',
     surface: 'platform',
     path: '/platform/billing/invoices',
@@ -456,6 +573,23 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-billing.paymentSchema',
+    surface: 'platform',
+    path: '/platform/billing/payments/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-billing.paymentPageSchema')?.id }),
+  },
+  {
+    key: 'ops-billing.billingSummarySchema',
+    surface: 'platform',
+    path: '/platform/billing/summary',
+  },
+  {
+    key: 'ops-billing.subscriptionPageSchema',
+    surface: 'platform',
+    path: '/platform/billing/subscriptions',
+    params: LIST,
+  },
+  {
     key: 'ops-billing.dunningPageSchema',
     surface: 'platform',
     path: '/platform/billing/dunning',
@@ -468,6 +602,13 @@ const SPEC = [
     needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.subscription?.id }),
   },
   {
+    key: 'ops-billing.prorationPreviewSchema',
+    surface: 'platform',
+    path: '/platform/billing/subscriptions/{id}/proration-preview',
+    params: { billing_period: 'yearly' },
+    needs: (fx) => ({ id: fx['ops-hospitals.hospitalDetailResponseSchema']?.subscription?.id }),
+  },
+  {
     key: 'ops-billing.planChangePageSchema',
     surface: 'platform',
     path: '/platform/billing/plan-change-requests',
@@ -477,6 +618,18 @@ const SPEC = [
     key: 'ops-settlements.periodPageResponseSchema',
     surface: 'platform',
     path: '/platform/settlements/periods',
+    params: LIST,
+  },
+  {
+    key: 'ops-settlements.periodDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/settlements/periods/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-settlements.periodPageResponseSchema')?.id }),
+  },
+  {
+    key: 'ops-settlements.payoutPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/settlements/payouts',
     params: LIST,
   },
   {
@@ -527,6 +680,12 @@ const SPEC = [
     redact: TICKET_TEXT,
   },
   {
+    key: 'ops-users.assignableStaffPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/staff/assignable',
+    params: LIST,
+  },
+  {
     key: 'ops-users.rolePageResponseSchema',
     surface: 'platform',
     path: '/platform/roles',
@@ -573,10 +732,34 @@ const SPEC = [
     params: LIST,
   },
   {
+    key: 'ops-compliance.dataRequestResponseSchema',
+    surface: 'platform',
+    path: '/platform/compliance/data-requests/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-compliance.dataRequestPageSchema')?.id }),
+  },
+  {
+    key: 'ops-compliance.phiAccessPageSchema',
+    surface: 'platform',
+    path: '/platform/compliance/phi-access',
+    params: LIST,
+  },
+  {
+    key: 'ops-compliance.staffDirectoryPageSchema',
+    surface: 'platform',
+    path: '/platform/hospital-staff',
+    // `q` needs at least two characters; the seeded staff share an email domain.
+    params: { ...LIST, q: 'lakeshore' },
+  },
+  {
     key: 'ops-logs.logsPageResponseSchema',
     surface: 'platform',
     path: '/platform/logs',
     params: { page: 1, page_size: 5 },
+  },
+  {
+    key: 'ops-logs.retentionResponseSchema',
+    surface: 'platform',
+    path: '/platform/compliance/retention',
   },
   {
     key: 'ops-notifications.bannersPageResponseSchema',
@@ -584,7 +767,73 @@ const SPEC = [
     path: '/platform/banners',
     params: LIST,
   },
+  {
+    key: 'ops-content.legalDocumentPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/legal-documents',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.faqPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/faqs',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.locationPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/locations',
+    params: LIST,
+  },
+  {
+    key: 'ops-content.ambulancePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/ambulance-providers',
+    params: LIST,
+  },
+  {
+    key: 'ops-message-templates.messageTemplatePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/messaging/templates',
+    params: LIST,
+  },
+  {
+    key: 'ops-onboarding-documents.documentRequirementPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/onboarding/document-requirements',
+    params: LIST,
+  },
+  {
+    key: 'ops-support.ticketPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets',
+    params: LIST,
+  },
+  {
+    key: 'ops-support.ticketDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-support.ticketPageResponseSchema')?.id }),
+  },
+  {
+    key: 'ops-reviews.reviewPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/reviews',
+    params: LIST,
+  },
   { key: 'ops-reports.reportListResponseSchema', surface: 'platform', path: '/platform/reports' },
+  {
+    key: 'ops-reports.reportResultResponseSchema',
+    surface: 'platform',
+    path: '/platform/reports/bookings',
+    params: { page: 1, page_size: 5, booking_date_from: '2026-01-01' },
+  },
+  {
+    key: 'ops-reports.reportSchedulePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/report-schedules',
+    params: LIST,
+  },
   {
     key: 'ops-analytics.overviewResponseSchema',
     surface: 'platform',
@@ -803,5 +1052,6 @@ process.stdout.write(
   `Recorded ${recorded} of ${selected.length} responses into src/test/contract/fixtures/\n`,
 );
 for (const [key, status] of report) {
-  if (status !== 'recorded') process.stdout.write(`  ${key}: ${status}\n`);
+  if (status !== 'recorded' && !status.startsWith('read,'))
+    process.stdout.write(`  ${key}: ${status}\n`);
 }

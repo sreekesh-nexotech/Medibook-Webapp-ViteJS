@@ -2,7 +2,10 @@ import type { Page } from '@/core/api/pagination';
 import type { Result } from '@/core/error/failure';
 
 import type {
+  OpsAssignableStaff,
   OpsPermission,
+  OpsRoleChanges,
+  OpsRoleDraft,
   OpsStaffInvite,
   OpsStaffMember,
   OpsStaffRole,
@@ -12,6 +15,8 @@ import type {
 export interface OpsUsersRepository {
   /** The first page of staff (largest page the backend allows). */
   listStaff(): Promise<Result<Page<OpsStaffMember>>>;
+  /** Active staff for assignee pickers (`support.edit`, `onboarding.edit` or `staff.view`). */
+  listAssignableStaff(): Promise<Result<Page<OpsAssignableStaff>>>;
   /** Create an invited member; the backend emails them a set-password link. */
   inviteStaff(invite: OpsStaffInvite): Promise<Result<OpsStaffMember>>;
   /** Move a member to another role (optimistic concurrency on `version`). */
@@ -21,6 +26,11 @@ export interface OpsUsersRepository {
   reactivateStaff(id: string): Promise<Result<OpsStaffMember>>;
   /** Clear a sign-in lockout. */
   unlockStaff(id: string): Promise<Result<OpsStaffMember>>;
+  /** Email an invited member a fresh set-password link (B2, BE-31). */
+  resendStaffInvite(id: string): Promise<Result<OpsStaffMember>>;
   listRoles(): Promise<Result<readonly OpsStaffRole[]>>;
+  createRole(draft: OpsRoleDraft): Promise<Result<OpsStaffRole>>;
+  updateRole(id: string, changes: OpsRoleChanges, version: number): Promise<Result<OpsStaffRole>>;
+  deleteRole(id: string, version: number): Promise<Result<null>>;
   listPermissions(): Promise<Result<readonly OpsPermission[]>>;
 }

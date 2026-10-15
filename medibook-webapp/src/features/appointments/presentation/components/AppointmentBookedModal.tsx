@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 
+import { useActionKeys } from '@/shared/hooks/useActionKeys';
+import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
+import { useCan } from '@/shared/hooks/usePermission';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
-import { Can } from '@/shared/ui/Can';
 import { Field } from '@/shared/ui/Field';
 import { Modal } from '@/shared/ui/Modal';
 import { Select } from '@/shared/ui/Select';
@@ -20,22 +22,22 @@ import { useCollectPaymentMutation } from '@/features/appointments/application/q
 import { AppointmentReceiptModal } from '@/features/appointments/presentation/components/AppointmentReceiptModal';
 import { AppointmentTokenModal } from '@/features/appointments/presentation/components/AppointmentTokenModal';
 import {
+  deskErrorText,
   DESK_METHODS,
+  isNothingDue,
   methodLabel,
   needsPayment,
-  PAYMENT_LABEL,
+  paymentBadge,
   timeOf,
 } from '@/features/appointments/presentation/components/appointments.view';
 
-/** Rupee amounts are sent to the backend in integer paise. */
-const PAISE_PER_RUPEE = 100;
-
-/** The backend's answer when a cash line has no open cash session (D-28). */
-const CASH_SESSION_REQUIRED = 'CASH_SESSION_REQUIRED';
+/** The backend's limit on a payment reference (`PaymentLineSerializer`). */
+const REFERENCE_MAX = 200;
 
 interface AppointmentBookedModalProps {
   /** The visit just booked; `null` = closed. */
   appointments: readonly DeskAppointment[] | null;
+  /** The name typed on the form, used only if the booking carries no patient (03 F28). */
   patientName: string;
   onDone: () => void;
 }
@@ -43,8 +45,10 @@ interface AppointmentBookedModalProps {
 /**
  * After a walk-in booking: every consultation booked with its token and fee,
  * one "Collect" for all of them (one payment per appointment, same method),
- * then each one's receipt and token slip. Leaving without collecting is
- * allowed — the bookings stay "Pending payment" in the list.
+ * then each one's receipt and token slip. A ₹0 consultation owes nothing and
+ * gets no receipt (UAT-12). A role without payments (department front desk)
+ * is told the patient pays at reception (UAT-45). Leaving without collecting
+ * is allowed — the bookings stay "Pending payment" in the list.
  */
 export function AppointmentBookedModal({
   appointments,
@@ -65,6 +69,9 @@ function BookedVisit({
   onDone: () => void;
 }) {
   const collect = useCollectPaymentMutation();
+  const actionKeys = useActionKeys();
+  const timeZone = useHospitalTimeZone();
+  const canCollect = useCan('Payments.add');
   const [paidIds, setPaidIds] = useState<readonly string[]>([]);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reference, setReference] = useState('');
@@ -76,8 +83,13 @@ function BookedVisit({
 
   const unpaid = appointments.filter((a) => needsPayment(a) && !paidIds.includes(a.id));
   const dueTotal = unpaid.reduce((sum, a) => sum + a.totalRupees, 0);
+  const recordName = appointments.find((a) => a.patient)?.patient?.fullName ?? patientName;
 
-  /** One payment per appointment, in order; stops at the first refusal. */
+  /**
+   * One payment per appointment, in order; stops at the first refusal. Each
+   * appointment's collection keeps its key across retries (UAT-16), so a
+   * retry after a lost answer is replayed, not charged again.
+   */
   const collectAll = async (): Promise<void> => {
     // A second click while collecting must not start a second run (DATA-11).
     if (collectingRef.current) return;
@@ -86,28 +98,21 @@ function BookedVisit({
     setError(null);
     try {
       for (const a of unpaid) {
-        if (a.totalRupees > 0) {
-          await collect.mutateAsync({
-            id: a.id,
-            lines: [
-              {
-                method,
-                amountPaise: Math.round(a.totalRupees * PAISE_PER_RUPEE),
-                reference: reference.trim(),
-              },
-            ],
-          });
-        }
+        const scope = `collect:${a.id}`;
+        await collect.mutateAsync({
+          id: a.id,
+          idempotencyKey: actionKeys.keyFor(scope),
+          lines: [{ method, amountRupees: a.totalRupees, reference: reference.trim() }],
+        });
+        actionKeys.settle(scope);
         setPaidIds((ids) => [...ids, a.id]);
       }
       toast(`Payment of ${money(dueTotal)} recorded`, 'success');
     } catch (failure) {
       setError(
-        isFailure(failure) && failure.code === CASH_SESSION_REQUIRED
-          ? 'Open your cash drawer on the Payments screen before taking cash, or collect by UPI or card.'
-          : isFailure(failure)
-            ? failure.message
-            : 'Could not record the payment.',
+        isFailure(failure)
+          ? deskErrorText(failure, 'Could not record the payment.')
+          : 'Could not record the payment.',
       );
     } finally {
       collectingRef.current = false;
@@ -121,19 +126,17 @@ function BookedVisit({
         open
         onClose={onDone}
         dismissible={!isCollecting}
-        title={`Booked for ${patientName}`}
+        title={`Booked for ${recordName}`}
         width={620}
         footer={
           <>
             <Button variant="secondary" onClick={onDone} disabled={isCollecting}>
               {unpaid.length > 0 ? 'Collect later' : 'Done'}
             </Button>
-            {unpaid.length > 0 && (
-              <Can perm="Payments.add">
-                <Button icon="indian-rupee" busy={isCollecting} onClick={() => void collectAll()}>
-                  Collect {money(dueTotal)}
-                </Button>
-              </Can>
+            {unpaid.length > 0 && canCollect && (
+              <Button icon="indian-rupee" busy={isCollecting} onClick={() => void collectAll()}>
+                Collect {money(dueTotal)}
+              </Button>
             )}
           </>
         }
@@ -141,6 +144,7 @@ function BookedVisit({
         <ul className="divide-border-soft border-border-soft mb-4 divide-y rounded-md border">
           {appointments.map((a) => {
             const isPaid = paidIds.includes(a.id) || a.paymentStatus === 'paid';
+            const badge = isPaid ? { status: 'Paid', label: 'Paid' } : paymentBadge(a);
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-3 px-3.5 py-3">
                 <div className="min-w-40 flex-1">
@@ -148,15 +152,15 @@ function BookedVisit({
                     {a.doctor.name} · {a.department.name}
                   </div>
                   <div className="text-caption text-text-muted">
-                    {timeOf(a.scheduledStartAt)} · {a.sessionLabel} · {a.bookingRef}
+                    {timeOf(a.scheduledStartAt, timeZone)} · {a.sessionLabel} · {a.bookingRef}
                   </div>
                 </div>
                 {a.tokenLabel && (
                   <span className="text-body text-blue font-bold">{a.tokenLabel}</span>
                 )}
                 <span className="text-body tabular-nums">{money(a.totalRupees)}</span>
-                <Badge status={isPaid ? 'Paid' : PAYMENT_LABEL[a.paymentStatus]} />
-                {isPaid && (
+                <Badge status={badge.status}>{badge.label}</Badge>
+                {isPaid && !isNothingDue(a) && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -175,7 +179,13 @@ function BookedVisit({
             );
           })}
         </ul>
-        {unpaid.length > 0 && (
+        {unpaid.length > 0 && !canCollect && (
+          <div className="text-body text-text-body bg-grey-200 rounded-md px-3.5 py-2.5">
+            {money(dueTotal)} is still to be paid. Send the patient to reception to pay; check them
+            in once it is paid.
+          </div>
+        )}
+        {unpaid.length > 0 && canCollect && (
           <div className="flex items-end gap-3">
             <Field label="Payment method" className="flex-1">
               <Select
@@ -189,6 +199,7 @@ function BookedVisit({
             <Field label="Reference" className="flex-1">
               <TextInput
                 value={reference}
+                maxLength={REFERENCE_MAX}
                 placeholder={method === 'cash' ? 'Optional' : 'UPI / card ref.'}
                 onChange={setReference}
               />

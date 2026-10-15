@@ -3,8 +3,10 @@ import type {
   ConfigChangeFilters,
   ConfigChangeParams,
   DataExportDraft,
+  DataRequestParams,
   LoginHistoryFilters,
   LoginHistoryParams,
+  PhiAccessParams,
 } from '@/features/ops-compliance/domain/entities/compliance.entities';
 
 /** Query params the compliance lists accept; absent filters are omitted. */
@@ -33,7 +35,8 @@ export function toLoginFilterParams(filters: LoginHistoryFilters): ComplianceQue
     ...dateParams(filters),
     ...(filters.result ? { result: filters.result } : {}),
     ...(filters.hospitalId ? { hospital_id: filters.hospitalId } : {}),
-    ...(filters.principal ? { principal: filters.principal } : {}),
+    // One surface is valid on every backend; several need B6's multi-value `principal`.
+    ...(filters.principals.length > 0 ? { principal: filters.principals.join(',') } : {}),
   };
 }
 
@@ -51,6 +54,23 @@ export function toConfigFilterParams(filters: ConfigChangeFilters): ComplianceQu
     ...dateParams(filters),
     ...(filters.scope ? { scope: filters.scope } : {}),
     ...(filters.settingKeyPrefix ? { setting_key_prefix: filters.settingKeyPrefix } : {}),
+    ...(filters.hospitalId ? { hospital_id: filters.hospitalId } : {}),
+  };
+}
+
+/** `GET /platform/compliance/data-requests` params (`status` is multi-value on the backend). */
+export function toDataRequestParams(params: DataRequestParams): ComplianceQueryParams {
+  return {
+    page: params.page,
+    page_size: params.pageSize,
+    sort: '-requested_at',
+    ...(params.statuses.length > 0 ? { status: params.statuses.join(',') } : {}),
+    ...(params.kind ? { kind: params.kind } : {}),
+    ...(params.subjectKind ? { subject_kind: params.subjectKind } : {}),
+    // B6 filters: sent only when used, so an older backend still answers the rest.
+    ...(params.requestNo?.trim() ? { request_no: params.requestNo.trim().toUpperCase() } : {}),
+    ...(params.dateFrom ? { date_from: params.dateFrom } : {}),
+    ...(params.dateTo ? { date_to: params.dateTo } : {}),
   };
 }
 
@@ -65,4 +85,21 @@ export function toConfigChangeParams(params: ConfigChangeParams): ComplianceQuer
 
 export function toDataExportCreateRequest(draft: DataExportDraft): DataExportCreateRequest {
   return { subject_user_id: draft.subjectUserId, kind: 'export', subject_kind: draft.subjectKind };
+}
+
+/** `GET /platform/compliance/phi-access` params (B6); absent filters are omitted. */
+export function toPhiAccessParams(params: PhiAccessParams): ComplianceQueryParams {
+  const search = params.search?.trim();
+  return {
+    ...dateParams(params),
+    ...(params.principals.length > 0 ? { principal: params.principals.join(',') } : {}),
+    ...(params.subjectKind ? { subject_kind: params.subjectKind } : {}),
+    ...(params.hospitalId ? { hospital_id: params.hospitalId } : {}),
+    ...(params.actorUserId ? { actor_user_id: params.actorUserId } : {}),
+    ...(params.subjectId ? { subject_id: params.subjectId } : {}),
+    ...(search ? { search } : {}),
+    page: params.page,
+    page_size: params.pageSize,
+    sort: sortParam('occurred_at', params.sortDirection),
+  };
 }

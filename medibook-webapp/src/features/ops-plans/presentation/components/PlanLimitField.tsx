@@ -14,6 +14,24 @@ interface PlanLimitFieldProps {
   error?: string;
   onValue: (value: string) => void;
   onUnlimited: (unlimited: boolean) => void;
+  /**
+   * Whether reaching the cap refuses further adds (`hard_limits`) or only
+   * warns. Leave out for a ceiling the backend always enforces (storage).
+   */
+  hard?: boolean;
+  onHard?: (hard: boolean) => void;
+}
+
+/** What the hint says about enforcement, once there is a cap. */
+function enforcementHint(limitKey: PlanLimitKey, hard: boolean | undefined): string {
+  if (hard === undefined) {
+    return limitKey === 'storageGb'
+      ? 'Admins are warned at 80%; uploads past the cap are refused.'
+      : '';
+  }
+  return hard
+    ? 'Adding past the cap is refused.'
+    : 'Admins are warned at the cap; nothing is refused.';
 }
 
 /**
@@ -30,32 +48,51 @@ export function PlanLimitField({
   error,
   onValue,
   onUnlimited,
+  hard,
+  onHard,
 }: PlanLimitFieldProps) {
   const meta = PLAN_LIMIT_META[limitKey];
+  const enforcement = enforcementHint(limitKey, hard);
   return (
     <OpsField
       label={meta.label}
       required={!unlimited}
       error={error}
-      hint={unlimited ? 'No ceiling — unlimited.' : `In ${meta.unit}. 0 turns the feature off.`}
+      hint={
+        unlimited
+          ? 'No ceiling — unlimited.'
+          : `In ${meta.unit}. 0 turns the feature off.${enforcement ? ` ${enforcement}` : ''}`
+      }
     >
-      <div className="flex items-center gap-3">
-        <TextInput
-          value={unlimited ? '' : value}
-          onChange={onValue}
-          placeholder={unlimited ? 'Unlimited' : meta.placeholder}
-          inputMode="numeric"
-          disabled={unlimited}
-          height={48}
-        />
-        <span className="flex flex-none items-center gap-2">
-          <Toggle
-            value={unlimited}
-            onChange={onUnlimited}
-            label={`Unlimited ${meta.label.toLowerCase()}`}
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-3">
+          <TextInput
+            value={unlimited ? '' : value}
+            onChange={onValue}
+            placeholder={unlimited ? 'Unlimited' : meta.placeholder}
+            inputMode="numeric"
+            disabled={unlimited}
+            height={48}
           />
-          <span className="text-caption text-text-muted">Unlimited</span>
-        </span>
+          <span className="flex flex-none items-center gap-2">
+            <Toggle
+              value={unlimited}
+              onChange={onUnlimited}
+              label={`Unlimited ${meta.label.toLowerCase()}`}
+            />
+            <span className="text-caption text-text-muted">Unlimited</span>
+          </span>
+        </div>
+        {hard !== undefined && onHard && !unlimited && (
+          <span className="flex items-center gap-2">
+            <Toggle
+              value={hard}
+              onChange={onHard}
+              label={`Refuse ${meta.label.toLowerCase()} past the cap`}
+            />
+            <span className="text-caption text-text-muted">Refuse past the cap</span>
+          </span>
+        )}
       </div>
     </OpsField>
   );

@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import type { WeeklySession } from '@/features/doctors/domain/entities/doctors.types';
+import type {
+  DoctorScheduleHistory,
+  WeeklySession,
+} from '@/features/doctors/domain/entities/doctors.types';
 import {
   gridToSessions,
+  pastScheduleLines,
   sameSessions,
   sessionsToGrid,
 } from '@/features/doctors/presentation/components/doctors.view';
+import { todayIn } from '@/shared/lib/hospitalTime';
+import { todayISO } from '@/shared/lib/format';
+import { HOSPITAL_DATE, HOSPITAL_TIME_ZONE, PC_DATE, withPcBehindHospital } from '@/test/pcClock';
 
 /** The seeded shape on the test backend: "Morning OPD" daily, "Evening OPD" Mon/Wed/Fri. */
 const morning = (weekday: number): WeeklySession => ({
@@ -84,5 +91,43 @@ describe('weekly sessions ↔ editor grid', () => {
       ),
     });
     expect(out.map((s) => s.sessionCode).sort()).toEqual(['custom-1', 'morning']);
+  });
+});
+
+describe('past leave and exceptions split on the hospital’s today (UAT-47, 06·Profile F9)', () => {
+  withPcBehindHospital();
+
+  /** Leave that ended on the PC's date, and an exception on the hospital's date. */
+  const history: DoctorScheduleHistory = {
+    leaves: [
+      {
+        id: 'l-1',
+        kind: 'sick',
+        dateFrom: '2026-10-05',
+        dateTo: PC_DATE,
+        reason: 'Fever',
+        version: 1,
+      },
+    ],
+    dateExceptions: [
+      { id: 'e-1', date: HOSPITAL_DATE, kind: 'closed', note: '', sessions: [], version: 1 },
+      { id: 'e-2', date: '2026-09-30', kind: 'closed', note: 'Audit', sessions: [], version: 1 },
+    ],
+  };
+
+  it('counts leave that ended yesterday at the hospital as over, though the PC is still on that day', () => {
+    expect(todayISO()).toBe(PC_DATE);
+    const lines = pastScheduleLines(history, todayIn(HOSPITAL_TIME_ZONE, Date.now()));
+    expect(lines.map((l) => l.key)).toEqual(['leave:l-1', 'exception:e-2']);
+    expect(lines[0]?.what).toBe('Sick leave · Fever');
+  });
+
+  it('keeps today’s exception out of the history', () => {
+    const lines = pastScheduleLines(history, HOSPITAL_DATE);
+    expect(lines.some((l) => l.key === 'exception:e-1')).toBe(false);
+  });
+
+  it('would have kept the ended leave current on the PC’s date', () => {
+    expect(pastScheduleLines(history, todayISO()).map((l) => l.key)).toEqual(['exception:e-2']);
   });
 });

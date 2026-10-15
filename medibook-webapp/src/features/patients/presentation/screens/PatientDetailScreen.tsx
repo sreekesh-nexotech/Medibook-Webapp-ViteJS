@@ -3,13 +3,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { useCan } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 import { fmtDate, money } from '@/shared/lib/format';
+import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
+import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Icon } from '@/shared/ui/Icon';
@@ -17,6 +21,7 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
+import { toast } from '@/shared/ui/toast/toast.store';
 
 import {
   hospitalBookForPatientPath,
@@ -26,6 +31,7 @@ import {
   isRecordId,
 } from '@/app/router/paths';
 
+import { useDeletePatientMutation } from '@/features/patients/application/queries/useDeletePatientMutation';
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
 import { usePatientQuery } from '@/features/patients/application/queries/usePatientQuery';
@@ -43,11 +49,11 @@ import {
   appointmentStatusBadge,
   displayPhone,
   formatAddress,
-  formatTime,
   genderLabel,
   paiseToRupees,
   patientSourceBadge,
   paymentBadge,
+  saveErrorMessage,
 } from '@/features/patients/presentation/components/patientsFormat';
 
 /**
@@ -58,6 +64,12 @@ import {
  */
 
 const HISTORY_COLUMNS = ['Date', 'Doctor / Dept', 'Source', 'Payment', 'Token', 'Status'];
+
+const DELETE_FAILED = 'The record could not be deleted. Please try again.';
+
+/** Why Edit / Delete are off while a request waits (the backend answers `409 APPROVAL_PENDING`). */
+const PENDING_REQUEST_TITLE =
+  'A change to this record is waiting for an administrator. Edit again once it is decided.';
 const HISTORY_LOADING_ROWS = 3;
 
 /** Still owed: not paid yet, on a visit that has not been called off. */
@@ -87,6 +99,11 @@ export function PatientDetailScreen() {
   }, [legacyMrn, byMrn.data, hospitalRole, navigate]);
 
   const [edit, setEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const canBook = useCan('Appointments.add');
+  const deletion = useDeletePatientMutation();
+  // Age and visit times on the hospital's calendar and clock (D-09, UAT-47).
+  const { today, timeZone } = useHospitalToday();
   const backToList = () => navigate(hospitalPath(hospitalRole, 'patients'));
 
   if (!patientId) {
@@ -139,7 +156,7 @@ export function PatientDetailScreen() {
   const totalBookings = historyQuery.data?.total ?? 0;
   // Cancelled, no-show and upcoming bookings are not visits.
   const completedVisits = list.filter((a) => a.status === 'completed').length;
-  const age = ageFromDob(p.dateOfBirth);
+  const age = ageFromDob(p.dateOfBirth, today);
   const phone = displayPhone(p.phone);
   const gender = genderLabel(p.gender);
   const address = formatAddress(p);
@@ -161,6 +178,26 @@ export function PatientDetailScreen() {
 
   const book = () => {
     navigate(hospitalBookForPatientPath(hospitalRole, p.id));
+  };
+
+  const hasPendingChange = p.pendingChange !== null;
+
+  const handleDelete = (): void => {
+    setConfirmDelete(false);
+    deletion.mutate(
+      { id: p.id, version: p.version },
+      {
+        onSuccess: (outcome) => {
+          if (outcome.status === 'deleted') {
+            toast(`${p.fullName}’s record was deleted`, 'success');
+            backToList();
+            return;
+          }
+          toast('Deletion sent to an admin for approval', 'info');
+        },
+        onError: (error) => toast(saveErrorMessage(error, DELETE_FAILED), 'error'),
+      },
+    );
   };
 
   const historyState: TableStateSpec | undefined = historyQuery.isPending
@@ -186,9 +223,22 @@ export function PatientDetailScreen() {
             ) : (
               <Badge status={source.status}>{source.label}</Badge>
             )}
+            {p.isLinked && (
+              <span title="This record is the same person as a Medibook app account">
+                <Badge status="Medibook">Medibook account</Badge>
+              </span>
+            )}
           </div>
           <div className="text-body text-text-muted mt-1.25 flex flex-wrap gap-4">
             <span>MR: {p.mrn}</span>
+            {p.legacyMrn && (
+              <>
+                <span>·</span>
+                <span title="The number from the hospital's earlier system">
+                  Legacy MR: {p.legacyMrn}
+                </span>
+              </>
+            )}
             <span>·</span>
             <span>
               {ageText(age)} · {gender || '—'}
@@ -200,9 +250,29 @@ export function PatientDetailScreen() {
           </div>
         </div>
         <Can perm="Patients.edit">
-          <Button variant="secondary" icon="pencil" onClick={() => setEdit(true)}>
-            Edit
-          </Button>
+          <span title={hasPendingChange ? PENDING_REQUEST_TITLE : undefined}>
+            <Button
+              variant="secondary"
+              icon="pencil"
+              disabled={hasPendingChange}
+              onClick={() => setEdit(true)}
+            >
+              Edit
+            </Button>
+          </span>
+        </Can>
+        <Can perm="Patients.del">
+          <span title={hasPendingChange ? PENDING_REQUEST_TITLE : undefined}>
+            <Button
+              variant="ghost"
+              icon="trash-2"
+              disabled={hasPendingChange}
+              busy={deletion.isPending}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Delete
+            </Button>
+          </span>
         </Can>
         <Can perm="Appointments.add">
           <Button icon="calendar-plus" onClick={book}>
@@ -210,7 +280,15 @@ export function PatientDetailScreen() {
           </Button>
         </Can>
       </Card>
-      {p.pendingChange && <PatientChangeNotice change={p.pendingChange} />}
+      {p.pendingChange && (
+        <PatientChangeNotice
+          change={p.pendingChange}
+          onDecided={(decision) => {
+            // An approved deletion removes the record: leave its page (F12).
+            if (decision.kind === 'delete' && decision.status === 'approved') backToList();
+          }}
+        />
+      )}
       {/* Side by side on wide screens; stacked on tablets (PERF-05). */}
       <div className="flex flex-col gap-5 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-5 xl:flex-2">
@@ -224,9 +302,9 @@ export function PatientDetailScreen() {
                 icon="calendar-plus"
                 title="No appointments yet for this patient."
                 message="Book the first visit and it will appear here with its token and payment."
-                actionLabel="Book appointment"
+                actionLabel={canBook ? 'Book appointment' : undefined}
                 actionIcon="calendar-plus"
-                onAction={book}
+                onAction={canBook ? book : undefined}
               />
             ) : (
               <TableShell columns={HISTORY_COLUMNS} state={historyState}>
@@ -239,7 +317,7 @@ export function PatientDetailScreen() {
                       <td className={tdClass}>
                         {fmtDate(a.scheduledDate)}
                         <div className="text-caption text-text-muted">
-                          {formatTime(a.scheduledStartAt)}
+                          {formatTimeIn(a.scheduledStartAt, timeZone)}
                         </div>
                       </td>
                       <td className={tdClass}>
@@ -309,6 +387,15 @@ export function PatientDetailScreen() {
         </div>
       </div>
       <PatientModal open={edit} patient={p} onClose={() => setEdit(false)} />
+      <ConfirmModal
+        open={confirmDelete}
+        danger
+        title={`Delete ${p.fullName}’s record?`}
+        body={`The record ${p.mrn} leaves the patients list. Its appointments, payments and receipts are kept. A record with upcoming bookings cannot be deleted, and when the hospital requires approval, an administrator decides first.`}
+        confirmLabel="Delete record"
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

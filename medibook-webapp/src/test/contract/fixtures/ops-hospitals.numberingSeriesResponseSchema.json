@@ -1,0 +1,17 @@
+{
+  "kind": "booking",
+  "format": "{PREFIX}-{YY}{MM}-{SEQ:5}",
+  "prefix": "LKSB",
+  "separator": null,
+  "pad_width": 4,
+  "reset": "calendar_year",
+  "fy_start_month": 4,
+  "gapless": false,
+  "editable_by": "hospital_admin",
+  "locked": false,
+  "has_allocated": true,
+  "next_preview": "LKSB-2610-00196",
+  "version": 1,
+  "updated_at": "2026-10-08T00:03:10.027333Z",
+  "warning": "Changing a format never rewrites numbers already issued; the new format applies only to numbers allocated from now on (D-26)."
+}

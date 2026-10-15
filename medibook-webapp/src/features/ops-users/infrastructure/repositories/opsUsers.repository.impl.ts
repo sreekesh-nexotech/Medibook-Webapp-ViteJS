@@ -3,14 +3,19 @@ import { attempt } from '@/core/error/attempt';
 
 import type { OpsUsersRepository } from '@/features/ops-users/domain/repositories/opsUsers.repository';
 import {
+  deleteRole,
+  getAssignableStaff,
   getPermissions,
   getRoles,
   getStaff,
+  patchRole,
   patchStaffRole,
+  postRole,
   postStaff,
   postStaffAction,
 } from '@/features/ops-users/infrastructure/data-sources/remote/opsUsers.api';
 import {
+  toAssignableStaff,
   toPermissions,
   toStaffMember,
   toStaffRole,
@@ -18,6 +23,9 @@ import {
 
 export const opsUsersRepository: OpsUsersRepository = {
   listStaff: () => attempt(async () => toPage(await getStaff(), toStaffMember)),
+
+  listAssignableStaff: () =>
+    attempt(async () => toPage(await getAssignableStaff(), toAssignableStaff)),
 
   inviteStaff: (invite) => attempt(async () => toStaffMember(await postStaff(invite))),
 
@@ -32,7 +40,21 @@ export const opsUsersRepository: OpsUsersRepository = {
 
   unlockStaff: (id) => attempt(async () => toStaffMember(await postStaffAction(id, 'unlock'))),
 
+  resendStaffInvite: (id) =>
+    attempt(async () => toStaffMember(await postStaffAction(id, 'resend-invite'))),
+
   listRoles: () => attempt(async () => (await getRoles()).results.map(toStaffRole)),
+
+  createRole: (draft) => attempt(async () => toStaffRole(await postRole(draft))),
+
+  updateRole: (id, changes, version) =>
+    attempt(async () => toStaffRole(await patchRole(id, changes, version))),
+
+  deleteRole: (id, version) =>
+    attempt(async () => {
+      await deleteRole(id, version);
+      return null;
+    }),
 
   listPermissions: () => attempt(async () => toPermissions(await getPermissions())),
 };

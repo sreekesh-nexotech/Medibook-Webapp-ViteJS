@@ -2,17 +2,17 @@ import type { Result } from '@/core/error/failure';
 
 import type {
   HolidayInput,
-  HolidayTarget,
+  HolidayRef,
+  HolidayWriteMode,
   ScheduleChange,
 } from '@/features/settings/domain/entities/profile.entities';
 import { profileRepository } from '@/features/settings/infrastructure/repositories/profile.repository.impl';
 
-/** Create (`target === null`) or update a closure — a dry run unless `confirm`. */
+/** Create (`existing === null`) or update a closure — a dry run unless confirming. */
 export function saveHoliday(
-  target: HolidayTarget | null,
+  existing: HolidayRef | null,
   input: HolidayInput,
-  confirm: boolean,
-  replayKey: string,
+  mode: HolidayWriteMode,
 ): Promise<Result<ScheduleChange>> {
-  return profileRepository.saveHoliday(target, input, confirm, replayKey);
+  return profileRepository.saveHoliday(existing, input, mode);
 }

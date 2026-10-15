@@ -1,6 +1,5 @@
 import type {
   HospitalCoupon,
-  PricedService,
   ServiceTaxRate,
 } from '@/features/settings/domain/entities/services.entities';
 import { addDaysISO, calendarDate, calendarInstant } from '@/shared/lib/format';
@@ -9,12 +8,13 @@ import { addDaysISO, calendarDate, calendarInstant } from '@/shared/lib/format';
  * Pure pricing rules, mirroring the backend's fee engine
  * (`catalog/services/fees.py`, `core/money.py`) so the screen shows what a
  * receipt will. Worked in paise, like the backend:
- * - a service is taxed only by its **own** tax rate (none = exempt) — and the
- *   backend charges that rate even after it is switched off (BACKEND_BLOCKERS
- *   SVC-01), so this does too;
+ * - a service is taxed only by its **own** tax rate, and only while that rate
+ *   is switched on and applies to services (`fees.service_tax_rate`, BE-10):
+ *   a deleted, switched-off or consultation-only rate bills the service
+ *   exempt (`chargedServiceRate`);
  * - an added-on tax line is rounded half-up to the rupee (`round_tax_paise`);
- * - inclusive tax is informational, broken out to the paisa, already inside
- *   the price;
+ * - inclusive tax is already inside the price; the amount it contains is
+ *   rounded half-up to the rupee too (`inclusive_tax_paise`, L-22);
  * - a percent coupon is rounded half-up to the paisa (`apply_bp`) and capped
  *   at its maximum discount.
  */
@@ -37,6 +37,14 @@ function roundTaxPaise(amountPaise: number, rateBp: number): number {
   if (rateBp === 0 || amountPaise === 0) return 0;
   const unit = PAISE_PER_RUPEE * BP;
   return Math.floor((amountPaise * rateBp + unit / 2) / unit) * PAISE_PER_RUPEE;
+}
+
+/** `inclusive_tax_paise`: the tax inside an amount, half-up to the rupee, never above it. */
+function inclusiveTaxPaise(amountPaise: number, rateBp: number): number {
+  if (rateBp === 0 || amountPaise === 0) return 0;
+  const unit = PAISE_PER_RUPEE * (BP + rateBp);
+  const rupees = Math.floor((amountPaise * rateBp + Math.floor(unit / 2)) / unit);
+  return Math.min(rupees * PAISE_PER_RUPEE, amountPaise);
 }
 
 /** `apply_bp`: a basis-point share, half-up to the paisa. */
@@ -65,19 +73,33 @@ export function priceService(base: number, tax: ServiceTaxRate | null): ServiceP
   }
   const basePaise = toPaise(base);
   if (tax.isInclusive) {
-    const preTax = Math.floor((basePaise * BP + Math.floor((BP + rateBp) / 2)) / (BP + rateBp));
-    return { base, tax: (basePaise - preTax) / PAISE_PER_RUPEE, isInclusive: true, total: base };
+    const inside = inclusiveTaxPaise(basePaise, rateBp) / PAISE_PER_RUPEE;
+    return { base, tax: inside, isInclusive: true, total: base };
   }
   const amount = roundTaxPaise(basePaise, rateBp) / PAISE_PER_RUPEE;
   return { base, tax: amount, isInclusive: false, total: base + amount };
 }
 
-/** Rates a hospital may attach to a service (active, for services or everything). */
-export function serviceTaxOptions(rates: readonly ServiceTaxRate[]): readonly ServiceTaxRate[] {
-  return rates.filter((r) => r.isActive && (r.appliesTo === 'service' || r.appliesTo === 'all'));
+/** True when a rate may tax a service line (`applies_to` service or all). */
+function appliesToServices(rate: Pick<ServiceTaxRate, 'appliesTo'>): boolean {
+  return rate.appliesTo === 'service' || rate.appliesTo === 'all';
 }
 
-/** Derived availability of a coupon on a given local day. */
+/**
+ * The rate a service's receipt line is actually taxed with: its own rate
+ * while that is switched on and applies to services, else none (exempt).
+ * `rate` is `null` when the service has none or the rate is gone (deleted).
+ */
+export function chargedServiceRate(rate: ServiceTaxRate | null): ServiceTaxRate | null {
+  return rate !== null && rate.isActive && appliesToServices(rate) ? rate : null;
+}
+
+/** Rates a hospital may attach to a service (active, for services or everything). */
+export function serviceTaxOptions(rates: readonly ServiceTaxRate[]): readonly ServiceTaxRate[] {
+  return rates.filter((r) => r.isActive && appliesToServices(r));
+}
+
+/** Derived availability of a coupon at a given instant. */
 export type CouponState = 'Active' | 'Scheduled' | 'Expired' | 'Exhausted' | 'Paused';
 
 /** ISO date-time → the day `yyyy-mm-dd` it falls on in the hospital's calendar. */
@@ -105,11 +127,16 @@ export function dayEndExclusiveIso(day: string): string {
   return calendarInstant(addDaysISO(day, 1));
 }
 
-export function couponState(coupon: HospitalCoupon, today: string): CouponState {
+/**
+ * A coupon's state at the instant `now`, against its validity instants the way
+ * the backend checks them (`valid_from <= now < valid_to`). Instants need no
+ * calendar day, so the PC's date and zone cannot shift it (D-09, UAT-47).
+ */
+export function couponState(coupon: HospitalCoupon, now: number): CouponState {
   if (!coupon.isActive) return 'Paused';
   if (coupon.usageCap !== null && coupon.usedCount >= coupon.usageCap) return 'Exhausted';
-  if (lastValidDay(coupon.validTo) < today) return 'Expired';
-  if (localDay(coupon.validFrom) > today) return 'Scheduled';
+  if (Date.parse(coupon.validTo) <= now) return 'Expired';
+  if (Date.parse(coupon.validFrom) > now) return 'Scheduled';
   return 'Active';
 }
 
@@ -137,29 +164,26 @@ export function couponDiscount(
   return Math.max(0, Math.min(discount, orderPaise)) / PAISE_PER_RUPEE;
 }
 
-/**
- * Services a coupon may be redeemed against. No scope = every service; with
- * scopes, a booking qualifies when **any** scope matches — its service, or its
- * department (the backend's rule, `fees.validate_coupon`).
- */
-export function couponServices(
-  scope: Pick<HospitalCoupon, 'serviceIds' | 'departmentIds'>,
-  services: readonly PricedService[],
-): readonly PricedService[] {
-  if (scope.serviceIds.length === 0 && scope.departmentIds.length === 0) return services;
-  return services.filter(
-    (s) =>
-      scope.serviceIds.includes(s.id) ||
-      (s.departmentId !== null && scope.departmentIds.includes(s.departmentId)),
-  );
+/** What a coupon needs to know about a doctor: their department and consultation fee. */
+export interface CouponDoctor {
+  readonly departmentId: string;
+  readonly feePaise: number;
 }
 
-/** Highest sensible flat discount: the cheapest service in scope (null = none in scope). */
-export function flatCouponCeiling(
-  scope: Pick<HospitalCoupon, 'serviceIds' | 'departmentIds'>,
-  services: readonly PricedService[],
+/**
+ * The cheapest consultation a coupon can be redeemed on, in rupees — the
+ * discount base of an app booking (`fees.quote`: consultation, no service;
+ * decision 7: no desk coupons). No departments = every department; `null`
+ * when no doctor is in scope. A flat coupon above it simply stops at the fee.
+ */
+export function cheapestConsultationRupees(
+  doctors: readonly CouponDoctor[],
+  departmentIds: readonly string[],
 ): number | null {
-  const scoped = couponServices(scope, services);
+  const scoped =
+    departmentIds.length === 0
+      ? doctors
+      : doctors.filter((d) => departmentIds.includes(d.departmentId));
   if (scoped.length === 0) return null;
-  return scoped.reduce((min, s) => Math.min(min, s.priceRupees), Number.POSITIVE_INFINITY);
+  return Math.min(...scoped.map((d) => d.feePaise)) / PAISE_PER_RUPEE;
 }

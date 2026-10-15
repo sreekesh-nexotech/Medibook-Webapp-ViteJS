@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "id": "01a1174e-1290-7d02-bd6f-cacad732f7b6",
+      "slug": "guidelines",
+      "version": 1,
+      "title": "Community Guidelines",
+      "body_md": "# Guidelines\n\nBe kind to hospital staff.",
+      "published_at": "2026-08-08T04:00:00.193398Z",
+      "is_current": true,
+      "created_at": "2026-08-08T04:00:00.189293Z",
+      "updated_at": "2026-08-08T04:00:00.189312Z"
+    },
+    {
+      "id": "01a1174e-1266-7c42-bfd0-5d4ba3857cec",
+      "slug": "privacy",
+      "version": 1,
+      "title": "Privacy Policy",
+      "body_md": "# Privacy Policy\n\nDemo privacy policy.",
+      "published_at": "2026-08-08T04:00:00.157239Z",
+      "is_current": true,
+      "created_at": "2026-08-08T04:00:00.147137Z",
+      "updated_at": "2026-08-08T04:00:00.147191Z"
+    },
+    {
+      "id": "01a1174e-12aa-7780-923e-91a4e09579b3",
+      "slug": "terms",
+      "version": 2,
+      "title": "Terms of Service (v2 draft)",
+      "body_md": "# Terms of Service\n\nDraft with updated refund wording.",
+      "published_at": null,
+      "is_current": false,
+      "created_at": "2026-08-08T04:00:00.215510Z",
+      "updated_at": "2026-08-08T04:00:00.215529Z"
+    },
+    {
+      "id": "01a1174e-123c-72a2-8090-89cfe7714ac0",
+      "slug": "terms",
+      "version": 1,
+      "title": "Terms of Service",
+      "body_md": "# Terms of Service\n\nDemo terms for the Medibook app.",
+      "published_at": "2026-08-08T04:00:00.109925Z",
+      "is_current": true,
+      "created_at": "2026-08-08T04:00:00.104764Z",
+      "updated_at": "2026-08-08T04:00:00.104782Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 4,
+  "has_next": false
+}

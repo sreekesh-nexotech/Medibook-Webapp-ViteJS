@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "id": "01a1174e-1316-7a73-a4f7-0ff838d06e86",
+      "city": "Coimbatore",
+      "area": "RS Puram",
+      "state": "Tamil Nadu",
+      "lat": null,
+      "lng": null,
+      "is_popular": true,
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.323370Z",
+      "updated_at": "2026-08-08T04:00:00.323389Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-1328-7072-bd5a-9047ac3e228e",
+      "city": "Hyderabad",
+      "area": "Jubilee Hills",
+      "state": "Telangana",
+      "lat": null,
+      "lng": null,
+      "is_popular": true,
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.340670Z",
+      "updated_at": "2026-08-08T04:00:00.340695Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-12d6-7c32-b5d0-b837bb1d2002",
+      "city": "Kochi",
+      "area": "Edappally",
+      "state": "Kerala",
+      "lat": null,
+      "lng": null,
+      "is_popular": false,
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.259038Z",
+      "updated_at": "2026-08-08T04:00:00.259053Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-12b9-73b1-ab0a-15758c23e07d",
+      "city": "Kochi",
+      "area": "Kadavanthra",
+      "state": "Kerala",
+      "lat": null,
+      "lng": null,
+      "is_popular": true,
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.229961Z",
+      "updated_at": "2026-08-08T04:00:00.229974Z",
+      "version": 1
+    },
+    {
+      "id": "01a1174e-1300-7db3-b115-6b291dbe296e",
+      "city": "Pune",
+      "area": "Kothrud",
+      "state": "Maharashtra",
+      "lat": null,
+      "lng": null,
+      "is_popular": false,
+      "is_active": true,
+      "created_at": "2026-08-08T04:00:00.301136Z",
+      "updated_at": "2026-08-08T04:00:00.301149Z",
+      "version": 1
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 6,
+  "has_next": true
+}

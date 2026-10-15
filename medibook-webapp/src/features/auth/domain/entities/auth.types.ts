@@ -42,6 +42,8 @@ export interface HospitalSession {
   readonly role: StaffRole;
   /** Short permission codes, e.g. `appointments.view`. */
   readonly permissions: readonly string[];
+  /** Server-side idle limit in minutes, when the backend reports it (BE-21). */
+  readonly sessionTimeoutMin: number | null;
   readonly hospital: {
     readonly id: string;
     readonly name: string;
@@ -52,6 +54,8 @@ export interface HospitalSession {
     readonly readOnly: boolean;
     /** The hospital's uploaded logo (a stored file id), or `null`. */
     readonly logoFileId: string | null;
+    /** IANA zone the hospital works in (D-09), or `null` when the server did not say. */
+    readonly timeZone: string | null;
   };
 }
 
@@ -61,6 +65,8 @@ export interface PlatformSession {
   readonly user: StaffUser;
   readonly role: StaffRole;
   readonly permissions: readonly string[];
+  /** Server-side idle limit in minutes, when the backend reports it (BE-21). */
+  readonly sessionTimeoutMin: number | null;
 }
 
 export type StaffSession = HospitalSession | PlatformSession;

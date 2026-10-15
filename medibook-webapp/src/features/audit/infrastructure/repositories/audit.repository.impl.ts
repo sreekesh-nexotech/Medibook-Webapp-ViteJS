@@ -15,8 +15,13 @@ export const auditRepository: AuditRepository = {
   listLog: (query) => attempt(async () => toPage(await getAuditLog(query), toAuditLogEntry)),
 
   exportLog: (filters) =>
-    attempt(async () => ({
-      filename: AUDIT_EXPORT_FILENAME,
-      csv: await getAuditLogCsv(filters),
-    })),
+    attempt(async () => {
+      const { csv, truncation } = await getAuditLogCsv(filters);
+      return {
+        filename: AUDIT_EXPORT_FILENAME,
+        csv,
+        isTruncated: truncation.truncated,
+        rowLimit: truncation.rowLimit,
+      };
+    }),
 };

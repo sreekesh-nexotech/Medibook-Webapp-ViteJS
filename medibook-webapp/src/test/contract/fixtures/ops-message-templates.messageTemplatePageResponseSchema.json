@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "id": "01a1174c-0819-7513-8553-7e2530b99ca2",
+      "event_code": "account.deletion_requested",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Account deletion requested",
+      "body": "Your account is scheduled for deletion. Log in before the cooling-off period ends to cancel.",
+      "whatsapp_template_name": null,
+      "is_active": true,
+      "version": 1,
+      "updated_by": null,
+      "created_at": "2026-10-07T16:57:01.209844Z",
+      "updated_at": "2026-10-07T16:57:01.209849Z"
+    },
+    {
+      "id": "01a1174c-0812-7d42-ae18-23e8b253a5c5",
+      "event_code": "account.deletion_requested",
+      "channel": "sms",
+      "locale": "en-IN",
+      "subject": null,
+      "body": "Medibook: We received a request to delete your Medibook account. Log in to the app before the cooling-off period ends to cancel it.",
+      "whatsapp_template_name": null,
+      "is_active": true,
+      "version": 1,
+      "updated_by": null,
+      "created_at": "2026-10-07T16:57:01.202191Z",
+      "updated_at": "2026-10-07T16:57:01.202198Z"
+    },
+    {
+      "id": "01a1174c-0427-79d0-be79-cbce47cbea00",
+      "event_code": "appointment.approved",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Appointment approved",
+      "body": "{{doctorName}}, {{hospitalName}} on {{date}} at {{time}}. Token {{token}}.",
+      "whatsapp_template_name": null,
+      "is_active": true,
+      "version": 1,
+      "updated_by": null,
+      "created_at": "2026-10-07T16:57:00.199993Z",
+      "updated_at": "2026-10-07T16:57:00.200002Z"
+    },
+    {
+      "id": "01a1174c-041f-7e51-a5f1-d7585efb8140",
+      "event_code": "appointment.approved",
+      "channel": "sms",
+      "locale": "en-IN",
+      "subject": null,
+      "body": "Medibook: {{hospitalName}} approved your appointment with {{doctorName}} on {{date}} {{time}}. Token {{token}}. Ref {{bookingRef}}.",
+      "whatsapp_template_name": null,
+      "is_active": true,
+      "version": 1,
+      "updated_by": null,
+      "created_at": "2026-10-07T16:57:00.191722Z",
+      "updated_at": "2026-10-07T16:57:00.191730Z"
+    },
+    {
+      "id": "01a1174c-045c-7c11-872a-28979f57fe7a",
+      "event_code": "appointment.cancelled",
+      "channel": "push",
+      "locale": "en-IN",
+      "subject": "Appointment cancelled",
+      "body": "{{doctorName}} on {{date}} at {{time}} is cancelled. Ref {{bookingRef}}.{{rebookText}}",
+      "whatsapp_template_name": null,
+      "is_active": true,
+      "version": 1,
+      "updated_by": null,
+      "created_at": "2026-10-07T16:57:00.252152Z",
+      "updated_at": "2026-10-07T16:57:00.252158Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 43,
+  "has_next": true
+}

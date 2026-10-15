@@ -1,0 +1,108 @@
+{
+  "results": [
+    {
+      "staff_id": "01a118cf-6cf2-72a0-b318-add2fdb5c93c",
+      "user_id": "01a118cf-6ced-7bb0-b1c3-998169fcde32",
+      "full_name": "Revathi UatCufv",
+      "email": "uat.invitee.cufv4890@lakeshore.medibook.example.com",
+      "phone_e164": null,
+      "employee_code": null,
+      "designation": null,
+      "status": "active",
+      "joined_at": "2026-10-08T00:00:09.316515Z",
+      "deactivated_at": null,
+      "hospital": {
+        "id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+        "name": "Lakeshore Multispeciality Hospital"
+      },
+      "role": {
+        "code": "receptionist",
+        "name": "Receptionist"
+      }
+    },
+    {
+      "staff_id": "01a118b6-9544-7f40-a516-3f650843d9b0",
+      "user_id": "01a118b6-9541-7d20-a2d7-3b1ee933d1ba",
+      "full_name": "Nimmy George",
+      "email": "nimmy.george@lakeshore.medibook.example.com",
+      "phone_e164": "+910000000000",
+      "employee_code": "LKS-04",
+      "designation": null,
+      "status": "active",
+      "joined_at": "2026-08-15T04:30:01.401861Z",
+      "deactivated_at": null,
+      "hospital": {
+        "id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+        "name": "Lakeshore Multispeciality Hospital"
+      },
+      "role": {
+        "code": "dept_front_desk",
+        "name": "Department Front Desk"
+      }
+    },
+    {
+      "staff_id": "01a118b6-94be-7972-b017-b108570b32ff",
+      "user_id": "01a118b6-94bc-71a1-a9a6-3475d2fc91b0",
+      "full_name": "Joseph Kurian",
+      "email": "joseph.kurian@lakeshore.medibook.example.com",
+      "phone_e164": "+910000000000",
+      "employee_code": "LKS-03",
+      "designation": null,
+      "status": "active",
+      "joined_at": "2026-08-15T04:30:01.268270Z",
+      "deactivated_at": null,
+      "hospital": {
+        "id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+        "name": "Lakeshore Multispeciality Hospital"
+      },
+      "role": {
+        "code": "accountant",
+        "name": "Accountant"
+      }
+    },
+    {
+      "staff_id": "01a118b6-9435-7892-81b0-e956ca5cf6e3",
+      "user_id": "01a118b6-9432-78e2-a202-d142cd25ea88",
+      "full_name": "Shalini Thomas",
+      "email": "shalini.thomas@lakeshore.medibook.example.com",
+      "phone_e164": "+910000000000",
+      "employee_code": "LKS-02",
+      "designation": null,
+      "status": "active",
+      "joined_at": "2026-08-15T04:30:01.130986Z",
+      "deactivated_at": null,
+      "hospital": {
+        "id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+        "name": "Lakeshore Multispeciality Hospital"
+      },
+      "role": {
+        "code": "receptionist",
+        "name": "Receptionist"
+      }
+    },
+    {
+      "staff_id": "01a118b6-93ae-79a2-98a5-15e934db03bb",
+      "user_id": "01a118b6-93ab-7e82-a57d-7103284dc8a1",
+      "full_name": "Vineeth Kumar",
+      "email": "vineeth.kumar@lakeshore.medibook.example.com",
+      "phone_e164": "+910000000000",
+      "employee_code": "LKS-01",
+      "designation": null,
+      "status": "active",
+      "joined_at": "2026-08-15T04:30:00.995613Z",
+      "deactivated_at": null,
+      "hospital": {
+        "id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+        "name": "Lakeshore Multispeciality Hospital"
+      },
+      "role": {
+        "code": "receptionist",
+        "name": "Receptionist"
+      }
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 6,
+  "has_next": true
+}

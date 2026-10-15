@@ -14,8 +14,9 @@ const LOGS_STALE_TIME_MS = 30_000;
  * page stays on screen while the next one loads, so paging and filtering do
  * not blank the table.
  */
-export function useLogsQuery(query: AuditLogQuery) {
+export function useLogsQuery(query: AuditLogQuery, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: logsKeys.list(query),
     queryFn: async () => unwrap(await fetchLogs(query)),
     staleTime: LOGS_STALE_TIME_MS,

@@ -123,7 +123,7 @@ export function HospitalPatientAccessCard({ h }: HospitalPatientAccessCardProps)
   // A closed hospital, or a role without hospitals.edit (SEC-05), cannot change these.
   const canEdit = useOpsPermission().can('hospitals.edit');
   const locked = h.status === 'closed' || !canEdit;
-  const gaps = bookabilityGaps(h);
+  const gaps = bookabilityGaps(h, h.subscription?.status ?? null);
   const copy = change ? confirmCopy(change, h) : null;
 
   const settle = (done: string) => ({

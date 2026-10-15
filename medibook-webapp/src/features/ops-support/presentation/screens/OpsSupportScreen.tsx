@@ -1,244 +1,263 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
-import { opsSupportTicketPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
-import { useSupportTicketCountQuery } from '@/features/ops-support/application/queries/useSupportTicketCountQuery';
-import { useSupportTicketsQuery } from '@/features/ops-support/application/queries/useSupportTicketsQuery';
+import { useSort } from '@/shared/hooks/useSort';
+import { Badge } from '@/shared/ui/Badge';
+import { Card } from '@/shared/ui/Card';
+import { FilterSelect } from '@/shared/ui/FilterSelect';
+import { OpsEntity } from '@/shared/ui/OpsEntity';
+import { Pager } from '@/shared/ui/Pager';
+import { SearchField } from '@/shared/ui/SearchField';
+import { TableShell, tdClass } from '@/shared/ui/TableShell';
+import type { TableStateSpec } from '@/shared/ui/TableState';
+import { ToggleChip } from '@/shared/ui/ToggleChip';
+
+import { useHospitalOptionsQuery } from '@/features/ops-hospitals/application/queries/useHospitalOptionsQuery';
+import { useTicketsQuery } from '@/features/ops-support/application/queries/useTicketsQuery';
 import type {
   SupportTicket,
   TicketCategory,
-  TicketListParams,
   TicketPriority,
+  TicketRaisedByKind,
   TicketStatus,
 } from '@/features/ops-support/domain/entities/support.entities';
 import {
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
+  TICKET_RAISERS,
   TICKET_STATUSES,
-  UNRESOLVED_STATUSES,
 } from '@/features/ops-support/domain/entities/support.entities';
 import {
-  CATEGORY_LABELS,
-  NO_VALUE,
-  PRIORITY_PILLS,
-  STATUS_PILLS,
-  formatDateTime,
-} from '@/features/ops-support/presentation/components/supportFormat';
-import { TicketRequester } from '@/features/ops-support/presentation/components/TicketRequester';
-import { useSort } from '@/shared/hooks/useSort';
-import { Badge } from '@/shared/ui/Badge';
-import { Card } from '@/shared/ui/Card';
-import { FilterSelect } from '@/shared/ui/FilterSelect';
-import { IconBtn } from '@/shared/ui/IconBtn';
-import { Pager } from '@/shared/ui/Pager';
-import { RefreshBtn } from '@/shared/ui/RefreshBtn';
-import { SearchField } from '@/shared/ui/SearchField';
-import { StatCard } from '@/shared/ui/StatCard';
-import type { StatCardData } from '@/shared/ui/StatCard';
-import { TableShell, tdClass } from '@/shared/ui/TableShell';
-import type { TableStateSpec } from '@/shared/ui/TableState';
+  TicketDrawer,
+  type AssigneeOption,
+} from '@/features/ops-support/presentation/components/TicketDrawer';
+import {
+  ACTIVE_STATUSES,
+  assigneeLabel,
+  CATEGORY_LABEL,
+  normaliseTicketNo,
+  PRIORITY_LOOK,
+  RAISER_LABEL,
+  requesterLine,
+  STATUS_LOOK,
+} from '@/features/ops-support/presentation/components/support.view';
+import { useSupportDebouncedValue } from '@/features/ops-support/presentation/hooks/useSupportDebouncedValue';
+import { useAssignableStaffQuery } from '@/features/ops-users/application/queries/useAssignableStaffQuery';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
+const SEARCH_DEBOUNCE_MS = 350;
 
-/** Wait this long after the last keystroke before looking a ticket number up. */
-const SEARCH_DEBOUNCE_MS = 300;
+const COLUMNS = ['Ticket', 'Raised by', 'Category', 'Priority', 'Status', 'Assignee', 'Updated'];
 
-const COLUMNS = ['Ticket', 'From', 'Topic', 'Priority', 'Status', 'Updated', 'Action'] as const;
+const ALL_CATEGORIES = 'Category: All';
+const ALL_RAISERS = 'Raised by: Anyone';
+const ALL_HOSPITALS = 'Hospital: All';
+const ALL_ASSIGNEES = 'Assignee: Anyone';
 
-/** Columns the server can sort, and the field each sorts by. */
-const SORT_FIELDS: Readonly<Record<string, string>> = { Updated: 'updated_at' };
-const DEFAULT_SORT = '-updated_at';
+const DATE_TIME = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
-const UNRESOLVED_LABEL = 'Status: Unresolved';
-const ALL_STATUSES_LABEL = 'Status: All';
-const ALL_PRIORITIES_LABEL = 'Priority: All';
-const ALL_TOPICS_LABEL = 'Topic: All';
+const dateInputClass =
+  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
 
-const OPEN_ONLY: readonly TicketStatus[] = ['open'];
-const IN_PROGRESS_ONLY: readonly TicketStatus[] = ['in_progress'];
-const WAITING_ONLY: readonly TicketStatus[] = ['waiting_on_requester'];
-
-function countValue(count: number | undefined): string {
-  return count === undefined ? NO_VALUE : count.toLocaleString('en-IN');
-}
-
-function statusesFor(filter: string): readonly TicketStatus[] {
-  if (filter === UNRESOLVED_LABEL) return UNRESOLVED_STATUSES;
-  return TICKET_STATUSES.filter((s) => STATUS_PILLS[s].label === filter);
-}
+const toggle = <T,>(list: readonly T[], value: T, on: boolean): readonly T[] =>
+  on ? [...list, value] : list.filter((x) => x !== value);
 
 /**
- * Support inbox (OBS-02): every ticket raised from a hospital's Help & Support
- * screen or the patient app. Unresolved tickets first; a ticket opens to its
- * thread, where ops replies (emailed to the requester) and sets its status.
+ * The support desk (UAT-30, ops side): every ticket hospitals and patients
+ * raise, filtered by status, priority, category, requester, hospital,
+ * assignee, ticket number and date; a ticket opens in a drawer with its
+ * conversation, controls and reply box. `support.view`.
  */
 export function OpsSupportScreen() {
-  const navigate = useNavigate();
-  const [statusF, setStatusF] = useState(UNRESOLVED_LABEL);
-  const [priorityF, setPriorityF] = useState(ALL_PRIORITIES_LABEL);
-  const [topicF, setTopicF] = useState(ALL_TOPICS_LABEL);
+  const [statuses, setStatuses] = useState<readonly TicketStatus[]>(ACTIVE_STATUSES);
+  const [priorities, setPriorities] = useState<readonly TicketPriority[]>([]);
+  const [category, setCategory] = useState<TicketCategory | null>(null);
+  const [raisedBy, setRaisedBy] = useState<TicketRaisedByKind | null>(null);
+  const [hospitalId, setHospitalId] = useState<string | null>(null);
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [ticketNo, setTicketNo] = useState('');
-  const [searchNo, setSearchNo] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(0);
-  const { sort, onSort } = useSort<SupportTicket>();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const { sort, onSort } = useSort<SupportTicket>({ key: 'updated', dir: 'desc' });
+  const hospitals = useHospitalOptionsQuery();
+  // Support assigns without the full staff list (`GET /platform/staff/assignable`).
+  const staff = useAssignableStaffQuery();
+  const debouncedTicketNo = useSupportDebouncedValue(
+    normaliseTicketNo(ticketNo),
+    SEARCH_DEBOUNCE_MS,
+  );
 
-  useEffect(() => {
-    const id = setTimeout(() => setSearchNo(ticketNo.trim()), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [ticketNo]);
+  const assignees: readonly AssigneeOption[] | null = staff.data
+    ? staff.data.items.map((s) => ({ id: s.id, name: s.name }))
+    : null;
+  const hospitalName = (id: string): string | null =>
+    hospitals.options.find((h) => h.id === id)?.name ?? null;
+  const staffName = (id: string): string | null =>
+    staff.data?.items.find((s) => s.id === id)?.name ?? null;
 
-  const sortField = sort.key ? SORT_FIELDS[sort.key] : undefined;
-  const priority: TicketPriority | null =
-    TICKET_PRIORITIES.find((p) => PRIORITY_PILLS[p].label === priorityF) ?? null;
-  const category: TicketCategory | null =
-    TICKET_CATEGORIES.find((c) => CATEGORY_LABELS[c] === topicF) ?? null;
-  const params: TicketListParams = {
-    statuses: statusesFor(statusF),
-    priority,
-    category,
-    ticketNo: searchNo,
-    sort: sortField ? `${sort.dir === 'asc' ? '' : '-'}${sortField}` : DEFAULT_SORT,
+  const tickets = useTicketsQuery({
     page: page + 1,
     pageSize: PAGE_SIZE,
-  };
-  const list = useSupportTicketsQuery(params);
-  const open = useSupportTicketCountQuery(OPEN_ONLY);
-  const inProgress = useSupportTicketCountQuery(IN_PROGRESS_ONLY);
-  const waiting = useSupportTicketCountQuery(WAITING_ONLY);
-
-  const kpis: readonly StatCardData[] = [
-    {
-      icon: 'life-buoy',
-      label: 'New',
-      value: countValue(open.data),
-      sub: 'Not picked up yet',
-      iconClass: 'bg-badge-queue-bg text-badge-queue-fg',
-      valueClass: 'text-text-navy',
-      subClass: 'text-text-muted',
-    },
-    {
-      icon: 'headset',
-      label: 'In progress',
-      value: countValue(inProgress.data),
-      sub: 'Being worked on',
-      iconClass: 'bg-blue-soft-bg text-blue',
-      valueClass: 'text-blue',
-      subClass: 'text-text-muted',
-    },
-    {
-      icon: 'hourglass',
-      label: 'Waiting on requester',
-      value: countValue(waiting.data),
-      sub: 'Back to us when they reply',
-      iconClass: 'bg-grey-200 text-text-muted',
-      valueClass: 'text-text-strong',
-      subClass: 'text-text-muted',
-    },
-  ];
-
-  const rows = list.data?.items ?? [];
-  const total = list.data?.total ?? 0;
-  // A status change elsewhere can shrink the list under the current page.
-  const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
-  if (list.data && !list.isPlaceholderData && page > lastPage) setPage(lastPage);
+    statuses,
+    priorities,
+    category,
+    raisedByKind: raisedBy,
+    hospitalId,
+    assignedToId: assigneeId,
+    ticketNo: debouncedTicketNo || null,
+    dateFrom: dateFrom || null,
+    dateTo: dateTo || null,
+    sort: sort.key === 'raised' ? 'created_at' : 'updated_at',
+    sortDir: sort.dir,
+  });
+  const rows = tickets.data?.items ?? [];
+  const total = tickets.data?.total ?? 0;
 
   const reset =
-    (fn: (v: string) => void) =>
-    (v: string): void => {
+    <T,>(fn: (v: T) => void) =>
+    (v: T): void => {
       fn(v);
       setPage(0);
     };
-  const filtersActive =
-    statusF !== UNRESOLVED_LABEL ||
-    priorityF !== ALL_PRIORITIES_LABEL ||
-    topicF !== ALL_TOPICS_LABEL ||
-    ticketNo.trim() !== '';
+
+  const filtersActive = Boolean(
+    priorities.length > 0 ||
+    category ||
+    raisedBy ||
+    hospitalId ||
+    assigneeId ||
+    ticketNo.trim() ||
+    dateFrom ||
+    dateTo,
+  );
   const clearAll = (): void => {
-    setStatusF(UNRESOLVED_LABEL);
-    setPriorityF(ALL_PRIORITIES_LABEL);
-    setTopicF(ALL_TOPICS_LABEL);
+    setStatuses([]);
+    setPriorities([]);
+    setCategory(null);
+    setRaisedBy(null);
+    setHospitalId(null);
+    setAssigneeId(null);
     setTicketNo('');
-    setSearchNo('');
+    setDateFrom('');
+    setDateTo('');
     setPage(0);
-  };
-  const handleSort = (key: string): void => {
-    onSort(key);
-    setPage(0);
-  };
-  const view = (t: SupportTicket): void => {
-    void navigate(opsSupportTicketPath(t.id));
-  };
-  const handleRefresh = async (): Promise<void> => {
-    await Promise.all([list.refetch(), open.refetch(), inProgress.refetch(), waiting.refetch()]);
   };
 
-  const tableState: TableStateSpec | undefined = list.isPending
+  const tableState: TableStateSpec | undefined = tickets.isPending
     ? { kind: 'loading', rows: 6 }
-    : list.isLoadingError
+    : tickets.isError
       ? {
           kind: 'error',
-          error: list.error,
-          title: "Support tickets didn't load",
-          message: isFailure(list.error) ? list.error.message : undefined,
-          onRetry: () => void list.refetch(),
+          message: isFailure(tickets.error) ? tickets.error.message : undefined,
+          onRetry: () => void tickets.refetch(),
         }
       : rows.length === 0
         ? {
             kind: 'empty',
             icon: 'life-buoy',
-            title: filtersActive ? 'No tickets match your filters.' : 'No tickets waiting.',
+            title: filtersActive ? 'No tickets match your filters.' : 'No tickets here.',
             message: filtersActive
-              ? 'Clear the filters to see every unresolved ticket.'
-              : 'New tickets from hospitals and the patient app appear here.',
-            ...(filtersActive ? { actionLabel: 'Clear filters', onAction: clearAll } : {}),
+              ? 'The ticket number must match exactly. Widen the dates or clear the filters.'
+              : 'Tickets hospitals and patients raise appear here.',
+            ...(filtersActive || statuses.length > 0
+              ? { actionLabel: 'Show every ticket', onAction: clearAll }
+              : {}),
           }
         : undefined;
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap gap-4">
-        {kpis.map((k) => (
-          <StatCard key={k.label} k={k} />
-        ))}
-      </div>
       <Card>
-        <div className="mb-4">
-          <SearchField
-            value={ticketNo}
-            onChange={reset(setTicketNo)}
-            placeholder="Find a ticket number, e.g. TKT-2026-0042"
-            aria-label="Find a support ticket by its number"
-          />
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-caption text-text-muted mr-1">Status</span>
+          {TICKET_STATUSES.map((s) => (
+            <ToggleChip
+              key={s}
+              pressed={statuses.includes(s)}
+              onChange={(on) => reset(setStatuses)(toggle(statuses, s, on))}
+            >
+              {STATUS_LOOK[s].label}
+            </ToggleChip>
+          ))}
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-caption text-text-muted mr-1">Priority</span>
+          {TICKET_PRIORITIES.map((p) => (
+            <ToggleChip
+              key={p}
+              pressed={priorities.includes(p)}
+              onChange={(on) => reset(setPriorities)(toggle(priorities, p, on))}
+            >
+              {PRIORITY_LOOK[p].label}
+            </ToggleChip>
+          ))}
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
-          <RefreshBtn onRefresh={handleRefresh} title="Refresh support tickets" />
+          <div className="w-72">
+            <SearchField
+              value={ticketNo}
+              onChange={reset(setTicketNo)}
+              placeholder="Ticket no., e.g. TKT-2026-0001"
+              aria-label="Find a ticket by its exact number"
+            />
+          </div>
           <FilterSelect
-            value={statusF}
-            aria-label="Filter by status"
-            options={[
-              UNRESOLVED_LABEL,
-              ALL_STATUSES_LABEL,
-              ...TICKET_STATUSES.map((s) => STATUS_PILLS[s].label),
-            ]}
-            onChange={reset(setStatusF)}
+            value={category ? CATEGORY_LABEL[category] : ALL_CATEGORIES}
+            options={[ALL_CATEGORIES, ...TICKET_CATEGORIES.map((c) => CATEGORY_LABEL[c])]}
+            onChange={(v) =>
+              reset(setCategory)(TICKET_CATEGORIES.find((c) => CATEGORY_LABEL[c] === v) ?? null)
+            }
+            aria-label="Filter by category"
           />
           <FilterSelect
-            value={priorityF}
-            aria-label="Filter by priority"
-            options={[
-              ALL_PRIORITIES_LABEL,
-              ...TICKET_PRIORITIES.map((p) => PRIORITY_PILLS[p].label),
-            ]}
-            onChange={reset(setPriorityF)}
+            value={raisedBy ? RAISER_LABEL[raisedBy] : ALL_RAISERS}
+            options={[ALL_RAISERS, ...TICKET_RAISERS.map((r) => RAISER_LABEL[r])]}
+            onChange={(v) =>
+              reset(setRaisedBy)(TICKET_RAISERS.find((r) => RAISER_LABEL[r] === v) ?? null)
+            }
+            aria-label="Filter by who raised the ticket"
           />
-          <FilterSelect
-            value={topicF}
-            aria-label="Filter by topic"
-            options={[ALL_TOPICS_LABEL, ...TICKET_CATEGORIES.map((c) => CATEGORY_LABELS[c])]}
-            onChange={reset(setTopicF)}
+          {hospitals.canView && (
+            <FilterSelect
+              value={hospitals.options.find((h) => h.id === hospitalId)?.name ?? ALL_HOSPITALS}
+              options={[ALL_HOSPITALS, ...hospitals.options.map((h) => h.name)]}
+              onChange={(v) =>
+                reset(setHospitalId)(hospitals.options.find((h) => h.name === v)?.id ?? null)
+              }
+              aria-label="Filter by hospital"
+            />
+          )}
+          {assignees && (
+            <FilterSelect
+              value={assignees.find((a) => a.id === assigneeId)?.name ?? ALL_ASSIGNEES}
+              options={[ALL_ASSIGNEES, ...assignees.map((a) => a.name)]}
+              onChange={(v) =>
+                reset(setAssigneeId)(assignees.find((a) => a.name === v)?.id ?? null)
+              }
+              aria-label="Filter by assignee"
+            />
+          )}
+          <input
+            type="date"
+            value={dateFrom}
+            max={dateTo || undefined}
+            onChange={(e) => reset(setDateFrom)(e.target.value)}
+            title="Raised on or after"
+            aria-label="Raised from"
+            className={dateInputClass}
           />
-          {filtersActive && (
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(e) => reset(setDateTo)(e.target.value)}
+            title="Raised on or before"
+            aria-label="Raised to"
+            className={dateInputClass}
+          />
+          {(filtersActive || statuses.length > 0) && (
             <button
               type="button"
               onClick={clearAll}
@@ -251,52 +270,61 @@ export function OpsSupportScreen() {
         <TableShell
           columns={COLUMNS}
           scrollLabel="Support tickets"
-          sortKeys={{ Updated: 'Updated' }}
+          sortKeys={{ Updated: 'updated', Ticket: 'raised' }}
           sort={sort}
-          onSort={handleSort}
+          onSort={(key) => {
+            onSort(key);
+            setPage(0);
+          }}
           state={tableState}
-          busy={list.isPlaceholderData}
         >
-          {rows.map((t) => {
-            const status = STATUS_PILLS[t.status];
-            const prio = PRIORITY_PILLS[t.priority];
-            return (
-              <tr
-                key={t.id}
-                onClick={() => view(t)}
-                className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
-              >
-                <td className={tdClass}>
-                  <div className="text-text-strong font-semibold tabular-nums">{t.ticketNo}</div>
-                  <div className="text-caption text-text-muted max-w-80 truncate">{t.subject}</div>
-                </td>
-                <td className={tdClass}>
-                  <TicketRequester ticket={t} />
-                </td>
-                <td className={tdClass}>{CATEGORY_LABELS[t.category]}</td>
-                <td className={tdClass}>
-                  <Badge status={prio.badge}>{prio.label}</Badge>
-                </td>
-                <td className={tdClass}>
-                  <Badge status={status.badge}>{status.label}</Badge>
-                </td>
-                <td className={`${tdClass} whitespace-nowrap`}>{formatDateTime(t.updatedAt)}</td>
-                <td className={tdClass} onClick={(e) => e.stopPropagation()}>
-                  <IconBtn
-                    name="eye"
-                    box={36}
-                    size={16}
-                    label={`Open ticket ${t.ticketNo}`}
-                    title={`Open ticket ${t.ticketNo}`}
-                    onClick={() => view(t)}
+          {rows.map((t) => (
+            <tr
+              key={t.id}
+              onClick={() => setOpenId(t.id)}
+              className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
+            >
+              <td className={`${tdClass} max-w-90`}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenId(t.id);
+                  }}
+                  className="w-full cursor-pointer border-none bg-transparent p-0 text-left"
+                  aria-label={`Open ticket ${t.ticketNo}`}
+                >
+                  <OpsEntity
+                    icon="life-buoy"
+                    tint={t.priority === 'urgent' ? 'danger' : 'info'}
+                    title={t.subject}
+                    sub={`${t.ticketNo} · raised ${DATE_TIME.format(new Date(t.createdAt))}`}
                   />
-                </td>
-              </tr>
-            );
-          })}
+                </button>
+              </td>
+              <td className={tdClass}>{requesterLine(t, hospitalName)}</td>
+              <td className={tdClass}>{CATEGORY_LABEL[t.category]}</td>
+              <td className={tdClass}>
+                <Badge status={PRIORITY_LOOK[t.priority].badge}>
+                  {PRIORITY_LOOK[t.priority].label}
+                </Badge>
+              </td>
+              <td className={tdClass}>
+                <Badge status={STATUS_LOOK[t.status].badge}>{STATUS_LOOK[t.status].label}</Badge>
+              </td>
+              <td className={tdClass}>{assigneeLabel(t, staffName)}</td>
+              <td className={tdClass}>{DATE_TIME.format(new Date(t.updatedAt))}</td>
+            </tr>
+          ))}
         </TableShell>
         <Pager total={total} page={page} pageSize={PAGE_SIZE} onPage={setPage} noun="tickets" />
       </Card>
+      <TicketDrawer
+        ticketId={openId}
+        assignees={assignees}
+        hospitalNameOf={hospitalName}
+        onClose={() => setOpenId(null)}
+      />
     </div>
   );
 }

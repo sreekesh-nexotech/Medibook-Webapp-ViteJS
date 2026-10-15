@@ -1,3 +1,5 @@
+import { activeSurface } from '@/core/api/surface';
+
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Icon } from '@/shared/ui/Icon';
@@ -11,6 +13,8 @@ interface ForbiddenScreenProps {
   requiredPermission?: string;
   /** Override the headline. */
   title?: string;
+  /** Override the explanation (e.g. a read-only hospital, not a missing role). */
+  message?: string;
 }
 
 /**
@@ -24,8 +28,14 @@ export function ForbiddenScreen({
   requiredRole,
   requiredPermission,
   title = "You don't have access to this screen",
+  message,
 }: ForbiddenScreenProps) {
   const home = useHomeTarget();
+  // Platform roles are granted by a Medibook administrator, not a hospital one (01·F14).
+  const whoGrants =
+    activeSurface() === 'platform'
+      ? 'Ask a Medibook administrator to add it to your role under Users & Roles.'
+      : 'Ask a hospital administrator to grant it under Users & Roles.';
   return (
     <div className="flex min-h-105 items-center justify-center p-5">
       <Card pad={32} className="max-w-115 text-center">
@@ -34,8 +44,7 @@ export function ForbiddenScreen({
         </div>
         <div className="text-h2 text-text-strong mb-2">{title}</div>
         <p className="text-body text-text-muted mb-4">
-          Your role does not include this module. Ask a hospital administrator to grant it under
-          Users &amp; Roles.
+          {message ?? `Your role does not include this module. ${whoGrants}`}
         </p>
         {(requiredRole ?? requiredPermission) && (
           <div className="bg-bg-subtle border-border mb-5.5 flex flex-col gap-1 rounded-md border px-4 py-3 text-left">

@@ -10,14 +10,16 @@ interface UpdateChecklistInput {
   readonly caseId: string;
   readonly code: string;
   readonly update: ChecklistUpdate;
+  /** The item version (`If-Match`). */
+  readonly version: number | null;
 }
 
-/** Mark a document received, verified, waived or sent back. */
+/** Mark a document received, verified, waived or sent back, or detach its scan. */
 export function useUpdateChecklistItemMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ caseId, code, update }: UpdateChecklistInput) =>
-      unwrap(await updateChecklistItem(caseId, code, update)),
+    mutationFn: async ({ caseId, code, update, version }: UpdateChecklistInput) =>
+      unwrap(await updateChecklistItem(caseId, code, update, version)),
     onSettled: () => invalidateOnboarding(queryClient),
   });
 }

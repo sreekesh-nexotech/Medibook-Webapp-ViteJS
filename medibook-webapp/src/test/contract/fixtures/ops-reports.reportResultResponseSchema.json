@@ -1,0 +1,146 @@
+{
+  "code": "bookings",
+  "title": "Bookings Report",
+  "filters_applied": {
+    "booking_date_from": "2026-01-01"
+  },
+  "kpis": [
+    {
+      "key": "total_bookings",
+      "label": "Total bookings",
+      "kind": "int",
+      "value": 454
+    },
+    {
+      "key": "completed",
+      "label": "Completed",
+      "kind": "int",
+      "value": 301
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "kind": "int",
+      "value": 78
+    }
+  ],
+  "columns": [
+    {
+      "key": "booking_id",
+      "label": "Booking ID",
+      "kind": "str"
+    },
+    {
+      "key": "booking_date",
+      "label": "Booking Date",
+      "kind": "date"
+    },
+    {
+      "key": "appointment_date",
+      "label": "Appointment Date",
+      "kind": "date"
+    },
+    {
+      "key": "hospital",
+      "label": "Hospital",
+      "kind": "str"
+    },
+    {
+      "key": "doctor",
+      "label": "Doctor",
+      "kind": "str"
+    },
+    {
+      "key": "department",
+      "label": "Department",
+      "kind": "str"
+    },
+    {
+      "key": "patient",
+      "label": "Patient",
+      "kind": "str"
+    },
+    {
+      "key": "status",
+      "label": "Status",
+      "kind": "str"
+    },
+    {
+      "key": "booking_type",
+      "label": "Booking Type",
+      "kind": "str"
+    }
+  ],
+  "rows": [
+    {
+      "booking_id": "LKSB-2610-00145",
+      "booking_date": "2026-10-07",
+      "appointment_date": "2026-10-12",
+      "hospital": "Lakeshore Multispeciality Hospital",
+      "doctor": "Dr. Meera Varghese",
+      "department": "General Medicine",
+      "patient": "Jacob Mathew (+91******95)",
+      "status": "scheduled",
+      "booking_type": "App"
+    },
+    {
+      "booking_id": "LKSB-2610-00146",
+      "booking_date": "2026-10-07",
+      "appointment_date": "2026-10-07",
+      "hospital": "Lakeshore Multispeciality Hospital",
+      "doctor": "Dr. Suresh Pillai",
+      "department": "General Medicine",
+      "patient": "Imran Sheikh (+91******99)",
+      "status": "completed",
+      "booking_type": "Walk-in"
+    },
+    {
+      "booking_id": "LKSB-2610-00147",
+      "booking_date": "2026-10-07",
+      "appointment_date": "2026-10-07",
+      "hospital": "Lakeshore Multispeciality Hospital",
+      "doctor": "Dr. Harish Menon",
+      "department": "Cardiology",
+      "patient": "Yusuf Pathan (+91******54)",
+      "status": "completed",
+      "booking_type": "Walk-in"
+    },
+    {
+      "booking_id": "LKSB-2610-00148",
+      "booking_date": "2026-10-07",
+      "appointment_date": "2026-10-15",
+      "hospital": "Lakeshore Multispeciality Hospital",
+      "doctor": "Dr. Meera Varghese",
+      "department": "General Medicine",
+      "patient": "Nandini Pillai (+91******14)",
+      "status": "scheduled",
+      "booking_type": "App"
+    },
+    {
+      "booking_id": "LKSB-2610-00149",
+      "booking_date": "2026-10-07",
+      "appointment_date": "2026-10-19",
+      "hospital": "Lakeshore Multispeciality Hospital",
+      "doctor": "Dr. Meera Varghese",
+      "department": "General Medicine",
+      "patient": "Vivek Menon (+91******19)",
+      "status": "scheduled",
+      "booking_type": "App"
+    }
+  ],
+  "page": {
+    "page": 1,
+    "page_size": 5,
+    "total": 454,
+    "has_next": true
+  },
+  "meta": {
+    "notes": [
+      "A booking excludes the live 5-minute checkout hold (pending_payment) and online checkouts cancelled without ever being paid; definition for the client to confirm.",
+      "Each date filter is a range: <name>_from / <name>_to (YYYY-MM-DD, inclusive); a single day is from = to.",
+      "Patient = the hospital patient's name with a masked phone number.",
+      "Platform date filters on timestamps are Asia/Kolkata calendar days; row dates are shown in each hospital's own timezone.",
+      "Booking Type: App = online booking, Walk-in = desk booking."
+    ]
+  }
+}

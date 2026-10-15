@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { cn } from '@/shared/lib/cn';
@@ -7,27 +8,27 @@ import { Icon } from '@/shared/ui/Icon';
 
 import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { isFailure } from '@/core/error/failure';
-import type { Failure } from '@/core/error/failure';
 
 import {
-  AUTH_FORGOT_PATH,
   AUTH_NEXT_PARAM,
   AUTH_SURFACE_OPS,
   AUTH_SURFACE_PARAM,
+  forgotPathFor,
   hospitalDashboardPath,
   isOpsReturnPath,
   OPS_BASE_PATH,
   returnPathAfterLogin,
+  surfaceFromParam,
 } from '@/app/router/paths';
 
 import type { StaffSession } from '@/features/auth/domain/entities/auth.types';
 import { useLoginMutation } from '@/features/auth/application/queries/useLoginMutation';
-import { useLogoutMutation } from '@/features/auth/application/queries/useLogoutMutation';
 import { hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
 import { AuthAlert } from '@/features/auth/presentation/components/AuthAlert';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
 import { AuthPasswordField } from '@/features/auth/presentation/components/AuthPasswordField';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
+import { loginErrorMessage } from '@/features/auth/presentation/components/loginErrors';
 
 type LoginMode = 'hospital' | 'ops';
 
@@ -38,36 +39,31 @@ const MODES: readonly (readonly [LoginMode, string])[] = [
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-const SUSPENDED_MESSAGE =
-  "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate.";
-
-/** Sign-in failures worth wording for this screen; anything else shows the server's message. */
-function loginErrorMessage(failure: Failure, isOps: boolean): string {
-  if (failure.code === 'AUTH_INVALID_CREDENTIALS') return 'Incorrect email or password.';
-  if (failure.code === 'PERMISSION_DENIED') {
-    return isOps
-      ? 'This account does not have access to the operations console.'
-      : 'This account has no active hospital access. Contact your hospital administrator.';
-  }
-  return failure.message;
-}
-
 /**
  * Login screen (design `Auth.jsx` `Login`): the Hospital/Operations segmented
  * toggle, "Welcome Back" heading, email + password fields, the remember-me /
  * ops lock note, forgot-password link and email validation — now signing in
- * against `/<surface>/auth/login`, validating the session with `/me`, refusing
- * a suspended hospital, and landing on the session role's dashboard — or back
- * on the emailed report link that sent the user here (`?next=`).
+ * against `/<surface>/auth/login`, validating the session with `/me`, and
+ * landing on the session role's dashboard — or back on the emailed report link
+ * that sent the user here (`?next=`). `?surface=ops` opens the Operations tab
+ * (every operations exit returns here that way, UAT-44). Enter submits, and a
+ * failed attempt says how many tries are left or when a lock-out ends (UAT-70).
+ *
+ * A suspended or read-only hospital still signs in: suspension and a lapsed
+ * subscription refuse writes, never sign-in (D-30, decision 9); the shell
+ * shows why changes are blocked.
  */
 export function LoginScreen() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const next = params.get(AUTH_NEXT_PARAM);
   const loginMutation = useLoginMutation();
-  const { mutate: logout } = useLogoutMutation();
 
-  const [mode, setMode] = useState<LoginMode>(isOpsReturnPath(next) ? 'ops' : 'hospital');
+  const [mode, setMode] = useState<LoginMode>(
+    isOpsReturnPath(next) || surfaceFromParam(params.get(AUTH_SURFACE_PARAM)) === 'platform'
+      ? 'ops'
+      : 'hospital',
+  );
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
   // Off by default: front-desk terminals are shared (SEC-02).
@@ -79,6 +75,16 @@ export function LoginScreen() {
     if (m === mode) return;
     setMode(m);
     setErr('');
+    // Keep the tab in the URL, so a reload or "Back to login" returns to it.
+    setParams(
+      (current) => {
+        const updated = new URLSearchParams(current);
+        if (m === 'ops') updated.set(AUTH_SURFACE_PARAM, AUTH_SURFACE_OPS);
+        else updated.delete(AUTH_SURFACE_PARAM);
+        return updated;
+      },
+      { replace: true },
+    );
   };
 
   const land = (session: StaffSession) => {
@@ -88,18 +94,14 @@ export function LoginScreen() {
       navigate(back ?? OPS_BASE_PATH, { replace: true });
       return;
     }
-    if (session.hospital.status === 'suspended') {
-      // Login itself is never cut off (D-30); the app is. Sign straight back out.
-      logout('hospital');
-      setErr(SUSPENDED_MESSAGE);
-      return;
-    }
     navigate(back ?? hospitalDashboardPath(hospitalUrlRole(session.role.code)), {
       replace: true,
     });
   };
 
-  const go = () => {
+  const go = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    if (loginMutation.isPending) return;
     if (!email.trim() || !pwd.trim()) {
       setErr('Enter your email and password to continue.');
       return;
@@ -129,13 +131,17 @@ export function LoginScreen() {
       <BrandPanel />
       <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
         <div className="w-full max-w-100">
-          <div className="border-border-input bg-bg-subtle mb-7.5 flex gap-1 rounded-md border p-1">
+          <div
+            role="group"
+            aria-label="Sign in to"
+            className="border-border-input bg-bg-subtle mb-7.5 flex gap-1 rounded-md border p-1"
+          >
             {MODES.map(([k, l]) => (
               <button
                 key={k}
                 type="button"
-                onClick={() => pick(k)}
                 aria-pressed={mode === k}
+                onClick={() => pick(k)}
                 className={cn(
                   'flex-1 cursor-pointer rounded-sm py-2.25 text-center text-[13px] transition-colors duration-150',
                   mode === k
@@ -162,10 +168,7 @@ export function LoginScreen() {
           <form
             noValidate
             className="flex flex-col gap-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              go();
-            }}
+            onSubmit={go}
           >
             <AuthField
               label="Email Address"
@@ -212,13 +215,7 @@ export function LoginScreen() {
               )}
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    isOps
-                      ? `${AUTH_FORGOT_PATH}?${AUTH_SURFACE_PARAM}=${AUTH_SURFACE_OPS}`
-                      : AUTH_FORGOT_PATH,
-                  )
-                }
+                onClick={() => navigate(forgotPathFor(isOps ? 'platform' : 'hospital'))}
                 className="text-body text-link shrink-0 cursor-pointer font-medium"
               >
                 Forgot Password?

@@ -5,6 +5,7 @@ import type { MessagingRepository } from '@/features/messaging/domain/repositori
 import {
   getAllDeliveries,
   getDeliveries,
+  getDelivery,
   getTemplates,
   postSend,
 } from '@/features/messaging/infrastructure/data-sources/remote/messaging.api';
@@ -26,6 +27,8 @@ export const messagingRepository: MessagingRepository = {
     attempt(async () =>
       toPage(await getDeliveries(toDeliveryQueryParams(params)), toMessageDelivery),
     ),
+
+  getDelivery: (id) => attempt(async () => toMessageDelivery(await getDelivery(id))),
 
   listAllDeliveries: (filters) =>
     attempt(async () =>

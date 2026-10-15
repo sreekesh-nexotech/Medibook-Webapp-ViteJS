@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
 
-import { patientsKeys } from '@/features/patients/application/queries/patients.keys';
+import { refreshAfterPatientDecision } from '@/features/patients/application/queries/patients.cache';
 import { rejectPatientChange } from '@/features/patients/application/usecases/rejectPatientChange';
 
 interface RejectPatientChangeInput {
@@ -17,6 +17,7 @@ export function useRejectPatientChangeMutation() {
   return useMutation({
     mutationFn: async ({ requestId, note }: RejectPatientChangeInput) =>
       unwrap(await rejectPatientChange(requestId, note)),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: patientsKeys.all }),
+    // The admin dashboard counts pending patient changes.
+    onSettled: () => refreshAfterPatientDecision(queryClient),
   });
 }

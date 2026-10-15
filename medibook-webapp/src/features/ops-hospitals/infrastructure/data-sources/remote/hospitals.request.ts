@@ -9,6 +9,7 @@ export interface HospitalCreateRequest {
   readonly name: string;
   readonly email: string;
   readonly phone_e164: string;
+  readonly timezone?: string;
   readonly address_line1: string;
   readonly city: string;
   readonly state: string;
@@ -38,6 +39,7 @@ export function toHospitalCreateRequest(input: HospitalCreateInput): HospitalCre
     name: input.name,
     email: input.email,
     phone_e164: input.phoneE164,
+    ...(input.timezone !== undefined && { timezone: input.timezone }),
     address_line1: input.addressLine1,
     city: input.city,
     state: input.state,
@@ -75,6 +77,7 @@ export interface HospitalPatchRequest {
   readonly city?: string;
   readonly state?: string;
   readonly pincode?: string;
+  readonly timezone?: string;
   readonly online_booking_enabled?: boolean;
 }
 
@@ -92,6 +95,7 @@ export function toHospitalPatchRequest(c: HospitalProfileChanges): HospitalPatch
     ...(c.city !== undefined && { city: c.city }),
     ...(c.state !== undefined && { state: c.state }),
     ...(c.pincode !== undefined && { pincode: c.pincode }),
+    ...(c.timezone !== undefined && { timezone: c.timezone }),
     ...(c.onlineBookingEnabled !== undefined && {
       online_booking_enabled: c.onlineBookingEnabled,
     }),

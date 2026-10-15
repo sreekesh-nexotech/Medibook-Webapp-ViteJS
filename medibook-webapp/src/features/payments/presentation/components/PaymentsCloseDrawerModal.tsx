@@ -1,7 +1,5 @@
 import { useState } from 'react';
 
-import { isFailure } from '@/core/error/failure';
-
 import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { Field } from '@/shared/ui/Field';
@@ -9,9 +7,9 @@ import { FormModal } from '@/shared/ui/FormModal';
 import { TextInput } from '@/shared/ui/TextInput';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import type { CashSession } from '@/features/payments/domain/entities/payments.entities';
 import { useCloseCashSessionMutation } from '@/features/payments/application/queries/useCashSessionMutations';
 import {
+  cashWriteFailureCopy,
   drawerBalance,
   paiseToRupees,
   rupeesToPaise,
@@ -19,9 +17,21 @@ import {
 
 const NOTE_MAX_CHARS = 1000;
 
+/** What closing a drawer needs to know about it. */
+export interface ClosableDrawer {
+  readonly id: string;
+  /** Sent as `If-Match` (B2); `null` on an older backend. */
+  readonly version: number | null;
+  readonly staffName: string;
+  readonly openingFloatPaise: number;
+  readonly expectedCashPaise: number;
+  /** The signed-in member's own drawer (anyone else's needs `cash_desk.del`). */
+  readonly isOwn: boolean;
+}
+
 interface PaymentsCloseDrawerModalProps {
   /** The open drawer being closed. */
-  session: CashSession;
+  session: ClosableDrawer;
   onClose: () => void;
 }
 
@@ -29,9 +39,16 @@ interface PaymentsCloseDrawerModalProps {
  * Close a cash drawer with the cash actually counted (D-28). The server keeps
  * the expected amount and records the variance; this previews it so the staff
  * member can recount or leave a note for the admin before closing.
+ *
+ * Mounted per open: the replay key is minted once, so a retry after a lost
+ * answer replays the close instead of failing (B2), and the drawer's version
+ * rides as `If-Match` so a stale screen cannot close a changed drawer.
  */
 export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDrawerModalProps) {
   const close = useCloseCashSessionMutation();
+  // One key per close action: a retry of the same count and note reuses it.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const renewKey = (): void => setIdempotencyKey(crypto.randomUUID());
   const [countedText, setCountedText] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +63,12 @@ export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDraw
       return;
     }
     close.mutate(
-      { id: session.id, countedCashPaise: counted, note: note.trim() || null },
+      {
+        id: session.id,
+        countedCashPaise: counted,
+        note: note.trim() || null,
+        guard: { version: session.version, idempotencyKey },
+      },
       {
         onSuccess: (closed) => {
           const v = closed.variancePaise ?? 0;
@@ -59,7 +81,7 @@ export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDraw
           onClose();
         },
         onError: (failure) => {
-          setError(isFailure(failure) ? failure.message : 'The drawer could not be closed.');
+          setError(cashWriteFailureCopy(failure, 'The drawer could not be closed.'));
         },
       },
     );
@@ -69,7 +91,7 @@ export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDraw
     <FormModal
       open
       onClose={onClose}
-      title="Close your cash drawer"
+      title={session.isOwn ? 'Close your cash drawer' : `Close ${session.staffName}’s drawer`}
       width={520}
       onSubmit={submit}
       submitLabel="Close drawer"
@@ -96,6 +118,7 @@ export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDraw
             onChange={(v) => {
               setCountedText(v);
               setError(null);
+              renewKey();
             }}
             inputMode="decimal"
             placeholder="Count the notes and coins in the drawer"
@@ -120,7 +143,10 @@ export function PaymentsCloseDrawerModal({ session, onClose }: PaymentsCloseDraw
         <Field label="Note for the admin" hint="Optional. Explain any difference.">
           <TextInput
             value={note}
-            onChange={setNote}
+            onChange={(v) => {
+              setNote(v);
+              renewKey();
+            }}
             maxLength={NOTE_MAX_CHARS}
             placeholder="e.g. ₹50 change given from personal cash"
             height={48}

@@ -53,10 +53,10 @@ interface OpsConfirmProps {
  * block). The prototype positioned this absolutely inside its windowed stage —
  * ported as a fixed full-viewport overlay (same visual at 100% zoom).
  *
- * It is a real dialog (A11Y-02): announced as an alert dialog with its title
- * and message, focus moves into it and stays there, Escape cancels, and focus
- * returns to the button that opened it. While the action runs, it cannot be
- * dismissed.
+ * A real dialog (A11Y-02, UAT-76, 01·F32): announced as an alert dialog with
+ * its title and message, focus moves into it and stays there, Escape cancels,
+ * and focus returns to the button that opened it. While the action runs, it
+ * cannot be dismissed.
  */
 export function OpsConfirm({
   open,
@@ -89,7 +89,7 @@ export function OpsConfirm({
         ref={panelRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={title ? titleId : undefined}
         aria-describedby={body ? descriptionId : undefined}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}

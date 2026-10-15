@@ -7,8 +7,11 @@ import {
   getAllConfigChanges,
   getAllLoginHistory,
   getConfigChanges,
+  getDataRequest,
   getDataRequests,
+  getHospitalStaffDirectory,
   getLoginHistory,
+  getPhiAccess,
   postDataRequest,
   postProcessDataRequest,
   postRejectDataRequest,
@@ -17,13 +20,17 @@ import {
   toConfigChangeParams,
   toConfigFilterParams,
   toDataExportCreateRequest,
+  toDataRequestParams,
   toLoginFilterParams,
   toLoginHistoryParams,
+  toPhiAccessParams,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.request';
 import {
   toConfigChange,
   toDataRequest,
   toLoginEvent,
+  toPhiAccessEntry,
+  toStaffDirectoryEntry,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 
 /** The backend answers 501 when the export renderer only runs in the nightly worker. */
@@ -50,16 +57,20 @@ export const complianceRepository: ComplianceRepository = {
       return { rows: walked.rows.map(toConfigChange), truncated: walked.truncated };
     }),
 
-  listDataRequests: ({ page, pageSize }) =>
-    attempt(async () => toPage(await getDataRequests(page, pageSize), toDataRequest)),
+  listDataRequests: (params) =>
+    attempt(async () => toPage(await getDataRequests(toDataRequestParams(params)), toDataRequest)),
+
+  getDataRequest: (id) => attempt(async () => toDataRequest(await getDataRequest(id))),
 
   createDataExport: (draft) =>
     attempt(async () =>
       toDataRequest(await postDataRequest(toDataExportCreateRequest(draft), draft.idempotencyKey)),
     ),
 
-  processDataRequest: async (id) => {
-    const result = await attempt(async () => toDataRequest(await postProcessDataRequest(id)));
+  processDataRequest: async (id, notes) => {
+    const result = await attempt(async () =>
+      toDataRequest(await postProcessDataRequest(id, notes)),
+    );
     if (result.ok) return ok({ status: 'processed', request: result.data });
     if (result.failure.status === HTTP_NOT_IMPLEMENTED) return ok({ status: 'deferred' });
     return err(result.failure);
@@ -67,4 +78,10 @@ export const complianceRepository: ComplianceRepository = {
 
   rejectDataRequest: (id, reason) =>
     attempt(async () => toDataRequest(await postRejectDataRequest(id, reason))),
+
+  listPhiAccess: (params) =>
+    attempt(async () => toPage(await getPhiAccess(toPhiAccessParams(params)), toPhiAccessEntry)),
+
+  findHospitalStaff: (q) =>
+    attempt(async () => (await getHospitalStaffDirectory(q)).results.map(toStaffDirectoryEntry)),
 };

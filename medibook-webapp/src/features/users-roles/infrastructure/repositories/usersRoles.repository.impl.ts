@@ -9,6 +9,7 @@ import {
   getRolePreview,
   getRoles,
   getStaff,
+  patchRole,
   patchRolePermissions,
   patchStaff,
   postInvitation,
@@ -69,8 +70,13 @@ export const usersRolesRepository: UsersRolesRepository = {
 
   listRoles: () => attempt(async () => (await getRoles()).map(toStaffRole)),
 
-  updateRolePermissions: (roleCode, permissions) =>
-    attempt(async () => toStaffRole(await patchRolePermissions(roleCode, { permissions }))),
+  updateRolePermissions: (roleCode, permissions, version) =>
+    attempt(async () =>
+      toStaffRole(await patchRolePermissions(roleCode, { permissions }, version)),
+    ),
+
+  updateRoleDescription: (roleCode, description, version) =>
+    attempt(async () => toStaffRole(await patchRole(roleCode, { description }, version))),
 
   previewRole: (roleCode) => attempt(async () => toRolePreview(await getRolePreview(roleCode))),
 };

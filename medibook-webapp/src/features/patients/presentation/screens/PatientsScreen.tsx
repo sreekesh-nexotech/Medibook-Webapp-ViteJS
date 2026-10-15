@@ -1,7 +1,9 @@
 import { formatUpdatedAt } from '@/shared/lib/format';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { useCan } from '@/shared/hooks/usePermission';
 import type { SortState } from '@/shared/hooks/useSort';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
@@ -15,19 +17,26 @@ import { RefreshBtn } from '@/shared/ui/RefreshBtn';
 import { SearchField } from '@/shared/ui/SearchField';
 import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
+import { Tabs } from '@/shared/ui/Tabs';
 
 import {
+  type HospitalRole,
+  PATIENTS_APPROVALS_TAB,
+  PATIENTS_TAB_PARAM,
   hospitalBookForPatientPath,
   hospitalPatientPath,
   isHospitalRole,
 } from '@/app/router/paths';
 
+import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
+import { usePendingApprovalCountQuery } from '@/features/patients/application/queries/usePendingApprovalCountQuery';
 import { usePatientVisitCountsQuery } from '@/features/patients/application/queries/usePatientVisitCountsQuery';
 import type {
   PatientListParams,
   PatientSortField,
 } from '@/features/patients/domain/entities/patients.entities';
+import { PatientApprovalsPanel } from '@/features/patients/presentation/components/PatientApprovalsPanel';
 import { PatientModal } from '@/features/patients/presentation/components/PatientModal';
 import {
   SOURCE_LABELS,
@@ -72,10 +81,73 @@ const COLUMN_SORT_FIELDS: Readonly<Record<string, PatientSortField>> = {
 
 const NO_COLUMN_SORT: SortState = { key: null, dir: 'asc' };
 
+/** Backend permission that reads the approvals queue — outside the ten-module grid. */
+const APPROVALS_VIEW_PERMISSION = 'patient_approvals.view';
+
+const TAB_RECORDS = 'Patients';
+const TAB_APPROVALS = 'Approvals';
+
+/**
+ * The Patients screen: the records list, and — for roles that may read it —
+ * the approvals queue (D-29) as a second tab, reachable directly with
+ * `?tab=approvals` (the admin dashboard links there).
+ */
 export function PatientsScreen() {
   const navigate = useNavigate();
   const { role } = useParams();
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const session = useSessionQuery('hospital');
+  const canSeeApprovals = session.data?.permissions.includes(APPROVALS_VIEW_PERMISSION) ?? false;
+  const pendingCount = usePendingApprovalCountQuery(canSeeApprovals).data;
+  const isApprovalsTab =
+    canSeeApprovals && searchParams.get(PATIENTS_TAB_PARAM) === PATIENTS_APPROVALS_TAB;
+
+  const openPatient = (mrn: string) => navigate(hospitalPatientPath(hospitalRole, mrn));
+  const approvalsLabel =
+    pendingCount !== undefined && pendingCount > 0
+      ? `${TAB_APPROVALS} (${pendingCount})`
+      : TAB_APPROVALS;
+  const onTab = (label: string): void => {
+    setSearchParams(
+      label.startsWith(TAB_APPROVALS) ? { [PATIENTS_TAB_PARAM]: PATIENTS_APPROVALS_TAB } : {},
+      { replace: true },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {canSeeApprovals && (
+        <Card pad={14}>
+          <Tabs
+            tabs={[TAB_RECORDS, approvalsLabel]}
+            value={isApprovalsTab ? approvalsLabel : TAB_RECORDS}
+            onChange={onTab}
+          />
+        </Card>
+      )}
+      {isApprovalsTab ? (
+        <Card pad={20}>
+          <PatientApprovalsPanel onOpenPatient={openPatient} />
+        </Card>
+      ) : (
+        <PatientRecordsList hospitalRole={hospitalRole} onOpenPatient={openPatient} />
+      )}
+    </div>
+  );
+}
+
+interface PatientRecordsListProps {
+  hospitalRole: HospitalRole;
+  onOpenPatient: (mrn: string) => void;
+}
+
+function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListProps) {
+  const navigate = useNavigate();
+  const canAdd = useCan('Patients.add');
+  const canBook = useCan('Appointments.add');
+  // Ages count to the hospital's today (D-09, UAT-47).
+  const { today } = useHospitalToday();
 
   const [q, setQ] = useState('');
   const [sourceF, setSourceF] = useState(ALL_SOURCES);
@@ -97,9 +169,12 @@ export function PatientsScreen() {
   const patientsQuery = usePatientsQuery(params);
   const rows = patientsQuery.data?.items ?? [];
   const total = patientsQuery.data?.total ?? 0;
-  const visits = usePatientVisitCountsQuery(rows.map((p) => p.id));
+  // Rows carry their completed-visit count (B6); only older rows are counted one by one (PAT-01).
+  const visits = usePatientVisitCountsQuery(
+    rows.filter((p) => p.completedVisits === null).map((p) => p.id),
+  );
 
-  const open = (patientId: string) => navigate(hospitalPatientPath(hospitalRole, patientId));
+  const open = onOpenPatient;
   const book = (patientId: string) => {
     navigate(hospitalBookForPatientPath(hospitalRole, patientId));
   };
@@ -153,9 +228,11 @@ export function PatientsScreen() {
               kind: 'empty',
               icon: 'user-plus',
               title: 'No patients yet.',
-              message: 'Add the first record — identity and contact only, no clinical data.',
-              actionLabel: 'Add patient',
-              onAction: () => setAddOpen(true),
+              message: canAdd
+                ? 'Add the first record — identity and contact only, no clinical data.'
+                : 'Records appear here as the desk registers patients and online bookings arrive.',
+              actionLabel: canAdd ? 'Add patient' : undefined,
+              onAction: canAdd ? () => setAddOpen(true) : undefined,
             }
         : undefined;
 
@@ -234,10 +311,10 @@ export function PatientsScreen() {
                     <span className="text-text-strong font-medium">{p.fullName}</span>
                   </div>
                 </td>
-                <td className={tdClass}>{ageFromDob(p.dateOfBirth) ?? '—'}</td>
+                <td className={tdClass}>{ageFromDob(p.dateOfBirth, today) ?? '—'}</td>
                 <td className={tdClass}>{genderLabel(p.gender) || '—'}</td>
                 <td className={tdClass}>{displayPhone(p.phone) || '—'}</td>
-                <td className={tdClass}>{visits.get(p.id) ?? '—'}</td>
+                <td className={tdClass}>{p.completedVisits ?? visits.get(p.id) ?? '—'}</td>
                 <td className={tdClass}>
                   <Badge status={source.status}>{source.label}</Badge>
                 </td>
@@ -250,13 +327,15 @@ export function PatientsScreen() {
                       size={16}
                       onClick={() => open(p.id)}
                     />
-                    <IconBtn
-                      name="calendar-plus"
-                      label="Book appointment"
-                      box={36}
-                      size={16}
-                      onClick={() => book(p.id)}
-                    />
+                    {canBook && (
+                      <IconBtn
+                        name="calendar-plus"
+                        label="Book appointment"
+                        box={36}
+                        size={16}
+                        onClick={() => book(p.id)}
+                      />
+                    )}
                   </div>
                 </td>
               </tr>

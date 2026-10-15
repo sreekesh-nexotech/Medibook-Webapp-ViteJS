@@ -1,16 +1,16 @@
 import type { Result } from '@/core/error/failure';
 
 import type {
-  HolidayTarget,
+  HolidayRef,
+  HolidayWriteMode,
   ScheduleChange,
 } from '@/features/settings/domain/entities/profile.entities';
 import { profileRepository } from '@/features/settings/infrastructure/repositories/profile.repository.impl';
 
-/** Remove a closure — a dry run unless `confirm`. */
+/** Remove a closure — a dry run unless confirming. */
 export function removeHoliday(
-  target: HolidayTarget,
-  confirm: boolean,
-  replayKey: string,
+  holiday: HolidayRef,
+  mode: HolidayWriteMode,
 ): Promise<Result<ScheduleChange>> {
-  return profileRepository.removeHoliday(target, confirm, replayKey);
+  return profileRepository.removeHoliday(holiday, mode);
 }

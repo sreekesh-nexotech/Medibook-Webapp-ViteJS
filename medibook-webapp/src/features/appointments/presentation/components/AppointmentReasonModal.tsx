@@ -7,6 +7,9 @@ import { Modal } from '@/shared/ui/Modal';
 /** Shortest reason the desk may record — the patient sees it. */
 const MIN_REASON_LENGTH = 3;
 
+/** The backend's limit (`HospitalReasonSerializer`), enforced here so it never 400s (03 F15). */
+const MAX_REASON_LENGTH = 500;
+
 interface AppointmentReasonModalProps {
   open: boolean;
   title: string;
@@ -14,14 +17,17 @@ interface AppointmentReasonModalProps {
   body: string;
   confirmLabel: string;
   busy: boolean;
+  /** The "back out" button; refunds of a finished booking are not "keeping" it. */
+  dismissLabel?: string;
   onClose: () => void;
   onConfirm: (reason: string) => void;
 }
 
 /**
  * A reason prompt for the desk's irreversible actions — cancel, reject and
- * refund. Each refunds in full to the original payment method(s) (Q11, Q94,
- * Q95), so there is no amount or channel to choose, only the reason.
+ * refund. Whatever was paid is refunded in full to the original payment
+ * method(s) (Q11, Q94, Q95), so there is no amount or channel to choose, only
+ * the reason. The body says whether anything is refunded at all.
  */
 export function AppointmentReasonModal({
   open,
@@ -29,6 +35,7 @@ export function AppointmentReasonModal({
   body,
   confirmLabel,
   busy,
+  dismissLabel = 'Keep booking',
   onClose,
   onConfirm,
 }: AppointmentReasonModalProps) {
@@ -52,7 +59,7 @@ export function AppointmentReasonModal({
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
-            Keep booking
+            {dismissLabel}
           </Button>
           <Button variant="danger" onClick={confirm} busy={busy}>
             {confirmLabel}
@@ -66,6 +73,7 @@ export function AppointmentReasonModal({
           <textarea
             id={field.id}
             value={reason}
+            maxLength={MAX_REASON_LENGTH}
             onChange={(e) => setReason(e.target.value)}
             onBlur={() => setTouched(true)}
             placeholder="e.g. Doctor unavailable — patient informed"

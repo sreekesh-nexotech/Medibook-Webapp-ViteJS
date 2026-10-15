@@ -5,7 +5,8 @@ import { useCallback, useEffect, useId, useRef, type RefObject } from 'react';
  * ("No dialog can be closed with Escape, and none traps focus"). One
  * implementation, shared by `Modal` and `Drawer` so the two can never drift:
  *
- *  - Escape closes.
+ *  - Escape closes — only the innermost open dialog, so a confirm opened
+ *    from a drawer closes alone.
  *  - Focus moves into the panel on open (first focusable element, else the
  *    panel itself).
  *  - Tab / Shift+Tab cycle inside the panel and never reach the page behind.
@@ -16,9 +17,6 @@ import { useCallback, useEffect, useId, useRef, type RefObject } from 'react';
  *
  * It renders nothing and adds no styling, so a dialog's visuals are untouched.
  */
-
-/** Open dialogs, oldest first; only the last one handles keys. */
-const openDialogs: symbol[] = [];
 
 /** Everything natively focusable, minus anything explicitly removed from the order. */
 const FOCUSABLE_SELECTOR = [
@@ -35,6 +33,17 @@ const FOCUSABLE_SELECTOR = [
   '[contenteditable]:not([contenteditable="false"])',
   '[tabindex]',
 ].join(',');
+
+/**
+ * Open dialogs, innermost last. A confirm opened from a drawer must answer
+ * Escape and Tab on its own: only the top of this stack handles keys, so
+ * Escape closes the confirm and leaves the drawer open (A11Y-07, UAT-76, 01·F30).
+ */
+const openDialogs: symbol[] = [];
+
+function isTopmost(token: symbol): boolean {
+  return openDialogs[openDialogs.length - 1] === token;
+}
 
 export interface UseDialogOptions {
   /** Whether the dialog is mounted/visible. */
@@ -103,12 +112,12 @@ export function useDialog({
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
+    const token = Symbol('dialog');
+    openDialogs.push(token);
     focusFirst();
-    const self = Symbol('dialog');
-    openDialogs.push(self);
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (openDialogs[openDialogs.length - 1] !== self) return;
+      if (!isTopmost(token)) return;
       if (closeOnEscape && e.key === 'Escape') {
         e.stopPropagation();
         onCloseRef.current();
@@ -140,7 +149,8 @@ export function useDialog({
     if (lockScroll) body.style.overflow = 'hidden';
 
     return () => {
-      openDialogs.splice(openDialogs.indexOf(self), 1);
+      const at = openDialogs.indexOf(token);
+      if (at >= 0) openDialogs.splice(at, 1);
       document.removeEventListener('keydown', onKeyDown, true);
       if (lockScroll) body.style.overflow = previousOverflow;
       previouslyFocused?.focus();

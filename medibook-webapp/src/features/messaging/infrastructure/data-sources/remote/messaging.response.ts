@@ -22,12 +22,16 @@ export const templateResponseSchema = z.object({
   updated_at: z.string(),
 });
 
-/** `HospitalDelivery` (`schema.yml`). */
+/** `HospitalDelivery` (`schema.yml`); B7 adds `sending`, `recipient_source`, `deferred_until`. */
 export const deliveryResponseSchema = z.object({
   id: z.string(),
   channel: channelSchema,
   event_code: z.string(),
   recipient_address: z.string(),
+  recipient_source: z
+    .enum(['account', 'hospital_record', 'devices', 'staff'])
+    .nullable()
+    .optional(),
   status: z.enum(DELIVERY_STATUSES),
   rendered_subject: z.string().nullable().optional(),
   queued_at: z.string(),
@@ -35,7 +39,12 @@ export const deliveryResponseSchema = z.object({
   delivered_at: z.string().nullable().optional(),
   failed_at: z.string().nullable().optional(),
   error_message: z.string().nullable().optional(),
+  error_code: z.string().nullable().optional(),
   triggered_by_kind: z.string().nullable().optional(),
+  deferred_until: z.string().nullable().optional(),
+  provider: z.string().nullable().optional(),
+  provider_message_id: z.string().nullable().optional(),
+  attempts: z.number().int().nullable().optional(),
 });
 
 /**
@@ -73,6 +82,7 @@ export function toMessageDelivery(dto: DeliveryResponse): MessageDelivery {
     channel: dto.channel,
     eventCode: dto.event_code,
     recipientAddress: dto.recipient_address,
+    recipientSource: dto.recipient_source ?? null,
     status: dto.status,
     renderedSubject: dto.rendered_subject ?? null,
     queuedAt: dto.queued_at,
@@ -80,6 +90,11 @@ export function toMessageDelivery(dto: DeliveryResponse): MessageDelivery {
     deliveredAt: dto.delivered_at ?? null,
     failedAt: dto.failed_at ?? null,
     errorMessage: dto.error_message ?? null,
+    errorCode: dto.error_code ?? null,
     triggeredByKind: dto.triggered_by_kind ?? null,
+    deferredUntil: dto.deferred_until ?? null,
+    provider: dto.provider ?? null,
+    providerMessageId: dto.provider_message_id ?? null,
+    attempts: dto.attempts ?? null,
   };
 }

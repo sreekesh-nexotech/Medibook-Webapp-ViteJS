@@ -129,6 +129,7 @@ function TicketThread({ ticket }: { ticket: SupportTicketDetail }) {
     authorName: null,
     body: ticket.description,
     attachmentIds: [],
+    attachmentFileIds: [],
     occurredAt: ticket.createdAt,
     isInternal: false,
   };

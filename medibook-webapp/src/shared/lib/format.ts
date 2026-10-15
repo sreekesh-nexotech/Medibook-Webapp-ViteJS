@@ -196,9 +196,12 @@ export function toLocalISO(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Today's date (`yyyy-mm-dd`) on the hospital's calendar, not the device's. */
+/**
+ * The PC's own calendar date as `yyyy-mm-dd`. Hospital screens never use it:
+ * their "today" is the hospital's (`useHospitalToday`, D-09, UAT-47).
+ */
 export function todayISO(): string {
-  return calendarDate();
+  return toLocalISO(new Date());
 }
 
 /** `yyyy-mm-dd` shifted by whole days. */

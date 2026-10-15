@@ -1,7 +1,10 @@
 import { useState } from 'react';
 
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
-import { fmtDate, todayISO } from '@/shared/lib/format';
+import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
+import { fmtDate } from '@/shared/lib/format';
+import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
@@ -9,7 +12,7 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
-import { hospitalSessionOf } from '@/features/auth/application/store/auth.roles';
+
 import { useMessagingTemplatesQuery } from '@/features/messaging/application/queries/useMessagingTemplatesQuery';
 import { renderTemplate } from '@/features/messaging/application/store/messaging.logic';
 import {
@@ -22,14 +25,14 @@ import {
   DESK_SEND_EVENTS,
   channelLabel,
   eventLabel,
-  fmtLocalTime,
+  messageableAppointments,
   messagingSampleValues,
   patientChannelFromLabel,
+  templateTime,
 } from '@/features/messaging/presentation/components/messaging.labels';
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import type {
-  AppointmentStatus,
   PatientAppointment,
   PatientListParams,
   PatientRecord,
@@ -41,12 +44,8 @@ const PATIENT_PICK_LIMIT = 20;
 /** Searches shorter than this list the first patients alphabetically instead. */
 const MIN_SEARCH_CHARS = 2;
 
-/** Appointments still worth confirming or reminding about. */
-const MESSAGEABLE_STATUSES: ReadonlySet<AppointmentStatus> = new Set([
-  'pending_approval',
-  'scheduled',
-  'checked_in',
-]);
+/** Wait this long after the last keystroke before searching (05 F29). */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /** What the screen needs to confirm, then queue, one send. */
 export interface SendReview {
@@ -82,21 +81,25 @@ function patientLabel(p: PatientRecord): string {
   return `${p.fullName} · ${p.mrn}${p.phone ? ` · ${p.phone}` : ''}`;
 }
 
-function appointmentLabel(a: PatientAppointment): string {
-  return `${a.bookingRef} · ${a.doctorName} · ${fmtDate(a.scheduledDate)} ${fmtLocalTime(a.scheduledStartAt)}`;
+/** The booking as the picker lists it, its time on the hospital's clock (D-09). */
+function appointmentLabel(a: PatientAppointment, timeZone: string): string {
+  return `${a.bookingRef} · ${a.doctorName} · ${fmtDate(a.scheduledDate)} ${formatTimeIn(a.scheduledStartAt, timeZone)}`;
 }
 
-/** Upcoming, still-active appointments, soonest first. */
-function messageable(items: readonly PatientAppointment[]): readonly PatientAppointment[] {
-  const today = todayISO();
-  return items
-    .filter((a) => MESSAGEABLE_STATUSES.has(a.status) && a.scheduledDate >= today)
-    .toSorted((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
-}
-
-function destinationFor(channel: PatientChannel, patient: PatientRecord): string {
+/**
+ * Where the message will go, as the backend decides it (B7
+ * `recipient_source`): an app booking goes to the booking account's phone —
+ * not the hospital record's, which may be a dependant's or one the desk
+ * edited — and a walk-in to the hospital record's phone (UAT-65, 05 F22).
+ */
+function destinationFor(
+  channel: PatientChannel,
+  patient: PatientRecord,
+  appt: PatientAppointment | null,
+): string {
   if (channel === 'push') return "the patient's Medibook app";
-  return patient.phone ?? 'no phone on record';
+  if (appt?.source === 'online') return "the phone on the booking's Medibook account";
+  return patient.phone ? `${patient.phone} (the hospital record)` : 'no phone on record';
 }
 
 /**
@@ -109,9 +112,12 @@ function destinationFor(channel: PatientChannel, patient: PatientRecord): string
  * Nothing is queued from inside this modal — the screen confirms first.
  */
 export function SendMessageModal({ open, onClose, onReview }: SendMessageModalProps) {
-  const hospitalName = hospitalSessionOf(useSessionQuery('hospital').data)?.hospital.name;
   const [search, setSearch] = useState('');
-  const term = search.trim();
+  // Upcoming means from the hospital's today; times are its clock (D-09, UAT-47).
+  const { today, timeZone } = useHospitalToday();
+  const session = useSessionQuery('hospital').data;
+  const hospitalName = session?.surface === 'hospital' ? session.hospital.name : null;
+  const term = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const params: PatientListParams = {
     page: 1,
     pageSize: PATIENT_PICK_LIMIT,
@@ -138,7 +144,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
         eventCode: v.eventCode,
         channel: v.channel,
         patientName: patient.fullName,
-        destination: destinationFor(v.channel, patient),
+        destination: destinationFor(v.channel, patient, appt),
         bookingRef: appt.bookingRef,
       });
     },
@@ -147,7 +153,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   const patient = patients.find((p) => p.id === values.patientId) ?? null;
   const appointmentsQuery = usePatientAppointmentsQuery(values.patientId || undefined);
-  const appointments = messageable(appointmentsQuery.data?.items ?? []);
+  const appointments = messageableAppointments(appointmentsQuery.data?.items ?? [], today);
   const appt = appointments.find((a) => a.id === values.appointmentId) ?? null;
 
   const templatesQuery = useMessagingTemplatesQuery(values.channel);
@@ -155,15 +161,18 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   const rendered =
     template && appt && patient
-      ? renderTemplate(template.body, {
-          ...messagingSampleValues(hospitalName),
-          '{{patientName}}': patient.fullName,
+      ? // The values the server fills in (`messaging/services/context.py`): the
+        // patient's first name, its own date and time format, the token label.
+        renderTemplate(template.body, {
+          ...messagingSampleValues(hospitalName ?? undefined),
+          '{{patientName}}': patient.firstName,
           '{{name}}': patient.firstName,
           '{{doctorName}}': appt.doctorName,
           '{{date}}': fmtDate(appt.scheduledDate),
-          '{{time}}': fmtLocalTime(appt.scheduledStartAt),
-          '{{token}}': appt.tokenLabel ?? '—',
+          '{{time}}': templateTime(appt.scheduledStartAt, timeZone),
+          '{{token}}': appt.tokenLabel ?? '',
           '{{bookingRef}}': appt.bookingRef,
+          ...(hospitalName ? { '{{hospitalName}}': hospitalName } : {}),
         })
       : '';
 
@@ -231,10 +240,10 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           </Field>
           <Field label="Appointment" required error={form.errorFor('appointmentId')}>
             <Select
-              value={appt ? appointmentLabel(appt) : ''}
-              options={appointments.map(appointmentLabel)}
+              value={appt ? appointmentLabel(appt, timeZone) : ''}
+              options={appointments.map((a) => appointmentLabel(a, timeZone))}
               onChange={(label) => {
-                const picked = appointments.find((a) => appointmentLabel(a) === label);
+                const picked = appointments.find((a) => appointmentLabel(a, timeZone) === label);
                 form.setField('appointmentId', picked?.id ?? '');
               }}
               placeholder={appointmentPlaceholder}
@@ -258,7 +267,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           </Field>
           <Field
             label="Channel"
-            hint={patient ? `Goes to ${destinationFor(values.channel, patient)}` : undefined}
+            hint={patient ? `Goes to ${destinationFor(values.channel, patient, appt)}` : undefined}
           >
             <Select
               value={channelName}
@@ -294,6 +303,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
             subject={template?.subject ?? undefined}
             rendered={templatesQuery.isLoading ? 'Loading the template…' : rendered}
             title="This patient will receive"
+            isSample={!appt}
           />
         )}
 
@@ -302,6 +312,9 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           <span>
             Messages are queued for the gateway, not delivered from this screen — the outbox shows
             each one&apos;s status as the gateway works through it.
+            {values.channel === 'push'
+              ? ' Push messages sent between 21:00 and 08:00 wait until 08:00 hospital time.'
+              : ''}
           </span>
         </div>
       </div>

@@ -78,7 +78,9 @@ export const reportResultResponseSchema = z.object({
 export const reportExportQueuedResponseSchema = z.object({
   status: z.literal('processing'),
   export_id: z.string(),
-  rows: z.number().int(),
+  file_url: z.string().nullable().optional(),
+  rows: z.number().int().nullable().optional(),
+  max_sync_rows: z.number().int().nullable().optional(),
 });
 
 type ValueKindDto = z.infer<typeof valueKindSchema>;

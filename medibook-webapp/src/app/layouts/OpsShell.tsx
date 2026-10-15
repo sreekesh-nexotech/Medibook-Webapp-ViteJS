@@ -2,10 +2,13 @@ import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useDocumentTitle } from '@/shared/hooks/useDocumentTitle';
-import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
 import { useIdleTimeout } from '@/shared/hooks/useIdleTimeout';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { OpsSkeleton } from '@/shared/ui/OpsSkeleton';
 
+import { DEFAULT_IDLE_MINUTES } from '@/core/config/session';
+
+import { OPS_HOME_PATH } from '@/app/router/opsAccess';
 import {
   opsAccountPath,
   opsPath,
@@ -16,7 +19,6 @@ import {
 
 import type { PlatformSession } from '@/features/auth/domain/entities/auth.types';
 import { useOpsSettingsQuery } from '@/features/ops-settings/application/queries/useOpsSettingsQuery';
-import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { IdleWarningModal } from './IdleWarningModal';
@@ -49,9 +51,9 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
   const navigate = useNavigate();
   const { user } = session;
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-  // The session timeout lives in Platform Settings; a role that cannot read
-  // them keeps the default rather than failing a request on every screen.
-  const settings = useOpsSettingsQuery(useOpsPermission().can('settings.view'));
+  const { can } = useOpsPermission();
+  // Only roles that may read platform settings ask for them (UAT-35).
+  const settings = useOpsSettingsQuery(can('settings.view'));
 
   const view = opsViewFromPath(location.pathname);
   const navActive = OPS_DETAIL_PARENT[view] ?? view;
@@ -86,12 +88,15 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
   const handleLogout = onLogout;
 
   // Audit 3.7.5 — the platform's Session Timeout setting has a timer behind
-  // it, with a warning at T-60s. A role that cannot read the setting, or a
-  // console still loading it, uses the backend's default, so every platform
-  // role signs out when idle (SEC-12).
-  const idleMinutes = settings.data?.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES;
+  // it, with a warning at T-60s. The limit comes from `/platform/me` (BE-21),
+  // else from the settings for a role that may read them, else the backend's
+  // default, so every platform role signs out when idle (SEC-12). Input in any
+  // ops tab keeps every tab signed in (UAT-04).
+  const idleMinutes =
+    session.sessionTimeoutMin ?? settings.data?.sessionTimeoutMin ?? DEFAULT_IDLE_MINUTES;
   const { warning, secondsLeft, stayActive } = useIdleTimeout({
     minutes: idleMinutes,
+    surface: 'platform',
     onTimeout: handleLogout,
   });
 
@@ -127,11 +132,17 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
           <ErrorBoundary
             key={view}
             fallback={(err, reset, reference) => (
+              // `/ops` sends each role to the first screen it may open; not
+              // every platform role has the dashboard (UAT-35).
               <ScreenError
                 error={err}
                 reference={reference}
                 onRetry={reset}
-                onHome={() => handleNavigate('dashboard')}
+                homeLabel="Back to start"
+                onHome={() => {
+                  setNavOpen(false);
+                  navigate(OPS_HOME_PATH);
+                }}
               />
             )}
           >

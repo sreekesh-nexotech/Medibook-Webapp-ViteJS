@@ -32,23 +32,39 @@ const FORMULA_PREFIX = /^[=+\-@\t\r]/;
 const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
 /**
+ * Prefix that makes Excel, Sheets and LibreOffice show the cell as literal text
+ * (OWASP CSV injection, UAT-75, PHI-04).
+ */
+const FORMULA_ESCAPE = "'";
+
+/**
  * Neutralise spreadsheet formula injection the way the backend's own exports
  * do (`settlements/services/export.py`): text a spreadsheet would run as a
  * formula gets a leading apostrophe, so it opens as plain text.
  */
 export function neutraliseFormula(text: string): string {
-  return FORMULA_PREFIX.test(text) && !PLAIN_NUMBER.test(text) ? `'${text}` : text;
+  return FORMULA_PREFIX.test(text) && !PLAIN_NUMBER.test(text) ? `${FORMULA_ESCAPE}${text}` : text;
 }
 
 /**
- * RFC-4180 cell: empty for nullish, always quoted, embedded `"` doubled.
- * Quoting unconditionally means commas, newlines and leading zeros survive.
- * Text cells are formula-neutralised (PHI-04); numbers are written as they are.
+ * Neutralise a cell a spreadsheet would otherwise evaluate: user text such as
+ * a patient name `=HYPERLINK(…)` or `@SUM(…)` is prefixed with `'` so it opens
+ * as text (UAT-75, PHI-04). Numbers, and numeric strings like "-250", are left alone
+ * so amounts and refunds still sum.
+ */
+export function neutraliseCsvFormula(cell: CsvCell): string {
+  if (cell == null) return '';
+  if (typeof cell === 'number') return String(cell);
+  return FORMULA_PREFIX.test(cell) && !PLAIN_NUMBER.test(cell) ? `${FORMULA_ESCAPE}${cell}` : cell;
+}
+
+/**
+ * RFC-4180 cell: empty for nullish, always quoted, embedded `"` doubled, and
+ * formula prefixes neutralised. Quoting unconditionally means commas,
+ * newlines and leading zeros survive.
  */
 function csvCell(cell: CsvCell): string {
-  if (cell == null) return '""';
-  const text = typeof cell === 'string' ? neutraliseFormula(cell) : String(cell);
-  return `"${text.replace(/"/g, '""')}"`;
+  return `"${neutraliseCsvFormula(cell).replace(/"/g, '""')}"`;
 }
 
 /** Serialise rows to an RFC-4180 CSV body (no BOM — `downloadCsv` adds it). */
@@ -63,6 +79,20 @@ export function toCsv(rows: readonly (readonly CsvCell[])[]): string {
  */
 export function downloadTextFile(filename: string, text: string, mime = 'text/plain'): void {
   const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+}
+
+/** Download a binary file the app already holds (an XLSX or PDF export body). */
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

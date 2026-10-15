@@ -6,6 +6,7 @@ import { onboardingRepository } from '@/features/ops-hospitals/infrastructure/re
 export function rejectOnboardingCase(
   caseId: string,
   reason: string,
+  version: number | null,
 ): Promise<Result<OnboardingCaseDetail>> {
-  return onboardingRepository.rejectCase(caseId, reason);
+  return onboardingRepository.rejectCase(caseId, reason, version);
 }

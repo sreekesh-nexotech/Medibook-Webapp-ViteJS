@@ -1,19 +1,52 @@
 import { useState } from 'react';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
+import { fmtDate } from '@/shared/lib/format';
+import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { Icon } from '@/shared/ui/Icon';
 import type { IconName } from '@/shared/ui/icon-registry';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
-import type { PlatformHospitalDetail } from '@/features/ops-hospitals/domain/entities/hospitals.entity';
+import type {
+  CommissionRate,
+  PlatformHospitalDetail,
+} from '@/features/ops-hospitals/domain/entities/hospitals.entity';
+import { useCommissionHistoryQuery } from '@/features/ops-hospitals/application/queries/useCommissionHistoryQuery';
 import { HospitalCommissionModal } from '@/features/ops-hospitals/presentation/components/HospitalCommissionModal';
 import { HospitalConvenienceFeeModal } from '@/features/ops-hospitals/presentation/components/HospitalConvenienceFeeModal';
 import {
   bpCopy,
   convenienceFeeCopy,
 } from '@/features/ops-hospitals/presentation/components/hospitals.view';
+
+/** Commission-history status → [badge status, label]. */
+const RATE_STATUS: Readonly<Record<string, readonly [string, string]>> = {
+  scheduled: ['Queued', 'Scheduled'],
+  current: ['Active', 'In force'],
+  past: ['Inactive', 'Past'],
+};
+
+/** Shown in the history list at most; older rates stay in the audit log. */
+const HISTORY_ROWS = 6;
+
+function RateRow({ rate }: { rate: CommissionRate }) {
+  const [badge, label] = RATE_STATUS[rate.status] ?? ['Inactive', rate.status];
+  return (
+    <li className="border-border-soft flex flex-wrap items-center gap-3 border-b py-2.5 last:border-b-0">
+      <span className="text-body text-text-strong w-16 font-semibold tabular-nums">
+        {bpCopy(rate.commissionBp)}
+      </span>
+      <span className="text-caption text-text-muted min-w-40 flex-1">
+        from {fmtDate(rate.effectiveFrom)}
+        {rate.setByName ? ` · set by ${rate.setByName}` : ''}
+        {rate.note ? ` · ${rate.note}` : ''}
+      </span>
+      <Badge status={badge}>{label}</Badge>
+    </li>
+  );
+}
 
 interface TermProps {
   icon: IconName;
@@ -58,6 +91,10 @@ export function HospitalCommercialTermsCard({ h }: HospitalCommercialTermsCardPr
   // A closed hospital, or a role without hospitals.edit (SEC-05), cannot change these.
   const canEdit = useOpsPermission().can('hospitals.edit');
   const locked = h.status === 'closed' || !canEdit;
+  // API-01: scheduled (future-dated) and past rates, so a change "from tomorrow"
+  // is visible before it applies.
+  const history = useCommissionHistoryQuery(h.id);
+  const scheduled = history.data?.rates.find((r) => r.status === 'scheduled') ?? null;
 
   return (
     <Card>
@@ -71,7 +108,11 @@ export function HospitalCommercialTermsCard({ h }: HospitalCommercialTermsCardPr
           icon="percent"
           label="Platform commission"
           value={bpCopy(h.commissionBp)}
-          sub="Of the consultation fee, deducted at settlement."
+          sub={
+            scheduled
+              ? `Changes to ${bpCopy(scheduled.commissionBp)} from ${fmtDate(scheduled.effectiveFrom)}.`
+              : 'Of the consultation fee, deducted at settlement.'
+          }
           actionLabel="Change"
           disabled={locked}
           onAction={() => setModal('commission')}
@@ -86,6 +127,21 @@ export function HospitalCommercialTermsCard({ h }: HospitalCommercialTermsCardPr
           onAction={() => setModal('fee')}
         />
       </div>
+      {history.data && history.data.rates.length > 0 && (
+        <div className="mt-4">
+          <div className="text-caption text-text-muted mb-1 font-medium">Commission history</div>
+          <ul className="m-0 list-none p-0">
+            {history.data.rates.slice(0, HISTORY_ROWS).map((rate) => (
+              <RateRow key={rate.id} rate={rate} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {history.isError && (
+        <div className="text-caption text-text-muted mt-3">
+          The commission history could not be loaded.
+        </div>
+      )}
       {modal === 'commission' && <HospitalCommissionModal h={h} onClose={() => setModal(null)} />}
       {modal === 'fee' && <HospitalConvenienceFeeModal h={h} onClose={() => setModal(null)} />}
     </Card>

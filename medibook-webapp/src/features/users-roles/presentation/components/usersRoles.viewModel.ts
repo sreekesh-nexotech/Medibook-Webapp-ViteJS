@@ -28,10 +28,10 @@ import type {
 /* ------------------------------------------------------------------ roles */
 
 /**
- * The backend has no role colour or description (`Role` is id, code, name,
- * flags and permissions), so the screen's dot colour and one-line summary are
- * presentation copy keyed by the four fixed role codes. Colours are `@theme`
- * tokens, applied through `style` because they are chosen per row.
+ * The backend has no role colour, so the screen's dot colour is presentation
+ * copy keyed by the four fixed role codes; so is the one-line summary used
+ * until the backend's own `description` (USR-02) arrives. Colours are
+ * `@theme` tokens, applied through `style` because they are chosen per row.
  */
 const ROLE_PRESENTATION: Readonly<Record<StaffRoleCode, { color: string; desc: string }>> = {
   admin: {
@@ -74,6 +74,10 @@ export interface RoleView extends Role {
   readonly editable: boolean;
   /** The role's full permission set as the server holds it, grid or not. */
   readonly permissionCodes: readonly string[];
+  /** The backend's own description (USR-02); `null` when it has none. */
+  readonly description: string | null;
+  /** Row version for `If-Match` (USR-02); `null` on an older backend. */
+  readonly version: number | null;
 }
 
 function moduleOf(code: string): string {
@@ -130,6 +134,35 @@ export function gridToPermissionCodes(grid: PermsGrid, current: readonly string[
 }
 
 /**
+ * The role's codes for the modules outside the ten-row grid (`cash_desk.view`,
+ * …). Read from the role itself, never from the catalogue, so a catalogue
+ * that loads late (or fails) cannot make Save drop them (UAT-22).
+ */
+export function nonGridCodes(codes: readonly string[]): string[] {
+  return codes.filter((c) => !GRID_MODULE_CODES.has(moduleOf(c)));
+}
+
+/** What a set of codes grants on each module outside the grid, labelled from the catalogue. */
+export function extraModuleAccess(
+  catalogue: readonly PermissionModule[],
+  codes: readonly string[],
+): readonly { readonly module: string; readonly label: string; readonly actions: string[] }[] {
+  const held = new Set(codes);
+  return extraPermissionModules(catalogue).map((m) => ({
+    module: m.module,
+    label: m.label,
+    actions: m.actions.filter((a) => held.has(`${m.module}.${a}`)),
+  }));
+}
+
+/** The preview's modules outside the grid (Cash Desk, …), as the server labels them. */
+export function previewExtraModules(
+  modules: readonly RolePreviewModule[],
+): readonly RolePreviewModule[] {
+  return modules.filter((m) => !GRID_MODULE_CODES.has(m.module));
+}
+
+/**
  * Catalogue modules the ten-row grid does not have (on the test backend:
  * Cash Desk, Patient Approvals, Display Devices). The role editor lists them
  * under the grid so they can be seen and changed, not only carried over.
@@ -140,9 +173,14 @@ export function extraPermissionModules(
   return catalogue.filter((m) => !GRID_MODULE_CODES.has(m.module));
 }
 
-/** How many catalogue modules a permission set touches at all. */
-export function modulesHeld(codes: readonly string[]): number {
-  return new Set(codes.map(moduleOf)).size;
+/**
+ * How many modules a permission set touches. Without the catalogue only the
+ * grid's ten are counted, so the card never reads "13/10" (08 F9).
+ */
+export function modulesHeld(codes: readonly string[], gridOnly = false): number {
+  const modules = new Set(codes.map(moduleOf));
+  if (!gridOnly) return modules.size;
+  return [...modules].filter((m) => GRID_MODULE_CODES.has(m)).length;
 }
 
 export function toRoleView(role: StaffRole): RoleView {
@@ -152,7 +190,9 @@ export function toRoleView(role: StaffRole): RoleView {
     code: role.code,
     name: role.name,
     color: look.color,
-    desc: look.desc,
+    desc: role.description ?? look.desc,
+    description: role.description,
+    version: role.version,
     system: !role.editable,
     editable: role.editable,
     perms: toPermsGrid(role.permissions),
@@ -171,6 +211,8 @@ export interface UserRow {
   readonly kind: 'staff' | 'invitation';
   /** Staff id or invitation id, per `kind`. */
   readonly id: string;
+  /** The staff member's user id (to know the signed-in user's own row); `null` for invitations. */
+  readonly userId: string | null;
   readonly name: string;
   readonly email: string;
   readonly phone: string;
@@ -217,6 +259,7 @@ export function staffToRow(s: StaffMember): UserRow {
     key: `staff:${s.id}`,
     kind: 'staff',
     id: s.id,
+    userId: s.userId,
     name: fullName(s.firstName, s.lastName),
     email: s.email ?? NO_VALUE,
     phone: s.phone ?? NO_VALUE,
@@ -239,16 +282,17 @@ export function staffToRow(s: StaffMember): UserRow {
 }
 
 /**
- * An invitation is listed as `invited` until the same email is invited again
- * (BACKEND_BLOCKERS USR-01), so whether its link still works comes from
- * `expires_at`, compared with `now` (epoch ms).
+ * Whether an invitation's link no longer works: the backend says `expired`
+ * (USR-01), or — on an older backend that keeps saying `invited` — its
+ * `expires_at` has passed at `now` (epoch ms).
  */
 export function invitationToRow(i: StaffInvitation, now: number): UserRow {
-  const expired = Date.parse(i.expiresAt) <= now;
+  const expired = i.status === 'expired' || Date.parse(i.expiresAt) <= now;
   return {
     key: `invitation:${i.id}`,
     kind: 'invitation',
     id: i.id,
+    userId: null,
     name: fullName(i.firstName, i.lastName),
     email: i.email,
     phone: i.phone ?? NO_VALUE,
@@ -314,6 +358,11 @@ export function splitFullName(name: string): { firstName: string; lastName: stri
 }
 
 /* ----------------------------------------------------------------- errors */
+
+/** True while `row` is the signed-in user's own membership (B2 refuses self role changes). */
+export function isOwnRow(row: UserRow, myUserId: string | null): boolean {
+  return row.kind === 'staff' && myUserId !== null && row.userId === myUserId;
+}
 
 /**
  * The user-safe sentence for a failed request: the first field message of a

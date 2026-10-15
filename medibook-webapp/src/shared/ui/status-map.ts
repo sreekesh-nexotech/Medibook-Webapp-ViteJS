@@ -2,8 +2,8 @@
  * Status pill palette — every hospital-side status from the design's `ui.jsx`
  * STATUS map plus the ops-console extension `Ops.jsx` applies on top
  * (`Object.assign(STATUS, {...})`), translated from CSS variables to Tailwind
- * class pairs. Consumed by `Badge`; unknown statuses fall back to Scheduled
- * styling inside `Badge`, exactly like the prototype.
+ * class pairs. Consumed by `Badge`; an unknown status falls back to a neutral
+ * pill inside `Badge` (not Scheduled blue, UAT-76).
  *
  * Badge text is 12.5px, so every pair here must clear 4.5:1. The neutral
  * pills use `text-grey-900` on `bg-grey-300` (6.90:1) rather than

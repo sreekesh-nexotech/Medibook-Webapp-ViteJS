@@ -7,6 +7,10 @@ import type {
   HolidayWriteRequest,
 } from '@/features/settings/infrastructure/data-sources/remote/profile.request';
 import type {
+  HolidayRef,
+  HolidayWriteMode,
+} from '@/features/settings/domain/entities/profile.entities';
+import type {
   BannerResponse,
   HolidayResponse,
   ScheduleChangeResponse,
@@ -21,15 +25,23 @@ import {
 /**
  * Hospital Profile endpoints (`/api/v1/hospital/…`). Every body is
  * Zod-validated. Holiday writes are dry-run/confirm and declared idempotent
- * server-side, so each carries a fresh `Idempotency-Key` (the backend
- * requires one on every holiday POST/PATCH/DELETE, dry run included).
+ * server-side: each carries the caller's `Idempotency-Key` (fresh per dry
+ * run, one per confirmed action — 07·P-F9) and an edit carries `If-Match`
+ * (the backend's `require_version`, kept by decision 10 — UAT-05).
  */
 
 const HOLIDAYS_PATH = '/holidays';
 const BANNERS_PATH = '/banners';
 
-function confirmParams(confirm: boolean): Readonly<Record<string, string>> {
-  return confirm ? { confirm: 'true' } : {};
+/** Query parameter carrying the dry run's preview token on confirm (BE-33). */
+const PREVIEW_TOKEN_PARAM = 'preview_token';
+
+function writeParams(mode: HolidayWriteMode): Readonly<Record<string, string>> {
+  if (!mode.confirm) return {};
+  return {
+    confirm: 'true',
+    ...(mode.previewToken ? { [PREVIEW_TOKEN_PARAM]: mode.previewToken } : {}),
+  };
 }
 
 export async function listHolidays(): Promise<readonly HolidayResponse[]> {
@@ -41,40 +53,39 @@ export async function listHolidays(): Promise<readonly HolidayResponse[]> {
 
 export async function postHoliday(
   body: HolidayWriteRequest,
-  confirm: boolean,
-  replayKey: string,
+  mode: HolidayWriteMode,
 ): Promise<ScheduleChangeResponse> {
   const response = await hospitalApi.post(HOLIDAYS_PATH, body, {
-    params: confirmParams(confirm),
-    headers: idempotencyKey(replayKey),
+    params: writeParams(mode),
+    headers: idempotencyKey(mode.idempotencyKey),
   });
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
-/** `If-Match` is mandatory here: a stale screen gets 409 instead of overwriting (DATA-05). */
 export async function patchHoliday(
-  id: string,
+  holiday: HolidayRef,
   body: HolidayWriteRequest,
-  confirm: boolean,
-  version: number,
-  replayKey: string,
+  mode: HolidayWriteMode,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.patch(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, body, {
-    params: confirmParams(confirm),
-    headers: { ...ifMatch(version), ...idempotencyKey(replayKey) },
-  });
+  const response = await hospitalApi.patch(
+    `${HOLIDAYS_PATH}/${encodeURIComponent(holiday.id)}`,
+    body,
+    {
+      params: writeParams(mode),
+      headers: { ...ifMatch(holiday.version), ...idempotencyKey(mode.idempotencyKey) },
+    },
+  );
   return scheduleChangeResponseSchema.parse(response.data);
 }
 
+/** DELETE honours `If-Match` when sent (`check_version_if_sent`): a stale row is refused. */
 export async function deleteHoliday(
-  id: string,
-  confirm: boolean,
-  version: number,
-  replayKey: string,
+  holiday: HolidayRef,
+  mode: HolidayWriteMode,
 ): Promise<ScheduleChangeResponse> {
-  const response = await hospitalApi.delete(`${HOLIDAYS_PATH}/${encodeURIComponent(id)}`, {
-    params: confirmParams(confirm),
-    headers: { ...ifMatch(version), ...idempotencyKey(replayKey) },
+  const response = await hospitalApi.delete(`${HOLIDAYS_PATH}/${encodeURIComponent(holiday.id)}`, {
+    params: writeParams(mode),
+    headers: { ...ifMatch(holiday.version), ...idempotencyKey(mode.idempotencyKey) },
   });
   return scheduleChangeResponseSchema.parse(response.data);
 }

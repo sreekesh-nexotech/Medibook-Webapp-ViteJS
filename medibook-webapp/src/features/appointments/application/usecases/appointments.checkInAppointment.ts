@@ -5,7 +5,7 @@ import { appointmentsRepository } from '@/features/appointments/infrastructure/r
 
 export function checkInAppointment(
   id: string,
-  replayKey: string,
+  idempotencyKey: string,
 ): Promise<Result<DeskAppointment>> {
-  return appointmentsRepository.checkIn(id, replayKey);
+  return appointmentsRepository.checkIn(id, idempotencyKey);
 }

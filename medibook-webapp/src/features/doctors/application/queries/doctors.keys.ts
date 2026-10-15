@@ -7,4 +7,5 @@ export const doctorsKeys = {
   schedule: (id: string) => [...doctorsKeys.all, 'schedule', id] as const,
   scheduleHistory: (id: string) => [...doctorsKeys.all, 'schedule-history', id] as const,
   photo: (fileId: string) => [...doctorsKeys.all, 'photo', fileId] as const,
+  reviews: (id: string, page: number) => [...doctorsKeys.all, 'reviews', id, page] as const,
 };

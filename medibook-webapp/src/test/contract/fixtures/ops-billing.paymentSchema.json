@@ -1,0 +1,20 @@
+{
+  "id": "01a118b8-9535-7062-98d5-9afb98d02a4a",
+  "invoice_id": "01a118b8-9519-7a50-a32b-017dfaaf64e8",
+  "invoice_no": "INV-2026-0009",
+  "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "plan_name": "Growth",
+  "amount_paise": 597803,
+  "method": "credit_note",
+  "gateway_payment_id": null,
+  "status": "captured",
+  "attempt_no": 1,
+  "attempted_at": "2026-10-07T23:35:12.436799Z",
+  "captured_at": "2026-10-07T23:35:12.436799Z",
+  "failure_reason": null,
+  "reference_note": "CN-26-27-0001",
+  "recorded_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+  "recorded_by_name": "Farah Khan",
+  "created_at": "2026-10-07T23:35:12.437694Z"
+}

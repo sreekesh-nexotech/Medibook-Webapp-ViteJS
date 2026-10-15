@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { referenceOf } from '@/core/error/reference';
-import { clientFailure, toFailure } from '@/core/error/toFailure';
+import { clientFailure, isHospitalWriteBlock, toFailure } from '@/core/error/toFailure';
+
 
 function httpError(status: number, data: unknown): AxiosError {
   const config = { headers: new AxiosHeaders() };
@@ -66,6 +67,29 @@ describe('toFailure', () => {
     });
   });
 
+  it('flattens nested and per-item field errors into dotted paths (UAT-48)', () => {
+    const failure = toFailure(
+      httpError(
+        400,
+        envelope('VALIDATION_ERROR', 'Some fields are invalid.', {
+          errors: {
+            booking: { prefix: ['Another hospital already uses this prefix.'] },
+            lines: [{}, { amount_paise: ['Must be positive.'] }],
+            scopes: ['Pick at least one.', { service_id: 'Unknown service.' }],
+            'If-Match': ['This header is required (the record version).'],
+          },
+        }),
+      ),
+    );
+    expect(failure.fieldErrors).toEqual({
+      'booking.prefix': ['Another hospital already uses this prefix.'],
+      'lines.1.amount_paise': ['Must be positive.'],
+      scopes: ['Pick at least one.'],
+      'scopes.1.service_id': ['Unknown service.'],
+      'If-Match': ['This header is required (the record version).'],
+    });
+  });
+
   it('never shows a server error’s own message to the user', () => {
     const failure = toFailure(httpError(500, envelope('INTERNAL', 'Traceback: db password…')));
     expect(failure.kind).toBe('server');
@@ -108,6 +132,26 @@ describe('toFailure', () => {
 
   it('treats anything else as unknown', () => {
     expect(toFailure(new Error('boom')).kind).toBe('unknown');
+  });
+});
+
+describe('hospital write blocks (UAT-38)', () => {
+  it('words a read-only hospital as such, not as a permission problem', () => {
+    const failure = toFailure(
+      httpError(403, envelope('HOSPITAL_READ_ONLY', 'This hospital is in read-only mode.')),
+    );
+    expect(failure.kind).toBe('forbidden');
+    expect(failure.message).toContain('read-only until its Medibook subscription is paid');
+    expect(isHospitalWriteBlock(failure)).toBe(true);
+  });
+
+  it('words a suspended hospital, and leaves other 403s alone', () => {
+    const suspended = toFailure(httpError(403, envelope('HOSPITAL_SUSPENDED', 'Suspended.')));
+    expect(suspended.message).toContain('suspended by Medibook operations');
+    expect(isHospitalWriteBlock(suspended)).toBe(true);
+    const denied = toFailure(httpError(403, envelope('PERMISSION_DENIED', 'No.')));
+    expect(denied.message).toBe('No.');
+    expect(isHospitalWriteBlock(denied)).toBe(false);
   });
 });
 

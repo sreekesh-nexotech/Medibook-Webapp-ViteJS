@@ -1,12 +1,13 @@
-import { useId, type ReactNode } from 'react';
+import { useId, type HTMLInputAutoCompleteAttribute, type ReactNode } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 
 /**
  * Labelled auth input with an optional trailing adornment (the password
- * show/hide eye), ported 1:1 from the design `Auth.jsx` `AuthField`. The label
- * names the input (A11Y-04), and `autoComplete` lets password managers fill
- * the sign-in form.
+ * show/hide eye), ported 1:1 from the design `Auth.jsx` `AuthField`. The
+ * label is tied to the input (`htmlFor`), so screen readers announce it and
+ * a click on the label focuses the field (01·F4, A11Y-04), and `autoComplete`
+ * lets password managers fill the sign-in form.
  */
 interface AuthFieldProps {
   label: string;
@@ -14,8 +15,8 @@ interface AuthFieldProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   type?: string;
-  /** e.g. `username`, `current-password`, `new-password`. */
-  autoComplete?: string;
+  /** Lets password managers fill and submit the form (`email`, `current-password`, …). */
+  autoComplete?: HTMLInputAutoCompleteAttribute;
   /** Trailing adornment rendered inside the field (e.g. the eye toggle). */
   trailing?: ReactNode;
 }

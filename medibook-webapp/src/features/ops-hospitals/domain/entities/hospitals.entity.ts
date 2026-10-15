@@ -10,8 +10,12 @@ export type HospitalLifecycle = 'draft' | 'onboarding' | 'active' | 'suspended' 
 export type HospitalSuspensionReason =
   'non_payment' | 'non_payment_read_only' | 'compliance' | 'manual' | 'onboarding_rejected';
 
-/** The reasons an operator may pick by hand (`non_payment_read_only` is set by dunning only). */
-export type HospitalSuspendReason = Exclude<HospitalSuspensionReason, 'non_payment_read_only'>;
+/**
+ * The reasons an operator may pick by hand (`PlatformHospitalSuspendSerializer`):
+ * `non_payment_read_only` is set by dunning only and `onboarding_rejected` by
+ * rejecting the onboarding case (decision 9).
+ */
+export type HospitalSuspendReason = 'non_payment' | 'compliance' | 'manual';
 
 /** Onboarding-case stage (backend `OnboardingCase.Stage`). */
 export type HospitalOnboardingStage =
@@ -52,15 +56,30 @@ export interface PlatformHospital {
   readonly convenienceFeeValue: number;
   /** ISO timestamp the instance went live, or `null` while onboarding. */
   readonly goLiveAt: string | null;
+  /** IANA zone the hospital works in (`Asia/Kolkata`); `null` when the server does not say. */
+  readonly timezone: string | null;
   readonly createdAt: string;
   readonly version: number;
+  /*
+   * Registry extras (BE-29). `null` when the server sends none — an older
+   * backend, or a hospital without a subscription / case / suspension.
+   */
+  readonly planName: string | null;
+  readonly planCode: string | null;
+  readonly subscriptionStatus: string | null;
+  /** Live bookings in the last 30 days. */
+  readonly bookings30d: number | null;
+  readonly onboardingStage: HospitalOnboardingStage | null;
+  /** The newest active suspension's reason (e.g. `onboarding_rejected`). */
+  readonly suspensionReason: HospitalSuspensionReason | null;
 }
 
 /** Current plan subscription of a hospital. */
 export interface HospitalSubscription {
   readonly id: string;
   readonly planId: string;
-  readonly planCode: string;
+  readonly planCode: string | null;
+  readonly planName: string | null;
   readonly status: string;
   readonly billingPeriod: string;
   readonly trialEndsAt: string | null;
@@ -78,6 +97,8 @@ export interface HospitalUsageMeter {
 export interface HospitalActiveSuspension {
   readonly id: string;
   readonly reason: HospitalSuspensionReason;
+  /** The operator's note, when one was recorded. */
+  readonly note: string | null;
   readonly suspendedAt: string;
 }
 
@@ -88,14 +109,65 @@ export interface HospitalGoLiveBlocker {
   readonly details: readonly string[];
 }
 
+/** Status of the first administrator's invitation (`HospitalAdminInvitation.Status`). */
+export type FirstAdminInvitationStatus = 'invited' | 'accepted' | 'expired' | 'revoked';
+
+/** The first administrator's invitation as ops sees it (CORE-04). */
+export interface FirstAdminInvitation {
+  readonly id: string;
+  readonly email: string;
+  readonly firstName: string;
+  readonly lastName: string | null;
+  /** `invited` past its expiry reads as `expired`. Unknown values are kept as sent. */
+  readonly status: FirstAdminInvitationStatus | string;
+  readonly invitedAt: string;
+  readonly lastSentAt: string;
+  readonly expiresAt: string;
+  readonly resendCount: number;
+  readonly maxResends: number;
+  readonly acceptedAt: string | null;
+  /** Some administrator has accepted (this invitation or another). */
+  readonly adminAccepted: boolean;
+  readonly canResend: boolean;
+}
+
+/** Re-issue the first-admin invitation, optionally to corrected details. */
+export interface FirstAdminResend {
+  readonly email?: string;
+  readonly firstName?: string;
+  readonly lastName?: string | null;
+}
+
+/** A hospital payout account as the platform sees it — never the full number. */
+export interface HospitalBankAccount {
+  readonly id: string;
+  readonly accountHolder: string;
+  readonly bankName: string;
+  readonly ifsc: string;
+  readonly accountNumberMasked: string;
+  readonly upiIdMasked: string | null;
+  readonly isPrimary: boolean;
+  /** Set once platform finance verified it (M-45); unverified primaries are skipped by payouts. */
+  readonly verifiedAt: string | null;
+  readonly createdAt: string;
+}
+
 /** The full platform profile of one hospital (`GET /platform/hospitals/{id}`). */
 export interface PlatformHospitalDetail extends PlatformHospital {
   readonly subscription: HospitalSubscription | null;
   readonly usage: Readonly<Partial<Record<HospitalUsageMetric, HospitalUsageMeter>>>;
-  readonly onboarding: { readonly id: string; readonly stage: HospitalOnboardingStage } | null;
+  readonly onboarding: {
+    readonly id: string;
+    readonly stage: HospitalOnboardingStage;
+    readonly rejectionReason: string | null;
+  } | null;
   readonly staffCount: number;
   readonly activeSuspensions: readonly HospitalActiveSuspension[];
   readonly goLiveBlockers: readonly HospitalGoLiveBlocker[];
+  /** `null` when never invited, or when the server does not report it. */
+  readonly firstAdminInvitation: FirstAdminInvitation | null;
+  /** Masked payout accounts; `null` when the server does not report them. */
+  readonly bankAccounts: readonly HospitalBankAccount[] | null;
 }
 
 /** Server-side list query: 1-based page, search, filters and sort. */
@@ -134,8 +206,10 @@ export interface HospitalCreateInput {
   readonly slug: string;
   readonly name: string;
   readonly email: string;
-  /** E.164, e.g. `+919876543210`. */
+  /** E.164, e.g. `+919876543210` or a landline `+914842701000`. */
   readonly phoneE164: string;
+  /** IANA zone the hospital works in; omitted = the server default. */
+  readonly timezone?: string;
   readonly addressLine1: string;
   readonly city: string;
   readonly state: string;
@@ -176,6 +250,8 @@ export interface HospitalProfileChanges {
   readonly city?: string;
   readonly state?: string;
   readonly pincode?: string;
+  /** Fixed once the hospital is live (L-20). */
+  readonly timezone?: string;
   readonly onlineBookingEnabled?: boolean;
 }
 
@@ -192,4 +268,37 @@ export interface HospitalConvenienceFeeChange {
   readonly kind: ConvenienceFeeKind;
   /** Paise when flat; basis points (0–10000) when percent. */
   readonly value: number;
+}
+
+/** One commission rate in the hospital's history (API-01, Q9). */
+export interface CommissionRate {
+  readonly id: string;
+  readonly commissionBp: number;
+  /** ISO date, hospital-local. */
+  readonly effectiveFrom: string;
+  /** `scheduled` (future-dated), `current` (in force today) or `past`. */
+  readonly status: string;
+  readonly note: string | null;
+  readonly setByName: string | null;
+  readonly createdAt: string;
+}
+
+/** Every rate set for a hospital, newest `effectiveFrom` first. */
+export interface CommissionHistory {
+  /** The hospital-local today the statuses were worked out on. */
+  readonly today: string | null;
+  readonly rates: readonly CommissionRate[];
+}
+
+/** A payout account as platform finance verifies it (M-45, decision 4). */
+export interface PayoutBankAccount {
+  readonly id: string;
+  readonly accountHolder: string;
+  readonly bankName: string;
+  readonly ifsc: string;
+  readonly accountNumberMasked: string;
+  readonly upiId: string | null;
+  readonly isPrimary: boolean;
+  readonly verifiedAt: string | null;
+  readonly version: number;
 }

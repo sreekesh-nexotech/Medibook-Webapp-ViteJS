@@ -24,18 +24,22 @@ interface MessagePreviewProps {
   rendered: string;
   /** Heading above the bubble. Default "Preview". */
   title?: string;
+  /** Filled with sample values (the template library) rather than one patient's own. */
+  isSample?: boolean;
 }
 
 /**
- * What the patient would actually see, rendered with sample data — the live
- * preview audit HA-11 asks for, plus the character / segment count that makes
- * an SMS template's cost visible while it is being written.
+ * What the patient would actually see — with sample values in the template
+ * library, with the appointment's own values before a send (UAT-65) — plus
+ * the character and segment count, so a long SMS is visible. Hospitals are
+ * never billed for messages (Q109), so nothing here talks about cost.
  */
 export function MessagePreview({
   channel,
   subject,
   rendered,
   title = 'Preview',
+  isSample = true,
 }: MessagePreviewProps) {
   const limit = channelCharLimit(channel);
   const overLimit = limit != null && rendered.length > limit;
@@ -46,7 +50,8 @@ export function MessagePreview({
       <div className="mb-2 flex items-center gap-2">
         <Icon name={CHANNEL_ICON[channel]} size={15} className="text-text-muted" />
         <span className="text-caption text-text-muted">
-          {title} · {channel} · rendered with sample data
+          {title} · {channel}
+          {isSample ? ' · sample values' : ''}
         </span>
       </div>
       <div className="border-border-soft rounded-md border bg-white px-3.5 py-3">
@@ -68,7 +73,7 @@ export function MessagePreview({
         </span>
         {channel === 'SMS' && (
           <span className="text-caption text-text-muted">
-            {segments} SMS {segments === 1 ? 'segment' : 'segments'} billed
+            {segments} SMS {segments === 1 ? 'segment' : 'segments'}
           </span>
         )}
         {overLimit && channel === 'Push' && (

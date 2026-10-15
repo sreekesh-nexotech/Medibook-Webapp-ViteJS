@@ -33,7 +33,7 @@ export function RequirePermission({
   roleLabel,
 }: RequirePermissionProps) {
   const { role: roleParam } = useParams();
-  const { canAll, canAny } = usePermission();
+  const { canAll, canAny, writeBlock } = usePermission();
 
   if (requireAdminRole && roleParam !== 'admin') {
     return <ForbiddenScreen requiredRole={roleLabel ?? 'Administrator'} />;
@@ -43,6 +43,21 @@ export function RequirePermission({
     const keys: readonly PermissionKey[] = typeof perm === 'string' ? [perm] : perm;
     const allowed = all ? canAll(...keys) : canAny(...keys);
     if (!allowed) {
+      // A write screen (New Appointment) refused because the hospital is
+      // read-only or suspended is not a role problem: say so (UAT-38).
+      const isWriteScreen = keys.some((key) => !key.endsWith('.view'));
+      if (writeBlock !== null && isWriteScreen) {
+        return (
+          <ForbiddenScreen
+            title={
+              writeBlock === 'suspended'
+                ? 'This hospital is suspended'
+                : 'This hospital is read-only right now'
+            }
+            message="You can view records, but nothing can be created or changed until the hospital is active again."
+          />
+        );
+      }
       return (
         <ForbiddenScreen
           requiredRole={roleLabel}

@@ -1,73 +1,54 @@
 import { cn } from '@/shared/lib/cn';
-import { FilterSelect } from '@/shared/ui/FilterSelect';
 import { Icon } from '@/shared/ui/Icon';
-
-import { HOSPITAL_ROLES, type HospitalRole } from '@/app/router/paths';
 
 import type { PermsGrid } from '@/features/users-roles/application/store/rbac.types';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
 import {
   ACTION_LABEL,
   buildRoleAccessPreview,
-  type PreviewNavItem,
 } from '@/features/users-roles/presentation/components/access-preview';
 
-/** Sign-in role labels, as the topbar switcher names them. */
-const SIGN_IN_LABEL: Readonly<Record<HospitalRole, string>> = {
-  admin: 'Administrator sign-in',
-  receptionist: 'Front desk sign-in',
-};
-
-const SIGN_IN_OPTIONS: readonly string[] = HOSPITAL_ROLES.map((r) => SIGN_IN_LABEL[r]);
-
-function signInFromLabel(label: string): HospitalRole {
-  return HOSPITAL_ROLES.find((r) => SIGN_IN_LABEL[r] === label) ?? 'receptionist';
+/** A module outside the ten-row grid (Cash Desk, Patient Approvals, Display Devices). */
+export interface ExtraModuleAccess {
+  readonly module: string;
+  readonly label: string;
+  readonly actions: readonly string[];
 }
 
-/** One sentence saying why a screen is out of reach, in the role's own terms. */
-function denialReason(item: PreviewNavItem, signInAs: HospitalRole): string {
-  if (item.reason === 'permission' && item.needs) return `needs ${item.needs}`;
-  if (item.reason === 'role') return `${SIGN_IN_LABEL[signInAs]} cannot open this URL`;
-  return 'not available to this role';
-}
+const EXTRA_ACTION_LABEL: Readonly<Record<string, string>> = ACTION_LABEL;
 
 interface RoleAccessPreviewProps {
   roleName: string;
   /** Concrete role colour from the store — data-driven, hence `style`. */
   roleColor?: string;
   perms: PermsGrid;
-  signInAs: HospitalRole;
-  /** Omit to render the sign-in role as a read-only line instead of a picker. */
-  onSignInAsChange?: (role: HospitalRole) => void;
+  /** What the role holds on the modules the grid does not show (UAT-23, 08 F10). */
+  extraModules?: readonly ExtraModuleAccess[];
   /** Single-column layout for the role-editor drawer. */
   compact?: boolean;
 }
 
 /**
  * "What this role actually sees" — the demonstrable half of audit 2.4 / X-01 /
- * Q-03. Given a permission grid and a sign-in role it renders the sidebar the
- * role gets, the actions it holds per module, and the screens it is refused
- * with the exact permission key each denial is missing.
+ * Q-03. Given a permission grid it renders the sidebar the role gets, the
+ * actions it holds per module (the three modules outside the grid included),
+ * and the screens it is refused with the exact permission each one needs.
  *
- * Everything comes from `buildRoleAccessPreview`, which reads the same
- * `NAV_MODEL` role gate and the same `perms[module].view` check the live
- * sidebar and route guards use — so ticking a box in the permission grid
- * changes this panel on the same render, and the preview cannot drift from the
- * real behaviour.
+ * Everything comes from `buildRoleAccessPreview`, which applies the one gate
+ * the app has — the role's permission for the screen's module, as the
+ * sidebar and route guards apply it (UAT-23). Ticking a box in the grid
+ * changes this panel on the same render.
  */
 export function RoleAccessPreview({
   roleName,
   roleColor,
   perms,
-  signInAs,
-  onSignInAsChange,
+  extraModules = [],
   compact = false,
 }: RoleAccessPreviewProps) {
-  const preview = buildRoleAccessPreview(perms, signInAs);
+  const preview = buildRoleAccessPreview(perms);
   const total = preview.visible.length + preview.denied.length;
-  // Screens the grid allows but the URL-role gate refuses — the X-01 gap: the
-  // topbar switcher can only sign in as receptionist or admin.
-  const roleGated = preview.denied.filter((i) => i.reason === 'role');
+  const extras = extraModules.filter((m) => m.actions.length > 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,34 +62,12 @@ export function RoleAccessPreview({
         <span className="text-caption text-text-muted">
           sees {preview.visible.length} of {total} screens
         </span>
-        <span className="flex-1" />
-        {onSignInAsChange ? (
-          <FilterSelect
-            value={SIGN_IN_LABEL[signInAs]}
-            options={SIGN_IN_OPTIONS}
-            onChange={(label) => onSignInAsChange(signInFromLabel(label))}
-            aria-label="Preview this role at which sign-in"
-          />
-        ) : (
-          <span className="text-caption text-text-muted">{SIGN_IN_LABEL[signInAs]}</span>
-        )}
       </div>
-
-      {roleGated.length > 0 && (
-        <div className="text-caption text-y-700 bg-y-100 flex items-start gap-2 rounded-md px-3 py-2.25">
-          <Icon name="info" size={15} className="mt-px flex-none" />
-          <span>
-            {roleGated.length} {roleGated.length === 1 ? 'screen is' : 'screens are'} granted by
-            this role&apos;s permissions but sit behind the administrator sign-in —{' '}
-            {roleGated.map((i) => i.label).join(', ')}. Switch the sign-in above to see them.
-          </span>
-        </div>
-      )}
 
       {preview.isLockedOut && (
         <div className="text-caption text-d-700 bg-d-100 flex items-center gap-2 rounded-md px-3 py-2.25">
-          <Icon name="triangle-alert" size={15} className="flex-none" /> This role cannot open a
-          single screen — grant View on at least one module.
+          <Icon name="triangle-alert" size={15} className="flex-none" /> This role cannot open any
+          working screen — grant View on at least one module.
         </div>
       )}
 
@@ -147,7 +106,7 @@ export function RoleAccessPreview({
           <h4 className="text-caption text-text-navy mb-2.5 font-semibold uppercase">
             Actions it gets
           </h4>
-          {preview.moduleActions.length === 0 ? (
+          {preview.moduleActions.length === 0 && extras.length === 0 ? (
             <span className="text-caption text-text-muted">No actions on any module.</span>
           ) : (
             <div className="flex flex-col gap-2">
@@ -160,6 +119,19 @@ export function RoleAccessPreview({
                       className="text-tiny bg-bg-tint text-text-navy rounded-full px-2 py-0.5 font-semibold"
                     >
                       {ACTION_LABEL[a]}
+                    </span>
+                  ))}
+                </div>
+              ))}
+              {extras.map((m) => (
+                <div key={m.module} className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-caption text-text-strong font-medium">{m.label}</span>
+                  {m.actions.map((a) => (
+                    <span
+                      key={a}
+                      className="text-tiny bg-bg-tint text-text-navy rounded-full px-2 py-0.5 font-semibold"
+                    >
+                      {EXTRA_ACTION_LABEL[a] ?? a}
                     </span>
                   ))}
                 </div>
@@ -183,7 +155,9 @@ export function RoleAccessPreview({
                   <Icon name="lock" size={13} className="text-text-muted mt-0.5 flex-none" />
                   <span>
                     <b className="text-text-strong font-semibold">{i.label}</b>{' '}
-                    <span className="text-text-muted">— {denialReason(i, signInAs)}</span>
+                    <span className="text-text-muted">
+                      — needs {i.needs ?? 'a permission this role does not have'}
+                    </span>
                   </span>
                 </li>
               ))}

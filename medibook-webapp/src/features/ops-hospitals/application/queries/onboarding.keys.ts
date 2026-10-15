@@ -1,11 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query';
 
+import type { OnboardingListQuery } from '@/features/ops-hospitals/domain/entities/onboarding.entity';
 import { hospitalsKeys } from '@/features/ops-hospitals/application/queries/hospitals.keys';
 
 /** Query keys for the onboarding pipeline (P3) — standards §4, no inline key arrays. */
 export const onboardingKeys = {
   all: ['ops-onboarding'] as const,
   cases: () => [...onboardingKeys.all, 'cases'] as const,
+  caseList: (query: OnboardingListQuery) => [...onboardingKeys.cases(), query] as const,
   case: (caseId: string) => [...onboardingKeys.all, 'case', caseId] as const,
   requirements: () => [...onboardingKeys.all, 'requirements'] as const,
 };

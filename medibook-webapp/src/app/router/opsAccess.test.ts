@@ -66,3 +66,43 @@ describe('ops access without a platform session', () => {
     expect(opsHomePath(checks)).toBe('/ops/account');
   });
 });
+
+/** Backend `PLATFORM_ROLES.support` (`core/seeds/v1.py`). */
+const SUPPORT = [
+  'support.view',
+  'support.add',
+  'support.edit',
+  'support.del',
+  'hospitals.view',
+  'platform_users.view',
+  'logs.view',
+  'notifications.add',
+  'notifications.edit',
+];
+
+describe('ops access to the screens added for UAT report §8', () => {
+  it('keeps patient-app content behind settings.view', () => {
+    expect(canOpenOpsView('content', opsPermissionChecks(['settings.view']))).toBe(true);
+    expect(canOpenOpsView('content', opsPermissionChecks(SUPPORT))).toBe(false);
+  });
+
+  it('lets support moderate reviews (notifications.edit), not read-only roles', () => {
+    expect(canOpenOpsView('reviews', opsPermissionChecks(SUPPORT))).toBe(true);
+    expect(canOpenOpsView('reviews', opsPermissionChecks(['notifications.view']))).toBe(false);
+  });
+
+  it('keeps message templates and onboarding documents behind settings.view', () => {
+    for (const view of ['message-templates', 'onboarding-documents'] as const) {
+      expect(canOpenOpsView(view, opsPermissionChecks(['settings.view']))).toBe(true);
+      expect(canOpenOpsView(view, opsPermissionChecks(SUPPORT))).toBe(false);
+    }
+  });
+
+  it('opens the support desk to support.view (support, read-only), not finance', () => {
+    expect(canOpenOpsView('support', opsPermissionChecks(SUPPORT))).toBe(true);
+    expect(canOpenOpsView('support', opsPermissionChecks(['support.view']))).toBe(true);
+    expect(canOpenOpsView('support', opsPermissionChecks(['billing.view', 'hospitals.view']))).toBe(
+      false,
+    );
+  });
+});

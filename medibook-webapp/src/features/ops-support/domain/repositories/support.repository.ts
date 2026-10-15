@@ -6,22 +6,24 @@ import type {
   SupportTicketDetail,
   TicketChanges,
   TicketListParams,
+  TicketListQuery,
   TicketMessage,
   TicketReply,
 } from '@/features/ops-support/domain/entities/support.entities';
 
-/** The ops console's support inbox. */
+/** The platform support desk (`support.view` / `.add` / `.edit`). */
 export interface SupportRepository {
-  listTickets(params: TicketListParams): Promise<Result<Page<SupportTicket>>>;
+  listTickets(query: TicketListQuery | TicketListParams): Promise<Result<Page<SupportTicket>>>;
   /** How many tickets have one of `statuses`. */
   countTickets(statuses: readonly string[]): Promise<Result<number>>;
   getTicket(id: string): Promise<Result<SupportTicketDetail>>;
-  /** Change status, priority or assignee; refused when `version` is stale. */
+  /** Status / priority / assignee, guarded by the ticket's version. */
   updateTicket(
     id: string,
     changes: TicketChanges,
     version: number,
   ): Promise<Result<SupportTicketDetail>>;
+  reply(id: string, reply: TicketReply): Promise<Result<TicketMessage>>;
   /** Reply to the requester (emailed) or add an internal note. */
   replyToTicket(id: string, reply: TicketReply): Promise<Result<TicketMessage>>;
   /** A short-lived download link for a file attached to a ticket. */

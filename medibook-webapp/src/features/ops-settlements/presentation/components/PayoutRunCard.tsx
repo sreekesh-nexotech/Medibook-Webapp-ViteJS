@@ -9,7 +9,7 @@ import { TableShell } from '@/shared/ui/TableShell';
 
 import {
   RUN_STATUS_LABEL,
-  runnablePeriods,
+  canReleaseTo,
   type LedgerRow,
   type RunGroup,
 } from '@/features/ops-settlements/presentation/components/opsSettlements.viewModel';
@@ -21,10 +21,14 @@ interface PayoutRunCardProps {
   today: string;
   /** True while this card's approve request is in flight. */
   approving: boolean;
+  /** Closed periods not in a run, across every filter — what a new run would pick up. */
+  runnableCount: number;
+  /** The signed-in user created this run (four-eyes: someone else approves it). */
+  createdByMe: boolean;
   onApprove: (runId: string) => void;
   onReleaseRun: (group: RunGroup) => void;
   onCreateRun: () => void;
-  onOpenHosp: (hospitalId: string) => void;
+  onOpen: (row: LedgerRow) => void;
   onRelease: (row: LedgerRow) => void;
 }
 
@@ -37,18 +41,19 @@ export function PayoutRunCard({
   group,
   today,
   approving,
+  runnableCount,
+  createdByMe,
   onApprove,
   onReleaseRun,
   onCreateRun,
-  onOpenHosp,
+  onOpen,
   onRelease,
 }: PayoutRunCardProps) {
   const { run, rows } = group;
-  const relRows = rows.filter((r) => r.releasable && r.payout?.hasBankAccount);
-  const skipRows = rows.filter((r) => r.releasable && !r.payout?.hasBankAccount);
+  const relRows = rows.filter((r) => r.releasable && canReleaseTo(r.payout));
+  const skipRows = rows.filter((r) => r.releasable && !canReleaseTo(r.payout));
   const total = rows.reduce((a, r) => a + r.netRupees, 0);
   const relTotal = relRows.reduce((a, r) => a + r.netRupees, 0);
-  const runnable = run === null ? runnablePeriods(rows) : [];
   const due = run?.scheduledFor != null && run.scheduledFor <= today && relRows.length > 0;
   return (
     <Card>
@@ -70,15 +75,18 @@ export function PayoutRunCard({
           <div className="text-caption text-text-muted">
             {run ? `${RUN_STATUS_LABEL[run.status]} · ` : ''}
             {rows.length} statement{rows.length === 1 ? '' : 's'} · net {money(total)}
-            {skipRows.length > 0 ? ` · ${skipRows.length} not releasable (no payout account)` : ''}
+            {skipRows.length > 0
+              ? ` · ${skipRows.length} not releasable (payout account missing or unverified)`
+              : ''}
+            {run && createdByMe && run.status !== 'released' ? ' · created by you' : ''}
           </div>
         </div>
         <div className="flex-1"></div>
         {/* SEC-05: creating, approving and releasing runs need settlements.edit. */}
         <CanOps perm="settlements.edit">
-          {run === null && runnable.length > 0 && (
+          {run === null && runnableCount > 0 && (
             <Button size="sm" icon="plus" onClick={onCreateRun}>
-              Create Payout Run ({runnable.length})
+              Create Payout Run ({runnableCount})
             </Button>
           )}
           {run?.status === 'draft' && (
@@ -103,7 +111,7 @@ export function PayoutRunCard({
             key={s.id}
             s={s}
             showDate={false}
-            onOpenHosp={onOpenHosp}
+            onOpen={onOpen}
             onRelease={onRelease}
           />
         ))}

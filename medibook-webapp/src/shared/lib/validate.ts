@@ -86,15 +86,23 @@ export function positiveAmount(
   return n > 0 ? undefined : `${label} must be greater than zero.`;
 }
 
-/** An ISO `yyyy-mm-dd` date that is today or earlier (e.g. date of birth). */
-export function notFutureDate(value: string | null | undefined, label = 'Date'): ValidationError {
+/**
+ * An ISO `yyyy-mm-dd` date that is today or earlier (e.g. date of birth).
+ * Hospital screens pass the hospital's `today` (`useHospitalToday`, D-09,
+ * UAT-47); without it the PC's own date is used.
+ */
+export function notFutureDate(
+  value: string | null | undefined,
+  label = 'Date',
+  today?: string,
+): ValidationError {
   const raw = (value ?? '').trim();
   if (raw === '') return `${label} is required.`;
   if (!ISO_DATE_PATTERN.test(raw)) return `${label} must be a valid date.`;
   const d = new Date(`${raw}T00:00:00`);
   if (Number.isNaN(d.getTime())) return `${label} must be a valid date.`;
-  // Compared as calendar dates on the hospital's calendar, so today is allowed.
-  return raw <= todayISO() ? undefined : `${label} cannot be in the future.`;
+  const referenceToday = today ?? todayISO();
+  return raw <= referenceToday ? undefined : `${label} cannot be in the future.`;
 }
 
 /**

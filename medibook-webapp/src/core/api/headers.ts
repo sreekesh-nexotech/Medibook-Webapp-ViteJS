@@ -15,13 +15,20 @@ export function ifMatch(version: number): Readonly<Record<string, string>> {
   return { [IF_MATCH_HEADER]: `"${version}"` };
 }
 
+/** A new replay key. Mint it once per user action, never per HTTP call (UAT-16). */
+export function newIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 /**
- * A fresh replay key for a declared-idempotent write. Generate it once per
- * user intent (e.g. when the form opens), not per retry, so a retried submit
- * is deduplicated instead of performed twice.
+ * The replay header for a declared-idempotent write. Pass the key minted once
+ * per user intent (e.g. when the form opens) and reuse it on retry, so a
+ * retried submit is deduplicated instead of performed twice. The backend
+ * stores only successful answers, so after an error the same key may be sent
+ * again (`core/idempotency.py`).
  */
 export function idempotencyKey(
-  key: string = crypto.randomUUID(),
+  key: string = newIdempotencyKey(),
 ): Readonly<Record<string, string>> {
   return { [IDEMPOTENCY_KEY_HEADER]: key };
 }

@@ -15,35 +15,19 @@ interface SortThProps {
 }
 
 /**
- * Shared sort header cell — used by table shells. A sortable column holds a
- * real button and says how it is sorted (`aria-sort`), so it works from the
- * keyboard and a screen reader hears the order (A11Y-01).
+ * Shared sort header cell — used by table shells. A sortable column is a real
+ * button inside the header (keyboard-operable) and the header reports its
+ * order through `aria-sort` (A11Y-01, UAT-76, 01·F31).
  */
 export function SortTh({ label, baseClassName, right, sortKeys, sort, onSort }: SortThProps) {
   const key = sortKeys?.[label];
   const active = Boolean(sort && key && sort.key === key);
-  const ariaSort = active && sort ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined;
-  if (!key || !onSort) {
-    return (
-      <th className={cn(baseClassName, right ? 'text-right' : 'text-left', 'select-none')}>
-        {label}
-      </th>
-    );
-  }
-  return (
-    <th
-      aria-sort={ariaSort}
-      className={cn(baseClassName, right ? 'text-right' : 'text-left', 'select-none')}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(key)}
-        className={cn(
-          'inline-flex cursor-pointer items-center gap-1.25',
-          right && 'flex-row-reverse',
-        )}
-      >
-        {label}
+  const ariaSort =
+    active && sort ? (sort.dir === 'asc' ? 'ascending' : 'descending') : key ? 'none' : undefined;
+  const content = (
+    <span className={cn('inline-flex items-center gap-1.25', right && 'flex-row-reverse')}>
+      {label}
+      {key && onSort && (
         <Icon
           name={
             active && sort
@@ -55,7 +39,25 @@ export function SortTh({ label, baseClassName, right, sortKeys, sort, onSort }: 
           size={14}
           className={active ? 'text-text-navy' : 'text-text-faint'}
         />
-      </button>
+      )}
+    </span>
+  );
+  return (
+    <th
+      aria-sort={ariaSort}
+      className={cn(
+        baseClassName,
+        right ? 'text-right' : 'text-left',
+        'cursor-default select-none',
+      )}
+    >
+      {key && onSort ? (
+        <button type="button" onClick={() => onSort(key)} className="cursor-pointer">
+          {content}
+        </button>
+      ) : (
+        content
+      )}
     </th>
   );
 }

@@ -9,6 +9,7 @@ import { usersRolesRepository } from '@/features/users-roles/infrastructure/repo
 export function updateRolePermissions(
   roleCode: StaffRoleCode,
   permissions: readonly string[],
+  version: number | null,
 ): Promise<Result<StaffRole>> {
-  return usersRolesRepository.updateRolePermissions(roleCode, permissions);
+  return usersRolesRepository.updateRolePermissions(roleCode, permissions, version);
 }

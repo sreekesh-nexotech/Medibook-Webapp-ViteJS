@@ -8,9 +8,7 @@ import { useBankAccountsQuery } from '@/features/settings/application/queries/us
 import { useHospitalHoursQuery } from '@/features/settings/application/queries/useHospitalHoursQuery';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useHospitalRuleSettingsQuery } from '@/features/settings/application/queries/useHospitalRuleSettingsQuery';
-import { useNumberingQuery } from '@/features/settings/application/queries/useNumberingQuery';
 import { useTokenPolicyQuery } from '@/features/settings/application/queries/useTokenPolicyQuery';
-import { payoutAccountOf } from '@/features/settings/application/store/settings.form';
 
 import { type BankAccountsState, SettingsEditor } from '../components/SettingsEditor';
 
@@ -22,10 +20,11 @@ const CARD_SKELETON_PAD = 28;
 
 /**
  * Hospital Settings (module H2) — loads the hospital's profile, rulebook,
- * working hours, token policy and number series from the API, then hands them to
- * `SettingsEditor`. The payout account loads on its own (it needs the
+ * working hours and token policy from the API, then hands them to
+ * `SettingsEditor`. The payout accounts load on their own (they need the
  * Billing & Settlements permission), so a refusal there never blocks the
- * rest of the screen.
+ * rest of the screen; numbering, counters, templates and display screens
+ * load inside their own sections.
  */
 export function HospitalSettingsScreen() {
   const { can } = usePermission();
@@ -36,7 +35,6 @@ export function HospitalSettingsScreen() {
   const rules = useHospitalRuleSettingsQuery(canView);
   const hours = useHospitalHoursQuery(canView);
   const tokenPolicy = useTokenPolicyQuery(canView);
-  const numbering = useNumberingQuery(canView);
   const bankAccounts = useBankAccountsQuery(canViewBank);
 
   if (!canView) {
@@ -51,22 +49,20 @@ export function HospitalSettingsScreen() {
     );
   }
 
-  const core = [profile, rules, hours, tokenPolicy, numbering];
-  const failed = core.find((q) => q.isLoadingError);
-  if (failed) {
+  const core = [profile, rules, hours, tokenPolicy];
+  if (core.some((q) => q.isError)) {
     return (
       <ErrorState
-        error={failed.error}
         title="Hospital settings did not load"
         message="Nothing has changed. Retry to load the settings again."
         onRetry={() => {
-          for (const q of core) if (q.isLoadingError) void q.refetch();
+          for (const q of core) if (q.isError) void q.refetch();
         }}
       />
     );
   }
 
-  if (!profile.data || !rules.data || !hours.data || !tokenPolicy.data || !numbering.data) {
+  if (!profile.data || !rules.data || !hours.data || !tokenPolicy.data) {
     return (
       <div className="flex items-start gap-5" aria-busy="true">
         <SkeletonBlock w={NAV_SKELETON_WIDTH} h={NAV_SKELETON_HEIGHT} className="flex-none" />
@@ -79,10 +75,10 @@ export function HospitalSettingsScreen() {
 
   const bank: BankAccountsState = !canViewBank
     ? { status: 'hidden' }
-    : bankAccounts.isLoadingError
-      ? { status: 'error', error: bankAccounts.error, retry: () => void bankAccounts.refetch() }
+    : bankAccounts.isError
+      ? { status: 'error', retry: () => void bankAccounts.refetch() }
       : bankAccounts.data
-        ? { status: 'ready', account: payoutAccountOf(bankAccounts.data) }
+        ? { status: 'ready', accounts: bankAccounts.data }
         : { status: 'loading' };
 
   return (
@@ -91,7 +87,6 @@ export function HospitalSettingsScreen() {
       rules={rules.data}
       hours={hours.data}
       tokenPolicy={tokenPolicy.data}
-      numbering={numbering.data}
       bank={bank}
     />
   );

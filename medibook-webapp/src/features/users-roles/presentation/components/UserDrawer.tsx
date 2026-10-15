@@ -27,6 +27,8 @@ import {
 interface UserDrawerProps {
   user: UserRow;
   roles: readonly RoleView[];
+  /** The signed-in user's own row: no deactivate (the backend refuses it, UAT-24). */
+  isSelf: boolean;
   onClose: () => void;
   onReset: (user: UserRow) => void;
   /**
@@ -54,6 +56,7 @@ interface UserDrawerProps {
 export function UserDrawer({
   user,
   roles,
+  isSelf,
   onClose,
   onReset,
   onDeactivate,
@@ -140,7 +143,7 @@ export function UserDrawer({
                 onClick={handleResend}
                 busy={resend.isPending}
               >
-                Resend Invite
+                {user.status === 'Expired' ? 'Resend (new link)' : 'Resend Invite'}
               </Button>
             </Can>
             <span className="flex-1" />
@@ -158,29 +161,34 @@ export function UserDrawer({
           </>
         ) : (
           <>
-            <Can perm="Users & Roles.edit">
-              <Button variant="secondary" icon="key-round" onClick={() => onReset(user)}>
-                Reset Password
-              </Button>
-            </Can>
+            {/* The backend sends reset links to active members only (08 F4). */}
+            {active && (
+              <Can perm="Users & Roles.edit">
+                <Button variant="secondary" icon="key-round" onClick={() => onReset(user)}>
+                  Reset Password
+                </Button>
+              </Can>
+            )}
             <span className="flex-1" />
-            <Can perm="Users & Roles.edit">
-              <Button
-                variant={active ? 'ghost' : 'success'}
-                icon={active ? 'user-x' : 'user-check'}
-                style={active ? { color: 'var(--color-d-600)' } : undefined}
-                busy={reactivate.isPending}
-                onClick={() => {
-                  if (active) {
-                    onDeactivate(user);
-                    return;
-                  }
-                  handleReactivate();
-                }}
-              >
-                {active ? 'Deactivate' : 'Activate'}
-              </Button>
-            </Can>
+            {!isSelf && (
+              <Can perm="Users & Roles.edit">
+                <Button
+                  variant={active ? 'ghost' : 'success'}
+                  icon={active ? 'user-x' : 'user-check'}
+                  style={active ? { color: 'var(--color-d-600)' } : undefined}
+                  busy={reactivate.isPending}
+                  onClick={() => {
+                    if (active) {
+                      onDeactivate(user);
+                      return;
+                    }
+                    handleReactivate();
+                  }}
+                >
+                  {active ? 'Deactivate' : 'Activate'}
+                </Button>
+              </Can>
+            )}
           </>
         )
       }
@@ -283,7 +291,9 @@ export function UserDrawer({
             : 'They become a user once they accept the emailed link. Resending issues a new link; revoking cancels it.'
           : locked
             ? 'Locked out after too many failed sign-ins. Unlock lets them try again now.'
-            : 'Edit Details changes their role, employee code, designation and default counter. Name, email and phone belong to their own account.'}
+            : isSelf
+              ? 'This is your own account. Another administrator changes your role or deactivates you; you can still edit your employee code, designation and default counter.'
+              : 'Edit Details changes their role, employee code, designation and default counter. Name, email and phone belong to their own account.'}
       </div>
     </Drawer>
   );

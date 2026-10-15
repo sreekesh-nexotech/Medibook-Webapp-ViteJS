@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "key": "unpaid_walk_ins_today",
+      "label": "Walk-in payments pending today",
+      "count": 5,
+      "latest_at": "2026-10-07T23:59:55.894434Z",
+      "read": false,
+      "read_at": "2026-10-07T23:35:14.269802Z"
+    },
+    {
+      "key": "cash_sessions_to_reconcile",
+      "label": "Cash sessions to reconcile",
+      "count": 3,
+      "latest_at": "2026-10-08T00:00:17.146962Z",
+      "read": false,
+      "read_at": "2026-10-07T23:35:14.269802Z"
+    }
+  ],
+  "unread_count": 2
+}

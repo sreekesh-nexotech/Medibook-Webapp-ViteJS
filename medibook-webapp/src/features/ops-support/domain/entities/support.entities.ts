@@ -1,8 +1,8 @@
 /**
  * Support tickets raised by hospitals (Help & Support) and patients (the
- * Medibook app), as the ops console answers them (`/api/v1/platform/support/
- * tickets`, backend `support/services/tickets.py`). Every change and every
- * reply that is not an internal note is emailed to the requester (Q127).
+ * Medibook app), as the ops console answers them (`/platform/support/tickets`,
+ * backend `support/services/tickets.py`). Requesters hear back by email (Q127).
+ * Internal notes stay inside the platform team and never reach the requester.
  */
 
 export const TICKET_STATUSES = [
@@ -21,7 +21,7 @@ export const UNRESOLVED_STATUSES: readonly TicketStatus[] = [
   'waiting_on_requester',
 ];
 
-export const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+export const TICKET_PRIORITIES = ['urgent', 'high', 'normal', 'low'] as const;
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 
 export const TICKET_CATEGORIES = [
@@ -34,28 +34,45 @@ export const TICKET_CATEGORIES = [
 ] as const;
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 
+export const TICKET_RAISERS = ['hospital_staff', 'patient'] as const;
+export type TicketRaisedByKind = (typeof TICKET_RAISERS)[number];
+
 export const TICKET_REQUESTER_KINDS = ['hospital_staff', 'patient'] as const;
 export type TicketRequesterKind = (typeof TICKET_REQUESTER_KINDS)[number];
 
 export const MESSAGE_AUTHOR_KINDS = ['requester', 'platform_staff'] as const;
 export type MessageAuthorKind = (typeof MESSAGE_AUTHOR_KINDS)[number];
+export type TicketAuthorKind = 'requester' | 'platform_staff';
+
+/** Backend limits (`TicketMessageSerializer`). */
+export const TICKET_MESSAGE_MAX = 5000;
+export const TICKET_ATTACHMENTS_MAX = 5;
 
 export interface SupportTicket {
   readonly id: string;
-  /** `TKT-2026-0042`. */
+  /** Human reference, e.g. `TKT-2026-0001` — what staff and requesters quote. */
   readonly ticketNo: string;
-  readonly requesterKind: TicketRequesterKind;
-  /** The hospital that raised it; `null` for a patient's ticket. */
+  readonly raisedByKind: TicketRaisedByKind;
+  /** The requester's name (B9); `null` on an older server or a deleted account. */
+  readonly raisedByName: string | null;
+  readonly requesterKind?: TicketRequesterKind;
+  readonly requesterId?: string | null;
   readonly hospitalId: string | null;
-  /** The hospital user or patient account that raised it. */
-  readonly requesterId: string | null;
+  /** B9; `null` for patient tickets and on an older server. */
+  readonly hospitalName: string | null;
   readonly category: TicketCategory;
   readonly subject: string;
   readonly description: string;
   readonly priority: TicketPriority;
   readonly status: TicketStatus;
-  /** Platform staff member it is assigned to. */
-  readonly assigneeId: string | null;
+  /** A platform staff row id (not a user id). */
+  readonly assignedToId: string | null;
+  /** B9; `null` when unassigned or on an older server. */
+  readonly assignedToName: string | null;
+  /** Alias for assignedToId used in ops support views. */
+  readonly assigneeId?: string | null;
+  /** Statuses the server accepts next (B9, L-25); `null` when it does not say. */
+  readonly allowedTransitions: readonly TicketStatus[] | null;
   readonly resolvedAt: string | null;
   readonly closedAt: string | null;
   readonly createdAt: string;
@@ -66,18 +83,41 @@ export interface SupportTicket {
 
 export interface TicketMessage {
   readonly id: string;
-  readonly authorKind: MessageAuthorKind;
+  readonly authorKind: TicketAuthorKind;
   readonly authorName: string | null;
   readonly body: string;
+  readonly attachmentFileIds: readonly string[];
   readonly attachmentIds: readonly string[];
-  readonly occurredAt: string;
-  /** A note for Medibook staff only; never shown or emailed to the requester. */
+  /** Platform-only note; never shown to the requester. */
   readonly isInternal: boolean;
+  readonly occurredAt: string;
 }
 
 export interface SupportTicketDetail extends SupportTicket {
-  /** The thread, oldest first. */
+  /** Oldest first. */
   readonly messages: readonly TicketMessage[];
+}
+
+export type TicketSortKey = 'created_at' | 'updated_at';
+
+export interface TicketListQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  /** Empty = every status. */
+  readonly statuses: readonly TicketStatus[];
+  /** Empty = every priority. */
+  readonly priorities: readonly TicketPriority[];
+  readonly category: TicketCategory | null;
+  readonly raisedByKind: TicketRaisedByKind | null;
+  readonly hospitalId: string | null;
+  readonly assignedToId: string | null;
+  /** Exact ticket number. */
+  readonly ticketNo: string | null;
+  /** `YYYY-MM-DD`, on the day the ticket was raised. */
+  readonly dateFrom: string | null;
+  readonly dateTo: string | null;
+  readonly sort: TicketSortKey;
+  readonly sortDir: 'asc' | 'desc';
 }
 
 export interface TicketListParams {
@@ -93,16 +133,21 @@ export interface TicketListParams {
   readonly pageSize: number;
 }
 
-/** What ops can change on a ticket. */
+/** What a platform agent may change on a ticket (`support.edit`). */
 export interface TicketChanges {
   readonly status?: TicketStatus;
   readonly priority?: TicketPriority;
   /** `null` unassigns. */
+  readonly assignedToId?: string | null;
   readonly assigneeId?: string | null;
 }
 
 export interface TicketReply {
   readonly body: string;
-  /** Internal note: visible to Medibook staff only. */
-  readonly internal: boolean;
+  /** Clean `ticket_attachment` files this agent uploaded. */
+  readonly attachmentFileIds?: readonly string[];
+  /** An internal note: kept from the requester and sends no email. */
+  readonly isInternal?: boolean;
+  /** Alias for isInternal. */
+  readonly internal?: boolean;
 }

@@ -1,5 +1,5 @@
-import { useRovingFocus } from '@/shared/hooks/useRovingFocus';
 import { cn } from '@/shared/lib/cn';
+import { useTabList } from '@/shared/ui/useTabList';
 
 interface TabsProps {
   tabs: readonly string[];
@@ -7,17 +7,19 @@ interface TabsProps {
   onChange: (tab: string) => void;
   /** Gap between tab labels in px (design default 28 — dynamic, hence style). */
   gap?: number;
+  /** Accessible name of the tab list. */
+  ariaLabel?: string;
   /** What the tabs switch between, for screen readers (e.g. "Appointment status"). */
   label?: string;
 }
 
-/** Underline tab group: real tabs, reachable and switchable from the keyboard (A11Y-01). */
-export function Tabs({ tabs, value, onChange, gap = 28, label }: TabsProps) {
-  const { optionProps } = useRovingFocus(tabs, value, onChange);
+/** Underline tab group — a real tab list: Tab reaches it, arrows switch tabs (A11Y-01, UAT-76). */
+export function Tabs({ tabs, value, onChange, gap = 28, ariaLabel, label }: TabsProps) {
+  const { tabProps } = useTabList(tabs, value, onChange);
   return (
     <div
       role="tablist"
-      aria-label={label}
+      aria-label={ariaLabel ?? label}
       // Wraps onto a second line on narrow screens instead of pushing the
       // page sideways (PERF-05).
       className="flex flex-wrap gap-y-2 pr-2"
@@ -26,10 +28,7 @@ export function Tabs({ tabs, value, onChange, gap = 28, label }: TabsProps) {
       {tabs.map((t, i) => (
         <button
           key={t}
-          type="button"
-          role="tab"
-          aria-selected={value === t}
-          {...optionProps(t, i)}
+          {...tabProps(t, i)}
           className={cn(
             'text-body cursor-pointer border-b-2 pb-1 whitespace-nowrap',
             value === t

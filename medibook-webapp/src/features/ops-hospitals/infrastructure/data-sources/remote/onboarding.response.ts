@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 import { paginatedSchema } from '@/core/api/pagination';
 
+import {
+  firstAdminInvitationResponseSchema,
+  toFirstAdminInvitation,
+} from '@/features/ops-hospitals/infrastructure/data-sources/remote/hospitals.response';
 import type {
   ChecklistItem,
   DocumentRequirement,
@@ -40,8 +44,10 @@ const caseSchema = z.object({
   submitted_at: z.string().nullable(),
   approved_at: z.string().nullable(),
   rejection_reason: z.string().nullable(),
+  assigned_to_id: z.string().nullable().optional(),
   notes: z.string().nullable(),
   created_at: z.string(),
+  version: z.number().int().optional(),
 });
 
 type CaseDto = z.infer<typeof caseSchema>;
@@ -56,7 +62,10 @@ function toSummary(dto: CaseDto): OnboardingCaseSummary {
     submittedAt: dto.submitted_at,
     approvedAt: dto.approved_at,
     rejectionReason: dto.rejection_reason,
+    assignedToId: dto.assigned_to_id ?? null,
+    notes: dto.notes,
     createdAt: dto.created_at,
+    version: dto.version ?? null,
   };
 }
 
@@ -96,6 +105,7 @@ export const checklistItemResponseSchema = z.object({
   verified_at: z.string().nullable(),
   file_id: z.string().nullable(),
   note: z.string().nullable(),
+  version: z.number().int().optional(),
 });
 
 export type ChecklistItemResponse = z.infer<typeof checklistItemResponseSchema>;
@@ -109,6 +119,7 @@ export function toChecklistItem(dto: ChecklistItemResponse): ChecklistItem {
     verifiedAt: dto.verified_at,
     fileId: dto.file_id,
     note: dto.note,
+    version: dto.version ?? null,
   };
 }
 
@@ -125,6 +136,7 @@ function toBlocker(dto: z.infer<typeof blockerSchema>): GoLiveBlocker {
 export const caseDetailResponseSchema = caseSchema.extend({
   checklist: z.array(checklistItemResponseSchema),
   go_live_blockers: z.array(blockerSchema),
+  first_admin_invitation: firstAdminInvitationResponseSchema.nullable().optional(),
 });
 
 export type CaseDetailResponse = z.infer<typeof caseDetailResponseSchema>;
@@ -132,9 +144,11 @@ export type CaseDetailResponse = z.infer<typeof caseDetailResponseSchema>;
 export function toCaseDetail(dto: CaseDetailResponse): OnboardingCaseDetail {
   return {
     ...toSummary(dto),
-    notes: dto.notes,
     checklist: dto.checklist.map(toChecklistItem),
     blockers: dto.go_live_blockers.map(toBlocker),
+    firstAdminInvitation: dto.first_admin_invitation
+      ? toFirstAdminInvitation(dto.first_admin_invitation)
+      : null,
   };
 }
 
@@ -167,5 +181,9 @@ export function toRequirements(
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 }
 
-/** Approve / go-live answer with the hospital; only its identity is checked. */
-export const hospitalActionResponseSchema = z.object({ id: z.string() });
+/** Approve / go-live answer with the hospital; its identity and patient-app switches are read. */
+export const hospitalActionResponseSchema = z.object({
+  id: z.string(),
+  app_visibility: z.enum(['visible', 'hidden']).optional(),
+  online_booking_enabled: z.boolean().optional(),
+});

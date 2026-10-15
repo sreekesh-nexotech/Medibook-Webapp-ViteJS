@@ -9,6 +9,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useCreatePayoutRunMutation } from '@/features/ops-settlements/application/queries/useCreatePayoutRunMutation';
 import {
   failureText,
+  runSkipLabel,
   type LedgerRow,
 } from '@/features/ops-settlements/presentation/components/opsSettlements.viewModel';
 import { SettlementDateInput } from '@/features/ops-settlements/presentation/components/SettlementDateInput';
@@ -18,17 +19,21 @@ interface OpsSettlementsCreateRunModalProps {
   rows: readonly LedgerRow[];
   /** The smallest window covering them. */
   window: { readonly start: string; readonly end: string };
+  hospitalName: (id: string) => string | null;
   onClose: () => void;
 }
 
 /**
  * Create Payout Run — `POST /platform/settlements/payout-runs`. The backend
  * gathers every closed, unpaid period with a positive net inside the window
- * into a draft run, which is then approved and released from its card.
+ * into a draft run, which is then approved and released from its card. Only
+ * hospitals whose primary payout account platform finance has verified are
+ * paid (M-45); the others come back as `skipped` and are named here.
  */
 export function OpsSettlementsCreateRunModal({
   rows,
   window,
+  hospitalName,
   onClose,
 }: OpsSettlementsCreateRunModalProps) {
   const create = useCreatePayoutRunMutation();
@@ -45,8 +50,19 @@ export function OpsSettlementsCreateRunModal({
         notes: null,
       },
       {
-        onSuccess: (run) => {
+        onSuccess: ({ run, skipped }) => {
           toast(`Payout run ${run.runNo} created as a draft — approve it to release.`, 'success');
+          if (skipped.length > 0) {
+            toast(
+              `Left out of ${run.runNo}: ${skipped
+                .map(
+                  (s) =>
+                    `${hospitalName(s.hospitalId) ?? 'a hospital'} (${runSkipLabel(s.reason)})`,
+                )
+                .join(', ')}. Verify the payout account, then create another run.`,
+              'info',
+            );
+          }
           onClose();
         },
         onError: (failure) => setError(failureText(failure, 'Could not create the payout run.')),
@@ -80,8 +96,9 @@ export function OpsSettlementsCreateRunModal({
         </div>
         <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
           <Icon name="info" size={14} className="mt-px flex-none" /> Every closed, unpaid statement
-          in this window with something to pay joins the run. It starts as a draft; approve it, then
-          record each transfer.
+          in this window with something to pay joins the run — for every hospital, whatever the
+          queue&apos;s filters. Hospitals without a verified payout account are left out. The run
+          starts as a draft; someone approves it, then each transfer is recorded.
         </div>
         <OpsField label="Scheduled transfer date (optional)" error={error}>
           <SettlementDateInput

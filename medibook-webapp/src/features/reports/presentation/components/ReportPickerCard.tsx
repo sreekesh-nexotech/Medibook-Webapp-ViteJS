@@ -12,7 +12,9 @@ interface ReportPickerCardProps {
 
 /**
  * One report tile in the picker grid. Selected → blue ring + soft-blue fill
- * (design `on ? '1.5px solid var(--blue)' : '1px solid var(--border)'`).
+ * (design `on ? '1.5px solid var(--blue)' : '1px solid var(--border)'`). A
+ * real button, so it is reachable with Tab and opens with Enter or Space
+ * (08 F14), and it says which report is open.
  */
 export function ReportPickerCard({ report, selected, onSelect }: ReportPickerCardProps) {
   return (

@@ -4,14 +4,15 @@ import type {
   AdminDashboard,
   AppointmentBrief,
   AppointmentBriefList,
+  CashDrawerBrief,
   ReceptionDashboard,
 } from '@/features/dashboard/domain/entities/dashboard.types';
 
 /**
- * Response DTOs for the two dashboards. `schema.yml` types both as a bare
- * object, so the shapes here follow `analytics/services/dashboard.py`
- * (`admin`, `reception`, `_appt_brief`) and `tokens/services/queue.py`
- * (`snapshot`).
+ * Response DTOs for the two dashboards, following
+ * `analytics/services/dashboard.py` (`admin`, `reception`, `_appt_brief`) and
+ * `tokens/services/queue.py` (`snapshot`). Fields added by DASH-01/02,
+ * BE-20 and BE-26 are optional so the screens work against an older backend.
  */
 
 const PAISE_PER_RUPEE = 100;
@@ -22,6 +23,9 @@ function toRupees(paise: number): number {
 
 /** A grouped `Sum`/`Count`; the group key can be `null` (e.g. a payment with no order). */
 const totalsSchema = z.record(z.string(), z.number().nullable());
+
+/** Channel → method → total (DASH-02). */
+const nestedTotalsSchema = z.record(z.string(), totalsSchema);
 
 function toRupeeTotals(totals: Readonly<Record<string, number | null>>): Record<string, number> {
   return Object.fromEntries(
@@ -41,6 +45,9 @@ export const adminDashboardResponseSchema = z.object({
     total: z.number().int(),
     by_status: totalsSchema,
     by_source: totalsSchema,
+    // DASH-01: present when `total` and `by_source` already leave these out.
+    no_show: z.number().int().optional(),
+    cancelled: z.number().int().optional(),
   }),
   revenue: z.object({
     collected_paise: z.number(),
@@ -48,6 +55,9 @@ export const adminDashboardResponseSchema = z.object({
     net_paise: z.number(),
     by_channel: totalsSchema,
     by_method: totalsSchema,
+    by_channel_method: nestedTotalsSchema.optional(),
+    refunds_by_channel: totalsSchema.optional(),
+    refunds_by_method: totalsSchema.optional(),
   }),
   departments: z.array(
     z.object({ department_id: z.string(), name: z.string(), appointments: z.number().int() }),
@@ -62,6 +72,7 @@ export const adminDashboardResponseSchema = z.object({
   ),
   alerts: z.object({
     pending_approvals: z.number().int(),
+    pending_approvals_today: z.number().int().optional(),
     pending_patient_changes: z.number().int(),
     unpaid_walk_ins_today: z.number().int(),
     cash_sessions_to_reconcile: z.number().int(),
@@ -78,6 +89,7 @@ const appointmentBriefSchema = z.object({
   source: z.string(),
   payment_status: z.string(),
   total_paise: z.number(),
+  scheduled_date: z.string().optional(),
   scheduled_start_at: z.string(),
   doctor_name: z.string(),
   patient: z.object({ mrn: z.string().nullable(), full_name: z.string() }),
@@ -94,9 +106,12 @@ export const receptionDashboardResponseSchema = z.object({
     z.object({
       id: z.string(),
       doctor_id: z.string(),
+      department_id: z.string().nullable().optional(),
       label: z.string(),
       status: z.string(),
       current_token_no: z.number().int().nullable(),
+      current_appointment_id: z.string().nullable().optional(),
+      current_token_label: z.string().nullable().optional(),
       waiting_count: z.number().int(),
       completed_count: z.number().int(),
     }),
@@ -110,25 +125,62 @@ export const receptionDashboardResponseSchema = z.object({
     no_show: z.number().int(),
     cancelled: z.number().int(),
   }),
-  pending_approvals: appointmentBriefListSchema,
+  pending_approvals: appointmentBriefListSchema.extend({
+    // BE-26: the list is the day's; the rest are only counted.
+    other_days_count: z.number().int().optional(),
+  }),
   unpaid_walk_ins: appointmentBriefListSchema,
+  cash_session: z
+    .object({
+      id: z.string(),
+      business_date: z.string(),
+      opened_at: z.string(),
+      counter_code: z.string().nullable(),
+      opening_float_paise: z.number(),
+      expected_cash_paise: z.number(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type ReceptionDashboardResponse = z.infer<typeof receptionDashboardResponseSchema>;
 
+const CANCELLED = 'cancelled';
+const NO_SHOW = 'no_show';
+
 export function toAdminDashboard(dto: AdminDashboardResponse): AdminDashboard {
+  const byStatus = toCounts(dto.appointments.by_status);
+  // DASH-01 backends send `cancelled`/`no_show` beside a live-only total;
+  // older ones folded both into `total`, so take them out here.
+  const isLiveDefinition = dto.appointments.cancelled !== undefined;
+  const cancelled = dto.appointments.cancelled ?? byStatus[CANCELLED] ?? 0;
+  const noShow = dto.appointments.no_show ?? byStatus[NO_SHOW] ?? 0;
+  const booked = isLiveDefinition
+    ? dto.appointments.total
+    : Math.max(0, dto.appointments.total - cancelled - noShow);
+  const r = dto.revenue;
   return {
     period: dto.period,
     dateFrom: dto.date_from,
     dateTo: dto.date_to,
-    appointmentsTotal: dto.appointments.total,
-    appointmentsByStatus: toCounts(dto.appointments.by_status),
+    appointmentsBooked: booked,
+    appointmentsCancelled: cancelled,
+    appointmentsNoShow: noShow,
+    appointmentsByStatus: byStatus,
     appointmentsBySource: toCounts(dto.appointments.by_source),
-    collectedRupees: toRupees(dto.revenue.collected_paise),
-    refundedRupees: toRupees(dto.revenue.refunded_paise),
-    netRupees: toRupees(dto.revenue.net_paise),
-    collectedByChannel: toRupeeTotals(dto.revenue.by_channel),
-    collectedByMethod: toRupeeTotals(dto.revenue.by_method),
+    bySourceIsLive: isLiveDefinition,
+    collectedRupees: toRupees(r.collected_paise),
+    refundedRupees: toRupees(r.refunded_paise),
+    netRupees: toRupees(r.net_paise),
+    collectedByChannel: toRupeeTotals(r.by_channel),
+    collectedByMethod: toRupeeTotals(r.by_method),
+    collectedByChannelMethod: r.by_channel_method
+      ? Object.fromEntries(
+          Object.entries(r.by_channel_method).map(([ch, m]) => [ch, toRupeeTotals(m)]),
+        )
+      : null,
+    refundedByChannel: r.refunds_by_channel ? toRupeeTotals(r.refunds_by_channel) : null,
+    refundedByMethod: r.refunds_by_method ? toRupeeTotals(r.refunds_by_method) : null,
     departments: dto.departments.map((d) => ({
       departmentId: d.department_id,
       name: d.name,
@@ -142,6 +194,7 @@ export function toAdminDashboard(dto: AdminDashboardResponse): AdminDashboard {
     })),
     alerts: {
       pendingApprovals: dto.alerts.pending_approvals,
+      pendingApprovalsToday: dto.alerts.pending_approvals_today ?? null,
       pendingPatientChanges: dto.alerts.pending_patient_changes,
       unpaidWalkInsToday: dto.alerts.unpaid_walk_ins_today,
       cashSessionsToReconcile: dto.alerts.cash_sessions_to_reconcile,
@@ -158,6 +211,7 @@ function toBrief(dto: z.infer<typeof appointmentBriefSchema>): AppointmentBrief 
     source: dto.source,
     paymentStatus: dto.payment_status,
     totalRupees: toRupees(dto.total_paise),
+    scheduledDate: dto.scheduled_date ?? null,
     scheduledStartAt: dto.scheduled_start_at,
     doctorName: dto.doctor_name,
     patientName: dto.patient.full_name,
@@ -168,6 +222,19 @@ function toBriefList(dto: z.infer<typeof appointmentBriefListSchema>): Appointme
   return { count: dto.count, items: dto.items.map(toBrief) };
 }
 
+function toCashDrawer(
+  dto: NonNullable<ReceptionDashboardResponse['cash_session']>,
+): CashDrawerBrief {
+  return {
+    id: dto.id,
+    businessDate: dto.business_date,
+    openedAt: dto.opened_at,
+    counterCode: dto.counter_code,
+    openingFloatRupees: toRupees(dto.opening_float_paise),
+    expectedCashRupees: toRupees(dto.expected_cash_paise),
+  };
+}
+
 export function toReceptionDashboard(dto: ReceptionDashboardResponse): ReceptionDashboard {
   const q = dto.queue_summary;
   return {
@@ -175,9 +242,11 @@ export function toReceptionDashboard(dto: ReceptionDashboardResponse): Reception
     sessions: dto.sessions.map((s) => ({
       id: s.id,
       doctorId: s.doctor_id,
+      departmentId: s.department_id ?? null,
       label: s.label,
       status: s.status,
-      currentTokenNo: s.current_token_no,
+      currentAppointmentId: s.current_appointment_id ?? null,
+      currentTokenLabel: s.current_token_label ?? null,
       waitingCount: s.waiting_count,
       completedCount: s.completed_count,
     })),
@@ -190,7 +259,11 @@ export function toReceptionDashboard(dto: ReceptionDashboardResponse): Reception
       noShow: q.no_show,
       cancelled: q.cancelled,
     },
-    pendingApprovals: toBriefList(dto.pending_approvals),
+    pendingApprovals: {
+      ...toBriefList(dto.pending_approvals),
+      otherDaysCount: dto.pending_approvals.other_days_count ?? null,
+    },
     unpaidWalkIns: toBriefList(dto.unpaid_walk_ins),
+    cashSession: dto.cash_session ? toCashDrawer(dto.cash_session) : null,
   };
 }

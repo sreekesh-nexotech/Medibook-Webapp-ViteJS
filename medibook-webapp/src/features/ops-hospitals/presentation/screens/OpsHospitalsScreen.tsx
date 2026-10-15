@@ -3,7 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { opsOnboardingPath, opsPath } from '@/app/router/paths';
 import { isFailure } from '@/core/error/failure';
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { useSort } from '@/shared/hooks/useSort';
+import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { CanOps } from '@/shared/ui/CanOps';
@@ -34,8 +36,8 @@ import { OnboardHospitalModal } from '@/features/ops-hospitals/presentation/comp
 import {
   HOSPITAL_PENDING_STATUSES,
   HOSPITAL_STATUS_FILTER,
-  HOSPITAL_STATUS_VIEW,
   hospitalDetailHref,
+  hospitalStatusView,
 } from '@/features/ops-hospitals/presentation/components/hospitals.view';
 import { useHospitalsDebouncedValue } from '@/features/ops-hospitals/presentation/components/useHospitalsDebouncedValue';
 
@@ -70,18 +72,26 @@ const SORT_FIELD: Readonly<Record<string, string>> = {
  * all served by `GET /platform/hospitals` (search, filters, sort and paging
  * run on the server).
  *
- * The registry rows carry no plan or booking volume, so the table has no
- * such columns; the plan *filter* still works (`plan_id`).
+ * Rows carry the plan and 30-day booking volume (BE-29; a dash on an older
+ * backend). The onboarding pipeline and onboarding actions are offered only to
+ * roles that may use them (UAT-59).
  */
 export function OpsHospitalsScreen() {
   const navigate = useNavigate();
+  const { can } = useOpsPermission();
+  const canOnboarding = can('onboarding.view');
+  const canAddHospital = can('hospitals.add');
   const [searchParams] = useSearchParams();
-  const plansQuery = usePlansQuery();
+  // The plan filter needs the catalog, which only `plans.view` may read (Support may not).
+  const canPlans = can('plans.view');
+  const plansQuery = usePlansQuery(canPlans);
   const plans = plansQuery.data ?? [];
 
   const [tab, setTab] = useState<'All' | 'Pending'>('All');
   const [q, setQ] = useState('');
-  const [planF, setPlanF] = useState<string>(searchParams.get('plan') ?? 'All');
+  const [planF, setPlanF] = useState<string>(
+    canPlans ? (searchParams.get('plan') ?? 'All') : 'All',
+  );
   const [statusF, setStatusF] = useState('All');
   const [page, setPage] = useState(0);
   const [onboard, setOnboard] = useState(false);
@@ -156,7 +166,8 @@ export function OpsHospitalsScreen() {
     },
   ];
 
-  const hasFilters = Boolean(q.trim()) || planF !== 'All' || statusF !== 'All';
+  // The status filter is hidden on the Pending tab, so it never counts there (10·F7).
+  const hasFilters = Boolean(q.trim()) || planF !== 'All' || (tab === 'All' && statusF !== 'All');
   const reset =
     (fn: (v: string) => void) =>
     (v: string): void => {
@@ -206,9 +217,15 @@ export function OpsHospitalsScreen() {
                   tab === 'Pending'
                     ? 'Every application has been reviewed. New ones arrive through the onboarding pipeline.'
                     : 'Onboard the first hospital to start the network.',
-                actionLabel: tab === 'Pending' ? 'Open onboarding pipeline' : 'Onboard a hospital',
-                onAction:
-                  tab === 'Pending' ? () => navigate(opsOnboardingPath()) : () => setOnboard(true),
+                ...(tab === 'Pending'
+                  ? canOnboarding && {
+                      actionLabel: 'Open onboarding pipeline',
+                      onAction: () => navigate(opsOnboardingPath()),
+                    }
+                  : canAddHospital && {
+                      actionLabel: 'Onboard a hospital',
+                      onAction: () => setOnboard(true),
+                    }),
               };
 
   const openHospital = (id: string) => navigate(hospitalDetailHref(opsPath('hospitals'), id));
@@ -225,14 +242,19 @@ export function OpsHospitalsScreen() {
           tabs={['All Hospitals', pendingTabLabel]}
           value={tab === 'All' ? 'All Hospitals' : pendingTabLabel}
           onChange={(v) => {
-            setTab(v.startsWith('All') ? 'All' : 'Pending');
+            const next = v.startsWith('All') ? 'All' : 'Pending';
+            setTab(next);
+            if (next === 'Pending') setStatusF('All');
             setPage(0);
           }}
+          ariaLabel="Hospital registry"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" icon="rocket" onClick={() => navigate(opsOnboardingPath())}>
-            Onboarding Pipeline
-          </Button>
+          {canOnboarding && (
+            <Button variant="secondary" icon="rocket" onClick={() => navigate(opsOnboardingPath())}>
+              Onboarding Pipeline
+            </Button>
+          )}
           <CanOps perm="hospitals.add">
             <Button icon="plus" onClick={() => setOnboard(true)}>
               Onboard Hospital
@@ -246,12 +268,14 @@ export function OpsHospitalsScreen() {
         </div>
         <div className="mb-4.5 flex flex-wrap items-center gap-3">
           <RefreshBtn onRefresh={refresh} title="Refresh the hospital registry" />
-          <FilterSelect
-            value={planF}
-            aria-label="Filter by subscription plan"
-            options={['Plan: All', ...plans.map((p) => p.name)]}
-            onChange={(v) => reset(setPlanF)(v === 'Plan: All' ? 'All' : v)}
-          />
+          {canPlans && (
+            <FilterSelect
+              value={planF}
+              aria-label="Filter by subscription plan"
+              options={['Plan: All', ...plans.map((p) => p.name)]}
+              onChange={(v) => reset(setPlanF)(v === 'Plan: All' ? 'All' : v)}
+            />
+          )}
           {tab === 'All' && (
             <FilterSelect
               value={statusF}
@@ -286,7 +310,7 @@ export function OpsHospitalsScreen() {
           state={tableState}
         >
           {rows.map((h, i) => {
-            const [badge, label] = HOSPITAL_STATUS_VIEW[h.status];
+            const [badge, label] = hospitalStatusView(h);
             return (
               <tr
                 key={h.id}
@@ -296,9 +320,13 @@ export function OpsHospitalsScreen() {
                 <td className={tdClass}>
                   <OpsEntity icon="building-2" tint={opsTintOf(i)} title={h.name} sub={h.email} />
                 </td>
+                <td className={tdClass}>{h.planName ?? NO_VALUE}</td>
                 <td className={tdClass}>
                   {h.city}
                   {h.state ? `, ${h.state}` : ''}
+                </td>
+                <td className={cn(tdClass, 'text-right tabular-nums')}>
+                  {h.bookings30d === null ? NO_VALUE : h.bookings30d.toLocaleString('en-IN')}
                 </td>
                 <td className={tdClass}>{longDateFromTimestamp(h.createdAt)}</td>
                 <td className={tdClass}>

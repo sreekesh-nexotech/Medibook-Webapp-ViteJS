@@ -38,6 +38,9 @@ export const platformSettingsResponseSchema = z.object({
   session_timeout_min: z.number().int(),
   min_app_version_android: z.string().nullable(),
   min_app_version_ios: z.string().nullable(),
+  payout_four_eyes: z.boolean().optional(),
+  max_pending_bookings_per_user: z.number().int().optional(),
+  max_bookings_per_person_doctor_day: z.number().int().optional(),
   version: z.number().int(),
   updated_at: z.string(),
 });
@@ -73,6 +76,9 @@ export function toPlatformSettings(dto: PlatformSettingsResponse): PlatformSetti
     sessionTimeoutMin: dto.session_timeout_min,
     minAppVersionAndroid: dto.min_app_version_android,
     minAppVersionIos: dto.min_app_version_ios,
+    payoutFourEyes: dto.payout_four_eyes ?? null,
+    maxPendingBookingsPerUser: dto.max_pending_bookings_per_user ?? null,
+    maxBookingsPerPersonDoctorDay: dto.max_bookings_per_person_doctor_day ?? null,
     version: dto.version,
     updatedAt: dto.updated_at,
   };

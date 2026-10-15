@@ -104,11 +104,23 @@ export interface ReportExportRequest {
 
 /**
  * An export is either the file itself, or — above the server's synchronous
- * row limit — queued, in which case the backend emails the requester a link.
+ * row limit — queued: the backend builds it in the background, emails the
+ * requester a link, and the screen follows it by `exportId` (UAT-67).
  */
 export type ReportExport =
   | { readonly kind: 'file'; readonly file: Blob; readonly filename: string }
-  | { readonly kind: 'queued'; readonly exportId: string; readonly rows: number };
+  | { readonly kind: 'queued'; readonly exportId: string; readonly rows: number | null };
+
+/** Where a queued export stands. */
+export type ReportExportStatus =
+  /** Still being built (or, on an older backend, not readable until built). */
+  | 'pending'
+  /** Built and downloadable until `expiresAt`. */
+  | 'ready'
+  /** The build failed; export again. */
+  | 'failed'
+  /** Past its expiry; export again. */
+  | 'expired';
 
 /**
  * A finished export an emailed link points at (`/shared/files/{id}`). The
@@ -122,4 +134,5 @@ export interface ReportExportFile {
   readonly createdAt: string;
   /** When the file stops being available; `null` when it does not expire. */
   readonly expiresAt: string | null;
+  readonly status: ReportExportStatus;
 }

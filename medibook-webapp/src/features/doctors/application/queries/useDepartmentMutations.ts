@@ -9,12 +9,15 @@ import { deleteDepartment } from '@/features/doctors/application/usecases/delete
 import { updateDepartment } from '@/features/doctors/application/usecases/updateDepartment';
 
 interface SaveDepartmentInput {
-  /** Absent → create; otherwise the department at the version shown (`If-Match`). */
+  /** Absent → create; present → update that row at the version the user edited. */
   readonly existing?: { readonly id: string; readonly version: number };
   readonly input: DepartmentInput;
 }
 
-/** Create or update a department. */
+/**
+ * Create or update a department. A 409 (someone else saved first) refreshes
+ * the list too, so reopening the editor starts from the current version.
+ */
 export function useSaveDepartmentMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -24,7 +27,7 @@ export function useSaveDepartmentMutation() {
           ? updateDepartment(existing.id, input, existing.version)
           : createDepartment(input)),
       ),
-    onSuccess: () => {
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() });
     },
   });

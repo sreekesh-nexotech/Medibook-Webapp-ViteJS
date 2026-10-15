@@ -6,10 +6,12 @@ import {
   WEEK_DAYS,
 } from '@/features/doctors/domain/calendar';
 import type {
+  DoctorScheduleHistory,
   DoctorStatus,
   LeaveKind,
   WeeklySession,
 } from '@/features/doctors/domain/entities/doctors.types';
+import { fmtDate, parseHundredths } from '@/shared/lib/format';
 
 /**
  * Palette cycled for department swatches, in design-token order: blue, p-400,
@@ -282,10 +284,124 @@ export function sameSessions(a: readonly WeeklySession[], b: readonly WeeklySess
  * value instead of silently falling back to the first option.
  */
 export function timeOptionsWith(current: string): readonly string[] {
-  if ((TIME_OPTS as readonly string[]).includes(current)) return TIME_OPTS;
+  if (TIME_OPTS.includes(current)) return TIME_OPTS;
   const minutes = timeLabelToMinutes(current);
   if (minutes == null) return TIME_OPTS;
   return [...TIME_OPTS, current].sort(
     (a, b) => (timeLabelToMinutes(a) ?? 0) - (timeLabelToMinutes(b) ?? 0),
   );
+}
+
+/* --------------------------------------------------------------------- fees */
+
+const PAISE_PER_RUPEE = 100;
+/** Digits with at most one dot and two decimals, as typed so far. */
+const RUPEE_TYPING_PATTERN = /^\d*(\.\d{0,2})?$/;
+
+/**
+ * Paise → the text a fee input shows: whole rupees stay whole ("500"), paise
+ * keep two places ("499.50"). Reading the integer paise — never a float
+ * rupee value — is what keeps ₹499.50 from turning into ₹4,995 (UAT-08).
+ */
+export function paiseToRupeeInput(paise: number): string {
+  const rupees = Math.trunc(paise / PAISE_PER_RUPEE);
+  const rest = Math.abs(paise % PAISE_PER_RUPEE);
+  return rest === 0 ? String(rupees) : `${rupees}.${String(rest).padStart(2, '0')}`;
+}
+
+/**
+ * Keep what a person types into a rupee field to digits, one dot and two
+ * decimals; anything else (₹, letters, a third decimal) is dropped.
+ */
+export function sanitizeRupeeInput(text: string): string {
+  const cleaned = text.replace(/[^0-9.]/g, '');
+  const [whole = '', ...fraction] = cleaned.split('.');
+  const next = fraction.length === 0 ? whole : `${whole}.${fraction.join('').slice(0, 2)}`;
+  return RUPEE_TYPING_PATTERN.test(next) ? next : whole;
+}
+
+/** "499.5" → 49950 paise; `null` when the text is not an amount. */
+export function rupeeInputToPaise(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === '' || trimmed === '.') return null;
+  return parseHundredths(trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed);
+}
+
+/**
+ * A fee field: required, an amount with at most two decimals, ₹0 allowed —
+ * the backend accepts `consultation_fee_paise ≥ 0` (06·Profile F4).
+ */
+export function feeError(text: string, label: string): string | undefined {
+  if (text.trim() === '') return `${label} is required. Enter 0 for a free consultation.`;
+  return rupeeInputToPaise(text) === null
+    ? `${label} must be an amount in rupees, e.g. 500 or 499.50.`
+    : undefined;
+}
+
+/* ------------------------------------------------------------ hours checks */
+
+/**
+ * Per-day problems in a weekly grid: an open day without patterns needs an
+ * end after its start (06·Profile F6 — the backend answers `ends_at` 400
+ * otherwise). Keyed by weekday index; empty when the week is fine.
+ */
+export function weekErrors(week: readonly WeekDay[]): Readonly<Record<number, string>> {
+  const out: Record<number, string> = {};
+  week.forEach((d, i) => {
+    if (!d.on || (d.patternIds ?? []).length > 0) return;
+    const from = timeLabelToMinutes(d.from);
+    const to = timeLabelToMinutes(d.to);
+    if (from == null || to == null) out[i] = 'Pick an opening and a closing time.';
+    else if (to <= from) out[i] = 'The end time must be after the start time.';
+  });
+  return out;
+}
+
+/* --------------------------------------------------------- schedule history */
+
+/** One past leave or date exception, as the history list shows it. */
+export interface ScheduleHistoryLine {
+  readonly key: string;
+  /** ISO date the entry ended — the list is newest first. */
+  readonly sortDate: string;
+  readonly when: string;
+  readonly what: string;
+}
+
+/**
+ * The leave and date exceptions that are over: ended before `today`, the
+ * hospital's calendar day (D-09, UAT-47) — the split the backend's schedule
+ * read makes with `local_today(hospital.timezone)`. Newest first.
+ */
+export function pastScheduleLines(
+  history: DoctorScheduleHistory,
+  today: string,
+): ScheduleHistoryLine[] {
+  return [
+    ...history.leaves
+      .filter((l) => l.dateTo < today)
+      .map((l) => ({
+        key: `leave:${l.id}`,
+        sortDate: l.dateTo,
+        when:
+          l.dateFrom === l.dateTo
+            ? fmtDate(l.dateFrom)
+            : `${fmtDate(l.dateFrom)} – ${fmtDate(l.dateTo)}`,
+        what: `${LEAVE_KIND_LABEL[l.kind]} leave${l.reason ? ` · ${l.reason}` : ''}`,
+      })),
+    ...history.dateExceptions
+      .filter((e) => e.date < today)
+      .map((e) => ({
+        key: `exception:${e.id}`,
+        sortDate: e.date,
+        when: fmtDate(e.date),
+        what: `${
+          e.kind === 'closed'
+            ? 'Closed all day'
+            : e.sessions
+                .map((w) => `${hhmmToLabel(w.startsAt)} – ${hhmmToLabel(w.endsAt)}`)
+                .join(', ')
+        }${e.note ? ` · ${e.note}` : ''}`,
+      })),
+  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
 }

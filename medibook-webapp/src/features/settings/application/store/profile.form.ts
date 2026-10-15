@@ -5,7 +5,8 @@
  * state. No React, no store, no I/O.
  */
 
-import { calendarDate, calendarInstant } from '@/shared/lib/format';
+import { calendarDate, calendarInstant, toLocalISO } from '@/shared/lib/format';
+import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
   AffectedBooking,
@@ -53,6 +54,66 @@ export function holidayDaysWithin(holiday: Holiday, windowFrom: string, windowTo
   const from = holiday.from > windowFrom ? holiday.from : windowFrom;
   const to = holiday.to < windowTo ? holiday.to : windowTo;
   return holidayDayCount(from, to);
+}
+
+/**
+ * Distinct calendar days inside `[windowFrom, windowTo]` that at least one of
+ * `holidays` closes — overlapping closures count each day once (07·P-F3).
+ */
+export function closedDaysWithin(
+  holidays: readonly Holiday[],
+  windowFrom: string,
+  windowTo: string,
+): number {
+  const days = new Set<string>();
+  for (const h of holidays) {
+    const from = h.from > windowFrom ? h.from : windowFrom;
+    const to = h.to < windowTo ? h.to : windowTo;
+    const count = holidayDayCount(from, to);
+    const start = localNoon(from);
+    for (let i = 0; i < count; i += 1) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      days.add(toLocalISO(d));
+    }
+  }
+  return days.size;
+}
+
+/** The upcoming-closures summary of the Holiday Calendar. */
+export interface UpcomingClosures {
+  /** Closures that end on or after `today` and start inside the window. */
+  readonly upcoming: readonly Holiday[];
+  /** Distinct whole-hospital closed days in the window (07·P-F3). */
+  readonly closedDays: number;
+  /** Department closures in the window, counted apart. */
+  readonly departmentClosures: number;
+  /** The earliest upcoming closure, if any. */
+  readonly next: Holiday | null;
+}
+
+/**
+ * Closures in the `horizonDays` from `today` — the hospital's calendar day
+ * (`useHospitalToday`, D-09, UAT-47), so a desk PC on another date neither
+ * drops today's closure nor counts yesterday's.
+ */
+export function upcomingClosures(
+  holidays: readonly Holiday[],
+  today: string,
+  horizonDays: number,
+): UpcomingClosures {
+  const horizonEnd = addIsoDays(today, horizonDays);
+  const upcoming = holidays.filter((h) => h.to >= today && h.from <= horizonEnd);
+  return {
+    upcoming,
+    closedDays: closedDaysWithin(
+      upcoming.filter((h) => h.departmentId === null),
+      today,
+      horizonEnd,
+    ),
+    departmentClosures: upcoming.filter((h) => h.departmentId !== null).length,
+    next: [...upcoming].sort((a, b) => a.from.localeCompare(b.from))[0] ?? null,
+  };
 }
 
 /** How many bookings to name in the confirm dialog before summarising the rest. */

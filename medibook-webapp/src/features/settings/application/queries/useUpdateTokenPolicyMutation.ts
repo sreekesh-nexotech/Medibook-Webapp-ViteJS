@@ -11,7 +11,7 @@ interface UpdateTokenPolicyInput {
   readonly version: number;
 }
 
-/** Change the token policy — scope and reset apply from tomorrow, the rest at once. */
+/** Save the token policy — scope and reset apply from tomorrow, the rest at once. */
 export function useUpdateTokenPolicyMutation() {
   const queryClient = useQueryClient();
   return useMutation({

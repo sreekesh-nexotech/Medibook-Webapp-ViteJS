@@ -3,6 +3,7 @@ import type { Result } from '@/core/error/failure';
 import type {
   ConfigList,
   FeatureFlag,
+  FeatureFlagChanges,
   PlatformSettings,
   PlatformSettingsValues,
   TaxRate,
@@ -19,7 +20,8 @@ export interface OpsSettingsRepository {
   saveSettings(values: PlatformSettingsValues, version: number): Promise<Result<PlatformSettings>>;
 
   listFeatureFlags(): Promise<Result<ConfigList<FeatureFlag>>>;
-  setFeatureFlagEnabled(key: string, enabled: boolean): Promise<Result<FeatureFlag>>;
+  /** Switch, describe or publish a flag; every change lands in the config trail. */
+  updateFeatureFlag(key: string, changes: FeatureFlagChanges): Promise<Result<FeatureFlag>>;
 
   listTaxRates(): Promise<Result<ConfigList<TaxRate>>>;
   createTaxRate(values: TaxRateValues): Promise<Result<TaxRate>>;

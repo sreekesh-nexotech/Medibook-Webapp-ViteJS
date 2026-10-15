@@ -1,0 +1,28 @@
+{
+  "hospital_id": "01a118b6-8eae-7911-aae8-d740c664dc2c",
+  "today": "2026-10-08",
+  "commission_bp": 500,
+  "current_id": "01a118b6-8f19-7393-a12d-bc93cf1f4abc",
+  "results": [
+    {
+      "id": "01a118b8-9575-7d43-bd77-3bf9ffde018f",
+      "commission_bp": 450,
+      "effective_from": "2026-11-01",
+      "status": "scheduled",
+      "note": "Volume discount from next month",
+      "set_by_id": "01a118b6-8de2-78a2-8766-914ba630c637",
+      "set_by_name": "Farah Khan",
+      "created_at": "2026-10-07T23:35:12.501890+00:00"
+    },
+    {
+      "id": "01a118b6-8f19-7393-a12d-bc93cf1f4abc",
+      "commission_bp": 500,
+      "effective_from": "2026-08-13",
+      "status": "current",
+      "note": "initial",
+      "set_by_id": "01a118b6-8da1-7e51-9e59-d80938df2219",
+      "set_by_name": "Kavya Iyer",
+      "created_at": "2026-08-13T04:30:00.109743+00:00"
+    }
+  ]
+}

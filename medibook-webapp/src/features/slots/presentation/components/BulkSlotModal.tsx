@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { formatInstant } from '@/shared/lib/format';
 
-import { TIME_OPTS } from '@/features/doctors/domain/calendar';
+import { END_OF_DAY_LABEL, TIME_OPTS } from '@/features/doctors/domain/calendar';
 import {
   formatIsoDayLabel,
   isoWeekdayIndex,
@@ -16,9 +16,10 @@ import type {
   BulkSlotResult,
 } from '@/features/slots/domain/entities/slots.entities';
 import { timeLabelToHhMm } from '@/features/slots/presentation/components/slotsGridView';
-import { isFailure } from '@/core/error/failure';
+import { isPreviewStale } from '@/features/doctors/presentation/components/scheduleConfirm';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
+import { describeFailure } from '@/shared/lib/serverErrors';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { Field } from '@/shared/ui/Field';
 import { FormModal } from '@/shared/ui/FormModal';
@@ -42,6 +43,9 @@ const ACTION_OPTIONS: readonly BulkAction[] = ['Block', 'Open'];
 const MAX_NAMED_BOOKINGS = 5;
 
 const APPLY_FAILED = 'The bulk update could not be applied. Please try again.';
+
+/** "To" may run to the last minute of the day, so a range can cover late slots too. */
+const TO_OPTIONS: readonly string[] = [...TIME_OPTS, END_OF_DAY_LABEL];
 
 interface BulkForm {
   scopeLabel: string;
@@ -75,6 +79,8 @@ interface BulkSlotModalProps {
   /** Pre-selected doctor when the modal is opened from a grid row. */
   initialDoctorId?: string | null;
   doctors: readonly BulkSlotDoctor[];
+  /** The hospital's zone, for booking times (D-09); the browser's when `null`. */
+  timeZone?: string | null;
   onClose: () => void;
 }
 
@@ -82,18 +88,22 @@ function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
 
-function bookingLine(b: AffectedBooking): string {
+function bookingLine(b: AffectedBooking, timeZone: string | null): string {
   const time = formatInstant(b.scheduledStartAt, {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: timeZone ?? undefined,
   });
   return `${b.tokenLabel ?? b.bookingRef} ${b.patientName} (${time})`;
 }
 
-function bookingsCopy(bookings: readonly AffectedBooking[]): string {
-  const named = bookings.slice(0, MAX_NAMED_BOOKINGS).map(bookingLine).join('; ');
+function bookingsCopy(bookings: readonly AffectedBooking[], timeZone: string | null): string {
+  const named = bookings
+    .slice(0, MAX_NAMED_BOOKINGS)
+    .map((b) => bookingLine(b, timeZone))
+    .join('; ');
   const rest = bookings.length - MAX_NAMED_BOOKINGS;
   return rest > 0 ? `${named}; and ${rest} more` : named;
 }
@@ -113,11 +123,16 @@ export function BulkSlotModal({
   departmentId,
   initialDoctorId,
   doctors,
+  timeZone = null,
   onClose,
 }: BulkSlotModalProps) {
   const apply = useApplyBulkSlotsMutation();
-  // One idempotency key per confirmation: set when the confirm dialog opens.
+  // One idempotency key per confirmation: set when the confirm dialog opens,
+  // reused if Apply is retried after a failure (D-21, UAT-16).
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  // The server refused the confirm because the slots or bookings changed
+  // since the preview (BE-33): the form shows the fresh counts and says so.
+  const [previewChanged, setPreviewChanged] = useState(false);
 
   const weekday = isoWeekdayLabel(date);
   const scopeLabels = useMemo<Readonly<Record<BulkScope, string>>>(
@@ -137,13 +152,16 @@ export function BulkSlotModal({
       scopeLabel: initialDoctorId ? scopeLabels['one-doctor'] : scopeLabels['all-doctors'],
       doctorId: initialDoctorId ?? doctors[0]?.id ?? '',
       action: 'Block',
-      from: TIME_OPTS[0],
-      to: TIME_OPTS[TIME_OPTS.length - 1],
+      from: TIME_OPTS[0] ?? '',
+      to: END_OF_DAY_LABEL,
       weeks: DEFAULT_WEEKS,
       reason: '',
     },
     validate: BULK_VALIDATORS,
-    onSubmit: () => setConfirmKey(crypto.randomUUID()),
+    onSubmit: () => {
+      setPreviewChanged(false);
+      setConfirmKey(crypto.randomUUID());
+    },
   });
 
   const { values } = form;
@@ -186,6 +204,8 @@ export function BulkSlotModal({
   const result: BulkSlotResult | null = preview.data ?? null;
   const count = result?.affectedCount ?? 0;
   const bookings = result?.affectedBookings ?? [];
+  // L-21: patients already in consultation or done keep their slot.
+  const kept = result?.notCancellableBookings ?? [];
   const verb = values.action === 'Block' ? 'blocked' : 'opened';
 
   const doctorName = doctors.find((d) => d.id === values.doctorId)?.name ?? 'this doctor';
@@ -202,6 +222,9 @@ export function BulkSlotModal({
         values.action === 'Open' && result.skippedBooked > 0
           ? `${plural(result.skippedBooked, 'booked slot')} left as they are`
           : '',
+        values.action === 'Block' && kept.length > 0
+          ? `${plural(kept.length, 'booking')} already in consultation or completed kept`
+          : '',
       ]
         .filter(Boolean)
         .join(', ')
@@ -211,10 +234,8 @@ export function BulkSlotModal({
     ? 'Fix the highlighted fields to see how many slots this covers.'
     : preview.isPending
       ? 'Counting the slots in that range…'
-      : preview.isLoadingError
-        ? isFailure(preview.error)
-          ? preview.error.message
-          : APPLY_FAILED
+      : preview.isError
+        ? describeFailure(preview.error, APPLY_FAILED)
         : count === 0
           ? `No ${values.action === 'Block' ? 'open or booked' : 'blocked'} slots in that range for ${scopeCopy}.`
           : `${plural(count, 'slot')} will be ${verb} for ${scopeCopy}.${
@@ -233,6 +254,7 @@ export function BulkSlotModal({
       {
         request: { ...request, reason: values.reason.trim() || undefined },
         idempotencyKey: confirmKey,
+        previewToken: result?.previewToken ?? null,
       },
       {
         onSuccess: (done) => {
@@ -246,7 +268,17 @@ export function BulkSlotModal({
           setConfirmKey(null);
           onClose();
         },
-        onError: (error) => toast(isFailure(error) ? error.message : APPLY_FAILED, 'error', error),
+        onError: (error) => {
+          if (isPreviewStale(error)) {
+            // Back to the form: the preview re-runs and shows what applies now.
+            setConfirmKey(null);
+            setPreviewChanged(true);
+            void preview.refetch();
+            return;
+          }
+          // The confirm stays open; Apply retries with the same key.
+          toast(describeFailure(error, APPLY_FAILED), 'error', error);
+        },
       },
     );
   };
@@ -256,7 +288,7 @@ export function BulkSlotModal({
     values.action === 'Block'
       ? `Block ${plural(count, 'slot')} for ${scopeCopy}? Patients can no longer book them in the Medibook app.${
           bookings.length > 0
-            ? ` This also cancels ${plural(bookings.length, 'booking')} with a full refund: ${bookingsCopy(bookings)}.`
+            ? ` This also cancels ${plural(bookings.length, 'booking')} with a full refund: ${bookingsCopy(bookings, timeZone)}.`
             : ''
         }`
       : `Open ${plural(count, 'slot')} for ${scopeCopy}? They become bookable in the Medibook app again.`;
@@ -277,6 +309,16 @@ export function BulkSlotModal({
         disabled={!isReady}
       >
         <div className="flex flex-col gap-4.5">
+          {previewChanged && (
+            <p
+              role="alert"
+              className="text-body bg-y-100 text-y-700 flex items-start gap-2 rounded-md px-3 py-2.5"
+            >
+              <Icon name="triangle-alert" size={16} className="mt-0.5 flex-none" />
+              The slots or bookings in this range changed since the preview. Check the updated count
+              below before applying.
+            </p>
+          )}
           <Field label="Apply to" required>
             <Select
               value={values.scopeLabel}
@@ -326,7 +368,7 @@ export function BulkSlotModal({
             >
               <Select
                 value={values.to}
-                options={TIME_OPTS}
+                options={TO_OPTIONS}
                 onChange={(v) => form.setField('to', v)}
                 onBlur={() => form.blurField('to')}
               />

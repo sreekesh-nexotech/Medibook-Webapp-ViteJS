@@ -4,7 +4,7 @@ import { setCalendarZone } from '@/shared/lib/format';
 import { isFailure } from '@/core/error/failure';
 
 import { OpsShell } from '@/app/layouts/OpsShell';
-import { AUTH_LOGIN_PATH } from '@/app/router/paths';
+import { loginPathFor } from '@/app/router/paths';
 import { SessionError } from '@/app/router/SessionError';
 import { SessionLoading } from '@/app/router/SessionLoading';
 import { useSessionExit } from '@/app/router/useSessionExit';
@@ -26,7 +26,7 @@ export function OpsGuard() {
   if (!data) {
     if (session.isLoadingError) {
       if (isFailure(session.error) && session.error.kind === 'unauthorized') {
-        return <Navigate to={AUTH_LOGIN_PATH} replace />;
+        return <Navigate to={loginPathFor('platform')} replace />;
       }
       return (
         <SessionError
@@ -37,7 +37,7 @@ export function OpsGuard() {
         />
       );
     }
-    if (session.fetchStatus === 'idle') return <Navigate to={AUTH_LOGIN_PATH} replace />;
+    if (session.fetchStatus === 'idle') return <Navigate to={loginPathFor('platform')} replace />;
     if (session.fetchStatus === 'paused') return <OfflineSession onLogout={logout} />;
     return <SessionLoading />;
   }
