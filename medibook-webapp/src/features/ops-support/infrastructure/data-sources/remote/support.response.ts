@@ -8,6 +8,7 @@ import type {
   TicketMessage,
 } from '@/features/ops-support/domain/entities/support.entities';
 import {
+  MESSAGE_AUTHOR_KINDS,
   TICKET_CATEGORIES,
   TICKET_PRIORITIES,
   TICKET_RAISERS,
@@ -47,7 +48,7 @@ export const ticketResponseSchema = z.object({
 /** `tickets.serialize_message`; `is_internal` is sent to platform staff only. */
 export const ticketMessageResponseSchema = z.object({
   id: z.string(),
-  author_kind: z.enum(['requester', 'platform_staff']),
+  author_kind: z.enum(MESSAGE_AUTHOR_KINDS),
   author_name: z.string().nullable(),
   body: z.string(),
   attachment_file_ids: z.array(z.string()),
@@ -55,16 +56,16 @@ export const ticketMessageResponseSchema = z.object({
   is_internal: z.boolean().optional(),
 });
 
+export const ticketPageResponseSchema = paginatedSchema(ticketResponseSchema);
+
 export const ticketDetailResponseSchema = ticketResponseSchema.extend({
   messages: z.array(ticketMessageResponseSchema),
 });
 
-export const ticketPageResponseSchema = paginatedSchema(ticketResponseSchema);
-
 export type TicketResponse = z.infer<typeof ticketResponseSchema>;
 export type TicketMessageResponse = z.infer<typeof ticketMessageResponseSchema>;
-export type TicketDetailResponse = z.infer<typeof ticketDetailResponseSchema>;
 export type TicketPageResponse = z.infer<typeof ticketPageResponseSchema>;
+export type TicketDetailResponse = z.infer<typeof ticketDetailResponseSchema>;
 
 export function toSupportTicket(dto: TicketResponse): SupportTicket {
   return {
@@ -72,6 +73,8 @@ export function toSupportTicket(dto: TicketResponse): SupportTicket {
     ticketNo: dto.ticket_no,
     raisedByKind: dto.raised_by_kind,
     raisedByName: dto.raised_by_name ?? null,
+    requesterKind: dto.raised_by_kind,
+    requesterId: dto.raised_by_id ?? null,
     hospitalId: dto.hospital_id,
     hospitalName: dto.hospital_name ?? null,
     category: dto.category,
@@ -81,6 +84,7 @@ export function toSupportTicket(dto: TicketResponse): SupportTicket {
     status: dto.status,
     assignedToId: dto.assigned_to_id ?? null,
     assignedToName: dto.assigned_to_name ?? null,
+    assigneeId: dto.assigned_to_id ?? null,
     allowedTransitions: dto.allowed_transitions ?? null,
     resolvedAt: dto.resolved_at,
     closedAt: dto.closed_at,
@@ -97,6 +101,7 @@ export function toTicketMessage(dto: TicketMessageResponse): TicketMessage {
     authorName: dto.author_name,
     body: dto.body,
     attachmentFileIds: dto.attachment_file_ids,
+    attachmentIds: dto.attachment_file_ids,
     isInternal: dto.is_internal ?? false,
     occurredAt: dto.occurred_at,
   };

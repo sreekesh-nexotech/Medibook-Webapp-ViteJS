@@ -44,7 +44,7 @@ function Stars({ rating }: { rating: number }) {
           key={i}
           name="star"
           size={15}
-          className={cn(i < rating ? 'text-y-600' : 'text-text-faint')}
+          className={cn(i < rating ? 'text-y-800' : 'text-text-faint')}
         />
       ))}
     </span>
@@ -203,7 +203,7 @@ export function OpsReviewsScreen() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-d-500"
+                      className="text-d-600"
                       disabled={busyId !== null}
                       onClick={() => setRejecting(r)}
                     >

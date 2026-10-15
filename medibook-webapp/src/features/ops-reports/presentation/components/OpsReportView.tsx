@@ -211,7 +211,7 @@ export function OpsReportView({ report, onBack }: OpsReportViewProps) {
           >
             {applied ? 'Run again' : 'Run report'}
           </Button>
-          <span className={cn('text-caption', dirty ? 'text-y-600' : 'text-text-muted')}>
+          <span className={cn('text-caption', dirty ? 'text-y-800' : 'text-text-muted')}>
             {dirty
               ? 'Filters changed — run again to update the preview.'
               : applied

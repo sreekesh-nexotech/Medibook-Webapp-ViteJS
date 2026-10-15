@@ -47,7 +47,7 @@ export function UnsavedBar({
           <span className="text-caption text-text-muted">{dirtyLabel}</span>
         </>
       ) : (
-        <span className="text-caption text-text-faint">{savedLabel}</span>
+        <span className="text-caption text-text-muted">{savedLabel}</span>
       )}
       <div className="flex-1" />
       <Button variant="secondary" disabled={blocked} onClick={onDiscard}>

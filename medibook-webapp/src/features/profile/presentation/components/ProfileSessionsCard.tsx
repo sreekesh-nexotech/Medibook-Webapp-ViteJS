@@ -52,7 +52,11 @@ export function ProfileSessionsCard({
       {
         onSuccess: () => toast('That device was signed out'),
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not sign that device out.', 'error'),
+          toast(
+            isFailure(failure) ? failure.message : 'Could not sign that device out.',
+            'error',
+            failure,
+          ),
       },
     );
   };
@@ -62,7 +66,11 @@ export function ProfileSessionsCard({
     everywhere.mutate(surface, {
       onSuccess: onSignedOut,
       onError: (failure) =>
-        toast(isFailure(failure) ? failure.message : 'Could not sign out everywhere.', 'error'),
+        toast(
+          isFailure(failure) ? failure.message : 'Could not sign out everywhere.',
+          'error',
+          failure,
+        ),
     });
   };
 
@@ -73,9 +81,10 @@ export function ProfileSessionsCard({
         <Spinner size={24} label="Loading your devices" />
       </div>
     );
-  } else if (sessions.isError) {
+  } else if (sessions.isLoadingError) {
     body = (
       <ErrorState
+        error={sessions.error}
         inline
         title="Could not load your devices"
         message={isFailure(sessions.error) ? sessions.error.message : undefined}

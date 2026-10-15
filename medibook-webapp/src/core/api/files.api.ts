@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-import { isFileStoreUrl } from '@/core/api/fileUrls';
 import { ifMatch } from '@/core/api/headers';
+import { isFileStoreUrl } from '@/core/api/fileUrls';
 import { sharedApi } from '@/core/api/http';
 import { activeSurface } from '@/core/api/surface';
 import { FILE_UPLOAD_MAX_BYTES, FILE_UPLOAD_RULES, normaliseMime } from '@/core/api/files.rules';

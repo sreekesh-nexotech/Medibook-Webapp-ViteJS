@@ -7,7 +7,6 @@ import type {
 
 /** Leading characters of a UUID shown when no name is available. */
 const ID_PREVIEW = 8;
-
 /** Audit timestamps read in IST, the console's timezone (backend `audit_log_spec`). */
 const LOG_TIME_ZONE = 'Asia/Kolkata';
 
@@ -171,4 +170,9 @@ export function isUuid(value: string): boolean {
 /** File name for a server export of the trail on a given day. */
 export function logsExportFileName(today: string): string {
   return `medibook-compliance-logs-${today}.csv`;
+}
+
+/** The request behind an entry — `POST /api/v1/platform/plans` — or a background task. */
+export function requestOf(method: string, path: string): string {
+  return method === 'TASK' || !path ? 'Background task' : `${method} ${path}`;
 }

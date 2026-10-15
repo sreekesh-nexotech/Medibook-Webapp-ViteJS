@@ -60,7 +60,7 @@ const STATUS_DOT: Readonly<Record<QueuePill, string>> = {
 
 /** Per-status pill background + text (design `DOC_STATUS_META`). */
 const STATUS_PILL: Readonly<Record<QueuePill, string>> = {
-  Consulting: 'bg-g-100 text-g-700',
+  Consulting: 'bg-g-100 text-g-800',
   Waiting: 'bg-y-100 text-y-700',
   'On Break': 'bg-grey-300 text-text-muted',
   Available: 'bg-blue-soft-bg text-blue',
@@ -162,7 +162,7 @@ export function DoctorQueueCard({
     if (isFailure(error) && (error.kind === NOT_FOUND || isStaleQueueRefusal(error.code))) {
       onStale();
     }
-    toast(failureText(error, fallback), 'error');
+    toast(failureText(error, fallback), 'error', error);
   };
 
   const runSession = (command: SessionCommand) =>
@@ -247,7 +247,7 @@ export function DoctorQueueCard({
             <span
               className={cn(
                 'text-caption flex-none font-semibold',
-                elapsed != null && elapsed > expectedMinutes ? 'text-d-500' : 'text-text-muted',
+                elapsed != null && elapsed > expectedMinutes ? 'text-d-600' : 'text-text-muted',
               )}
             >
               {elapsed == null ? '' : elapsed === 0 ? 'just now' : `${elapsed} min`}
@@ -444,7 +444,7 @@ export function DoctorQueueCard({
               label={isPaused ? 'Resume the session' : 'Pause the session — take a break'}
               box={34}
               size={15}
-              color={isPaused ? 'var(--color-g-600)' : undefined}
+              color={isPaused ? 'var(--color-g-800)' : undefined}
               disabled={busy}
               onClick={() => runSession(isPaused ? 'resume' : 'pause')}
             />

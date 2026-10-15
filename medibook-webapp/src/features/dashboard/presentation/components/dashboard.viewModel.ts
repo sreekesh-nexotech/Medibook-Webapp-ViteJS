@@ -1,5 +1,6 @@
 import { formatTimeIn, formatWeekdayDayIn, isoDayIn } from '@/shared/lib/hospitalTime';
 import type { BarChartDatum } from '@/shared/ui/BarChart';
+import { formatInstant } from '@/shared/lib/format';
 
 import type {
   AdminDashboard,
@@ -21,8 +22,8 @@ const STATUS_BARS: readonly { code: string; label: string; color: string }[] = [
   { code: 'checked_in', label: 'Checked in', color: 'var(--color-p-400)' },
   { code: 'in_consultation', label: 'In consult', color: 'var(--color-blue-strong)' },
   { code: 'completed', label: 'Completed', color: 'var(--color-g-500)' },
-  { code: 'no_show', label: 'No-show', color: 'var(--color-orange)' },
-  { code: 'cancelled', label: 'Cancelled', color: 'var(--color-d-500)' },
+  { code: 'no_show', label: 'No-show', color: 'var(--color-orange-strong)' },
+  { code: 'cancelled', label: 'Cancelled', color: 'var(--color-d-600)' },
 ];
 
 /**
@@ -207,4 +208,11 @@ export function revenueByMethod(data: AdminDashboard): readonly RevenueRow[] {
   return [...rows(data.collectedByMethod, data.refundedByMethod, METHOD_LABEL, [])].sort(
     (a, b) => b.collected - a.collected,
   );
+}
+
+const TIME_FORMAT: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+
+/** ISO date-time → "10:30 am". */
+export function clockTime(iso: string): string {
+  return formatInstant(iso, TIME_FORMAT);
 }

@@ -24,9 +24,9 @@ export function AccessSummary({ perms }: AccessSummaryProps) {
     ) : null;
   return (
     <div className="flex flex-col gap-1.5">
-      {line('circle-check', 'text-g-600', 'Full access', b.full)}
+      {line('circle-check', 'text-g-800', 'Full access', b.full)}
       {line('pencil', 'text-blue', 'Limited (some actions)', b.partial)}
-      {line('eye', 'text-y-600', 'View only', b.viewOnly)}
+      {line('eye', 'text-y-800', 'View only', b.viewOnly)}
       {b.none > 0 && (
         <span className="text-caption text-text-muted flex items-center gap-1.75">
           <Icon name="circle-slash" size={14} className="text-text-faint flex-none" /> No access to{' '}

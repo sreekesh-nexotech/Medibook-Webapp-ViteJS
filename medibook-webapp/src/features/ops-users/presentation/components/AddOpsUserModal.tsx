@@ -99,7 +99,7 @@ export function AddOpsUserModal({
     const nameErr = fe.first_name?.[0] ?? fe.last_name?.[0] ?? null;
     const emailErr = fe.email?.[0] ?? null;
     if (nameErr || emailErr) setErr({ name: nameErr, email: emailErr });
-    toast(fe.role_id?.[0] ?? emailErr ?? nameErr ?? failure.message, 'error');
+    toast(fe.role_id?.[0] ?? emailErr ?? nameErr ?? failure.message, 'error', failure);
   };
 
   const submit = () => {
@@ -151,7 +151,7 @@ export function AddOpsUserModal({
           <TextInput
             value={f.name}
             name="name"
-            autoComplete="name"
+            autoComplete="off"
             readOnly={editing}
             onChange={(v) => {
               setF({ ...f, name: v });
@@ -167,7 +167,7 @@ export function AddOpsUserModal({
             name="email"
             type="email"
             inputMode="email"
-            autoComplete="email"
+            autoComplete="off"
             readOnly={editing}
             onChange={(v) => {
               setF({ ...f, email: v });

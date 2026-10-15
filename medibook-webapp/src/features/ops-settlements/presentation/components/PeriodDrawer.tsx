@@ -303,7 +303,7 @@ function AdjustmentsSection({
               <span
                 className={cn(
                   'text-body flex-none font-medium tabular-nums',
-                  a.amountRupees < 0 ? 'text-d-700' : 'text-g-600',
+                  a.amountRupees < 0 ? 'text-d-700' : 'text-g-800',
                 )}
               >
                 {money(a.amountRupees)}

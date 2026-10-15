@@ -50,7 +50,7 @@ export function RegenerateResultModal({
           <p className="text-body text-text-body">{runChangesCopy(result)}.</p>
           {kept.length === 0 ? (
             <p className="text-body text-text-muted flex items-center gap-2">
-              <Icon name="circle-check" size={16} className="text-g-700 flex-none" /> No booking was
+              <Icon name="circle-check" size={16} className="text-g-800 flex-none" /> No booking was
               left on a slot the rules no longer produce.
             </p>
           ) : (

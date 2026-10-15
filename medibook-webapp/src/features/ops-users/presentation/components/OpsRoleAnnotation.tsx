@@ -26,7 +26,7 @@ export function OpsRoleAnnotation({ role, modules }: OpsRoleAnnotationProps) {
       </span>
       {can.map((g) => (
         <span key={g.heading} className="text-caption text-text-body flex items-start gap-1.75">
-          <Icon name="circle-check" size={14} className="text-g-600 mt-px flex-none" />{' '}
+          <Icon name="circle-check" size={14} className="text-g-800 mt-px flex-none" />{' '}
           <span>
             <span className="capitalize">{g.heading}</span>: {g.modules.join(', ')}
           </span>

@@ -1,6 +1,8 @@
 import { Button } from '@/shared/ui/Button';
 import { ErrorState } from '@/shared/ui/ErrorState';
 
+import { shortReference } from '@/core/error/reference';
+
 import { isStaleBuildError } from '@/app/staleBuild';
 
 interface ScreenErrorProps {
@@ -10,6 +12,8 @@ interface ScreenErrorProps {
   onRetry: () => void;
   /** Label of the way-out button; the ops console's home is not always a dashboard. */
   homeLabel?: string;
+  /** The crash report's id, shown for support (OBS-01). */
+  reference?: string | null;
 }
 
 /**
@@ -22,6 +26,7 @@ export function ScreenError({
   onHome,
   onRetry,
   homeLabel = 'Back to Dashboard',
+  reference = null,
 }: ScreenErrorProps) {
   // Re-rendering cannot fix a code file removed by a redeploy (React.lazy
   // keeps the failure); a reload fetches the new build (RUN-01).
@@ -31,6 +36,7 @@ export function ScreenError({
       title="This screen hit a snag"
       message={`Something didn't load right. You can retry, or use "${homeLabel}" — your data is safe.`}
       onRetry={retry}
+      reference={reference ? shortReference(reference) : null}
     >
       <Button icon="house" onClick={onHome}>
         {homeLabel}

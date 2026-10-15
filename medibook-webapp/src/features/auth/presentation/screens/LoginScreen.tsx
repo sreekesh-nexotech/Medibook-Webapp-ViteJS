@@ -26,6 +26,7 @@ import { useLoginMutation } from '@/features/auth/application/queries/useLoginMu
 import { hospitalUrlRole } from '@/features/auth/application/store/auth.roles';
 import { AuthAlert } from '@/features/auth/presentation/components/AuthAlert';
 import { AuthField } from '@/features/auth/presentation/components/AuthField';
+import { AuthPasswordField } from '@/features/auth/presentation/components/AuthPasswordField';
 import { BrandPanel } from '@/features/auth/presentation/components/BrandPanel';
 import { loginErrorMessage } from '@/features/auth/presentation/components/loginErrors';
 
@@ -65,7 +66,6 @@ export function LoginScreen() {
   );
   const [email, setEmail] = useState('');
   const [pwd, setPwd] = useState('');
-  const [show, setShow] = useState(false);
   // Off by default: front-desk terminals are shared (SEC-02).
   const [remember, setRemember] = useState(false);
   const [err, setErr] = useState('');
@@ -99,8 +99,8 @@ export function LoginScreen() {
     });
   };
 
-  const go = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const go = (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     if (loginMutation.isPending) return;
     if (!email.trim() || !pwd.trim()) {
       setErr('Enter your email and password to continue.');
@@ -129,8 +129,8 @@ export function LoginScreen() {
   return (
     <div className="flex h-full bg-white">
       <BrandPanel />
-      <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
-        <form className="w-full max-w-100" onSubmit={go} noValidate>
+      <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+        <div className="w-full max-w-100">
           <div
             role="group"
             aria-label="Sign in to"
@@ -164,37 +164,31 @@ export function LoginScreen() {
               <Icon name="file-down" size={15} /> Sign in to download the report from your email.
             </div>
           )}
-          <div className="flex flex-col gap-5">
+          {/* A form, so Enter signs in from either field (A11Y-04). */}
+          <form
+            noValidate
+            className="flex flex-col gap-5"
+            onSubmit={go}
+          >
             <AuthField
               label="Email Address"
+              type="email"
+              autoComplete="username"
               value={email}
               onChange={(v) => {
                 setEmail(v);
                 if (err) setErr('');
               }}
               placeholder={isOps ? 'you@medibook.com' : 'you@hospital.med'}
-              type="email"
-              autoComplete="username"
             />
-            <AuthField
+            <AuthPasswordField
               label="Password"
-              type={show ? 'text' : 'password'}
               autoComplete="current-password"
               value={pwd}
               onChange={(v) => {
                 setPwd(v);
                 if (err) setErr('');
               }}
-              trailing={
-                <button
-                  type="button"
-                  onClick={() => setShow((s) => !s)}
-                  className="flex"
-                  aria-label={show ? 'Hide password' : 'Show password'}
-                >
-                  <Icon name={show ? 'eye-off' : 'eye'} size={18} />
-                </button>
-              }
             />
             {err && <AuthAlert message={err} />}
             <div className="flex items-center justify-between gap-3">
@@ -235,14 +229,14 @@ export function LoginScreen() {
             >
               Login
             </Button>
-          </div>
-          <p className="text-caption text-text-faint mt-7 text-center">
+          </form>
+          <p className="text-caption text-text-muted mt-7 text-center">
             {isOps
               ? 'Restricted to Medibook operations staff.'
               : 'Trouble signing in? Contact your hospital administrator.'}
           </p>
-        </form>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

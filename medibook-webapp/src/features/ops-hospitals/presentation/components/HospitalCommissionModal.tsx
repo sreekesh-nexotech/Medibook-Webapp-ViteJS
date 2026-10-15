@@ -79,7 +79,7 @@ export function HospitalCommissionModal({ h, onClose }: HospitalCommissionModalP
         );
         onClose();
       } catch (error) {
-        toast(isFailure(error) ? error.message : SAVE_FAILED, 'error');
+        toast(isFailure(error) ? error.message : SAVE_FAILED, 'error', error);
       }
     },
   });
@@ -88,6 +88,7 @@ export function HospitalCommissionModal({ h, onClose }: HospitalCommissionModalP
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={`Commission for ${h.name}`}

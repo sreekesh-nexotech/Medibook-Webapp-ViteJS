@@ -65,7 +65,14 @@ export function InvitationForm({ token, invitation, onAccepted }: InvitationForm
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <form
+      noValidate
+      className="flex flex-col gap-5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
       <p className="text-body text-text-muted">
         You'll sign in as <b className="text-text-body">{invitation.email}</b>.
       </p>
@@ -87,6 +94,7 @@ export function InvitationForm({ token, invitation, onAccepted }: InvitationForm
       />
       <AuthPasswordField
         label={invitation.accountExists ? 'New Password for this Account' : 'Password'}
+        autoComplete="new-password"
         value={password}
         onChange={(v) => {
           setPassword(v);
@@ -95,6 +103,7 @@ export function InvitationForm({ token, invitation, onAccepted }: InvitationForm
       />
       <AuthPasswordField
         label="Confirm Password"
+        autoComplete="new-password"
         value={confirm}
         onChange={(v) => {
           setConfirm(v);
@@ -108,13 +117,13 @@ export function InvitationForm({ token, invitation, onAccepted }: InvitationForm
       )}
       {err && <AuthAlert message={err} />}
       <Button
+        type="submit"
         variant="info"
         className="h-13.5 w-full rounded-sm"
-        onClick={submit}
         busy={accept.isPending}
       >
         Accept & Sign In
       </Button>
-    </div>
+    </form>
   );
 }

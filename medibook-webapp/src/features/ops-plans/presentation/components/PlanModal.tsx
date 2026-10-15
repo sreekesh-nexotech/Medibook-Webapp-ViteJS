@@ -218,6 +218,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
   const defaultTrialDays = platformTrialDays ?? FALLBACK_TRIAL_DAYS;
   const isNew = !plan;
 
+
   const validate = useMemo<FormValidators<PlanFormValues>>(
     () => ({
       name: (value) => {
@@ -310,6 +311,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={plan ? `Edit ${plan.name}` : 'Create Plan'}
@@ -329,7 +331,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
         {values.custom && (
           <div className="text-caption text-text-muted bg-blue-soft-bg flex items-start gap-2 rounded-sm px-3 py-2.5">
             <Icon name="info" size={14} className="mt-px flex-none" /> Hospital-specific plans are
-            negotiated per tenant — put the hospital in the name (e.g. &quot;Custom — Apollo
+            negotiated per tenant — put the hospital in the name (e.g. &quot;Custom — Example
             Hospital&quot;) so it&apos;s recognisable everywhere plans appear.
           </div>
         )}
@@ -338,7 +340,7 @@ export function PlanModal({ open, plan, onClose, onDone }: PlanModalProps) {
             value={values.name}
             onChange={(v) => form.setField('name', v)}
             onBlur={() => form.blurField('name')}
-            placeholder={values.custom ? 'e.g. Custom — Apollo Hospital' : 'e.g. Growth'}
+            placeholder={values.custom ? 'e.g. Custom — Example Hospital' : 'e.g. Growth'}
             height={48}
           />
         </OpsField>

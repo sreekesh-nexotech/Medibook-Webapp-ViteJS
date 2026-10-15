@@ -18,8 +18,6 @@ export const AUDIT_ACTION_OPTIONS = [
   { code: 'http.delete', label: 'Delete' },
 ] as const;
 
-export type AuditActionLabel = (typeof AUDIT_ACTION_OPTIONS)[number]['label'];
-
 /** Filter label → action code. */
 export function actionCodeFor(label: string): string | undefined {
   return AUDIT_ACTION_OPTIONS.find((o) => o.label === label)?.code;

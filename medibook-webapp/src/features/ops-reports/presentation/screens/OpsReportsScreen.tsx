@@ -43,9 +43,10 @@ export function OpsReportsScreen() {
     );
   }
 
-  if (reports.isError) {
+  if (reports.isLoadingError) {
     return (
       <ErrorState
+        error={reports.error}
         title="Reports didn't load"
         message={isFailure(reports.error) ? reports.error.message : undefined}
         onRetry={() => void reports.refetch()}

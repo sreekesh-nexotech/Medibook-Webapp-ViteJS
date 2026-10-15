@@ -2,13 +2,13 @@
   "results": [
     {
       "id": "01a0ee28-e882-7011-bb5f-c269c60e2a02",
-      "booking_ref": "LKSB-2608-00002",
+      "booking_ref": "EXMB-2608-00002",
       "status": "no_show",
       "status_reason": null,
       "source": "walk_in",
       "patient": {
         "id": "01a0ee28-e848-76f2-9b5e-2d47712bf5dc",
-        "mrn": "LKSM000002",
+        "mrn": "EXMM000002",
         "full_name": "Ramesh Babu",
         "phone_e164": "+910000000000",
         "gender": "male",
@@ -80,13 +80,13 @@
     },
     {
       "id": "01a0ee28-e93f-7930-91ad-7125e82a20c1",
-      "booking_ref": "LKSB-2608-00003",
+      "booking_ref": "EXMB-2608-00003",
       "status": "completed",
       "status_reason": null,
       "source": "walk_in",
       "patient": {
         "id": "01a0ee28-e8f9-7271-a98e-44859f3600a1",
-        "mrn": "LKSM000003",
+        "mrn": "EXMM000003",
         "full_name": "Abdul Kareem",
         "phone_e164": "+910000000000",
         "gender": "male",
@@ -158,13 +158,13 @@
     },
     {
       "id": "01a0ee28-f3fe-7351-977c-21cb3d8e6f91",
-      "booking_ref": "LKSB-2608-00004",
+      "booking_ref": "EXMB-2608-00004",
       "status": "completed",
       "status_reason": null,
       "source": "online",
       "patient": {
         "id": "01a0ee28-f3d4-77f1-b97a-424a099d93c9",
-        "mrn": "LKSM000004",
+        "mrn": "EXMM000004",
         "full_name": "Fathima Beevi",
         "phone_e164": "+910000000000",
         "gender": null,
@@ -245,13 +245,13 @@
     },
     {
       "id": "01a0ee29-13bc-7382-9078-05f8904d0e3f",
-      "booking_ref": "LKSB-2608-00009",
+      "booking_ref": "EXMB-2608-00009",
       "status": "completed",
       "status_reason": null,
       "source": "walk_in",
       "patient": {
         "id": "01a0ee29-0392-7b20-890f-c734c51972ef",
-        "mrn": "LKSM000006",
+        "mrn": "EXMM000006",
         "full_name": "Priya Nair",
         "phone_e164": "+910000000000",
         "gender": null,
@@ -323,13 +323,13 @@
     },
     {
       "id": "01a0ee29-146a-7af1-8cc6-6be25966ade9",
-      "booking_ref": "LKSB-2608-00010",
+      "booking_ref": "EXMB-2608-00010",
       "status": "no_show",
       "status_reason": null,
       "source": "walk_in",
       "patient": {
         "id": "01a0ee29-142e-7702-ae5d-a0a9413530c9",
-        "mrn": "LKSM000008",
+        "mrn": "EXMM000008",
         "full_name": "Yusuf Pathan",
         "phone_e164": "+910000000000",
         "gender": "male",

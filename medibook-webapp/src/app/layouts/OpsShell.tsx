@@ -22,16 +22,15 @@ import { useOpsSettingsQuery } from '@/features/ops-settings/application/queries
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { IdleWarningModal } from './IdleWarningModal';
+import { ConnectionNotice } from './ConnectionNotice';
 import { OPS_DETAIL_PARENT, opsDocumentTitleFor } from './ops-nav';
 import { OpsSidebar } from './OpsSidebar';
 import { OpsTopbar } from './OpsTopbar';
 import { ScreenError } from './ScreenError';
+import { MAIN_CONTENT_ID, SkipLink } from './SkipLink';
 import { SidebarDrawer } from './SidebarDrawer';
 import { useSidebarMode } from './useSidebarMode';
 import { createViewHistory } from './view-history';
-
-/** Skeleton duration on every view change (design behaviour). */
-const SKELETON_MS = 450;
 
 /**
  * Module-level visited-view stack (the prototype's `OpsShell` histRef);
@@ -40,19 +39,13 @@ const SKELETON_MS = 450;
  */
 const history = createViewHistory<OpsView>();
 
-/** Skeleton phase: which view is being revealed, and whether it is still loading. */
-interface SkeletonPhase {
-  readonly view: OpsView;
-  readonly loading: boolean;
-}
-
 interface OpsShellProps {
   /** The validated session (`GET /platform/me`). */
   session: PlatformSession;
   onLogout: () => void;
 }
 
-/** Ops console frame: sidebar + topbar + skeleton + error boundary (design `OpsShell`). */
+/** Ops console frame: sidebar + topbar + error boundary (design `OpsShell`). */
 export function OpsShell({ session, onLogout }: OpsShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,19 +64,6 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
   const [navOpen, setNavOpen] = useState(false);
 
   useDocumentTitle(opsDocumentTitleFor(view));
-
-  // 450ms skeleton on every view change — the loading flag flips on during
-  // render (React's derive-while-rendering pattern) and off via the timer.
-  const [phase, setPhase] = useState<SkeletonPhase>({ view, loading: true });
-  if (phase.view !== view) setPhase({ view, loading: true });
-  useEffect(() => {
-    const t = setTimeout(
-      () => setPhase((p) => (p.view === view ? { view, loading: false } : p)),
-      SKELETON_MS,
-    );
-    return () => clearTimeout(t);
-  }, [view]);
-  const loading = phase.loading || phase.view !== view;
 
   // History-aware back — recorded synchronously in render so availability is
   // correct immediately (exactly like the prototype).
@@ -126,6 +106,7 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
 
   return (
     <div className="bg-bg-app flex h-full overflow-hidden">
+      <SkipLink />
       {sidebarMode !== 'drawer' && sidebar(sidebarMode)}
       <div className="flex min-w-0 flex-1 flex-col">
         <OpsTopbar
@@ -142,14 +123,20 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
           onBack={onBack}
           onMenu={sidebarMode === 'full' ? undefined : () => setNavOpen(true)}
         />
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
+        <ConnectionNotice />
+        <main
+          id={MAIN_CONTENT_ID}
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto p-3 outline-none sm:p-4 lg:p-5"
+        >
           <ErrorBoundary
             key={view}
-            fallback={(err, reset) => (
+            fallback={(err, reset, reference) => (
               // `/ops` sends each role to the first screen it may open; not
               // every platform role has the dashboard (UAT-35).
               <ScreenError
                 error={err}
+                reference={reference}
                 onRetry={reset}
                 homeLabel="Back to start"
                 onHome={() => {
@@ -159,15 +146,14 @@ export function OpsShell({ session, onLogout }: OpsShellProps) {
               />
             )}
           >
-            {loading ? (
-              <OpsSkeleton />
-            ) : (
-              <Suspense fallback={<OpsSkeleton />}>
-                <Outlet />
-              </Suspense>
-            )}
+            {/* The skeleton shows only while a screen's code loads; each screen
+                shows its own loading state for data, so a cached screen
+                renders at once (PERF-06). */}
+            <Suspense fallback={<OpsSkeleton />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
-        </div>
+        </main>
       </div>
       <SidebarDrawer
         open={navOpen && sidebarMode !== 'full'}

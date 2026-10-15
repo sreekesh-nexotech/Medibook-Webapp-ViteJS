@@ -21,7 +21,7 @@ export function InfoGrid({ items }: InfoGridProps) {
       <div className="grid grid-cols-3 gap-x-6 gap-y-5">
         {items.map((it) => (
           <div key={it.k} className="flex flex-col gap-1">
-            <span className="text-caption text-text-faint">{it.k}</span>
+            <span className="text-caption text-text-muted">{it.k}</span>
             <span
               className={cn('text-body text-text-strong font-medium', it.num && 'tabular-nums')}
             >

@@ -203,7 +203,7 @@ export function PhiAccessCard() {
             invalid={actorInvalid}
           />
           {actorInvalid && (
-            <span className="text-caption text-d-500">Paste the full user id (a UUID).</span>
+            <span className="text-caption text-d-600">Paste the full user id (a UUID).</span>
           )}
         </div>
         <div className="w-80">
@@ -215,7 +215,7 @@ export function PhiAccessCard() {
             invalid={subjectInvalid}
           />
           {subjectInvalid && (
-            <span className="text-caption text-d-500">Paste the full record id (a UUID).</span>
+            <span className="text-caption text-d-600">Paste the full record id (a UUID).</span>
           )}
         </div>
         {filtersActive && (

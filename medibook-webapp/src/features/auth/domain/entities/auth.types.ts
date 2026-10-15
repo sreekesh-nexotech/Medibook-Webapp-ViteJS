@@ -5,9 +5,6 @@
 /** The two staff surfaces: the hospital app and the operations console. */
 export type AuthSurface = 'hospital' | 'platform';
 
-/** Hospital roles (backend `RoleCodeEnum`, exactly four — Q60). */
-export type HospitalRoleCode = 'admin' | 'receptionist' | 'accountant' | 'dept_front_desk';
-
 /** Hospital lifecycle (backend `Hospital.Status`). */
 export type HospitalStatus = 'draft' | 'onboarding' | 'active' | 'suspended' | 'closed';
 
@@ -51,6 +48,8 @@ export interface HospitalSession {
     readonly id: string;
     readonly name: string;
     readonly status: HospitalStatus;
+    /** IANA zone of the hospital's calendar: "today" and every date shown follow it. */
+    readonly timezone: string;
     /** Subscription lapsed: reads work, writes are refused (D-30). */
     readonly readOnly: boolean;
     /** The hospital's uploaded logo (a stored file id), or `null`. */

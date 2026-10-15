@@ -21,7 +21,7 @@ export const SLOT_STATE_STYLE: Readonly<Record<SlotCellState, SlotStateStyle>> =
     label: 'Available',
   },
   held: {
-    box: 'bg-badge-queue-bg border-y-300 text-badge-queue-fg',
+    box: 'bg-badge-queue-bg border-badge-queue-border text-badge-queue-fg',
     icon: 'credit-card',
     label: 'Held',
   },

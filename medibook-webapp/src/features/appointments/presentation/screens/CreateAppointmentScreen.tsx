@@ -24,7 +24,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { isFailure } from '@/core/error/failure';
 
 import {
-  BOOK_FOR_MRN_PARAM,
+  BOOK_FOR_PATIENT_PARAM,
   hospitalPath,
   isHospitalRole,
   type HospitalRole,
@@ -51,7 +51,7 @@ import {
 } from '@/features/appointments/presentation/components/createAppointment.view';
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
-import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
+import { usePatientQuery } from '@/features/patients/application/queries/usePatientQuery';
 import type { PatientRecord } from '@/features/patients/domain/entities/patients.entities';
 import {
   useDoctorServicesQuery,
@@ -92,7 +92,7 @@ function displayPhone(e164: string | null): string | null {
 
 /** Native date-input styling — the design's `dateField`. */
 const dateInputClass =
-  'rounded-input border-border text-body text-text-strong h-13.5 w-full border bg-white px-4';
+  'rounded-input border-border-control text-body text-text-strong h-13.5 w-full border bg-white px-4';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -190,16 +190,16 @@ export function CreateAppointmentScreen() {
   const book = useBookWalkInMutation();
   const actionKeys = useActionKeys();
 
-  /** The MRN handed over by "Book Appointment" on the patients screens (`?mrn=`). */
+  /** The patient handed over by "Book Appointment" on the patients screens (`?patient=`). */
   const [searchParams] = useSearchParams();
-  const handoffMrn = searchParams.get(BOOK_FOR_MRN_PARAM);
-  const handoff = usePatientByMrnQuery(handoffMrn ?? undefined);
+  const handoffId = searchParams.get(BOOK_FOR_PATIENT_PARAM);
+  const handoff = usePatientQuery(handoffId ?? undefined);
 
   /** `undefined` = "use the hand-off patient, if any"; `null` = none picked. */
   const [selection, setSelection] = useState<PatientRecord | null | undefined>(undefined);
   const picked = selection === undefined ? (handoff.data ?? null) : selection;
   const handoffFailed =
-    Boolean(handoffMrn) && selection === undefined && !handoff.isPending && !handoff.data;
+    Boolean(handoffId) && selection === undefined && !handoff.isPending && !handoff.data;
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');
   const deferredQ = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS);
@@ -271,7 +271,7 @@ export function CreateAppointmentScreen() {
             ),
           );
         }
-        toast(failureText(error, 'Could not book the appointment.'), 'error');
+        toast(failureText(error, 'Could not book the appointment.'), 'error', error);
       }
     },
   });
@@ -373,7 +373,7 @@ export function CreateAppointmentScreen() {
         <div className="border-border-soft mb-4.5 border-b pb-3">
           <h3 className="text-h3 text-text-navy m-0">Patient details</h3>
         </div>
-        {handoffMrn && selection === undefined && handoff.isPending ? (
+        {handoffId && selection === undefined && handoff.isPending ? (
           <div className="text-text-muted flex justify-center py-4">
             <Spinner size={22} label="Loading the patient" />
           </div>
@@ -422,7 +422,7 @@ export function CreateAppointmentScreen() {
                   onChange={(v) => form.setField('phone', v)}
                   onBlur={() => form.blurField('phone')}
                   inputMode="tel"
-                  autoComplete="tel"
+                  autoComplete="off"
                   maxLength={10}
                   placeholder="10-digit mobile"
                 />
@@ -470,7 +470,7 @@ export function CreateAppointmentScreen() {
             {handoffFailed && (
               <div className="text-caption text-d-700 mb-3 flex items-center gap-1.5">
                 <Icon name="triangle-alert" size={13} />
-                No patient with MR number {handoffMrn} could be opened. Search for them or add them
+                The selected patient could not be opened. Search for them or add them
                 as a new patient.
               </div>
             )}
@@ -527,7 +527,7 @@ export function CreateAppointmentScreen() {
           <div className="mb-2.5 flex items-center gap-2">
             <span className="font-ui text-label text-text-strong">
               Consultations
-              <span className="text-d-500"> *</span>
+              <span className="text-d-600"> *</span>
             </span>
             <InfoDot text={CONSULT_HINT} />
           </div>
@@ -632,7 +632,7 @@ export function CreateAppointmentScreen() {
                           name="trash-2"
                           label="Remove consultation"
                           box={54}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() => removeConsult(c.id)}
                         />
                       ) : (
@@ -683,7 +683,7 @@ export function CreateAppointmentScreen() {
                 maxLength={REMARK_MAX}
                 onChange={(e) => form.setField('remark', e.target.value)}
                 placeholder="Add any relevant notes..."
-                className="rounded-input border-border text-body-lg text-text-strong h-23 w-full resize-none border p-3.5"
+                className="rounded-input border-border-control text-body-lg text-text-strong h-23 w-full resize-none border p-3.5"
               ></textarea>
             )}
           </Field>

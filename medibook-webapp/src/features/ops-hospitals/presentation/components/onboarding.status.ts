@@ -64,11 +64,11 @@ export const STAGE_CONTEXT: Readonly<Record<OnboardingCaseStage, string>> = {
 /** Tinted icon box per stage, reusing the ops accent pairs. */
 export const STAGE_TINT: Readonly<Record<OnboardingCaseStage, string>> = {
   application: 'bg-blue-soft-bg text-blue',
-  documents_pending: 'bg-y-100 text-y-600',
-  review: 'bg-badge-noshow-bg text-orange',
-  approved: 'bg-g-100 text-g-600',
-  live: 'bg-g-100 text-g-700',
-  rejected: 'bg-d-100 text-d-500',
+  documents_pending: 'bg-y-100 text-y-800',
+  review: 'bg-badge-noshow-bg text-orange-strong',
+  approved: 'bg-g-100 text-g-800',
+  live: 'bg-g-100 text-g-800',
+  rejected: 'bg-d-100 text-d-600',
 };
 
 /** The stages an operator moves a case between by hand. */
@@ -98,8 +98,8 @@ export const CHECKLIST_PILL: Readonly<Record<ChecklistStatus, string>> = {
 
 export const CHECKLIST_TINT: Readonly<Record<ChecklistStatus, string>> = {
   pending: 'bg-grey-300 text-text-muted',
-  received: 'bg-y-100 text-y-600',
-  verified: 'bg-g-100 text-g-600',
+  received: 'bg-y-100 text-y-800',
+  verified: 'bg-g-100 text-g-800',
   waived: 'bg-grey-300 text-text-muted',
 };
 

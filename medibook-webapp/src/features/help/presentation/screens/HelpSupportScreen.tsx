@@ -35,6 +35,9 @@ import { SupportTicketsCard } from '@/features/help/presentation/components/Supp
  * platform's `support_contacts` from app-config: the phone card only shows
  * when one is set, and the email falls back to the address the rest of the
  * app names. There is no live chat.
+ *
+ * The hero search and the category tiles are wired to the FAQ list they
+ * sit above, and a search that matches nothing gets an empty state.
  */
 export function HelpSupportScreen() {
   const [open, setOpen] = useState(0);
@@ -194,6 +197,9 @@ export function HelpSupportScreen() {
                 </div>
               </a>
             ))}
+            <p className="text-caption text-text-muted">
+              Raise a ticket and the Medibook team replies by email.
+            </p>
             <Button icon="ticket" className="mt-1 w-full" onClick={() => setRaising(true)}>
               Raise a Ticket
             </Button>

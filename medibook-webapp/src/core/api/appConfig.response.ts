@@ -12,9 +12,9 @@ export interface AppConfig {
   readonly featureFlags: Readonly<Record<string, boolean>>;
   /** Digits in an OTP code. */
   readonly otpLength: number;
-  /** Platform support phone in E.164, when configured. */
+  /** Platform support phone in E.164, when configured (Platform Settings). */
   readonly supportPhoneE164: string | null;
-  /** Platform support email, when configured (BE-34; older backends do not send it). */
+  /** Platform support email, when configured (BE-34, OBS-06-B). */
   readonly supportEmail: string | null;
   /** Current version number of each legal document, by slug. */
   readonly legalVersions: Readonly<Record<string, number>>;

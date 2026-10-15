@@ -119,7 +119,7 @@ export function RoleEditor({ role, catalogue, onClose }: RoleEditorProps) {
       toast(`${role.name} updated`, 'success');
       onClose();
     } catch (failure) {
-      toast(failureText(failure, 'Could not save the role.'), 'error');
+      toast(failureText(failure, 'Could not save the role.'), 'error', failure);
     }
   };
 

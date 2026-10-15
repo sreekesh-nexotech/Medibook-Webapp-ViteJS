@@ -1,16 +1,12 @@
-import { useState } from 'react';
-
 import { usePermission } from '@/shared/hooks/usePermission';
 import { cn } from '@/shared/lib/cn';
 
 import type { HospitalRole, HospitalView } from '@/app/router/paths';
 
 import { NAV_MODEL, NAV_PERMISSION_MODULE, type HospitalNavView } from './hospital-nav';
+import { HospitalLogo } from './HospitalLogo';
 import { HospitalNavItem } from './HospitalNavItem';
 import type { SidebarMode } from './useSidebarMode';
-
-/** Shown when the hospital has no logo, or its link fails to load. */
-const FALLBACK_LOGO_SRC = '/assets/medibook-mark.svg';
 
 interface HospitalSidebarProps {
   active: HospitalView;
@@ -40,9 +36,6 @@ export function HospitalSidebar({
   mode,
 }: HospitalSidebarProps) {
   const { canViewModule } = usePermission();
-  // A logo link that fails to load (expired, or unreachable storage) falls
-  // back to the mark instead of a broken image.
-  const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const isRail = mode ? mode === 'rail' : collapsed;
 
   // Permission gate — audit 2.4/X-01: a module the signed-in user's real
@@ -64,16 +57,11 @@ export function HospitalSidebar({
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <img
-          src={logoSrc && failedLogo !== logoSrc ? logoSrc : FALLBACK_LOGO_SRC}
-          alt={`${hospitalName} logo`}
-          onError={() => setFailedLogo(logoSrc)}
-          className="size-8.5 flex-none object-contain"
-        />
+        <HospitalLogo src={logoSrc} className="size-8.5 flex-none rounded-md object-contain" />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg truncate font-bold text-black">{hospitalName}</div>
-            <div className="text-text-faint text-[10.5px] font-medium tracking-[.04em]">
+            <div className="text-text-muted text-[10.5px] font-medium tracking-[.04em]">
               Medibook · mbAdmin
             </div>
           </div>
@@ -89,7 +77,7 @@ export function HospitalSidebar({
               {s.section}
             </div>
           )}
-          <nav className="flex flex-col gap-1">
+          <nav aria-label={s.section} className="flex flex-col gap-1">
             {s.items.map((i) => (
               <HospitalNavItem
                 key={i.id}

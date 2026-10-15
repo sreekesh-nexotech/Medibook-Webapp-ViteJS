@@ -7,6 +7,7 @@ import {
   paginatedSchema,
   toPage,
   type PageDto,
+  fetchCappedPages,
 } from '@/core/api/pagination';
 import { isFailure } from '@/core/error/failure';
 
@@ -71,5 +72,20 @@ describe('toPage', () => {
       total: 5,
       hasNext: true,
     });
+  });
+});
+
+describe('fetchCappedPages (DATA-07)', () => {
+  const pages = (count: number) => async (page: number) => ({
+    results: [page],
+    has_next: page < count,
+  });
+
+  it('reads every page of a short list and says it is complete', async () => {
+    expect(await fetchCappedPages(pages(3), 5)).toEqual({ rows: [1, 2, 3], truncated: false });
+  });
+
+  it('stops at the cap and says the list went on', async () => {
+    expect(await fetchCappedPages(pages(9), 2)).toEqual({ rows: [1, 2], truncated: true });
   });
 });

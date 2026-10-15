@@ -459,7 +459,8 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
           if (localPhoto) URL.revokeObjectURL(localPhoto);
           setLocalPhoto(URL.createObjectURL(file));
         },
-        onError: (error) => toast(failureText(error, 'Could not upload the photo.'), 'error'),
+        onError: (error) =>
+          toast(failureText(error, 'Could not upload the photo.'), 'error', error),
       },
     );
   };
@@ -473,7 +474,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
         toast('Doctor profile deleted', 'info');
         back();
       },
-      onError: (error) => toast(failureText(error, 'Could not delete the doctor.'), 'error'),
+      onError: (error) => toast(failureText(error, 'Could not delete the doctor.'), 'error', error),
     });
   };
 
@@ -596,7 +597,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
                   <TextInput
                     value={values.name}
                     placeholder="e.g. Dr. Asha Verma"
-                    autoComplete="name"
+                    autoComplete="off"
                     onChange={(v) => form.setField('name', v)}
                     onBlur={() => form.blurField('name')}
                   />
@@ -721,7 +722,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
               <div>
                 <div className="mb-2 flex items-center gap-2">
                   <span className="text-label font-ui text-text-strong">Department</span>
-                  <span className="text-d-500">*</span>
+                  <span className="text-d-600">*</span>
                   <InfoDot text="A doctor belongs to one department." />
                 </div>
                 {departments.length === 0 && (
@@ -766,7 +767,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
                     <span className="text-label font-ui text-text-strong">Services offered</span>
                     <InfoDot text="Procedures and tests booked with this doctor. Managed in Services & Pricing." />
                   </div>
-                  {doctorServicesQuery.isError || servicesQuery.isError ? (
+                  {doctorServicesQuery.isLoadingError || servicesQuery.isLoadingError ? (
                     <span className="text-caption text-text-muted">
                       Services could not be loaded.
                     </span>
@@ -804,7 +805,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
                     value={values.about}
                     placeholder="Short bio shown in the patient app"
                     onChange={(e) => form.setField('about', e.target.value)}
-                    className="border-border text-body-lg text-text-strong rounded-input box-border h-18 w-full resize-none border p-3"
+                    className="border-border-control text-body-lg text-text-strong rounded-input box-border h-18 w-full resize-none border p-3"
                   />
                 )}
               </Field>
@@ -867,7 +868,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
                       Online booking for this doctor
                       <span className="text-caption text-text-muted block">
                         {onlineBooking === undefined
-                          ? profileQuery.isError
+                          ? profileQuery.isLoadingError
                             ? 'Hospital-wide setting unavailable.'
                             : 'Checking the hospital-wide setting…'
                           : onlineBooking
@@ -966,7 +967,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
             <Button
               variant="ghost"
               icon="trash-2"
-              style={{ color: 'var(--color-d-500)' }}
+              style={{ color: 'var(--color-d-600)' }}
               onClick={() => setConfirmDelete(true)}
             >
               Delete Profile
@@ -1019,7 +1020,7 @@ export function DoctorDetailPageScreen() {
   const departmentsQuery = useDepartmentsQuery();
   const toList = () => navigate(hospitalPath(role, 'doctors'));
 
-  const failed = [doctorQuery, scheduleQuery, departmentsQuery].find((q) => q.isError);
+  const failed = [doctorQuery, scheduleQuery, departmentsQuery].find((q) => q.isLoadingError);
   if (failed) {
     if (
       isFailure(failed.error) &&
@@ -1038,6 +1039,7 @@ export function DoctorDetailPageScreen() {
     }
     return (
       <ErrorState
+        error={failed.error}
         title="Could not load this doctor"
         message={failureText(failed.error, 'Please try again.')}
         onRetry={() => {

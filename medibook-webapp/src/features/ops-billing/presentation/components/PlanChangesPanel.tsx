@@ -91,9 +91,10 @@ export function PlanChangesPanel() {
   const rows = query.data?.items ?? [];
   const tableState: TableStateSpec | undefined = query.isPending
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : query.isError
+    : query.isLoadingError
       ? {
           kind: 'error',
+          error: query.error,
           message: failureText(query.error, DECIDE_FAILED),
           onRetry: () => void query.refetch(),
         }
@@ -118,7 +119,7 @@ export function PlanChangesPanel() {
         setApproving(null);
         setResult({ toPlan, outcome: approval.outcome });
       },
-      onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error'),
+      onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error', error),
     });
   };
 
@@ -132,7 +133,7 @@ export function PlanChangesPanel() {
           setRejecting(null);
           setNote('');
         },
-        onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error'),
+        onError: (error) => toast(failureText(error, DECIDE_FAILED), 'error', error),
       },
     );
   };
@@ -283,7 +284,7 @@ export function PlanChangesPanel() {
       >
         {result && (
           <div className="flex items-start gap-3">
-            <Icon name="circle-check" size={20} className="text-g-600 mt-0.5 flex-none" />
+            <Icon name="circle-check" size={20} className="text-g-800 mt-0.5 flex-none" />
             <p className="text-body text-text-body m-0">
               The hospital is now on {result.toPlan}.{' '}
               {result.outcome.prorationInvoice

@@ -5,7 +5,7 @@ import { usePermission } from '@/shared/hooks/usePermission';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate, money } from '@/shared/lib/format';
+import { fmtDate, money, rupeesFixed } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
@@ -149,6 +149,7 @@ const COUPON_SORT_KEYS: Readonly<Record<string, string>> = {
 interface DeleteTarget {
   readonly kind: PricingTab;
   readonly id: string;
+  /** Row version for `If-Match` on tax-rate and coupon deletes (services take none). */
   readonly version: number;
   readonly label: string;
 }
@@ -376,7 +377,10 @@ export function ServicesPricingScreen() {
   const toggleService = (s: PricedService): void => {
     setServiceActive.mutate(
       { id: s.id, isActive: !s.isActive, version: s.version },
-      { onError: (error) => toast(failureText(error, 'Could not update the service.'), 'error') },
+      {
+        onError: (error) =>
+          toast(failureText(error, 'Could not update the service.'), 'error', error),
+      },
     );
   };
 
@@ -387,7 +391,7 @@ export function ServicesPricingScreen() {
         onError: (error) => {
           const view = taxRateInUseOf(error);
           if (view) setInUse({ rateName: taxLabel(t), action: 'switch off', view });
-          else toast(failureText(error, 'Could not update the tax rate.'), 'error');
+          else toast(failureText(error, 'Could not update the tax rate.'), 'error', error);
         },
       },
     );
@@ -396,7 +400,10 @@ export function ServicesPricingScreen() {
   const toggleCoupon = (c: HospitalCoupon): void => {
     setCouponActive.mutate(
       { id: c.id, isActive: !c.isActive, version: c.version },
-      { onError: (error) => toast(failureText(error, 'Could not update the coupon.'), 'error') },
+      {
+        onError: (error) =>
+          toast(failureText(error, 'Could not update the coupon.'), 'error', error),
+      },
     );
   };
 
@@ -428,8 +435,8 @@ export function ServicesPricingScreen() {
         label: 'Average Price',
         value: money(averagePrice),
         sub: 'before tax, bookable only',
-        iconClass: 'bg-g-100 text-g-600',
-        valueClass: 'text-g-600',
+        iconClass: 'bg-g-100 text-g-800',
+        valueClass: 'text-g-800',
         subClass: 'text-text-muted',
       },
       {
@@ -437,8 +444,8 @@ export function ServicesPricingScreen() {
         label: 'Taxed Services',
         value: `${taxed} of ${bookable.length}`,
         sub: taxCopy,
-        iconClass: 'bg-y-100 text-y-600',
-        valueClass: 'text-y-600',
+        iconClass: 'bg-y-100 text-y-800',
+        valueClass: 'text-y-800',
         subClass: 'text-text-muted',
       },
       {
@@ -470,8 +477,8 @@ export function ServicesPricingScreen() {
         s.name,
         deptName(s.departmentId),
         s.durationMinutes,
-        s.priceRupees,
-        priceService(s.priceRupees, taxOf(s)).total,
+        rupeesFixed(s.priceRupees),
+        rupeesFixed(priceService(s.priceRupees, taxOf(s)).total),
         s.requiresDoctor ? 'Yes' : 'No',
         offeredBy(s.id),
         s.isActive ? 'Yes' : 'No',
@@ -500,14 +507,14 @@ export function ServicesPricingScreen() {
       ...orderedCoupons.map((c) => [
         c.code,
         c.kind === 'percent' ? 'Percent' : 'Flat',
-        c.value,
+        c.kind === 'percent' ? c.value : rupeesFixed(c.value),
         localDay(c.validFrom),
         lastValidDay(c.validTo),
         c.maxDiscountRupees ?? '',
         c.usageCap ?? 'Unlimited',
         c.perUserCap ?? 'Unlimited',
         c.usedCount,
-        c.minOrderRupees,
+        rupeesFixed(c.minOrderRupees),
         c.departmentIds.length === 0
           ? 'All departments'
           : c.departmentIds.map((id) => deptName(id)).join(' | '),
@@ -533,7 +540,7 @@ export function ServicesPricingScreen() {
       .catch((error: unknown) => {
         const view = target.kind === 'Taxes' ? taxRateInUseOf(error) : null;
         if (view) setInUse({ rateName: target.label, action: 'delete', view });
-        else toast(failureText(error, 'Could not delete it.'), 'error');
+        else toast(failureText(error, 'Could not delete it.'), 'error', error);
       });
   };
 
@@ -570,9 +577,10 @@ export function ServicesPricingScreen() {
 
   const serviceTableState: TableStateSpec | undefined = servicesQuery.isPending
     ? { kind: 'loading', rows: SERVICE_PAGE_SIZE }
-    : servicesQuery.isError
+    : servicesQuery.isLoadingError
       ? {
           kind: 'error',
+          error: servicesQuery.error,
           title: 'Could not load services',
           message: failureText(servicesQuery.error, 'Please try again.'),
           onRetry: () => void servicesQuery.refetch(),
@@ -596,9 +604,10 @@ export function ServicesPricingScreen() {
 
   const couponTableState: TableStateSpec | undefined = couponsQuery.isPending
     ? { kind: 'loading', rows: COUPON_PAGE_SIZE }
-    : couponsQuery.isError
+    : couponsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: couponsQuery.error,
           title: 'Could not load coupons',
           message: failureText(couponsQuery.error, 'Please try again.'),
           onRetry: () => void couponsQuery.refetch(),
@@ -820,7 +829,7 @@ export function ServicesPricingScreen() {
                               title={`Delete ${s.name}`}
                               box={36}
                               size={15}
-                              color="var(--color-d-500)"
+                              color="var(--color-d-600)"
                               onClick={() =>
                                 setToDelete({
                                   kind: 'Services',
@@ -939,7 +948,7 @@ export function ServicesPricingScreen() {
                               title={`Delete ${c.code}`}
                               box={36}
                               size={15}
-                              color="var(--color-d-500)"
+                              color="var(--color-d-600)"
                               onClick={() =>
                                 setToDelete({
                                   kind: 'Coupons',
@@ -979,8 +988,9 @@ export function ServicesPricingScreen() {
             </div>
             {taxRatesQuery.isPending ? (
               <SkeletonTable rows={2} cols={4} card={false} />
-            ) : taxRatesQuery.isError ? (
+            ) : taxRatesQuery.isLoadingError ? (
               <ErrorState
+                error={taxRatesQuery.error}
                 inline
                 title="Could not load tax rates"
                 message={failureText(taxRatesQuery.error, 'Please try again.')}
@@ -1008,7 +1018,7 @@ export function ServicesPricingScreen() {
                     <div
                       className={cn(
                         'flex size-9.5 flex-none items-center justify-center rounded-md',
-                        t.isActive ? 'bg-y-100 text-y-600' : 'bg-grey-300 text-text-muted',
+                        t.isActive ? 'bg-y-100 text-y-800' : 'bg-grey-300 text-text-muted',
                       )}
                     >
                       <Icon name="percent" size={18} />
@@ -1082,7 +1092,7 @@ export function ServicesPricingScreen() {
                             title={`Delete ${t.name}`}
                             box={36}
                             size={15}
-                            color="var(--color-d-500)"
+                            color="var(--color-d-600)"
                             onClick={() => askDeleteTax(t)}
                           />
                         </Can>

@@ -9,8 +9,9 @@ import {
 import { fetchReceptionDashboard } from '@/features/dashboard/application/usecases/fetchReceptionDashboard';
 
 /** Today's front-desk view: doctor sessions, queue counts and what needs action. */
-export function useReceptionDashboardQuery() {
+export function useReceptionDashboardQuery(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: dashboardKeys.reception(),
     queryFn: async () => unwrap(await fetchReceptionDashboard()),
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,

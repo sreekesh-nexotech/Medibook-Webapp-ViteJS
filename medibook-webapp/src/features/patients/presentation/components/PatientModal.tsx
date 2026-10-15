@@ -37,8 +37,8 @@ interface PatientModalProps {
   /** Absent = "Add Patient" (new); present = "Edit Patient". */
   patient?: PatientRecord;
   onClose: () => void;
-  /** Called with the MRN of the saved (or already-registered) record. */
-  onSaved?: (mrn: string) => void;
+  /** Called with the record id of the saved (or already-registered) record. */
+  onSaved?: (patientId: string) => void;
 }
 
 interface PatientForm {
@@ -222,10 +222,10 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
           : 'Changes sent to an admin for approval',
         outcome.status === 'applied' ? 'success' : 'info',
       );
-      onSaved?.(patient.mrn);
+      onSaved?.(patient.id);
       onClose();
     } catch (error) {
-      toast(saveErrorMessage(error, SAVE_FAILED), 'error');
+      toast(saveErrorMessage(error, SAVE_FAILED), 'error', error);
     }
   };
 
@@ -278,6 +278,7 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title={isNew ? 'Add Patient' : 'Edit Patient'}

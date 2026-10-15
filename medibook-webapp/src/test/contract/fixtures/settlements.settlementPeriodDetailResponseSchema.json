@@ -1,7 +1,7 @@
 {
   "id": "01a0ee2f-9e8b-7020-819b-d2560f8b6da7",
   "hospital_id": "01a0ee28-80b3-7162-9efe-032fb9e1b6af",
-  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "hospital_name": "Example Multispeciality Hospital",
   "period_start": "2026-09-01",
   "period_end": "2026-09-15",
   "status": "closed",

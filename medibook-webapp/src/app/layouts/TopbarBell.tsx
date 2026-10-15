@@ -65,7 +65,7 @@ export function TopbarBell({
       >
         <Icon name="bell" size={21} />
         {unread > 0 && (
-          <span className="bg-d-500 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
+          <span className="bg-d-600 absolute -top-1.25 -right-1.5 flex h-3.75 min-w-3.75 items-center justify-center rounded-full border-[1.5px] border-white px-1 text-[10px] font-semibold text-white">
             {unread}
           </span>
         )}

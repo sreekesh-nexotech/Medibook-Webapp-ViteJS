@@ -1,14 +1,13 @@
+import { formatInstant } from '@/shared/lib/format';
+
 /** Display helpers for the my-account screen. Pure functions, no React. */
 
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
-/** "2026-10-05T09:12:00Z" → "5 Oct 2026, 2:42 pm" in the viewer's zone; em dash when unparsable. */
+/** "2026-10-05T09:12:00Z" → "5 Oct 2026, 2:42 pm" on the hospital's clock; em dash when unparsable. */
 export function formatDateTime(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '—' : DATE_TIME_FORMAT.format(date);
+  return Number.isNaN(date.getTime()) ? '—' : formatInstant(date, DATE_TIME_FORMAT);
 }
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [

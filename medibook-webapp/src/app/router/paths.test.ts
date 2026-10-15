@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   forgotPathFor,
+  hospitalBookForPatientPath,
+  hospitalPatientPath,
   hospitalViewFromPath,
   isOpsReturnPath,
+  isRecordId,
   loginPathFor,
   loginReturningTo,
   opsBillingForHospitalPath,
@@ -117,5 +120,21 @@ describe('ops screens added for UAT report §8', () => {
   it('opens Compliance Logs filtered to one hospital', () => {
     expect(opsLogsPath()).toBe('/ops/logs');
     expect(opsLogsPath(FILE_ID)).toBe(`/ops/logs?hospital_id=${FILE_ID}`);
+  });
+});
+
+describe('patient URLs carry the record id, not the MRN (PHI-07)', () => {
+  const id = '01a1061d-f850-72d2-9684-a119c346d805';
+
+  it('builds the patient page and booking hand-off from the record id', () => {
+    expect(hospitalPatientPath('admin', id)).toBe(`/admin/patients/${id}`);
+    expect(hospitalBookForPatientPath('receptionist', id)).toBe(
+      `/receptionist/appointments/new?patient=${id}`,
+    );
+  });
+
+  it('tells a record id from an older MRN link', () => {
+    expect(isRecordId(id)).toBe(true);
+    expect(isRecordId('LKSM000043')).toBe(false);
   });
 });

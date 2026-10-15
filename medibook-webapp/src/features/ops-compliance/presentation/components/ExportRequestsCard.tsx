@@ -136,7 +136,11 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
       { fileId: r.exportFileId, filename: `medibook-${r.requestNo.toLowerCase()}` },
       {
         onError: (error) =>
-          toast(isFailure(error) ? error.message : 'The export file could not be opened.', 'error'),
+          toast(
+            isFailure(error) ? error.message : 'The export file could not be opened.',
+            'error',
+            error,
+          ),
       },
     );
   };
@@ -152,7 +156,11 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
           setRejecting(null);
         },
         onError: (error) =>
-          toast(isFailure(error) ? error.message : 'The request could not be rejected.', 'error'),
+          toast(
+            isFailure(error) ? error.message : 'The request could not be rejected.',
+            'error',
+            error,
+          ),
       },
     );
   };
@@ -178,9 +186,10 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
 
   const tableState: TableStateSpec | undefined = requestsQuery.isLoading
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : requestsQuery.isError
+    : requestsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: requestsQuery.error,
           title: "Recorded requests didn't load.",
           message: isFailure(requestsQuery.error) ? requestsQuery.error.message : undefined,
           onRetry: () => void requestsQuery.refetch(),
@@ -351,7 +360,7 @@ export function ExportRequestsCard({ processingId, onProcess }: ExportRequestsCa
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-d-500"
+                      className="text-d-600"
                       onClick={() => setRejecting(r)}
                     >
                       Reject

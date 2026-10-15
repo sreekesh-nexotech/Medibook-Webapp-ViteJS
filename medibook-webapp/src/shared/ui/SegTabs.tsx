@@ -7,15 +7,17 @@ interface SegTabsProps {
   onChange: (tab: string) => void;
   /** Accessible name of the tab list. */
   ariaLabel?: string;
+  /** What the toggle chooses, for screen readers (e.g. "Revenue period"). */
+  label?: string;
 }
 
-/** Pill segmented control (revenue tabs / period toggles) — keyboard-operable tab list (UAT-76). */
-export function SegTabs({ tabs, value, onChange, ariaLabel }: SegTabsProps) {
+/** Pill segmented control (revenue tabs / period toggles) — keyboard-operable tab list (A11Y-01, UAT-76). */
+export function SegTabs({ tabs, value, onChange, ariaLabel, label }: SegTabsProps) {
   const { tabProps } = useTabList(tabs, value, onChange);
   return (
     <div
       role="tablist"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? label}
       className="bg-grey-300 inline-flex items-center gap-1.5 rounded-lg p-1"
     >
       {tabs.map((t, i) => (

@@ -90,7 +90,7 @@ export function TopbarAccountMenu({
                 }}
                 className={cn(
                   'hover:bg-grey-200 flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2.25 text-left transition-colors duration-150',
-                  item.isDanger ? 'text-d-500' : 'text-text-body',
+                  item.isDanger ? 'text-d-600' : 'text-text-body',
                 )}
               >
                 <Icon name={item.icon} size={18} />

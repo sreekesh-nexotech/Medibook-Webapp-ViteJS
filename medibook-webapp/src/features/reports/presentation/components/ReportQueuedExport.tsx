@@ -64,7 +64,7 @@ export function ReportQueuedExport({ exportId, format, rows, onDismiss }: Report
         <Icon
           name={status === 'ready' ? 'file-down' : 'triangle-alert'}
           size={16}
-          className={status === 'ready' ? 'text-g-600' : 'text-d-700'}
+          className={status === 'ready' ? 'text-g-800' : 'text-d-700'}
         />
       )}
       <div className="min-w-0 flex-1">

@@ -158,7 +158,7 @@ export function SlotsScreen() {
             `${row.doctorName} · ${slot.label} ${action === 'open' ? 'opened' : 'blocked'}`,
             action === 'open' ? 'success' : 'info',
           ),
-        onError: (error) => toast(errorText(error, TOGGLE_FAILED), 'error'),
+        onError: (error) => toast(errorText(error, TOGGLE_FAILED), 'error', error),
       },
     );
   };
@@ -175,12 +175,14 @@ export function SlotsScreen() {
         // Counts and any booking left on a slot the rules no longer produce (UAT-73).
         setRegenResult(res);
       },
-      onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error'),
+      onError: (error) => toast(errorText(error, REGENERATE_FAILED), 'error', error),
     });
   };
 
   const isCatalogLoading = doctorsQuery.isPending || departmentsQuery.isPending;
-  const catalogError = doctorsQuery.error ?? departmentsQuery.error;
+  const catalogError =
+    (doctorsQuery.isLoadingError ? doctorsQuery.error : null) ??
+    (departmentsQuery.isLoadingError ? departmentsQuery.error : null);
   const doctorsPage = gridQuery.data;
   const isTruncated = doctorsPage ? doctorsPage.total > doctorsPage.days.length : false;
 
@@ -258,7 +260,7 @@ export function SlotsScreen() {
             <Icon name="refresh-cw" size={13} />
             {latestRun.isPending
               ? 'Checking when slots were last generated…'
-              : latestRun.isError
+              : latestRun.isLoadingError
                 ? 'Could not read the last generation run.'
                 : latestRun.data
                   ? runCopy(latestRun.data, timeZone)
@@ -355,6 +357,7 @@ export function SlotsScreen() {
         </Card>
       ) : catalogError ? (
         <ErrorState
+          error={catalogError}
           title="Doctors and departments could not be loaded"
           message={errorText(catalogError, 'Please try again.')}
           onRetry={() => {
@@ -362,8 +365,9 @@ export function SlotsScreen() {
             void departmentsQuery.refetch();
           }}
         />
-      ) : gridQuery.isError && !grid ? (
+      ) : gridQuery.isLoadingError && !grid ? (
         <ErrorState
+          error={gridQuery.error}
           title="The slot grid could not be loaded"
           message={errorText(gridQuery.error, 'Please try again.')}
           onRetry={() => void gridQuery.refetch()}

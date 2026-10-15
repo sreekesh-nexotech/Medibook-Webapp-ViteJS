@@ -23,7 +23,7 @@ export function OpsInvoiceDetailScreen() {
   const invoiceQuery = useInvoiceQuery(id);
 
   if (invoiceQuery.isPending) return <SkeletonCards count={1} lines={5} pad={24} />;
-  if (invoiceQuery.isError) {
+  if (invoiceQuery.isLoadingError) {
     const isMissing = isFailure(invoiceQuery.error) && invoiceQuery.error.kind === 'notFound';
     return (
       <Card pad={32}>
@@ -37,6 +37,7 @@ export function OpsInvoiceDetailScreen() {
           />
         ) : (
           <ErrorState
+            error={invoiceQuery.error}
             inline
             title="This invoice didn't load"
             message={failureText(invoiceQuery.error, 'Please try again.')}

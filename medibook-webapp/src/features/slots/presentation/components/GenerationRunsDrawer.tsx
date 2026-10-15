@@ -92,7 +92,7 @@ export function GenerationRunsDrawer({
                         'text-caption ml-auto rounded-full px-2 py-0.5',
                         status === 'failed' && 'bg-d-100 text-d-700',
                         status === 'running' && 'bg-y-100 text-y-700',
-                        status === 'done' && 'bg-g-100 text-g-700',
+                        status === 'done' && 'bg-g-100 text-g-800',
                       )}
                     >
                       {STATUS_LABEL[status]}

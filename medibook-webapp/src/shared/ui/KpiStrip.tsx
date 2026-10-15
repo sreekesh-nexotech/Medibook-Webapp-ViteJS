@@ -13,7 +13,7 @@ interface KpiStripProps<T extends StatCardData> {
  */
 export function KpiStrip<T extends StatCardData>({ items, onItem }: KpiStripProps<T>) {
   return (
-    <div className="flex gap-4">
+    <div className="flex flex-wrap gap-4">
       {items.map((k, i) => (
         <StatCard key={k.label} k={k} onClick={onItem ? () => onItem(k, i) : undefined} />
       ))}

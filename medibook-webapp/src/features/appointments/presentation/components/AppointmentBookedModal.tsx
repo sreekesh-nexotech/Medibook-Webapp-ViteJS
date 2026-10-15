@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { useActionKeys } from '@/shared/hooks/useActionKeys';
 import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
@@ -76,6 +76,7 @@ function BookedVisit({
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reference, setReference] = useState('');
   const [isCollecting, setIsCollecting] = useState(false);
+  const collectingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [receiptFor, setReceiptFor] = useState<string | null>(null);
   const [tokenFor, setTokenFor] = useState<string | null>(null);
@@ -90,6 +91,9 @@ function BookedVisit({
    * retry after a lost answer is replayed, not charged again.
    */
   const collectAll = async (): Promise<void> => {
+    // A second click while collecting must not start a second run (DATA-11).
+    if (collectingRef.current) return;
+    collectingRef.current = true;
     setIsCollecting(true);
     setError(null);
     try {
@@ -111,6 +115,7 @@ function BookedVisit({
           : 'Could not record the payment.',
       );
     } finally {
+      collectingRef.current = false;
       setIsCollecting(false);
     }
   };
@@ -120,6 +125,7 @@ function BookedVisit({
       <Modal
         open
         onClose={onDone}
+        dismissible={!isCollecting}
         title={`Booked for ${recordName}`}
         width={620}
         footer={

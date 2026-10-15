@@ -137,7 +137,8 @@ export function ReportView({ report }: ReportViewProps) {
             );
           }
         },
-        onError: (failure) => toast(reportFailureText(failure, EXPORT_FAILED), 'error'),
+        onError: (failure) =>
+          toast(reportFailureText(failure, EXPORT_FAILED), 'error', failure),
       },
     );
   };
@@ -153,9 +154,10 @@ export function ReportView({ report }: ReportViewProps) {
         title: 'Fix the date range to see this report.',
         message: rangeError,
       }
-    : result.isError && !data
+    : result.isLoadingError && !data
       ? {
           kind: 'error',
+          error: result.error,
           message: reportFailureText(result.error, REPORT_FAILED),
           onRetry: () => void result.refetch(),
         }
@@ -257,7 +259,7 @@ export function ReportView({ report }: ReportViewProps) {
           )}
           {notes.length > 0 && <InfoDot text={notes.join(' ')} />}
         </div>
-        {rangeError !== undefined && <span className="text-body text-d-500">{rangeError}</span>}
+        {rangeError !== undefined && <span className="text-body text-d-600">{rangeError}</span>}
       </Card>
 
       {/* summary tiles — computed by the server over every filtered row */}
@@ -272,7 +274,7 @@ export function ReportView({ report }: ReportViewProps) {
             ))}
           </section>
         )
-      ) : result.isError || rangeError ? null : (
+      ) : result.isLoadingError || rangeError ? null : (
         <SkeletonKpiStrip count={3} />
       )}
 
@@ -284,6 +286,7 @@ export function ReportView({ report }: ReportViewProps) {
         {result.isError && data ? (
           <ErrorState
             inline
+            error={result.error}
             message={reportFailureText(result.error, REPORT_FAILED)}
             onRetry={() => void result.refetch()}
           />

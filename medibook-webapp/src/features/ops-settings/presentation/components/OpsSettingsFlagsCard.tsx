@@ -40,7 +40,11 @@ export function OpsSettingsFlagsCard() {
         onSuccess: (flag) =>
           toast(`${flag.key} ${flag.enabled ? 'switched on' : 'switched off'}.`, 'success'),
         onError: (failure) =>
-          toast(isFailure(failure) ? failure.message : 'Could not change that flag.', 'error'),
+          toast(
+            isFailure(failure) ? failure.message : 'Could not change that flag.',
+            'error',
+            failure,
+          ),
       },
     );
   };
@@ -54,9 +58,10 @@ export function OpsSettingsFlagsCard() {
         ))}
       </div>
     );
-  } else if (flags.isError) {
+  } else if (flags.isLoadingError) {
     body = (
       <ErrorState
+        error={flags.error}
         inline
         title="Could not load feature flags"
         message={isFailure(flags.error) ? flags.error.message : undefined}
@@ -105,7 +110,7 @@ export function OpsSettingsFlagsCard() {
           </div>
         ))}
         {total > items.length && (
-          <span className="text-caption text-text-faint">
+          <span className="text-caption text-text-muted">
             Showing {items.length} of {total} flags.
           </span>
         )}

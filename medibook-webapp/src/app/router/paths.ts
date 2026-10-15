@@ -162,7 +162,7 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   appointments: 'appointments',
   create: 'appointments/new',
   patients: 'patients',
-  'patient-detail': 'patients/:mrn',
+  'patient-detail': 'patients/:patientId',
   token: 'token',
   payments: 'payments',
   settlements: 'settlements',
@@ -181,32 +181,17 @@ export const HOSPITAL_VIEW_SEGMENT: Readonly<Record<HospitalView, string>> = {
   account: 'account',
 };
 
-/**
- * Hospital views that must sit behind `RequireAdmin` in the route tree — a
- * receptionist reaching one gets `ForbiddenScreen`, not a silent redirect.
- */
-export const ADMIN_ONLY_HOSPITAL_VIEWS: readonly HospitalView[] = [
-  'settlements',
-  'doctors',
-  'doctor-detail',
-  'users',
-  'reports',
-  'settings',
-  'slots',
-  'profile',
-  'services',
-  'messaging',
-  'audit',
-  'billing',
-];
-
 /** Absolute path for a param-free hospital view. */
 export function hospitalPath(role: HospitalRole, view: HospitalStaticView): string {
   return `/${role}/${HOSPITAL_VIEW_SEGMENT[view]}`;
 }
 
-/** Query param carrying the patient MRN from the patients screens to New Appointment. */
-export const BOOK_FOR_MRN_PARAM = 'mrn';
+/**
+ * Query param carrying the patient's record id from the patients screens to New
+ * Appointment. Patient URLs carry the record id, never the MRN, so MR numbers
+ * stay out of browser history and server access logs (PHI-07).
+ */
+export const BOOK_FOR_PATIENT_PARAM = 'patient';
 
 /** Query param carrying a department name from the front desk to Token Management. */
 export const TOKEN_DEPT_PARAM = 'dept';
@@ -229,9 +214,26 @@ export function hospitalAppointmentsPath(
   return `${hospitalPath(role, 'appointments')}${query ? `?${query}` : ''}`;
 }
 
-/** New Appointment, pre-selecting the patient with this MRN. */
-export function hospitalBookForPatientPath(role: HospitalRole, mrn: string): string {
-  return `${hospitalPath(role, 'create')}?${new URLSearchParams({ [BOOK_FOR_MRN_PARAM]: mrn })}`;
+/** New Appointment, pre-selecting the patient with this record id. */
+export function hospitalBookForPatientPath(role: HospitalRole, patientId: string): string {
+  const query = new URLSearchParams({ [BOOK_FOR_PATIENT_PARAM]: patientId });
+  return `${hospitalPath(role, 'create')}?${query}`;
+}
+
+/** One patient's page, by record id (never the MRN — see `BOOK_FOR_PATIENT_PARAM`). */
+export function hospitalPatientPath(role: HospitalRole, patientId: string): string {
+  const segment = HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(
+    ':patientId',
+    encodeURIComponent(patientId),
+  );
+  return `/${role}/${segment}`;
+}
+
+/** Backend record ids are UUIDs; any other patient URL is an older MRN link. */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isRecordId(value: string): boolean {
+  return RECORD_ID.test(value);
 }
 
 /** Query param selecting a tab of the Patients screen. */
@@ -239,11 +241,6 @@ export const PATIENTS_TAB_PARAM = 'tab';
 
 /** `PATIENTS_TAB_PARAM` value of the patient approvals queue (D-29). */
 export const PATIENTS_APPROVALS_TAB = 'approvals';
-
-/** One patient's detail page; the MRN is encoded, since a hospital's MRN format may use `/` or `#`. */
-export function hospitalPatientPath(role: HospitalRole, mrn: string): string {
-  return `/${role}/${HOSPITAL_VIEW_SEGMENT['patient-detail'].replace(':mrn', encodeURIComponent(mrn))}`;
-}
 
 /** The Patients screen on its approvals queue. */
 export function hospitalPatientApprovalsPath(role: HospitalRole): string {
@@ -303,7 +300,6 @@ export function hospitalAuditPath(role: HospitalRole): string {
 export function hospitalBillingPath(role: HospitalRole): string {
   return hospitalPath(role, 'billing');
 }
-
 export function hospitalAccountPath(role: HospitalRole): string {
   return hospitalPath(role, 'account');
 }
@@ -377,11 +373,18 @@ export type OpsView =
   /** Onboarding Documents (UAT report §8). */
   | 'onboarding-documents'
   /** The signed-in user's own account: name, password, sessions. */
-  | 'account';
+  | 'account'
+  /** Support tickets from hospitals and patients (OBS-02). */
+  | 'support'
+  | 'support-ticket';
 
 /** Ops detail views whose URL carries a param (`OpsSel` selection → URL). */
 export type OpsDetailView =
-  'hospital-detail' | 'invoice-detail' | 'payment-detail' | 'platform-user-detail';
+  | 'hospital-detail'
+  | 'invoice-detail'
+  | 'payment-detail'
+  | 'platform-user-detail'
+  | 'support-ticket';
 
 /** Ops views navigable without a param (nav items, notification targets). */
 export type OpsStaticView = Exclude<OpsView, OpsDetailView>;
@@ -412,6 +415,7 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   'message-templates': 'message-templates',
   'onboarding-documents': 'onboarding-documents',
   account: 'account',
+  'support-ticket': 'support/:id',
 };
 
 /** Absolute path for a param-free ops view. */
@@ -428,6 +432,16 @@ export function opsInvoiceDetailPath(id: string): string {
 /** One subscription payment in the ops billing screen. */
 export function opsPaymentDetailPath(id: string): string {
   return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['payment-detail'].replace(':id', encodeURIComponent(id))}`;
+}
+
+/** One patient account in the ops console. */
+export function opsPlatformUserDetailPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT['platform-users']}/${encodeURIComponent(id)}`;
+}
+
+/** One support ticket in the ops inbox. */
+export function opsSupportTicketPath(id: string): string {
+  return `${OPS_BASE_PATH}/${OPS_VIEW_SEGMENT.support}/${encodeURIComponent(id)}`;
 }
 
 export function opsHospitalDetailPath(id: string): string {
@@ -505,6 +519,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'message-templates',
   'onboarding-documents',
   'account',
+  'support',
 ];
 
 /** Current ops view id from an `/ops/...` pathname. */
@@ -517,5 +532,6 @@ export function opsViewFromPath(pathname: string): OpsView {
   if (first === 'billing' && second === 'invoices' && third) return 'invoice-detail';
   if (first === 'billing' && second === 'payments' && third) return 'payment-detail';
   if (first === 'platform-users' && second) return 'platform-user-detail';
+  if (first === 'support' && second) return 'support-ticket';
   return OPS_SEGMENT_VIEWS.find((v) => v === first) ?? 'dashboard';
 }

@@ -14,7 +14,7 @@ export const STATUS = {
   'In Queue': { bg: 'bg-badge-queue-bg', fg: 'text-badge-queue-fg' },
   Completed: { bg: 'bg-badge-completed-bg', fg: 'text-badge-completed-fg' },
   Scheduled: { bg: 'bg-badge-scheduled-bg', fg: 'text-badge-scheduled-fg' },
-  'Checked-in': { bg: 'bg-g-100', fg: 'text-g-700' },
+  'Checked-in': { bg: 'bg-g-100', fg: 'text-g-800' },
   Cancelled: { bg: 'bg-badge-cancelled-bg', fg: 'text-badge-cancelled-fg' },
   'No-show': { bg: 'bg-badge-noshow-bg', fg: 'text-badge-noshow-fg' },
   Paid: { bg: 'bg-badge-completed-bg', fg: 'text-badge-completed-fg' },
@@ -57,5 +57,3 @@ export const STATUS = {
   Submitted: { bg: 'bg-badge-queue-bg', fg: 'text-badge-queue-fg' },
   Missing: { bg: 'bg-badge-cancelled-bg', fg: 'text-badge-cancelled-fg' },
 } as const satisfies Record<string, { bg: string; fg: string }>;
-
-export type StatusKey = keyof typeof STATUS;

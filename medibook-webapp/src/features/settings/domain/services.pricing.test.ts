@@ -9,6 +9,9 @@ import {
   cheapestConsultationRupees,
   couponDiscount,
   couponState,
+  dayEndExclusiveIso,
+  dayStartIso,
+  lastValidDay,
   priceService,
 } from '@/features/settings/domain/services.pricing';
 import { todayISO } from '@/shared/lib/format';
@@ -70,17 +73,17 @@ describe('priceService (matches the backend fee engine)', () => {
 });
 
 describe('couponDiscount', () => {
-  // LAKE10 on the test backend: 10%, at most ₹200.
-  const lake10 = { kind: 'percent' as const, value: 10, minOrderRupees: 0, maxDiscountRupees: 200 };
+  // A typical coupon: 10%, at most ₹200.
+  const save10 = { kind: 'percent' as const, value: 10, minOrderRupees: 0, maxDiscountRupees: 200 };
 
   it('caps a percent discount at its maximum', () => {
-    expect(couponDiscount(lake10, 2000)).toBe(200);
-    expect(couponDiscount(lake10, 5000)).toBe(200);
-    expect(couponDiscount(lake10, 500)).toBe(50);
+    expect(couponDiscount(save10, 2000)).toBe(200);
+    expect(couponDiscount(save10, 5000)).toBe(200);
+    expect(couponDiscount(save10, 500)).toBe(50);
   });
 
   it('gives nothing below the minimum order', () => {
-    expect(couponDiscount({ ...lake10, minOrderRupees: 1000 }, 999)).toBe(0);
+    expect(couponDiscount({ ...save10, minOrderRupees: 1000 }, 999)).toBe(0);
   });
 
   it('never takes a flat discount past the order value', () => {
@@ -154,5 +157,18 @@ describe('couponState on a PC behind the hospital (UAT-47)', () => {
       validTo: '2026-10-15T18:30:00Z',
     });
     expect(couponState(tomorrow, Date.now())).toBe('Scheduled');
+  });
+});
+
+describe('coupon validity windows (DATA-03)', () => {
+  it("start and end on the hospital's midnights, not the device's", () => {
+    expect(dayStartIso('2026-10-06')).toBe('2026-10-06T00:00:00+05:30');
+    expect(dayEndExclusiveIso('2026-10-31')).toBe('2026-11-01T00:00:00+05:30');
+  });
+
+  it('reads the last valid day back as the day the user picked', () => {
+    expect(lastValidDay(new Date(dayEndExclusiveIso('2026-10-31')).toISOString())).toBe(
+      '2026-10-31',
+    );
   });
 });

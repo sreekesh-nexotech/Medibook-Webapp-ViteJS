@@ -46,7 +46,7 @@ export function DeptDrawer({
             <Button
               variant="ghost"
               icon="trash-2"
-              style={{ color: 'var(--color-d-500)' }}
+              style={{ color: 'var(--color-d-600)' }}
               onClick={() => onDelete(dept)}
             >
               Delete

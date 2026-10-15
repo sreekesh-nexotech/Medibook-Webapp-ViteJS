@@ -33,6 +33,7 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   'message-templates': 'settings.view',
   'onboarding-documents': 'settings.view',
   account: null,
+  'support-ticket': 'support.view',
 };
 
 export function canOpenOpsView(view: OpsView, checks: OpsPermissionChecks): boolean {
@@ -52,3 +53,4 @@ export function opsHomePath(checks: OpsPermissionChecks): string {
 
 /** The console's root, which sends each role to its own first screen. */
 export const OPS_HOME_PATH = OPS_BASE_PATH;
+

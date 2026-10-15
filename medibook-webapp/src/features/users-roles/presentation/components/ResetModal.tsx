@@ -64,7 +64,7 @@ export function ResetModal({ user, onClose }: ResetModalProps) {
         );
         onClose();
       } catch (error) {
-        toast(failureText(error, 'Could not send the reset link.'), 'error');
+        toast(failureText(error, 'Could not send the reset link.'), 'error', error);
       }
     },
   });
@@ -78,6 +78,7 @@ export function ResetModal({ user, onClose }: ResetModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open
       onClose={onClose}
       title="Reset Password"

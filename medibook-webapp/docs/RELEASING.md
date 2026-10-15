@@ -1,7 +1,7 @@
 # Releasing the Medibook web app
 
-How code reaches `main`, how it is tested, and how a release is cut. Deployment and
-rollback depend on the hosting guide (checklist DEP-01), which does not exist yet.
+How code reaches `main`, how it is tested, and how a release is cut. Hosting,
+deployment and rollback are in [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Branches and pull requests
 
@@ -96,4 +96,5 @@ Sign-in is rate-limited per account (five a minute), so leave a minute between r
 
 An open tab reloads itself once when a screen's code file has gone (the new
 deploy replaced it), so staff do not have to clear their cache. Hosting must
-serve `index.html` without caching for this to pick up the new build (DEP-01).
+serve `index.html` without caching, and a missing bundle as a 404, for this to
+pick up the new build (`docs/DEPLOYMENT.md`).

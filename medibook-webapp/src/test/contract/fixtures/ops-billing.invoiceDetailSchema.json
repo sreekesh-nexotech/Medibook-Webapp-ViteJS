@@ -2,7 +2,7 @@
   "id": "01a0fdfc-dfc0-7c33-a9f9-2cca1d86e72f",
   "invoice_no": "INV-2026-0010",
   "hospital_id": "01a0ee28-82e0-7f81-b1ca-fc7455d0a72a",
-  "hospital_name": "Deccan Heart Institute",
+  "hospital_name": "Demo Heart Institute",
   "subscription_id": "01a0ee28-835b-74b1-b749-2d63c4886a2d",
   "period_start": "2026-10-03",
   "period_end": "2026-11-02",
@@ -32,15 +32,15 @@
   ],
   "hospital_snapshot": {
     "city": "Hyderabad",
-    "name": "Deccan Heart Institute",
-    "email": "info@deccanheart.medibook.example.com",
+    "name": "Demo Heart Institute",
+    "email": "info@demoheart.medibook.example.com",
     "gstin": null,
     "state": "Telangana",
     "pincode": "500033",
     "legal_name": null,
     "phone_e164": "+910000000000",
-    "address_line1": "Road No. 10",
-    "address_line2": "Jubilee Hills",
+    "address_line1": "1 Example Road",
+    "address_line2": "1 Example Road",
     "address_line3": null
   },
   "platform_snapshot": {
@@ -50,7 +50,7 @@
     "pincode": "682042",
     "legal_name": "Medibook Health Technologies Pvt Ltd",
     "phone_e164": "+910000000000",
-    "address_line1": "4th Floor, Infopark Phase 2",
+    "address_line1": "1 Example Road",
     "address_line2": null,
     "address_line3": null
   }

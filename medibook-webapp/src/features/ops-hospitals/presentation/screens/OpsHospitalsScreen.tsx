@@ -52,15 +52,12 @@ const SEARCH_DEBOUNCE_MS = 300;
 /** Shown in a cell or KPI the backend has no value for. */
 const NO_VALUE = '—';
 
-const COLUMNS = [
-  'Hospital',
-  'Plan',
-  'Location',
-  'Bookings / Mo',
-  'Onboarded',
-  'Status',
-  'Action',
-] as const;
+/**
+ * The registry rows carry no plan or monthly bookings (PRD-05-B), so those
+ * columns are left out rather than shown as dashes; each hospital's page has
+ * its plan.
+ */
+const COLUMNS = ['Hospital', 'Location', 'Onboarded', 'Status', 'Action'] as const;
 
 /** Sortable column keys → backend `sort` fields (`PlatformHospitalListView.spec.sorts`). */
 const SORT_FIELD: Readonly<Record<string, string>> = {
@@ -147,24 +144,24 @@ export function OpsHospitalsScreen() {
       label: 'Active Instances',
       value: kpi(counts.data?.active),
       sub: 'Live and serving bookings',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'clock',
       label: 'Pending Verification',
       value: kpi(pendingCt),
       sub: 'Awaiting document review',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'ban',
       label: 'Suspended',
       value: kpi(counts.data?.suspended),
-      sub: 'Changes paused by the platform',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      sub: 'Access paused by platform',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
     },
   ];
@@ -187,9 +184,10 @@ export function OpsHospitalsScreen() {
 
   const listError = isPlanResolved ? hospitals.error : plansQuery.error;
   const tableState: TableStateSpec | undefined =
-    (isPlanResolved && hospitals.isError) || (!isPlanResolved && plansQuery.isError)
+    (isPlanResolved && hospitals.isLoadingError) || (!isPlanResolved && plansQuery.isLoadingError)
       ? {
           kind: 'error',
+          error: listError,
           title: "The hospital registry didn't load",
           message: isFailure(listError) ? listError.message : undefined,
           onRetry: () => void (isPlanResolved ? hospitals.refetch() : plansQuery.refetch()),
@@ -234,7 +232,7 @@ export function OpsHospitalsScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {KPIS.map((k) => (
           <StatCard key={k.label} k={k} />
         ))}
@@ -298,7 +296,6 @@ export function OpsHospitalsScreen() {
         </div>
         <TableShell
           columns={COLUMNS}
-          rightCols={['Bookings / Mo']}
           scrollLabel="Hospital registry"
           sortKeys={{
             Hospital: 'name',

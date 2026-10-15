@@ -1,4 +1,4 @@
-import { fmtDate } from '@/shared/lib/format';
+import { calendarDate, fmtDate } from '@/shared/lib/format';
 import { Card } from '@/shared/ui/Card';
 import { Icon } from '@/shared/ui/Icon';
 
@@ -36,7 +36,7 @@ export function PatientChangeNotice({ change, onDecided }: PatientChangeNoticePr
             {what} is waiting for admin approval.
           </div>
           <div className="text-caption text-text-muted mt-1">
-            Requested {fmtDate(change.requestedAt.slice(0, 10))}
+            Requested {fmtDate(calendarDate(change.requestedAt))}
             {change.requestedByName ? ` by ${change.requestedByName}` : ''}. The record shows the
             current details until it is approved.
           </div>

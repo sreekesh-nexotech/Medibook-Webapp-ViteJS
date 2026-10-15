@@ -6,8 +6,6 @@ import type {
 } from '@/features/appointments/domain/entities/appointments.entities';
 import { appointmentsRepository } from '@/features/appointments/infrastructure/repositories/appointments.repository.impl';
 
-export function fetchAppointments(
-  range: AppointmentRange,
-): Promise<Result<readonly DeskAppointment[]>> {
+export function fetchAppointments(range: AppointmentRange): Promise<Result<readonly DeskAppointment[]>> {
   return appointmentsRepository.list(range);
 }

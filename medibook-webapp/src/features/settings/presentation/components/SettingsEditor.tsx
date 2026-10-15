@@ -419,7 +419,7 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
               onUploaded(fileId);
             },
             onError: (error) =>
-              toast(describeFailure(error, 'The image could not be uploaded.'), 'error'),
+              toast(describeFailure(error, 'The image could not be uploaded.'), 'error', error),
           },
         );
       };
@@ -477,7 +477,7 @@ export function SettingsEditor({ profile, rules, hours, tokenPolicy, bank }: Set
 
         {attempted && errorCount > 0 && (
           <Card pad={14} className="flex items-center gap-2.5">
-            <Icon name="triangle-alert" size={16} className="text-d-500 flex-none" />
+            <Icon name="triangle-alert" size={16} className="text-d-600 flex-none" />
             <span className="text-body text-d-700">
               {errorCount === 1
                 ? 'One field needs attention before these settings can be saved.'

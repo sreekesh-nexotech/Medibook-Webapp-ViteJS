@@ -85,7 +85,7 @@ const ALL_HOSPITALS = 'Hospital: All';
 const MODULE_CODES = Object.keys(LOG_MODULE_LABEL);
 
 const dateInputClass =
-  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
 
 const refreshedAt = (at: number): string =>
   at
@@ -209,9 +209,10 @@ export function OpsLogsScreen() {
   const tableState: TableStateSpec | undefined =
     logsQuery.isPending || refreshing
       ? { kind: 'loading', rows: OPS_LOG_PAGE }
-      : logsQuery.isError
+      : logsQuery.isLoadingError
         ? {
             kind: 'error',
+            error: logsQuery.error,
             message: isFailure(logsQuery.error) ? logsQuery.error.message : undefined,
             onRetry: () => void logsQuery.refetch(),
           }
@@ -316,7 +317,7 @@ export function OpsLogsScreen() {
               invalid={actorInvalid}
             />
             {actorInvalid && (
-              <span className="text-caption text-d-500">Paste the full user id (a UUID).</span>
+              <span className="text-caption text-d-600">Paste the full user id (a UUID).</span>
             )}
           </div>
           <div className="w-72">

@@ -44,8 +44,8 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   secondary: 'border border-text-navy bg-white text-text-navy',
   info: 'bg-blue text-white hover:bg-blue-strong',
   ghost: 'bg-transparent text-text-muted',
-  danger: 'bg-d-500 text-white hover:bg-d-600',
-  success: 'bg-g-600 text-white hover:bg-g-700',
+  danger: 'bg-d-600 text-white hover:bg-d-700',
+  success: 'bg-success text-white hover:bg-g-800',
 };
 
 export function Button({

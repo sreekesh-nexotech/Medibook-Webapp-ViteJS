@@ -134,8 +134,8 @@ export function OpsPlatformUsersScreen() {
       sub: monthlyActive.isError
         ? NOT_AVAILABLE_SUB
         : `Signed in within the last ${ACTIVE_WINDOW_DAYS} days`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
       subClass: 'text-text-muted',
     },
     {
@@ -154,8 +154,8 @@ export function OpsPlatformUsersScreen() {
       label: 'Blocked Accounts',
       value: countValue(blockedCount.data),
       sub: 'Fraud or abuse reports',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
     },
   ];
 
@@ -198,9 +198,10 @@ export function OpsPlatformUsersScreen() {
 
   const tableState: TableStateSpec | undefined = list.isPending
     ? { kind: 'loading', rows: OPS_PU_PAGE }
-    : list.isError
+    : list.isLoadingError
       ? {
           kind: 'error',
+          error: list.error,
           title: "Patient accounts didn't load",
           message: isFailure(list.error) ? list.error.message : undefined,
           onRetry: () => void list.refetch(),
@@ -219,7 +220,7 @@ export function OpsPlatformUsersScreen() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
         {kpis.map((k) => (
           <StatCard key={k.label} k={k} />
         ))}

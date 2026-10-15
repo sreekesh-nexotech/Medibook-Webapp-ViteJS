@@ -40,11 +40,11 @@ export function OpsSidebar({ active, onNavigate, collapsed = false, mode }: OpsS
       )}
     >
       <div className={cn('flex items-center justify-center gap-2.25 pb-4', !isRail && 'px-4')}>
-        <img src="/assets/medibook-mark.svg" alt="Medibook" className="size-8.5 flex-none" />
+        <img src="/brand/medibook-mark.svg" alt="Medibook" className="size-8.5 flex-none" />
         {!isRail && (
           <div className="min-w-0">
             <div className="text-body-lg font-bold whitespace-nowrap text-black">Medibook</div>
-            <div className="text-text-faint text-[10.5px] font-medium tracking-[.04em]">
+            <div className="text-text-muted text-[10.5px] font-medium tracking-[.04em]">
               Operations Console
             </div>
           </div>
@@ -60,7 +60,7 @@ export function OpsSidebar({ active, onNavigate, collapsed = false, mode }: OpsS
               {s.section}
             </div>
           )}
-          <nav className="flex flex-col gap-1">
+          <nav aria-label={s.section} className="flex flex-col gap-1">
             {s.items.map((i) => {
               const isActive = active === i.id;
               return (

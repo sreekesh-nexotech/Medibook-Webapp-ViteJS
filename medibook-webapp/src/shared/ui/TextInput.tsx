@@ -115,7 +115,7 @@ export function TextInput({
         aria-label={ariaLabel}
         className={cn(
           'rounded-input text-body text-text-strong w-full border bg-white',
-          isInvalid ? 'border-d-500' : 'border-border',
+          isInvalid ? 'border-d-500' : 'border-border-control',
           disabled && 'text-text-muted bg-grey-200 cursor-not-allowed',
           icon ? 'pl-11' : 'pl-4',
           trailing ? 'pr-11' : 'pr-4',

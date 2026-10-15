@@ -87,9 +87,9 @@ interface SkeletonKpiStripProps {
 /** The dashboards' KPI tile row: label line, stat line, caption line per tile. */
 export function SkeletonKpiStrip({ count = 4, className }: SkeletonKpiStripProps) {
   return (
-    <div className={cn('flex gap-4', className)}>
+    <div className={cn('flex flex-wrap gap-4', className)}>
       {Array.from({ length: count }, (_, i) => (
-        <Card key={i} pad={18} className="min-w-0 flex-1">
+        <Card key={i} pad={18} className="min-w-0 flex-1 basis-52">
           <div className="flex flex-col gap-3">
             <SkeletonBlock w="42%" h={12} />
             <SkeletonBlock w="58%" h={26} />

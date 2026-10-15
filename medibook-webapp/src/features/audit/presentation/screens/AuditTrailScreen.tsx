@@ -65,7 +65,7 @@ const ENTITY_FILTER_OPTIONS: readonly string[] = [
 ];
 
 const DATE_INPUT_CLASS =
-  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
 
 const COLUMNS = [
   'Action',
@@ -225,7 +225,11 @@ export function AuditTrailScreen() {
         toast('Audit log exported as CSV', 'success');
       },
       onError: (failure) =>
-        toast(isFailure(failure) ? failure.message : 'Could not export the audit log.', 'error'),
+        toast(
+          isFailure(failure) ? failure.message : 'Could not export the audit log.',
+          'error',
+          failure,
+        ),
     });
   };
 
@@ -247,9 +251,10 @@ export function AuditTrailScreen() {
 
   const tableState: TableStateSpec | undefined = logQuery.isPending
     ? { kind: 'loading', rows: AUDIT_PAGE_SIZE }
-    : logQuery.isError
+    : logQuery.isLoadingError
       ? {
           kind: 'error',
+          error: loadError,
           message: isFailure(loadError) ? loadError.message : undefined,
           onRetry: () => void logQuery.refetch(),
         }

@@ -58,7 +58,7 @@ export function AppointmentSlotSelect({
 
   const placeholder = isLoading
     ? 'Loading slots…'
-    : grid.isError
+    : grid.isLoadingError
       ? 'Could not load slots — reselect the doctor to retry'
       : choice.emptyReason
         ? NO_SLOT_COPY[choice.emptyReason]

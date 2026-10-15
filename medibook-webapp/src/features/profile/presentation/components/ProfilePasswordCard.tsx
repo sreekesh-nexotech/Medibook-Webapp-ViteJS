@@ -60,7 +60,7 @@ export function ProfilePasswordCard({ surface }: ProfilePasswordCardProps) {
             current: failure.fieldErrors.current_password?.join(' '),
             next: failure.fieldErrors.new_password?.join(' '),
           });
-          toast(failure.message, 'error');
+          toast(failure.message, 'error', failure);
         },
       },
     );

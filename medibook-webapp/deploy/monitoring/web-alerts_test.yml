@@ -1,0 +1,59 @@
+# promtool test rules web-alerts_test.yml
+rule_files: [web-alerts.yml]
+evaluation_interval: 15s
+tests:
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="medibook-web", instance="https://medibook.example.com/"}'
+        values: '1 1 0x12'
+      - series: 'probe_success{job="medibook-ws", instance="https://medibook.example.com/ws/hospital/queue"}'
+        values: '1x14'
+      - series: 'probe_ssl_earliest_cert_expiry{job="medibook-web", instance="https://medibook.example.com/"}'
+        values: '1209600000x300'
+    alert_rule_test:
+      # Down for 1 minute: not yet paging.
+      - eval_time: 90s
+        alertname: WebAppDown
+        exp_alerts: []
+      # Down for over 2 minutes: pages.
+      - eval_time: 3m
+        alertname: WebAppDown
+        exp_alerts:
+          - exp_labels:
+              { severity: page, job: medibook-web, instance: 'https://medibook.example.com/' }
+            exp_annotations:
+              { summary: 'The Medibook web app is not loading at https://medibook.example.com/' }
+      - eval_time: 3m
+        alertname: WebSocketRouteDown
+        exp_alerts: []
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="medibook-ws", instance="https://medibook.example.com/ws/hospital/queue"}'
+        values: '0x12'
+      - series: 'probe_success{job="medibook-web", instance="https://medibook.example.com/"}'
+        values: '1x12'
+    alert_rule_test:
+      - eval_time: 150s
+        alertname: WebSocketRouteDown
+        exp_alerts:
+          - exp_labels:
+              {
+                severity: page,
+                job: medibook-ws,
+                instance: 'https://medibook.example.com/ws/hospital/queue',
+              }
+            exp_annotations:
+              {
+                summary: 'Live updates (queue, alerts) are unreachable at https://medibook.example.com/ws/hospital/queue',
+              }
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="medibook-ws", instance="https://medibook.example.com/ws/hospital/queue"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: WebChecksMissing
+        exp_alerts:
+          # absent() keeps the job label of the check that stopped.
+          - exp_labels: { severity: page, job: medibook-web }
+            exp_annotations: { summary: 'The web app checks have not run for 10 minutes' }

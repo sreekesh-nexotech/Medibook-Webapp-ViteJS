@@ -35,9 +35,10 @@ export function MyAccountScreen({ surface }: MyAccountScreenProps) {
       </div>
     );
   }
-  if (session.isError) {
+  if (session.isLoadingError) {
     return (
       <ErrorState
+        error={session.error}
         title="Could not load your account"
         message={isFailure(session.error) ? session.error.message : undefined}
         onRetry={() => void session.refetch()}

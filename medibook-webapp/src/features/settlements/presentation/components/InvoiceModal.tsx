@@ -1,7 +1,7 @@
 import { isFailure } from '@/core/error/failure';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, rupeesFromPaise } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -26,8 +26,6 @@ import {
 
 const MODAL_WIDTH = 620;
 const SKELETON_LINES = 6;
-const PAISE_PER_RUPEE = 100;
-
 interface InvoiceModalProps {
   invoiceId: string;
   /** Shown in the title while the detail loads. */
@@ -51,7 +49,7 @@ function Party({ heading, party }: { heading: string; party: InvoiceParty }) {
 }
 
 function invoiceCsv(inv: BillingInvoiceDetail): void {
-  const inRupees = (paise: number): number => paise / PAISE_PER_RUPEE;
+  const inRupees = rupeesFromPaise;
   downloadCsv(`${inv.invoiceNo}.csv`, [
     [
       'Invoice',
@@ -112,7 +110,11 @@ export function InvoiceModal({ invoiceId, invoiceNo, onClose }: InvoiceModalProp
     pdf.mutate(invoiceId, {
       onSuccess: (blob) => downloadBlob(blob, `${invoiceNo}.pdf`),
       onError: (failure) =>
-        toast(isFailure(failure) ? failure.message : 'Could not download the PDF.', 'error'),
+        toast(
+          isFailure(failure) ? failure.message : 'Could not download the PDF.',
+          'error',
+          failure,
+        ),
     });
   };
 
@@ -152,8 +154,9 @@ export function InvoiceModal({ invoiceId, invoiceNo, onClose }: InvoiceModalProp
             <SkeletonLine key={i} />
           ))}
         </div>
-      ) : invoiceQuery.isError || !inv || !status ? (
+      ) : invoiceQuery.isLoadingError || !inv || !status ? (
         <ErrorState
+          error={invoiceQuery.error}
           inline
           title="This invoice didn't load"
           message={isFailure(invoiceQuery.error) ? invoiceQuery.error.message : undefined}

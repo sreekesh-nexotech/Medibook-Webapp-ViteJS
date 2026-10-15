@@ -8,12 +8,12 @@ import type { IconName } from '@/shared/ui/icon-registry';
 /**
  * KPI tile datum. The prototype's color contract `{ c, bg, sc? }` (CSS color
  * strings) is redesigned to Tailwind class strings:
- *   - `bg` + `c` on the 38px icon box  → `iconClass`  (e.g. 'bg-g-100 text-g-600')
- *   - `c` on the stat number           → `valueClass` (e.g. 'text-g-600')
+ *   - `bg` + `c` on the 38px icon box  → `iconClass`  (e.g. 'bg-g-100 text-g-800')
+ *   - `c` on the stat number           → `valueClass` (e.g. 'text-g-800')
  *   - `sc` on the caption, falling back to `c` → `subClass`, falling back to
  *     `valueClass` (e.g. 'text-text-muted')
  * e.g. prototype `{ c: 'var(--g-600)', bg: 'var(--g-100)' }` becomes
- * `{ iconClass: 'bg-g-100 text-g-600', valueClass: 'text-g-600' }`.
+ * `{ iconClass: 'bg-g-100 text-g-800', valueClass: 'text-g-800' }`.
  */
 export interface StatCardData {
   readonly icon: IconName;
@@ -33,7 +33,7 @@ interface StatCardProps {
 /** Dashboard KPI tile — icon box + label, stat number, caption sub-line. */
 export function StatCard({ k, onClick }: StatCardProps) {
   return (
-    <Card className="min-w-0 flex-1" pad={18} onClick={onClick} hover={Boolean(onClick)}>
+    <Card className="min-w-0 flex-1 basis-52" pad={18} onClick={onClick} hover={Boolean(onClick)}>
       <div className="flex items-center gap-2.5">
         <div
           className={cn(

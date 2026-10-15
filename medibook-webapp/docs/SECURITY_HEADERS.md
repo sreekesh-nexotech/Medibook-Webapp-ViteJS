@@ -21,6 +21,9 @@ the meta tag must agree; when the origins change, rebuild with the new
 
 ## Example (nginx)
 
+The reference config in `deploy/nginx/` sends these from
+`medibook-security-headers.conf` on every location (`docs/DEPLOYMENT.md`). In short:
+
 ```nginx
 add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://files.example.com; font-src 'self'; connect-src 'self' https://api.example.com wss://ws.example.com https://files.example.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'" always;
 add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;

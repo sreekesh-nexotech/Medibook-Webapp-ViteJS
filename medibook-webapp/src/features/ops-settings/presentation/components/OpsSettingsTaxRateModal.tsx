@@ -102,7 +102,7 @@ export function OpsSettingsTaxRateModal({ rate, onClose }: OpsSettingsTaxRateMod
       if (formKey) fromServer[formKey] = messages[0] ?? null;
     }
     setErr((p) => ({ ...p, ...fromServer }));
-    toast(taxRateInUseMessage(failure.code, failure.meta) ?? failure.message, 'error');
+    toast(taxRateInUseMessage(failure.code, failure.meta) ?? failure.message, 'error', failure);
   };
 
   const handleSubmit = () => {

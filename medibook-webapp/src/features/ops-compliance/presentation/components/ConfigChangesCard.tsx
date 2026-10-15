@@ -177,15 +177,17 @@ export function ConfigChangesCard() {
         toast(
           isFailure(error) ? error.message : 'The configuration changes could not be exported.',
           'error',
+          error,
         ),
     });
   };
 
   const tableState: TableStateSpec | undefined = changesQuery.isLoading
     ? { kind: 'loading', rows: PAGE_SIZE }
-    : changesQuery.isError
+    : changesQuery.isLoadingError
       ? {
           kind: 'error',
+          error: changesQuery.error,
           title: "Configuration changes didn't load.",
           message: isFailure(changesQuery.error) ? changesQuery.error.message : undefined,
           onRetry: () => void changesQuery.refetch(),

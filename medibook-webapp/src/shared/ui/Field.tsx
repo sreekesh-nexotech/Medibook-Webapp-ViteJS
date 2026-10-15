@@ -53,7 +53,7 @@ export function Field({
     <div className={cn('flex flex-col gap-2', className)}>
       <label htmlFor={id} className="font-ui text-label text-text-strong">
         {label}
-        {required && <span className="text-d-500"> *</span>}
+        {required && <span className="text-d-600"> *</span>}
       </label>
       <FieldContext.Provider value={field}>
         {typeof children === 'function' ? children(field) : children}

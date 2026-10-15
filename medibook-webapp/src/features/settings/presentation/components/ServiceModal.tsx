@@ -171,6 +171,7 @@ export function ServiceModal({
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={service ? 'Edit Service' : 'Add Service'}
@@ -277,12 +278,17 @@ export function ServiceModal({
           error={form.errorFor('description')}
           hint="For your staff — shown in the catalogue."
         >
-          <textarea
-            value={form.values.description}
-            onChange={(e) => form.setField('description', e.target.value)}
-            placeholder="One or two lines about what the service includes."
-            className="rounded-input border-border text-body text-text-strong box-border h-20 w-full resize-none border p-3"
-          />
+          {({ id, describedById, invalid }) => (
+            <textarea
+              id={id}
+              aria-describedby={describedById}
+              aria-invalid={invalid || undefined}
+              value={form.values.description}
+              onChange={(e) => form.setField('description', e.target.value)}
+              placeholder="One or two lines about what the service includes."
+              className="rounded-input border-border-control text-body text-text-strong box-border h-20 w-full resize-none border p-3"
+            />
+          )}
         </Field>
         <div className="border-border-soft flex items-center gap-3 rounded-md border px-3.5 py-3">
           <Toggle

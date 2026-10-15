@@ -8,7 +8,7 @@ import { isFailure } from '@/core/error/failure';
 import { useFileDownloadMutation } from '@/shared/hooks/useFileDownloadMutation';
 import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import { cn } from '@/shared/lib/cn';
-import { fmtDate } from '@/shared/lib/format';
+import { calendarDate, fmtDate } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -65,7 +65,7 @@ function errorCopy(error: unknown): string {
 
 /** ISO timestamp → "12 Oct 2026"; empty for none. */
 function dateCopy(iso: string | null): string {
-  return iso ? fmtDate(iso.slice(0, 10)) : '';
+  return iso ? fmtDate(calendarDate(iso)) : '';
 }
 
 /** What happens next for a checklist row, in one line. */
@@ -125,9 +125,10 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
 
   if (caseQuery.isPending) return <SkeletonCards count={3} lines={4} />;
 
-  if (caseQuery.isError) {
+  if (caseQuery.isLoadingError) {
     return (
       <ErrorState
+        error={caseQuery.error}
         title="This application didn't load"
         message={errorCopy(caseQuery.error)}
         onRetry={() => void caseQuery.refetch()}
@@ -165,7 +166,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
       },
       {
         onSuccess: () => toast(done, 'success'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
@@ -179,7 +180,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
           { status: item.status === 'verified' ? 'verified' : 'received', fileId },
           `Scan attached to ${item.name}.`,
         ),
-      onError: (error) => toast(errorCopy(error), 'error'),
+      onError: (error) => toast(errorCopy(error), 'error', error),
       onSettled: () => setUploadingCode(null),
     });
   };
@@ -196,7 +197,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
       toast(`${sendingBack.name} sent back — tell ${detail.hospitalName} what to bring.`, 'info');
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -210,7 +211,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
       );
       return true;
     } catch (error) {
-      toast(errorCopy(error), 'error');
+      toast(errorCopy(error), 'error', error);
       return false;
     }
   };
@@ -218,7 +219,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
   const approveCase = (): void => {
     approve.mutate(detail.hospitalId, {
       onSuccess: () => toast(`${detail.hospitalName} approved — waiting on go-live.`, 'success'),
-      onError: (error) => toast(errorCopy(error), 'error'),
+      onError: (error) => toast(errorCopy(error), 'error', error),
     });
   };
 
@@ -248,7 +249,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
           }
         },
         onError: (error) => {
-          toast(errorCopy(error), 'error');
+          toast(errorCopy(error), 'error', error);
           setModal(null);
         },
       },
@@ -261,7 +262,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
       {
         onSuccess: () =>
           toast(`${detail.hospitalName}'s application is open again (under review).`, 'success'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
@@ -291,7 +292,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
             <span className="text-caption text-text-muted">
               {hospital
                 ? `${hospital.email} · ${hospital.city}${hospital.state ? `, ${hospital.state}` : ''} · plan ${planCode}`
-                : hospitalQuery.isError
+                : hospitalQuery.isLoadingError
                   ? 'Hospital details unavailable'
                   : 'Loading hospital details…'}
               {detail.submittedAt ? ` · applied ${dateCopy(detail.submittedAt)}` : ''}
@@ -319,7 +320,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                       { caseId: detail.id, stage: next, version: detail.version },
                       {
                         onSuccess: () => toast(`Moved to ${STAGE_LABEL[next]}.`, 'success'),
-                        onError: (error) => toast(errorCopy(error), 'error'),
+                        onError: (error) => toast(errorCopy(error), 'error', error),
                       },
                     );
                   }}
@@ -363,7 +364,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
 
       {rejected && (
         <Card pad={16} className="flex flex-wrap items-start gap-3">
-          <Icon name="circle-x" size={18} className="text-d-500 mt-0.5 flex-none" />
+          <Icon name="circle-x" size={18} className="text-d-600 mt-0.5 flex-none" />
           <div className="text-body text-text-body min-w-50 flex-1">
             <span className="text-text-strong font-medium">Application rejected.</span>{' '}
             {detail.rejectionReason ?? 'No reason was recorded.'}
@@ -392,7 +393,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
             <div
               className={cn(
                 'flex size-10 flex-none items-center justify-center rounded-md',
-                live || ready ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+                live || ready ? 'bg-g-100 text-g-800' : 'bg-y-100 text-y-800',
               )}
             >
               <Icon name={live ? 'rocket' : ready ? 'circle-check' : 'triangle-alert'} size={19} />
@@ -414,7 +415,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                 <ul className="mt-2.5 flex list-none flex-col gap-1.5 p-0">
                   {blockers.map((b) => (
                     <li key={b.code} className="text-body text-text-body flex items-start gap-2">
-                      <Icon name="circle-alert" size={15} className="text-y-600 mt-0.5 flex-none" />
+                      <Icon name="circle-alert" size={15} className="text-y-800 mt-0.5 flex-none" />
                       {blockerCopy(b, detail.checklist)}
                     </li>
                   ))}
@@ -485,7 +486,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                         item.fileId &&
                         downloadScan.mutate(
                           { fileId: item.fileId },
-                          { onError: (error) => toast(errorCopy(error), 'error') },
+                          { onError: (error) => toast(errorCopy(error), 'error', error) },
                         )
                       }
                       className="text-caption text-blue mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
@@ -498,7 +499,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                       type="button"
                       onClick={() => detachScan(item)}
                       disabled={updateItem.isPending}
-                      className="text-caption text-d-500 mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
+                      className="text-caption text-d-600 mt-0.5 flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0"
                     >
                       <Icon name="trash-2" size={13} className="flex-none" /> Remove scan
                     </button>
@@ -547,7 +548,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                       label="Verify document"
                       box={36}
                       size={16}
-                      color="var(--color-g-600)"
+                      color="var(--color-g-800)"
                       disabled={item.status !== 'received' || updateItem.isPending}
                       title={
                         item.status === 'received'
@@ -580,7 +581,7 @@ export function OnboardingCasePanel({ caseId }: OnboardingCasePanelProps) {
                       label="Send document back"
                       box={36}
                       size={16}
-                      color="var(--color-d-500)"
+                      color="var(--color-d-600)"
                       disabled={item.status === 'pending' || updateItem.isPending}
                       title={
                         item.status === 'pending'

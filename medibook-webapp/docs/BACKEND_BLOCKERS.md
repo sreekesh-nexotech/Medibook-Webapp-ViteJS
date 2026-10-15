@@ -6,48 +6,77 @@ Each entry says what fails, the evidence, what the backend needs to change, and 
 the web app does in the meantime.
 
 Found on 6 Oct 2026 against the shared test backend while fixing the Day-one
-workflows (`claude/core-day-one`) and the release items (`claude/rel-sec-hardening`).
+workflows (`claude/core-day-one`), the release and security items
+(`claude/rel-sec-hardening`), the patient-data, money and reliability items
+(`claude/privacy-data-runtime`), and the hosting, monitoring, accessibility,
+performance and product items (`claude/go-live-remaining`).
 Paths under `backend:` are in the Django repository.
 
 ## Summary
 
-| ID        | Problem                                                                    | Severity | Web app status                              |
-| --------- | -------------------------------------------------------------------------- | -------- | ------------------------------------------- |
-| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)              | Blocker  | Needs backend; admin stopgap available      |
-| ENV-03    | No resettable staging backend for end-to-end tests and UAT                 | High     | Read-only smoke tests only                  |
-| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)                         | High     | Needs backend and a product decision        |
-| SEC-07-B  | Token refresh shares the per-address sign-in limit                         | High     | App retries once after `Retry-After`        |
-| SEC-01-B  | Background polls keep a server session from going idle                     | Medium   | App signs idle tabs out itself              |
-| SEC-06-B  | Reusing a just-rotated refresh token revokes the session                   | Medium   | App coordinates refresh across tabs         |
-| CORE-04   | No platform endpoint to re-send the first-admin invitation                 | High     | Needs backend                               |
-| ROLE-01   | Only admins can refund cash at the desk                                    | Medium   | Product decision on role templates          |
-| CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)           |
-| ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                          |
-| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                     |
-| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads     |
-| API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible            |
-| DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't      |
-| DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately         |
-| DASH-03   | No server-side read state for hospital notifications                       | Low      | Bell remembers "read" per browser tab       |
-| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid                 | High     | Desk must collect again before check-in     |
-| APPT-02   | Cancelled unpaid bookings keep payment status "pending"                    | Low      | Shown as "Not paid"                         |
-| APPT-03   | No per-hospital list of accepted desk payment methods                      | Low      | Fixed list: cash, UPI, card, POS, other     |
-| APPT-04   | Appointment history names no actor                                         | Low      | Shows patient / staff / system only         |
-| APPT-05   | The desk cannot preview a walk-in's real fee before booking                | Medium   | Shows standard and follow-up fee            |
-| APPT-06   | Desk staff cannot read services, so no service can be booked               | Medium   | Bookings use the doctor's fee only          |
-| APPT-07   | A cancelled appointment keeps the token it gave up                         | Medium   | Patients history hides it on cancelled rows |
-| PAT-01    | The patient list carries no visit count                                    | Low      | One extra request per row                   |
-| TOK-01    | Desk roles cannot read the expected consultation time                      | Low      | Falls back to 20 minutes for them           |
-| TOK-02    | A session snapshot does not list its queue                                 | Medium   | Queue rebuilt from the appointment list     |
-| PAY-02    | Refunding one consultation of a visit refunds the whole visit              | High     | Desk collects per consultation              |
-| PAY-01    | Payments cannot be filtered by source (desk / online)                      | Low      | Source filters the visible page only        |
-| SET-01    | A paid period's net payable differs from its own ledger                    | High     | Drawer flags the gap                        |
-| SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS        |
-| DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                      |
-| SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings              |
-| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged            |
-| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                  |
-| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                      |
+| ID        | Problem                                                                    | Severity | Web app status                                |
+| --------- | -------------------------------------------------------------------------- | -------- | --------------------------------------------- |
+| CORE-07   | Receptionists cannot book appointments (403 on doctors/slots)              | Blocker  | Needs backend; admin stopgap available        |
+| ENV-03    | No resettable staging backend for end-to-end tests and UAT                 | High     | Read-only smoke tests only                    |
+| SEC-04    | No multi-factor sign-in (MFA endpoints answer 501)                         | High     | Needs backend and a product decision          |
+| SEC-07-B  | Token refresh shares the per-address sign-in limit                         | High     | App retries once after `Retry-After`          |
+| SEC-01-B  | Background polls keep a server session from going idle                     | Medium   | App signs idle tabs out itself                |
+| SEC-06-B  | Reusing a just-rotated refresh token revokes the session                   | Medium   | App coordinates refresh across tabs           |
+| CORE-04   | No platform endpoint to re-send the first-admin invitation                 | High     | Needs backend                                 |
+| ROLE-01   | Only admins can refund cash at the desk                                    | Medium   | Product decision on role templates            |
+| CORE-03-B | Go-live does not open the hospital to patients atomically                  | Medium   | Web app works around it (2 calls)             |
+| ENV-01    | Email links are relative when the frontend URLs are unset                  | High     | Deployment setting                            |
+| SCHEMA-01 | `schema.yml` documents paginated lists as bare arrays                      | Medium   | Web app fixed (CORE-01)                       |
+| ENV-02    | Test backend's file storage is fake: no upload or download can complete    | High     | Blocks photos, logos, KYC and downloads       |
+| API-01    | No way to read a hospital's commission history                             | Low      | Future-dated rates are invisible              |
+| DASH-01   | Admin dashboard counts cancelled bookings as appointments                  | Medium   | Web app subtracts them; walk-ins can't        |
+| DASH-02   | Refunds are not split by channel or payment method                         | Medium   | Front desk shows refunds separately           |
+| DASH-03   | No server-side read state for hospital notifications                       | Low      | Items stay highlighted until the work is done |
+| APPT-01   | A refunded walk-in stays scheduled and can check in unpaid                 | High     | Desk must collect again before check-in       |
+| APPT-02   | Cancelled unpaid bookings keep payment status "pending"                    | Low      | Shown as "Not paid"                           |
+| APPT-03   | No per-hospital list of accepted desk payment methods                      | Low      | Fixed list: cash, UPI, card, POS, other       |
+| APPT-04   | Appointment history names no actor                                         | Low      | Shows patient / staff / system only           |
+| APPT-05   | The desk cannot preview a walk-in's real fee before booking                | Medium   | Shows standard and follow-up fee              |
+| APPT-06   | Desk staff cannot read services, so no service can be booked               | Medium   | Bookings use the doctor's fee only            |
+| APPT-07   | A cancelled appointment keeps the token it gave up                         | Medium   | Patients history hides it on cancelled rows   |
+| PAT-01    | The patient list carries no visit count                                    | Low      | One extra request per row                     |
+| TOK-01    | Desk roles cannot read the expected consultation time                      | Low      | Falls back to 20 minutes for them             |
+| TOK-02    | A session snapshot does not list its queue                                 | Medium   | Queue rebuilt from the appointment list       |
+| PAY-02    | Refunding one consultation of a visit refunds the whole visit              | High     | Desk collects per consultation                |
+| PAY-01    | Payments cannot be filtered by source (desk / online)                      | Low      | Source filters the visible page only          |
+| SET-01    | A paid period's net payable differs from its own ledger                    | High     | Drawer flags the gap                          |
+| SET-02    | Statement PDFs are served by a redirect to file storage                    | Low      | Stored copy used; storage needs CORS          |
+| DOC-01    | Hospitals can't read their doctors' patient reviews                        | Low      | Average and count only                        |
+| SLOT-01   | The patient app's default date range stops a day before the booking window | Low      | Desk grid follows the settings                |
+| SVC-01    | Switching a tax rate off doesn't stop it being charged on services         | Medium   | Screen shows it as still charged              |
+| USR-01    | Expired staff invitations still read as `invited`                          | Low      | Screen checks `expires_at`                    |
+| USR-02    | No OTP invite, admin-set password, or role description                     | Low      | Options shown disabled                        |
+| PHI-01-B  | Reads, exports and downloads are not audited; nothing expires              | High     | Needs backend and a DPDP assessment           |
+| PHI-06-B  | SMS and WhatsApp templates are not registered                              | High     | Needs DLT and WhatsApp approval               |
+| PHI-03-B  | The message outbox export is built in the browser, unaudited               | Medium   | Admin-only; needs a server export             |
+| PHI-05-B  | Seeded test hospitals copy real hospitals' names and places                | Medium   | Committed fixtures scrubbed                   |
+| PHI-07-B  | Patient search terms travel in the URL (`?q=`)                             | Low      | MRNs out of URLs; search needs backend        |
+| DATA-01-B | The server's invoice document prints the UTC issue date                    | Medium   | App shows the IST date                        |
+| DATA-05-B | `schema.yml` omits the required `If-Match` on department edits             | Low      | App now sends it                              |
+| RUN-07-B  | Live-update sockets check sign-in only when they connect                   | Medium   | App closes sockets on sign-out                |
+| RUN-09-B  | Token-queue load at peak is untested                                       | Medium   | App refetches less; test needs ENV-03         |
+| DEP-01-B  | Hosting is not set up or checked on staging                                | Blocker  | Guide, nginx config and checker ready         |
+| DEP-02-B  | The browser cannot call the API from another origin                        | Blocker  | Same-origin layout ready; or set CORS         |
+| DEP-03-B  | File storage has no public HTTPS host                                      | Blocker  | Needs DevOps; CSP takes the host              |
+| DEP-04-B  | The bucket does not allow browser uploads (CORS)                           | High     | Rule in `docs/DEPLOYMENT.md`                  |
+| DEP-06-B  | Production providers and settings are unconfirmed                          | High     | Needs backend and DevOps                      |
+| DEP-07-B  | Nothing checks that email can be sent                                      | High     | Needs backend; link bases are ENV-01          |
+| DEP-09-B  | Backups and restores are unconfirmed                                       | High     | Needs DevOps                                  |
+| DEP-12-B  | Rate limits may see the proxy's address, not the client's                  | Medium   | Proxy settings documented                     |
+| OBS-01-B  | No error monitor receives the app's reports yet                            | High     | Reports ready; needs an endpoint              |
+| OBS-05-B  | Nothing alerts when the web app or its WebSocket route is down             | Medium   | Probes and rules in `deploy/monitoring`       |
+| OBS-02-B  | Tickets lack the requester's name; staff cannot self-assign                | Medium   | Inbox works around both                       |
+| OBS-06-B  | App config has a support phone but no support email                        | Low      | App shows only what is configured             |
+| PRD-08-B  | Audit rows carry no actor name; one resource type per filter               | Medium   | Names looked up where the role allows         |
+| PRD-02-B  | Resolved: `/hospital/me` already carries the logo                          | Low      | Every role sees the hospital's logo           |
+| PRD-05-B  | Ops lists lack plan, bookings, city, activity and payout data              | Low      | Columns and tiles left out                    |
+| PRD-06-B  | Two receipt settings and the series separator are never used               | Low      | Left out; needs a decision                    |
+| PRD-07-B  | The desk cannot get a fee quote before booking                             | Low      | Screen says the booking prices it             |
 
 ## CORE-07 — Receptionists cannot book appointments
 
@@ -313,7 +342,7 @@ first. The Commercial Terms card will list upcoming and past rates.
 
 **New finding (live check of the hospital dashboard, 6 Oct 2026).**
 
-**What fails.** For the same day the two dashboards disagree. On Lakeshore,
+**What fails.** For the same day the two dashboards disagree. On the test hospital,
 `GET /hospital/dashboard/admin?period=today` returned `appointments.total = 13` with
 `by_status = {cancelled: 12, scheduled: 1}`, while `GET /hospital/dashboard/reception`
 returned `queue_summary.total = 1`. The admin total leaves out only pending-payment
@@ -355,17 +384,17 @@ the hospital-wide refund total.
 ## DASH-03 — Hospital notifications have no read state
 
 **What fails.** The topbar bell is built from live counts (dashboard alerts and
-settlement periods). The hospital API has no notifications or read-receipt endpoint, so
-"Mark all read" cannot be stored: it does not survive a reload and does not carry over to
-other devices or tabs.
+settlement periods). The hospital API has no notifications or read-receipt endpoint, so a
+"read" state could not be stored: it would not survive a reload or carry over to other
+devices or tabs.
 
 **What the backend needs.** Either a hospital notifications feed with read state
 (`GET /hospital/notifications`, `POST …/read`), or a per-staff "last seen" timestamp for
 the alert counts.
 
-**What the web app does meanwhile.** Every bell item counts towards the badge. "Mark all
-read" clears the badge for that tab until a count changes (a new booking or drawer makes
-the item unread again).
+**What the web app does meanwhile.** Every bell item that needs action stays highlighted
+until the work behind it is done. There is no "Mark all read" (PRD-04), because reading an
+item does not do the work.
 
 ## APPT-01 — A refunded walk-in stays scheduled and can be checked in unpaid
 
@@ -375,7 +404,7 @@ the item unread again).
 payment status: the appointment stays `scheduled` with `payment_status = refunded`
 (backend: `payments/services/refunds.py:106-119`). Check-in looks only at the status and
 the date, not at payment (backend: `appointments/services/desk.py:164-171`), so the
-patient can be checked in and seen after their money was handed back. On Lakeshore today
+patient can be checked in and seen after their money was handed back. On the test hospital today
 the only live walk-in is in exactly this state, and the screen offered "Check in" for it.
 
 **What the backend needs.** Either cancel the appointment when its payment is refunded
@@ -389,7 +418,7 @@ drawer explains the refund, and Check in is hidden until it is paid again.
 ## APPT-02 — Cancelled unpaid bookings keep payment status "pending"
 
 **What fails.** An online booking cancelled before checkout completed keeps
-`payment_status = pending` for good. On Lakeshore today 12 of 13 appointments are such
+`payment_status = pending` for good. On the test hospital today 12 of 13 appointments are such
 cancelled bookings. A desk list reading "Pending ₹…" on them suggests money is still owed.
 
 **What the backend needs.** A terminal payment status for bookings that end without
@@ -428,7 +457,7 @@ staff or System, and the status change it made.
 **What fails.** A walk-in is priced at booking time by `fees.quote` (backend:
 `appointments/services/booking.py:248-255`, `catalog/services/fees.py:179`): follow-up
 pricing within `follow_up_window_days`, an optional service, and tax. No hospital
-endpoint returns that quote before booking. On Lakeshore, 2 of the 12 most recent
+endpoint returns that quote before booking. On the test hospital, 2 of the 12 most recent
 walk-ins were follow-ups charged half the doctor's fee (₹450 instead of ₹900), so a
 preview built from the doctor's standard fee overstates them by 50%.
 
@@ -443,7 +472,7 @@ totals from the booking.
 ## APPT-06 — Desk staff cannot read services, so no service can be booked
 
 **What fails.** A walk-in consultation may name a `service_id` (backend:
-`appointments/serializers/hospital_walk_in_consultation_serializer.py:9`), and Lakeshore has
+`appointments/serializers/hospital_walk_in_consultation_serializer.py:9`), and the test hospital has
 services linked to doctors (ECG, X-Ray (Knee)). But `GET /hospital/services` and
 `GET /hospital/doctor-services` need `hospital_settings.view` (backend:
 `catalog/views/hospital_service_list.py:16`,
@@ -464,7 +493,7 @@ service; a service picker can follow once desk roles can read the list.
 
 **What fails.** Cancelling a booking releases its token for the next booking (the history
 shows `token_reassigned`, and a new booking records `token_reused`), but the cancelled
-appointment keeps its `token_label` and `token_no`. On Lakeshore today, 12 cancelled
+appointment keeps its `token_label` and `token_no`. On the test hospital today, 12 cancelled
 appointments all read `A001` — the token now held by someone else — and patients' booking
 histories show the same stale tokens.
 
@@ -494,7 +523,7 @@ included (Ishaan Varma showed 1 visit for a cancelled booking).
 
 **What fails.** The queue's own notion of a long consultation is the doctor's
 `expected_consult_minutes`, falling back to the hospital's (backend:
-`tokens/services/queue.py:343-344`, Q29). On Lakeshore no doctor sets one, so the hospital
+`tokens/services/queue.py:343-344`, Q29). On the test hospital no doctor sets one, so the hospital
 default (10 minutes) applies, but it lives on `GET /hospital/settings`, which needs
 `hospital_settings.view` — receptionists, who run the queue, cannot read it.
 
@@ -557,7 +586,7 @@ its exports.
 
 **What fails.** `GET /hospital/settlements/periods/{id}` returns the period's
 `net_payable_paise` and a `breakdown` whose `ledger_net_paise` is the sum of its ledger
-entries. For Lakeshore's August period (paid, payout released, UTR `HDFCN01A0EE2F9F8B`) the
+entries. For the test hospital's August period (paid, payout released, UTR `HDFCN01A0EE2F9F8B`) the
 ledger nets to ₹6,889.84 but the period — and the released payout — say ₹6,989.84: ₹100
 more, with no adjustment recorded (`adjustments_paise = 0`). The 1–15 Sep period agrees
 (₹15,642.47 both ways).
@@ -582,7 +611,7 @@ storage host allows cross-origin reads (CORS).
 browser; and configure CORS on the storage bucket for the app's origin.
 
 **What the web app does meanwhile.** Statements that have a stored PDF (both on
-Lakeshore) download through the shared files API; the on-demand render is the fallback.
+the test hospital) download through the shared files API; the on-demand render is the fallback.
 
 ## DOC-01 — Hospitals can't read their doctors' patient reviews
 
@@ -610,7 +639,7 @@ last bookable date:
 
 - `GET /hospital/settings` → `derived.booking_window_end_date` = **5 Nov** (today + 30);
 - slot generation (`materialise`, the nightly run) creates slots up to **5 Nov** — 60 open
-  slots on Lakeshore that day;
+  slots on the test hospital that day;
 - `GET /patient/doctors/{id}/availability` with no `to` ends at **4 Nov**
   (`start + booking_window_days - 1`), so the patient app never offers 5 Nov unless it
   asks for that date explicitly.
@@ -651,7 +680,7 @@ re-send an unchanged rate, so such a service can still be edited or toggled.
 **What fails.** An invitation's `status` becomes `expired` only when the same email is
 invited again (`rbac/services/invitations.py`); nothing sweeps them when `expires_at`
 passes. So `GET /hospital/staff/invitations?status=invited` also returns invitations
-whose link no longer works — on Lakeshore, the receptionist invitation due at 17:21 on
+whose link no longer works — on the test hospital, the receptionist invitation due at 17:21 on
 6 Oct keeps reading `invited` after that.
 
 **What the backend needs.** Treat `expires_at <= now` as expired when listing and
@@ -677,3 +706,367 @@ on roles.
 **What the web app does meanwhile.** The OTP and set-a-password options are shown but
 disabled with an explanation; the email link is the only method that works. Role
 descriptions and colours are presentation copy.
+
+## PHI-01-B — Reads, exports and downloads are not audited; nothing expires
+
+**What fails.** Every successful write leaves an audit row, but safe methods are
+skipped (backend: `core/api.py:98-125`), so opening a patient, exporting a list or
+downloading a file leaves no trace. The retention sweep only records what is due for
+archival and never deletes (backend: `audit/tasks.py:20-25`, Q122).
+
+**Why it matters.** The DPDP Act 2023 assessment (checklist PHI-01) has to show who
+read or exported personal data, and how long each kind of data is kept.
+
+**What the backend should do.** Audit reads of patient records and every export and
+file download (actor, record or filter, time). Agree retention periods with
+compliance, then make the sweep delete or anonymise after them. The web app needs
+no change for either.
+
+## PHI-03-B — The message outbox export is built in the browser
+
+**What fails.** Messaging → Send & Outbox → Export CSV pages through
+`GET /hospital/messaging/deliveries` in the browser and writes the file there. On the
+test backend that was 9 requests and 820 rows of patients' phone numbers and email
+addresses, with no audit row (6 Oct). Only admins can open Messaging, and listing
+deliveries needs `hospital_settings.view`.
+
+**What the backend should do.** Add a server-side export (for example
+`GET /hospital/messaging/deliveries/export?format=csv` with the list's filters) that
+requires a permission, guards spreadsheet formulas like the settlement export, and
+writes an audit row with the actor and the filters. The web app then switches the
+button to it.
+
+**Meanwhile.** Every CSV the web app builds now neutralises spreadsheet formulas
+(PHI-04).
+
+## PHI-05-B — Seeded test hospitals copy real hospitals
+
+**What fails.** The test backend's seed names hospitals after real ones: one
+seeded hospital's name and street address match a real hospital in Kochi, and another
+echoes a real hospital chain in Pune. The names reach every screenshot, demo and
+recorded fixture. (They are not repeated here, for the same reason.)
+
+**What the backend should do.** Rename the seeded hospitals, companies, street
+addresses and email domains to clearly fictional ones.
+
+**Meanwhile.** The fixture recorder replaces these names, street addresses and exact
+coordinates before writing, and the committed fixtures are scrubbed
+(`node scripts/record-api-fixtures.mjs --rescrub`). Each seeded hospital also has a
+three-letter code that starts its booking, MRN and receipt numbers, staff codes and
+registration number; the recorder now replaces those codes too (PRD-06). Fixtures in
+earlier commits still carry them, so the git history needs a decision if that matters.
+
+## PHI-06-B — SMS and WhatsApp templates are not registered
+
+**What fails.** Every SMS must carry a DLT template id registered with the operator,
+set per event in `MSG91_DLT_TEMPLATE_IDS`; the operator permanently rejects an
+unregistered one (backend: `integrations/msg91/client.py:1-37`). WhatsApp business
+messages need approved templates as well. Until both are registered, patients get no
+confirmation or reminder by SMS or WhatsApp.
+
+**What is needed.** Register every patient-facing template (confirmation, reminder,
+cancellation, refund, one-time code) on the DLT portal and with WhatsApp, set the ids
+in production configuration, and check on staging that one appointment confirmation
+arrives by SMS, WhatsApp and email.
+
+## PHI-07-B — Patient search terms travel in the URL
+
+**What fails.** Patient search sends what staff type (names, phone numbers, MR
+numbers) as `GET /hospital/patients?q=…`, so it lands in proxy and server access logs.
+
+**What the web app now does.** Patient pages use the record id instead of the MR
+number, and opening a patient reads `/patients/{id}` without a search. Old MR-number
+links still work and are replaced by the record-id address.
+
+**What is needed.** Either the backend accepts the search in a POST body, or the
+reverse proxy leaves query strings out of access-log lines for
+`/api/v1/hospital/patients`. Confirm with a production log sample.
+
+## DATA-01-B — The server's invoice document prints the UTC issue date
+
+**What fails.** The invoice HTML/PDF prints `inv.issued_at.date()`, which is the UTC date
+(backend: `subscriptions/services/invoicing.py:272-273`). Invoices are generated at 00:30
+IST, the previous day in UTC, so every scheduled invoice document shows the day before
+its real issue date.
+
+**What the backend should do.** Convert to India Standard Time (or the hospital's zone)
+before taking the date, in the document and in any server-side CSV.
+
+**Meanwhile.** The web app shows and prints the IST date, and writes it to its own CSVs
+(DATA-01): the invoice issued at 00:30 IST on 3 Oct now reads "Issued 03 Oct 2026".
+
+## DATA-05-B — `schema.yml` does not say department edits need `If-Match`
+
+**What fails.** `PATCH /hospital/departments/{id}` refuses an edit without `If-Match`
+(backend: `catalog/services/departments.py:35`, `require_version`), but `schema.yml` does
+not list the header. The web app did not send it, so every department edit failed with
+400 "If-Match: This header is required" (confirmed 6 Oct). Holiday edits failed the same
+way; for those the contract does document the header.
+
+**What the backend should do.** Document `If-Match` on the department PATCH, and check
+every other PATCH that calls `require_version` for the same gap.
+
+**Meanwhile.** The web app now sends `If-Match` on department and holiday edits, and on
+leave, date-exception, tax-rate and coupon deletes (DATA-05).
+
+## RUN-07-B — Live-update sockets check sign-in only when they connect
+
+**What fails.** The socket consumers authorise the token once, at connect
+(backend: `core/ws.py:36-46`). A session revoked afterwards (sign-out everywhere, a
+blocked account) keeps receiving pushes until the socket drops. A bad token is
+refused by closing before accepting, which browsers report only as an abnormal close
+(1006), so a client cannot tell "signed out" from "network down".
+
+**What the backend should do.** Accept, then close with 4401 when the token is bad,
+and close a session's sockets when the session is revoked (or re-check the session on
+each push).
+
+**What the web app now does.** It closes every socket when its session ends in any
+tab, drops a line that stops answering pings, and after repeated refusals refreshes
+the token once and then shows "Live updates off" instead of reconnecting forever
+(RUN-07).
+
+## RUN-09-B — Token-queue load at peak is untested
+
+**What fails.** Every queue push reaches every open terminal, and each terminal used to
+refetch every page of every cached appointment list per push, so load grew with
+terminals × pages × token calls.
+
+**What the web app now does.** A push refreshes only lists that include today, at most
+once per two-second burst, and only the lists on screen (RUN-09).
+
+**What is needed.** A load test on staging (ENV-03): ten terminals and fifty doctors
+calling tokens at peak, with API response times and rate limits measured. Pushes that
+carry the changed appointment would let terminals update without refetching at all.
+
+## DEP-01-B — Hosting is not set up or checked on staging
+
+**What is missing.** Nothing has hosted the built app yet. The web app now ships the
+guide (`docs/DEPLOYMENT.md`), a reference nginx config (`deploy/nginx/`) and a checker
+(`scripts/check-deployment.sh`). The build refuses to run without explicit API and
+WebSocket origins (DEP-10), and the app refuses to start over plain http (DEP-05).
+
+**What DevOps needs to do.** Host a staging build by the guide, then:
+
+- run `scripts/check-deployment.sh https://<staging host>` until every check passes
+  (https redirect, security headers, deep links, caching, compression, the 404 for a
+  missing bundle, and the API);
+- book an appointment and record a payment over https (DEP-05);
+- call a token on one terminal and see it on another within two seconds (DEP-11): the
+  `/ws/` route needs the upgrade headers and a read timeout over 5 minutes.
+
+## DEP-02-B — The browser cannot call the API from another origin
+
+**What fails.** All three CORS allowlists default to empty (backend:
+`settings/base.py:192-196`) and origins must match exactly (backend: `core/cors.py`).
+From any other origin, every browser call is blocked.
+
+**What is needed.** One of:
+
+- **Same origin (recommended).** Serve `/api` and `/ws` from the app's own host, as
+  `deploy/nginx/medibook-web.conf` does, and build with `VITE_API_BASE_URL=same-origin`
+  and `VITE_WS_BASE_URL=same-origin`. No CORS settings are needed.
+- **Another origin.** Set `CORS_ORIGINS_HOSPITAL` and `CORS_ORIGINS_PLATFORM` to the app
+  origin (one app serves both consoles), allowing `Authorization`, `If-Match` and
+  `Idempotency-Key` and exposing `Content-Disposition` (report downloads read the file
+  name from it).
+
+## DEP-03-B — File storage has no public HTTPS host
+
+**What fails.** Signed upload and download links are signed for `S3_ENDPOINT` (backend:
+`integrations/storage/client.py:81-94`). Docker Compose sets it to the internal
+plain-http MinIO address, which browsers outside the server network cannot reach.
+Logos, banners, KYC scans and receipt PDFs all depend on it. The MinIO community
+edition used in Compose is archived. The test backend's version of this is ENV-02.
+
+**What is needed.** A storage endpoint browsers reach over https (S3, or a maintained
+S3-compatible store behind TLS). Build the app with that origin as
+`VITE_STORAGE_ORIGIN`, so the Content-Security-Policy allows it and downloads from
+any other host are refused.
+
+## DEP-04-B — The bucket does not allow browser uploads
+
+**What fails.** Uploads are a cross-origin `PUT` from the app origin with
+`Content-Type` and `x-amz-checksum-sha256` headers (backend:
+`integrations/storage/client.py:102-117`; `src/core/api/files.api.ts`). Without a
+bucket CORS rule the browser's preflight fails.
+
+**What is needed.** The bucket CORS rule in `docs/DEPLOYMENT.md` §4, with the
+production app origin.
+
+## DEP-06-B — Production providers and settings are unconfirmed
+
+**What fails.** `ENVIRONMENT` defaults to `dev` (backend: `settings/base.py:14`), and
+fake providers are refused only in `prod` (backend: `integrations/http.py:55-59`); fake
+storage hands out `storage.fake.local` links. Receipt PDFs answer 501 unless the PDF
+renderer is installed (backend: `payments/services/pdf.py:24-36`). `ALLOWED_HOSTS`
+defaults to localhost.
+
+**What is needed.** Staging and production run with `ENVIRONMENT=prod`, live Razorpay
+keys, the PDF renderer installed and `ALLOWED_HOSTS` naming the API host. Proof: a
+live-mode payment test passes and a receipt PDF downloads on staging.
+
+## DEP-07-B — Nothing checks that email can be sent
+
+**What fails.** Nothing checks the email settings at start-up. With the SES
+credentials missing, each send is refused by SES and the request is non-critical
+(backend: `integrations/ses/client.py:21-53`), so invitations and password resets do
+not arrive and nothing says why. Email link bases are covered by ENV-01.
+
+**What is needed.** A start-up check in production for the SES settings and the link
+bases, and a delivery test on staging: an invitation and a password reset arrive, and
+their links open the right screens.
+
+## DEP-09-B — Backups and restores are unconfirmed
+
+**What is missing.** The backend ships Postgres backup and restore scripts and an
+off-site copy (backend: `deploy/postgres/`), but nothing records that they run in
+production or that a restore has worked. Uploaded files in object storage need their
+own backup.
+
+**What is needed.** Restore last night's database and file storage into staging and
+record how long it took.
+
+## DEP-12-B — Rate limits may see the proxy's address, not the client's
+
+**What fails.** The backend trusts `X-Forwarded-For` only from `TRUSTED_PROXY_CIDRS`
+(backend: `core/net.py:20-30`; default `127.0.0.1/32`), and its nginx limits requests
+per connecting address (backend: `deploy/nginx/nginx.conf:7`). Behind a CDN, a load
+balancer or the web app's own proxy, every user would share one limit, and a few busy
+terminals could lock everyone out of sign-in.
+
+**What is needed.** List every proxy in front of the API in `TRUSTED_PROXY_CIDRS`, and
+give the backend's nginx `set_real_ip_from` and `real_ip_header X-Forwarded-For` for
+them. Proof: two users on different networks get separate limits in production.
+
+## OBS-01-B — No error monitor receives the app's reports yet
+
+**What is missing.** The web app now reports crashes, uncaught errors, server errors
+and unreadable responses, each with the screen path, release, commit and request id
+(`docs/MONITORING.md`). Nothing receives them until a monitor is chosen.
+
+**What is needed.** DevOps picks the endpoint (a log collector's HTTP input or a
+monitoring service that accepts JSON), allows the app origin in its CORS settings, and
+builds with `VITE_MONITORING_URL`. Source maps are built with `BUILD_SOURCEMAPS=hidden`
+and uploaded to the monitor, never to the web server. Proof: a forced render error and a
+forced 500 on staging both reach it.
+
+## OBS-05-B — Nothing alerts when the web app or its WebSocket route is down
+
+**What is missing.** The backend's Prometheus watches the API only. The web repo now
+ships blackbox probes, scrape jobs and alert rules for the app's page, a static file and
+the `/ws/` route (`deploy/monitoring/`, tests pass with `promtool`).
+
+**What is needed.** Run blackbox_exporter beside the backend's Prometheus, add the jobs
+and rules, then on staging stop the web server and the WebSocket route in turn: each must
+page the on-call person within five minutes.
+
+## OBS-02-B — Tickets lack the requester's name; staff cannot self-assign
+
+**What fails.** Platform ticket rows carry `raised_by_id` and `hospital_id` but no names
+(backend: `support/services/tickets.py` `serialize`), so the inbox looks up each hospital
+separately and can name the person who raised a ticket only once they post a message.
+`GET /platform/me` has no staff id, and the staff list needs `staff.view`, which only the
+Owner role holds, so the Operations Manager and Support roles cannot assign a ticket to
+anyone, themselves included. Sorting by `priority` is alphabetical.
+
+**What the web app does.** It resolves hospital names through the hospital record, shows
+the assignee picker only to roles with `staff.view` and a read-only value to others, and
+offers no priority sort.
+
+**What the backend needs.** Add the requester's name and email, the hospital name and the
+assignee's name to ticket rows; add the caller's staff id to `/platform/me` (or accept
+`me` as `assigned_to_id`); sort priority by severity.
+
+## OBS-06-B — App config has a support phone but no support email
+
+**What fails.** `GET /shared/app-config` returns `support_contacts.phone_e164` from Platform
+Settings, and nothing else. The app showed two different hard-coded addresses and a
+number that dialled a different line (OBS-06).
+
+**What the web app does.** It shows only what app config sends: today, the phone. It
+already reads `support_contacts.email` and shows it as soon as the backend sends it.
+
+**What is needed.** Send the support email (backend setting `PLATFORM_SUPPORT_EMAIL`, or a
+Platform Settings field) in `support_contacts`, and set the real support phone in Platform
+Settings before go-live.
+
+## PRD-08-B — Audit rows carry no actor name; one resource type per filter
+
+**What fails.** Audit rows return `actor_user_id` and `principal` only (backend:
+`audit/serializers/audit_log_serializer.py`). The roles that read the logs (Operations
+Manager, Support, Compliance) cannot list Medibook staff, because `staff.view` is
+Owner-only, and no platform endpoint names a hospital's staff member. `resource_type`
+filters one exact value, and request rows name a view class (`PlatformLoginView`), so a
+"module" filter would need one request per type. No severity is recorded, and refused
+requests are not recorded at all (backend: `core/api.py` `_audit_mutation` skips status
+400 and above).
+
+**What the web app does.** Names Medibook staff for roles that can list them, patients
+through their account, and hospital staff by their hospital, with the id's last eight
+characters otherwise. It filters by who acted, by one person picked from a row, and by
+one resource type from a menu of the types services record. The made-up severity column
+is gone.
+
+**What the backend needs.** Store the actor's name and role on each row when it is
+written; accept a comma-separated `resource_type` (or add a `module` column); decide
+whether refused attempts other than sign-ins belong in the trail.
+
+## PRD-02-B — Only Hospital Settings roles can see the hospital's logo (resolved)
+
+**Resolved.** `/hospital/me` already returns `logo_file_id` in its `hospital` object
+(backend `accounts/views/hospital_me.py`), so the sidebar now reads the logo from the
+session for every role and falls back to the Medibook mark when there is none or its link
+fails. Nothing is needed from the backend. Showing a real logo end to end is still
+untested while the test backend's file storage is fake (ENV-02).
+
+## PRD-05-B — Ops lists lack plan, bookings, city, activity and payout data
+
+**What fails.** These showed as columns and tiles that were always "—":
+
+- Hospitals: list rows have no plan or monthly bookings (backend:
+  `hospitals/serializers/platform_hospital_serializer.py`).
+- Platform Users: patient accounts have no city or booking count, and the list filters
+  only by status and search, so monthly-active and new-this-week counts cannot be made
+  (backend: `platform/views/users_list.py`).
+- Hospital profile in ops: no payout account or payment grace; payouts carry only the
+  account's last four digits.
+- Ops Users: two-factor status, which is off by design (SEC-04).
+
+**What the web app does.** Leaves those columns and tiles out. Each hospital's page shows
+its plan.
+
+**What the backend needs.** Only if they are wanted at launch: plan name and bookings
+this month on hospital rows; city and booking count on patient account rows, plus
+`created_from` and `last_login_from` filters or a counts endpoint; the masked primary
+payout account and grace days on the platform hospital profile.
+
+## PRD-06-B — Two receipt settings and the series separator are never used
+
+**What fails.** `PUT /hospital/settings` accepts `receipt_paper` and `receipt_show_staff`,
+but nothing reads them: receipts always print the staff name and counter, and the paper
+size comes from the print template (backend: `payments/services/receipts.py:147-148`,
+`tokens/models/print_template.py:29`). A number series' `separator` is stored and
+editable, but `numbering.render` never uses it. `GET /hospital/numbering` returns
+`{"results": [...]}` with no paging keys, while `schema.yml` documents a bare array (as
+in SCHEMA-01).
+
+**What the web app does.** Reads and saves every other hospital setting, the full token
+policy and the MRN, booking and receipt series, and leaves these three out so that no
+control does nothing.
+
+**What the backend needs.** Decide whether to use them (receipt layout, a separator
+placeholder) or drop them from the API, and fix the `schema.yml` entry.
+
+## PRD-07-B — The desk cannot get a fee quote before booking
+
+**What fails.** Only the patient app has a fee quote (`GET /patient/fee-quotes`), which
+knows when a visit is a follow-up. The desk's New Appointment screen adds up each doctor's
+consultation fee before booking, so a returning patient's follow-up price (PRD-07) shows
+only once the booking is made.
+
+**What the web app does.** Says under the total that follow-up pricing is worked out by
+the booking, and shows the real bill before any payment is collected.
+
+**What the backend needs.** A hospital-side quote, e.g. `GET /hospital/fee-quotes`
+with `doctor_id` and `hospital_patient_id`, returning `is_follow_up` and the fee.

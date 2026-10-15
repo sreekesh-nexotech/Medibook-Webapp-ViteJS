@@ -206,7 +206,7 @@ export function MessageTemplateModal({ template, templates, onClose }: MessageTe
               {isActive ? 'Active — used for new messages' : 'Off — kept but not used'}
             </span>
           </div>
-          {err.isActive && <span className="text-caption text-d-500">{err.isActive}</span>}
+          {err.isActive && <span className="text-caption text-d-600">{err.isActive}</span>}
         </div>
       </div>
     </FormModal>

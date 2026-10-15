@@ -123,7 +123,7 @@ export function ChangeSubscriptionModal({
         }
       >
         <div className="flex items-start gap-3">
-          <Icon name="circle-check" size={20} className="text-g-600 mt-0.5 flex-none" />
+          <Icon name="circle-check" size={20} className="text-g-800 mt-0.5 flex-none" />
           <p className="text-body text-text-body m-0">
             {doc
               ? `${outcome.prorationInvoice ? 'Proration invoice' : 'Credit note'} ${doc.number} for ${rupees(doc.totalPaise)} was issued to ${hospitalName}.`

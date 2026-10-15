@@ -1,3 +1,4 @@
+import { formatUpdatedAt } from '@/shared/lib/format';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -27,7 +28,6 @@ import {
   isHospitalRole,
 } from '@/app/router/paths';
 
-import { formatUpdatedAt } from '@/features/appointments/application/queries/useListRefresh';
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
 import { usePatientsQuery } from '@/features/patients/application/queries/usePatientsQuery';
 import { usePendingApprovalCountQuery } from '@/features/patients/application/queries/usePendingApprovalCountQuery';
@@ -175,8 +175,8 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
   );
 
   const open = onOpenPatient;
-  const book = (mrn: string) => {
-    navigate(hospitalBookForPatientPath(hospitalRole, mrn));
+  const book = (patientId: string) => {
+    navigate(hospitalBookForPatientPath(hospitalRole, patientId));
   };
 
   const reset = (fn: (v: string) => void) => (v: string) => {
@@ -208,9 +208,10 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
   /** Loading / empty / error live inside the table body so the header stays put. */
   const tableState: TableStateSpec | undefined = patientsQuery.isPending
     ? { kind: 'loading', rows: PAT_PAGE }
-    : patientsQuery.isError
+    : patientsQuery.isLoadingError
       ? {
           kind: 'error',
+          error: patientsQuery.error,
           message: patientsQuery.error.message,
           onRetry: () => void patientsQuery.refetch(),
         }
@@ -300,7 +301,7 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
             return (
               <tr
                 key={p.id}
-                onClick={() => open(p.mrn)}
+                onClick={() => open(p.id)}
                 className="hover:bg-grey-200 cursor-pointer transition-colors duration-150"
               >
                 <td className={tdClass}>{p.mrn}</td>
@@ -324,7 +325,7 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
                       label="View patient"
                       box={36}
                       size={16}
-                      onClick={() => open(p.mrn)}
+                      onClick={() => open(p.id)}
                     />
                     {canBook && (
                       <IconBtn
@@ -332,7 +333,7 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
                         label="Book appointment"
                         box={36}
                         size={16}
-                        onClick={() => book(p.mrn)}
+                        onClick={() => book(p.id)}
                       />
                     )}
                   </div>
@@ -346,9 +347,9 @@ function PatientRecordsList({ hospitalRole, onOpenPatient }: PatientRecordsListP
       <PatientModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSaved={(mrn) => {
+        onSaved={(patientId) => {
           setAddOpen(false);
-          open(mrn);
+          open(patientId);
         }}
       />
     </div>

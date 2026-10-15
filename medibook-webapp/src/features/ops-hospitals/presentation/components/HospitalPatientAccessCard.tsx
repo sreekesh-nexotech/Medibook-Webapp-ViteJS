@@ -132,7 +132,7 @@ export function HospitalPatientAccessCard({ h }: HospitalPatientAccessCardProps)
       setChange(null);
     },
     onError: (error: unknown) => {
-      toast(isFailure(error) ? error.message : FAILED, 'error');
+      toast(isFailure(error) ? error.message : FAILED, 'error', error);
       setChange(null);
     },
   });
@@ -158,7 +158,7 @@ export function HospitalPatientAccessCard({ h }: HospitalPatientAccessCardProps)
       <div
         className={cn(
           'text-caption mt-2 mb-4 flex items-start gap-2 rounded-sm px-3 py-2.5',
-          gaps.length === 0 ? 'bg-g-100 text-g-700' : 'bg-y-100 text-y-800',
+          gaps.length === 0 ? 'bg-g-100 text-g-800' : 'bg-y-100 text-y-800',
         )}
       >
         <Icon

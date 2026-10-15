@@ -26,29 +26,36 @@ const REVOKE_DELAY_MS = 1000;
 /** One CSV cell as a screen can hand it over. */
 export type CsvCell = string | number | null | undefined;
 
-/**
- * Characters that make a spreadsheet read a cell as a formula (or, for TAB and
- * CR, as a cell break that can smuggle one in): `= + - @ \t \r` (OWASP CSV
- * injection, UAT-75).
- */
-const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
-
-/** A plain number written as text ("-250", "+12.5") is data, not a formula. */
+/** Spreadsheet apps run a cell that starts with one of these as a formula. */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+/** A plain number cannot run anything, so it stays a number in the spreadsheet. */
 const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
-/** Prefix that makes Excel, Sheets and LibreOffice show the cell as literal text. */
+/**
+ * Prefix that makes Excel, Sheets and LibreOffice show the cell as literal text
+ * (OWASP CSV injection, UAT-75, PHI-04).
+ */
 const FORMULA_ESCAPE = "'";
+
+/**
+ * Neutralise spreadsheet formula injection the way the backend's own exports
+ * do (`settlements/services/export.py`): text a spreadsheet would run as a
+ * formula gets a leading apostrophe, so it opens as plain text.
+ */
+export function neutraliseFormula(text: string): string {
+  return FORMULA_PREFIX.test(text) && !PLAIN_NUMBER.test(text) ? `${FORMULA_ESCAPE}${text}` : text;
+}
 
 /**
  * Neutralise a cell a spreadsheet would otherwise evaluate: user text such as
  * a patient name `=HYPERLINK(…)` or `@SUM(…)` is prefixed with `'` so it opens
- * as text (UAT-75). Numbers, and numeric strings like "-250", are left alone
+ * as text (UAT-75, PHI-04). Numbers, and numeric strings like "-250", are left alone
  * so amounts and refunds still sum.
  */
 export function neutraliseCsvFormula(cell: CsvCell): string {
   if (cell == null) return '';
   if (typeof cell === 'number') return String(cell);
-  return FORMULA_TRIGGER.test(cell) && !PLAIN_NUMBER.test(cell) ? `${FORMULA_ESCAPE}${cell}` : cell;
+  return FORMULA_PREFIX.test(cell) && !PLAIN_NUMBER.test(cell) ? `${FORMULA_ESCAPE}${cell}` : cell;
 }
 
 /**
@@ -116,11 +123,17 @@ export function downloadCsv(filename: string, rows: readonly (readonly CsvCell[]
  * link from `GET /shared/files/{id}/url`, whose response already carries
  * `Content-Disposition: attachment`. `filename` is a hint only: browsers
  * ignore `download` on cross-origin links and use the server's name.
+ *
+ * Callers mint the link when the user asks (signed links expire after 10
+ * minutes, PRN-02). A link to another origin opens in a new tab, so a file
+ * the store serves inline (a PDF) never replaces the app the user is working
+ * in; an attachment still just downloads.
  */
 export function downloadFromUrl(url: string, filename?: string): void {
   const a = document.createElement('a');
   a.href = url;
   if (filename) a.download = filename;
+  if (new URL(url, window.location.href).origin !== window.location.origin) a.target = '_blank';
   a.rel = 'noopener';
   a.style.display = 'none';
   document.body.appendChild(a);

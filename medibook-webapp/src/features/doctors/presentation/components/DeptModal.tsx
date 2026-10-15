@@ -95,6 +95,7 @@ export function DeptModal({ dept, open, onClose }: DeptModalProps) {
             'Could not save the department.',
           ),
           'error',
+          error,
         );
       }
     },
@@ -102,6 +103,7 @@ export function DeptModal({ dept, open, onClose }: DeptModalProps) {
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title={isNew ? 'Add Department' : 'Edit Department'}
@@ -144,7 +146,7 @@ export function DeptModal({ dept, open, onClose }: DeptModalProps) {
               value={form.values.about}
               placeholder="Short description shown in the patient app"
               onChange={(e) => form.setField('about', e.target.value)}
-              className="border-border text-body-lg text-text-strong rounded-input box-border h-18.5 w-full resize-none border p-3"
+              className="border-border-control text-body-lg text-text-strong rounded-input box-border h-18.5 w-full resize-none border p-3"
             />
           )}
         </Field>

@@ -19,7 +19,7 @@ interface PatientMatchReviewProps {
  */
 export function PatientMatchReview({ candidates, onUse }: PatientMatchReviewProps) {
   return (
-    <div className="bg-y-100 mb-4 rounded-md border border-y-300 px-3.5 py-3" role="alert">
+    <div className="bg-y-100 mb-4 rounded-md border border-badge-queue-border px-3.5 py-3" role="alert">
       <div className="text-body text-text-strong mb-1 flex items-center gap-2 font-semibold">
         <Icon name="triangle-alert" size={16} className="text-y-700 flex-none" />
         This may be someone already registered here

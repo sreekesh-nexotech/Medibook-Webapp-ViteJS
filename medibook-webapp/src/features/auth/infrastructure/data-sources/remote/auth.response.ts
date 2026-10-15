@@ -43,11 +43,10 @@ export const hospitalMeResponseSchema = z.object({
     id: z.string(),
     name: z.string(),
     status: z.enum(['draft', 'onboarding', 'active', 'suspended', 'closed']),
+    timezone: z.string(),
     read_only: z.boolean(),
     // Optional so an older backend without it still signs in.
     logo_file_id: z.string().nullable().optional(),
-    /** IANA zone of the hospital (`hospitals.timezone`, D-09); hospital-local "today" uses it. */
-    timezone: z.string().nullable().optional(),
   }),
   default_counter: z.object({ id: z.string(), code: z.string(), name: z.string() }).nullable(),
   session_timeout_min: sessionTimeoutSchema,
@@ -100,6 +99,7 @@ export function toHospitalSession(dto: HospitalMeResponse): HospitalSession {
       id: dto.hospital.id,
       name: dto.hospital.name,
       status: dto.hospital.status,
+      timezone: dto.hospital.timezone,
       readOnly: dto.hospital.read_only,
       logoFileId: dto.hospital.logo_file_id ?? null,
       timeZone: dto.hospital.timezone ?? null,

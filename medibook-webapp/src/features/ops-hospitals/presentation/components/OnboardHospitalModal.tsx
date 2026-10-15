@@ -308,7 +308,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
         });
         setServerErrors(mapped.fields);
         setServerSummary(mapped.summary);
-        toast(mapped.headline, 'error');
+        toast(mapped.headline, 'error', error);
       }
     },
   });
@@ -345,6 +345,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title="Onboard Hospital"
@@ -429,7 +430,7 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
               label="Subscription Plan"
               required
               error={errorFor('planId')}
-              hint={plansQuery.isError ? 'Plans could not be loaded.' : undefined}
+              hint={plansQuery.isLoadingError ? 'Plans could not be loaded.' : undefined}
             >
               <Select
                 value={planName}

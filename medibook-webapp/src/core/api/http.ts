@@ -3,6 +3,7 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { z } from 'zod';
 
 import { isBackgroundTraffic } from '@/core/api/activity';
+import { withRequestId } from '@/core/api/requestId';
 import { announceRotation, announceSessionEnd } from '@/core/api/sessionSync';
 import { activeSurface } from '@/core/api/surface';
 import type { ApiSurface } from '@/core/api/surface';
@@ -78,8 +79,9 @@ const errorCodeSchema = z.object({ code: z.string() });
 
 /* ------------------------------------------------------------------ refresh */
 
-/** Bare client for the refresh call itself — no interceptors, so no loops. */
+/** Bare client for the refresh call itself — no auth interceptors, so no loops. */
 const refreshClient = axios.create({ baseURL: API_ROOT, timeout: API_TIMEOUT_MS });
+refreshClient.interceptors.request.use(withRequestId);
 
 const refreshInFlight = new Map<ApiSurface, Promise<string | null>>();
 
@@ -240,6 +242,7 @@ function isReadRequest(config: InternalAxiosRequestConfig): boolean {
 
 function createClient(basePath: string, resolveSurface: () => ApiSurface): AxiosInstance {
   const client = axios.create({ baseURL: `${API_ROOT}${basePath}`, timeout: API_TIMEOUT_MS });
+  client.interceptors.request.use(withRequestId);
 
   client.interceptors.request.use(async (config) => {
     const surface = resolveSurface();
@@ -278,6 +281,7 @@ function createClient(basePath: string, resolveSurface: () => ApiSurface): Axios
     }
     // Retry once through the bare Axios instance: it runs none of these
     // interceptors, so a second 401 propagates instead of refreshing again.
+    // The request keeps its id: support sees both attempts under one reference.
     config.headers.set(AUTH_HEADER, bearer(token));
     return axios.request(config);
   });
@@ -297,12 +301,19 @@ export const platformApi = createClient('/platform', () => 'platform');
  */
 export const sharedApi = createClient('/shared', activeSurface);
 
+/** A client without credentials that still tags each request with its id. */
+function createPublicClient(basePath: string): AxiosInstance {
+  const client = axios.create({ baseURL: `${API_ROOT}${basePath}`, timeout: API_TIMEOUT_MS });
+  client.interceptors.request.use(withRequestId);
+  return client;
+}
+
 /** `/api/v1/shared/…` with no credentials — public endpoints read before login. */
-export const publicApi = axios.create({ baseURL: `${API_ROOT}/shared`, timeout: API_TIMEOUT_MS });
+export const publicApi = createPublicClient('/shared');
 
 const publicSurfaceClients: Readonly<Record<ApiSurface, AxiosInstance>> = {
-  hospital: axios.create({ baseURL: `${API_ROOT}/hospital`, timeout: API_TIMEOUT_MS }),
-  platform: axios.create({ baseURL: `${API_ROOT}/platform`, timeout: API_TIMEOUT_MS }),
+  hospital: createPublicClient('/hospital'),
+  platform: createPublicClient('/platform'),
 };
 
 /**

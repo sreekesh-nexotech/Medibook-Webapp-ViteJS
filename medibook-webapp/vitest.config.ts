@@ -15,6 +15,9 @@ export default defineConfig((env) =>
     test: {
       environment: 'node',
       include: ['src/**/*.test.ts'],
+      // Let the contrast test read the theme tokens (`index.css?raw`); Vitest
+      // otherwise hands every stylesheet back empty.
+      css: { include: [/src\/index\.css/] },
     },
   }),
 );

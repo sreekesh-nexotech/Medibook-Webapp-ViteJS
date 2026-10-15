@@ -1,54 +1,59 @@
 /**
- * Real "Save as PDF" — audit 3.1.5. `src/index.css` already ships a
- * `@media print` block that hides `body *` and shows `.print-area` full page,
- * so handing one element that class and calling `window.print()` produces a
- * genuine, dependency-free PDF through the browser's own print dialog.
+ * Real "Save as PDF" / "Print" — audit 3.1.5, reworked for paper (PRN-01).
+ *
+ * The document is copied into a `.print-root` at the end of `<body>`, outside
+ * the app and its scrolling modals, and the global `@media print` rules in
+ * `src/index.css` show only that copy, in normal flow. A long invoice runs onto
+ * as many pages as it needs at the paper's own width (A4, A5), and a token slip
+ * prints at the 72 mm an 80 mm thermal roll allows.
+ *
+ * The copy is removed when the browser says printing finished (`afterprint`).
+ * Tablets return from `window.print()` before the preview is drawn, so there is
+ * no short timer that could blank the page there; a long one only tidies up a
+ * browser that never says.
  *
  * A control wired to this opens the print dialog, so it must be labelled
  * "Save as PDF" / "Print" — never "Download PDF", which promises a file the
  * browser may not write.
  */
 
-/** Class the global `@media print` rule isolates. */
-const PRINT_AREA_CLASS = 'print-area';
+/** Class the global `@media print` rules show on paper. */
+const PRINT_ROOT_CLASS = 'print-root';
+/** Added for a token slip: 72 mm wide, small page margins. */
+const PRINT_SLIP_CLASS = 'print-slip';
+
+/** Tidy-up for a browser that never fires `afterprint`. */
+const CLEANUP_FALLBACK_MS = 5 * 60_000;
+
+/** `page`: A4/A5 documents (receipts, invoices). `slip`: an 80 mm thermal token slip. */
+export type PrintLayout = 'page' | 'slip';
 
 /**
- * Safety net: some browsers never fire `afterprint` (or fire it before the
- * dialog closes). Strip the class on a timer too so the element can never be
- * left in its print-isolated state.
+ * Print a copy of `el` and nothing else. A null `el` is a no-op — callers can
+ * pass a ref's `.current` straight in.
  */
-const CLEANUP_FALLBACK_MS = 1500;
-
-/**
- * Print just `el`: temporarily marks it as the print area, opens the print
- * dialog, and removes the mark again on `afterprint` (or on a fallback timer).
- * A null `el` is a no-op — callers can pass a ref's `.current` straight in.
- */
-export function printElement(el: HTMLElement | null): void {
+export function printElement(el: HTMLElement | null, layout: PrintLayout = 'page'): void {
   if (!el) return;
 
-  // Never strip a class the element already carried (e.g. a receipt body that
-  // is permanently a print area).
-  const wasAlreadyPrintArea = el.classList.contains(PRINT_AREA_CLASS);
-  let cleaned = false;
+  for (const stale of document.querySelectorAll(`.${PRINT_ROOT_CLASS}`)) stale.remove();
+  const root = document.createElement('div');
+  root.className = layout === 'slip' ? `${PRINT_ROOT_CLASS} ${PRINT_SLIP_CLASS}` : PRINT_ROOT_CLASS;
+  root.appendChild(el.cloneNode(true));
+  document.body.appendChild(root);
+
   let timer: ReturnType<typeof setTimeout> | undefined;
-
   const cleanup = (): void => {
-    if (cleaned) return;
-    cleaned = true;
-    if (timer !== undefined) clearTimeout(timer);
     window.removeEventListener('afterprint', cleanup);
-    if (!wasAlreadyPrintArea) el.classList.remove(PRINT_AREA_CLASS);
+    if (timer !== undefined) clearTimeout(timer);
+    root.remove();
   };
-
-  el.classList.add(PRINT_AREA_CLASS);
   window.addEventListener('afterprint', cleanup);
   timer = setTimeout(cleanup, CLEANUP_FALLBACK_MS);
 
   try {
     window.print();
   } catch {
-    // A blocked or unavailable print dialog must not leave the page isolated.
+    // A blocked or unavailable print dialog must not leave the copy behind.
     cleanup();
   }
 }

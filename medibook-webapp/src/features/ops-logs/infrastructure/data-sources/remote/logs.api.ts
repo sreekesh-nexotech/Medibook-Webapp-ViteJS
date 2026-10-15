@@ -56,6 +56,7 @@ function pageParams(query: AuditLogQuery): Record<string, string | number> {
     ...filterParams(query),
     page: query.page,
     page_size: query.pageSize,
+
     ...(query.sortDir ? { sort: query.sortDir === 'asc' ? SORT_COLUMN : `-${SORT_COLUMN}` } : {}),
   };
 }

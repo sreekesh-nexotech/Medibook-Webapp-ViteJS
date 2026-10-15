@@ -1,3 +1,5 @@
+import { todayISO } from '@/shared/lib/format';
+
 /**
  * Pure local-calendar + clock-time helpers for the catalog and the slot grid.
  *
@@ -37,6 +39,10 @@ export function toIsoDate(date: Date): string {
 
 // "Today" is the hospital's calendar day (D-09, UAT-47): screens read it from
 // `useHospitalToday` (`@/shared/hooks/useHospitalTime`), never from the PC's clock.
+/** Today on the hospital's calendar, not the device's (DATA-02). */
+export function todayIso(): string {
+  return todayISO();
+}
 
 /** Parse ISO `yyyy-mm-dd` into a local-midnight `Date` (invalid input → null). */
 export function parseIsoDate(iso: string): Date | null {
@@ -48,7 +54,7 @@ export function parseIsoDate(iso: string): Date | null {
 
 /** `iso` shifted by `days` calendar days, still local (DST-safe). */
 export function addIsoDays(iso: string, days: number): string {
-  const base = parseIsoDate(iso) ?? new Date();
+  const base = parseIsoDate(iso) ?? parseIsoDate(todayISO()) ?? new Date();
   base.setDate(base.getDate() + days);
   return toIsoDate(base);
 }
@@ -79,13 +85,6 @@ export function isoWeekdayIndex(iso: string): number {
 /** Monday-first weekday label ("Mon".."Sun") of an ISO date. */
 export function isoWeekdayLabel(iso: string): WeekDayLabel {
   return WEEK_DAYS[isoWeekdayIndex(iso)];
-}
-
-/** True when `iso` falls inside the inclusive `from`–`to` range (ISO compares lexically). */
-export function isIsoWithin(iso: string, from: string, to: string): boolean {
-  const lo = from <= to ? from : to;
-  const hi = from <= to ? to : from;
-  return iso >= lo && iso <= hi;
 }
 
 /** "Mon 15 Sep" — the slot grid's date-navigator caption. */
@@ -124,7 +123,6 @@ export function minutesToTimeLabel(minutes: number): string {
     hour24 % HOURS_PER_HALF_DAY === 0 ? HOURS_PER_HALF_DAY : hour24 % HOURS_PER_HALF_DAY;
   return `${hour12}:${String(mins).padStart(2, '0')} ${suffix}`;
 }
-
 /** Minutes since local midnight, right now — the "past slot" cutoff. */
 export function minutesNow(): number {
   const now = new Date();

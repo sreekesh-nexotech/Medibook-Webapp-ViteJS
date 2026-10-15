@@ -147,12 +147,12 @@ const ROLE_LOOK: Readonly<Record<string, RoleLook>> = {
     iconClass: 'bg-blue-soft-bg text-blue',
     valueClass: 'text-blue',
   },
-  finance: { icon: 'indian-rupee', iconClass: 'bg-g-100 text-g-600', valueClass: 'text-g-600' },
+  finance: { icon: 'indian-rupee', iconClass: 'bg-g-100 text-g-800', valueClass: 'text-g-800' },
   support: { icon: 'headset', iconClass: 'bg-blue-soft-bg text-blue', valueClass: 'text-blue' },
   compliance: {
     icon: 'scale',
-    iconClass: 'bg-badge-noshow-bg text-orange',
-    valueClass: 'text-orange',
+    iconClass: 'bg-badge-noshow-bg text-orange-strong',
+    valueClass: 'text-orange-strong',
   },
   read_only: {
     icon: 'eye',

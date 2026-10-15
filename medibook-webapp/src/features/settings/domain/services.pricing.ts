@@ -2,6 +2,7 @@ import type {
   HospitalCoupon,
   ServiceTaxRate,
 } from '@/features/settings/domain/entities/services.entities';
+import { addDaysISO, calendarDate, calendarInstant } from '@/shared/lib/format';
 
 /**
  * Pure pricing rules, mirroring the backend's fee engine
@@ -101,35 +102,29 @@ export function serviceTaxOptions(rates: readonly ServiceTaxRate[]): readonly Se
 /** Derived availability of a coupon at a given instant. */
 export type CouponState = 'Active' | 'Scheduled' | 'Expired' | 'Exhausted' | 'Paused';
 
-/** ISO date-time → the local calendar day `yyyy-mm-dd`. */
+/** ISO date-time → the day `yyyy-mm-dd` it falls on in the hospital's calendar. */
 export function localDay(isoDateTime: string): string {
   const date = new Date(isoDateTime);
-  if (Number.isNaN(date.getTime())) return '';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return Number.isNaN(date.getTime()) ? '' : calendarDate(date);
 }
 
 /** One millisecond — `valid_to` is exclusive, so its last valid instant is just before it. */
 const ONE_MS = 1;
 
-/** The last local day a coupon is valid on (`valid_to` is an exclusive instant). */
+/** The last hospital day a coupon is valid on (`valid_to` is an exclusive instant). */
 export function lastValidDay(validTo: string): string {
   const end = Date.parse(validTo);
-  return Number.isNaN(end) ? '' : localDay(new Date(end - ONE_MS).toISOString());
+  return Number.isNaN(end) ? '' : calendarDate(end - ONE_MS);
 }
 
-/** Local `yyyy-mm-dd` → the instant that day starts, as ISO (UTC). */
+/** `yyyy-mm-dd` → the instant that day starts in the hospital's zone (DATA-03). */
 export function dayStartIso(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d).toISOString();
+  return calendarInstant(day);
 }
 
-/** Local `yyyy-mm-dd` → the exclusive end instant of that day (next local midnight), as ISO. */
+/** `yyyy-mm-dd` → the exclusive end of that day: the hospital's next midnight. */
 export function dayEndExclusiveIso(day: string): string {
-  const [y, m, d] = day.split('-').map(Number);
-  return new Date(y, m - 1, d + 1).toISOString();
+  return calendarInstant(addDaysISO(day, 1));
 }
 
 /**
@@ -146,22 +141,23 @@ export function couponState(coupon: HospitalCoupon, now: number): CouponState {
 }
 
 /**
- * Discount a coupon takes off `orderValue` (rupees, may carry paise), never
- * negative: a percent coupon is capped at its maximum discount, a flat one at
- * the order value.
+ * Discount a coupon takes off `orderValue` (rupees), worked out in paise exactly
+ * as the bill is (backend `catalog/services/fees.py`, `core/money.apply_bp`): a
+ * percent coupon rounds half-up to the paisa and stops at its cap, and no
+ * coupon takes more than the order (DATA-10).
  */
 export function couponDiscount(
-  coupon: Pick<HospitalCoupon, 'kind' | 'value' | 'minOrderRupees' | 'maxDiscountRupees'>,
+  coupon: Pick<HospitalCoupon, 'kind' | 'value' | 'minOrderRupees'> &
+    Partial<Pick<HospitalCoupon, 'maxDiscountRupees'>>,
   orderValue: number,
 ): number {
-  if (orderValue < coupon.minOrderRupees) return 0;
   const orderPaise = toPaise(orderValue);
+  if (orderPaise < toPaise(coupon.minOrderRupees)) return 0;
   let discount: number;
   if (coupon.kind === 'percent') {
     discount = applyBp(orderPaise, toBp(Math.min(coupon.value, MAX_PERCENT_COUPON)));
-    if (coupon.maxDiscountRupees !== null) {
-      discount = Math.min(discount, toPaise(coupon.maxDiscountRupees));
-    }
+    const cap = coupon.maxDiscountRupees;
+    if (cap != null) discount = Math.min(discount, toPaise(cap));
   } else {
     discount = toPaise(coupon.value);
   }

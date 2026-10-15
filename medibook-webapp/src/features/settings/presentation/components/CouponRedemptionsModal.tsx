@@ -95,7 +95,7 @@ export function CouponRedemptionsModal({ coupon, onClose }: CouponRedemptionsMod
                 >
                   {money(r.discountRupees)}
                 </td>
-                <td className={cn(tdClass, r.reversedAt ? 'text-text-muted' : 'text-g-700')}>
+                <td className={cn(tdClass, r.reversedAt ? 'text-text-muted' : 'text-g-800')}>
                   {r.reversedAt ? `Given back ${when(r.reversedAt)}` : 'Applied'}
                 </td>
               </tr>

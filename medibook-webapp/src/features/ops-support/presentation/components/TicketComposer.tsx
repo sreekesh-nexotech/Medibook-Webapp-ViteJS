@@ -129,9 +129,9 @@ export function TicketComposer({ ticketId }: TicketComposerProps) {
                 <span
                   className={cn(
                     status === 'clean'
-                      ? 'text-g-700'
+                      ? 'text-g-800'
                       : attachmentsState([status]) === 'failed'
-                        ? 'text-d-500'
+                        ? 'text-d-600'
                         : 'text-text-muted',
                   )}
                 >

@@ -11,11 +11,11 @@ export const REPORT_CATS: readonly string[] = ['All', 'Operations', 'Finance', '
 
 /**
  * Design `CAT_STYLE` translated to token classes for the icon box
- * (`bg` + `c`): Operations → blue, Finance → g-600, People → p-500.
+ * (`bg` + `c`): Operations → blue, Finance → g-800, People → p-500.
  */
 export const CAT_ICON_CLASS: Record<ReportCategory, string> = {
   Operations: 'bg-blue-soft-bg text-blue',
-  Finance: 'bg-g-100 text-g-600',
+  Finance: 'bg-g-100 text-g-800',
   People: 'bg-p-100 text-p-500',
 };
 

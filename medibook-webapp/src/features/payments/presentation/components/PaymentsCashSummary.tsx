@@ -59,7 +59,7 @@ function VarianceText({ variancePaise }: { variancePaise: number }) {
     <span
       className={cn(
         'font-medium tabular-nums',
-        balance === 'balanced' && 'text-g-700',
+        balance === 'balanced' && 'text-g-800',
         balance === 'short' && 'text-d-700',
         balance === 'over' && 'text-y-800',
       )}

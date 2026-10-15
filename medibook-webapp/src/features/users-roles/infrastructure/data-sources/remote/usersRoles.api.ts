@@ -1,8 +1,9 @@
 import type { z } from 'zod';
+import { clientFailure } from '@/core/error/toFailure';
 
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { MAX_PAGE_SIZE, paginatedSchema } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, paginatedSchema, fetchCappedPages } from '@/core/api/pagination';
 
 import type { StaffRoleCode } from '@/features/users-roles/domain/entities/usersRoles.types';
 import type {
@@ -36,6 +37,8 @@ import {
  */
 const MAX_PAGES = 50;
 
+const LIST_TOO_LONG = 'This list is too long to load in full. Narrow it down and try again.';
+
 /**
  * Invitations not yet accepted: links that still work (`invited`) and lapsed
  * ones (`expired`, USR-01) — an administrator resends those (`status` takes
@@ -56,15 +59,15 @@ async function getAllPages<T extends z.ZodType>(
   pageSchema: ReturnType<typeof paginatedSchema<T>>,
   params: Readonly<Record<string, string>> = {},
 ): Promise<z.infer<T>[]> {
-  const rows: z.infer<T>[] = [];
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
+  const { rows, truncated } = await fetchCappedPages(async (page) => {
     const response = await hospitalApi.get(path, {
       params: { ...params, page, page_size: MAX_PAGE_SIZE },
     });
-    const body = pageSchema.parse(response.data);
-    rows.push(...body.results);
-    if (!body.has_next) break;
-  }
+    return pageSchema.parse(response.data);
+  }, MAX_PAGES);
+  // The screen totals and filters the whole set, so a partial list would
+  // mislead: say so instead of silently dropping rows (DATA-07).
+  if (truncated) throw clientFailure('unknown', LIST_TOO_LONG);
   return rows;
 }
 

@@ -125,7 +125,7 @@ function initialWindow(tab: AppointmentTab): DateWindow {
 /** What the update caption says: live over the queue socket, or polling. */
 function liveCaption(canQueue: boolean, socket: SocketStatus) {
   if (canQueue && socket === 'open') {
-    return { label: 'Live', title: 'Updates arrive as they happen', dot: 'bg-g-600' };
+    return { label: 'Live', title: 'Updates arrive as they happen', dot: 'bg-g-800' };
   }
   return {
     label: 'Auto-refresh',
@@ -234,7 +234,6 @@ export function AppointmentsScreen() {
     filter !== null && !query.isPlaceholderData && query.isSuccess && page > lastPage;
   // Adjusting state from the previous render's data (React's documented pattern).
   if (isPastEnd) setPage(lastPage);
-
   const approve = useApproveMutation();
   const checkIn = useCheckInMutation();
   const actionKeys = useActionKeys();
@@ -283,7 +282,7 @@ export function AppointmentsScreen() {
     const p = primaryAction(a, today, canCollect);
     if (!p) return;
     const fail = (fallback: string) => (error: unknown) =>
-      toast(failureText(error, fallback), 'error');
+      toast(failureText(error, fallback), 'error', error);
     if (p.key === 'approve') {
       approve.mutate(
         { id: a.id },
@@ -321,6 +320,7 @@ export function AppointmentsScreen() {
       : filter && query.isError
         ? {
             kind: 'error',
+            error: query.error,
             message: failureText(query.error, 'Could not load appointments.'),
             onRetry: () => void refresh(),
           }
@@ -393,7 +393,7 @@ export function AppointmentsScreen() {
             onChange={(e) => reset(setExact)(e.target.value)}
             title="Pick a specific date, past or future"
             aria-label="Filter by a specific date"
-            className="rounded-input border-border text-body text-text-body h-11 border bg-white px-3"
+            className="rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3"
           />
           <FilterSelect
             value={(deptId && deptLabels.get(deptId)) || ALL_DEPTS}
@@ -538,7 +538,7 @@ export function AppointmentsScreen() {
                       )}
                       <IconBtn
                         name="eye"
-                        label="Details"
+                        label={`Details of ${a.patient?.fullName ?? 'the patient'}'s ${timeOf(a.scheduledStartAt, timeZone)} appointment`}
                         box={36}
                         size={16}
                         onClick={() => setParam(APPOINTMENT_PARAM, a.id)}

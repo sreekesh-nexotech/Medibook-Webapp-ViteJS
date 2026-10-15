@@ -8,6 +8,7 @@ import { ReportDownloadScreen } from '@/app/router/lazyScreens';
 import { hospitalDashboardPath, loginReturningTo, OPS_BASE_PATH } from '@/app/router/paths';
 import { SessionError } from '@/app/router/SessionError';
 import { SessionLoading } from '@/app/router/SessionLoading';
+import { SuspendedMessage } from '@/app/router/SuspendedMessage';
 import { useSessionExit } from '@/app/router/useSessionExit';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
@@ -16,10 +17,6 @@ import {
   hospitalUrlRole,
   platformSessionOf,
 } from '@/features/auth/application/store/auth.roles';
-
-/** Shown when the backend has suspended the hospital (login still works, D-30). */
-const SUSPENDED_MESSAGE =
-  "This hospital's Medibook instance is suspended by operations. Contact support@medibook.in to reactivate.";
 
 interface ReportDownloadGuardProps {
   /** Which session the emailed link belongs to: `/ops/…` links are the platform's. */
@@ -43,12 +40,13 @@ export function ReportDownloadGuard({ surface }: ReportDownloadGuardProps) {
   const platform = surface === 'platform' ? platformSessionOf(session.data) : null;
 
   if (!hospital && !platform) {
-    if (session.isError) {
+    if (session.isLoadingError) {
       if (isFailure(session.error) && session.error.kind === 'unauthorized') {
         return <Navigate to={loginReturningTo(pathname)} replace />;
       }
       return (
         <SessionError
+          error={session.error}
           message={isFailure(session.error) ? session.error.message : undefined}
           onRetry={() => void session.refetch()}
           onLogout={logout}
@@ -62,7 +60,7 @@ export function ReportDownloadGuard({ surface }: ReportDownloadGuardProps) {
 
   if (hospital?.hospital.status === 'suspended') {
     return (
-      <SessionError title="Hospital suspended" message={SUSPENDED_MESSAGE} onLogout={logout} />
+      <SessionError title="Hospital suspended" message={<SuspendedMessage />} onLogout={logout} />
     );
   }
 

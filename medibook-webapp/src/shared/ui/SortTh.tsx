@@ -17,7 +17,7 @@ interface SortThProps {
 /**
  * Shared sort header cell — used by table shells. A sortable column is a real
  * button inside the header (keyboard-operable) and the header reports its
- * order through `aria-sort` (UAT-76, 01·F31).
+ * order through `aria-sort` (A11Y-01, UAT-76, 01·F31).
  */
 export function SortTh({ label, baseClassName, right, sortKeys, sort, onSort }: SortThProps) {
   const key = sortKeys?.[label];

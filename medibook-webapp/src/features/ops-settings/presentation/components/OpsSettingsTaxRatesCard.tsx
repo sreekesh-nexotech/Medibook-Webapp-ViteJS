@@ -60,6 +60,7 @@ export function OpsSettingsTaxRatesCard() {
               ? (taxRateInUseMessage(failure.code, failure.meta) ?? failure.message)
               : 'Could not delete that rate.',
             'error',
+            failure,
           ),
       },
     );
@@ -68,9 +69,10 @@ export function OpsSettingsTaxRatesCard() {
   let state: TableStateSpec | undefined;
   if (rates.isPending) {
     state = { kind: 'loading', rows: 3 };
-  } else if (rates.isError) {
+  } else if (rates.isLoadingError) {
     state = {
       kind: 'error',
+      error: rates.error,
       title: 'Could not load tax rates',
       message: isFailure(rates.error) ? rates.error.message : undefined,
       onRetry: () => void rates.refetch(),
@@ -135,7 +137,7 @@ export function OpsSettingsTaxRatesCard() {
         ))}
       </TableShell>
       {total > items.length && (
-        <p className="text-caption text-text-faint mt-3">
+        <p className="text-caption text-text-muted mt-3">
           Showing {items.length} of {total} rates.
         </p>
       )}

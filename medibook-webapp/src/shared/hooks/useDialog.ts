@@ -12,6 +12,8 @@ import { useCallback, useEffect, useId, useRef, type RefObject } from 'react';
  *  - Tab / Shift+Tab cycle inside the panel and never reach the page behind.
  *  - Focus returns to whatever was focused before the dialog opened.
  *  - Body scroll is locked while open and restored afterwards.
+ *  - With dialogs stacked (a modal opened from a drawer), only the top one
+ *    answers Escape and Tab, so Escape closes one layer at a time (A11Y-07).
  *
  * It renders nothing and adds no styling, so a dialog's visuals are untouched.
  */
@@ -35,7 +37,7 @@ const FOCUSABLE_SELECTOR = [
 /**
  * Open dialogs, innermost last. A confirm opened from a drawer must answer
  * Escape and Tab on its own: only the top of this stack handles keys, so
- * Escape closes the confirm and leaves the drawer open (UAT-76, 01·F30).
+ * Escape closes the confirm and leaves the drawer open (A11Y-07, UAT-76, 01·F30).
  */
 const openDialogs: symbol[] = [];
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
 import { downloadCsv, type CsvCell } from '@/shared/lib/download';
-import { money } from '@/shared/lib/format';
+import { money, rupeesFixed } from '@/shared/lib/format';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { KpiStrip } from '@/shared/ui/KpiStrip';
 import { SkeletonCards, SkeletonKpiStrip } from '@/shared/ui/Skeleton';
@@ -59,15 +59,15 @@ const ONE_DECIMAL = 10;
 const LOAD_FAILED = 'Analytics could not be loaded. Please try again.';
 
 /** Overview metrics in the bookings CSV, in reading order. */
-const OVERVIEW_CSV: readonly (readonly [string, (o: AnalyticsOverview) => number])[] = [
+const OVERVIEW_CSV: readonly (readonly [string, (o: AnalyticsOverview) => CsvCell])[] = [
   ['Total bookings', (o) => o.bookingsTotal],
   ['Online bookings', (o) => o.bookingsOnline],
   ['Walk-in bookings', (o) => o.bookingsWalkIn],
   ['Completed', (o) => o.completed],
   ['Cancellations', (o) => o.cancellations],
   ['No-shows', (o) => o.noShows],
-  ['Revenue (INR)', (o) => o.revenueRupees],
-  ['Refunds (INR)', (o) => o.refundsRupees],
+  ['Revenue (INR)', (o) => rupeesFixed(o.revenueRupees)],
+  ['Refunds (INR)', (o) => rupeesFixed(o.refundsRupees)],
   ['New patients', (o) => o.newPatients],
 ];
 
@@ -99,16 +99,16 @@ function bookingKpis(o: AnalyticsOverview): readonly StatCardData[] {
       label: 'Completed ÷ Bookings Made',
       value: `${pct(o.completed, o.bookingsTotal)}%`,
       sub: `${o.completed.toLocaleString('en-IN')} completed in the window`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'circle-x',
       label: 'Cancelled ÷ Bookings Made',
       value: `${pct(o.cancellations, o.bookingsTotal)}%`,
       sub: `${pct(o.noShows, o.bookingsTotal)}% no-show · unpaid checkouts excluded`,
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
     },
   ];
@@ -128,8 +128,8 @@ function providerKpis(
       label: 'Provider Spend',
       value: money(spend),
       sub: `${rows.length} providers · ${windowLabel(window)}`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
       subClass: 'text-text-muted',
     },
     {
@@ -155,8 +155,8 @@ function providerKpis(
       label: 'Provider Errors',
       value: errors.toLocaleString('en-IN'),
       sub: `${pct(errors, requests)}% of requests`,
-      iconClass: errors > 0 ? 'bg-d-100 text-d-500' : 'bg-grey-300 text-text-muted',
-      valueClass: errors > 0 ? 'text-d-500' : 'text-text-muted',
+      iconClass: errors > 0 ? 'bg-d-100 text-d-600' : 'bg-grey-300 text-text-muted',
+      valueClass: errors > 0 ? 'text-d-600' : 'text-text-muted',
       subClass: 'text-text-muted',
     },
   ];
@@ -186,8 +186,8 @@ function errorKpis(
       label: 'Failed Requests',
       value: failed.toLocaleString('en-IN'),
       sub: `${server.toLocaleString('en-IN')} server errors (5xx)`,
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       subClass: 'text-text-muted',
     },
     {
@@ -195,8 +195,8 @@ function errorKpis(
       label: 'Error Rate',
       value: `${pct(failed, requests)}%`,
       sub: 'Failed share of all API requests',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
       subClass: 'text-text-muted',
     },
     {
@@ -303,7 +303,7 @@ export function OpsAnalyticsScreen() {
     : isProviders
       ? [providers]
       : [providers, apiErrors];
-  const failed = active.find((q) => q.isError);
+  const failed = active.find((q) => q.isLoadingError);
   const isLoading = active.some((q) => q.isPending);
 
   const bookings: BookingsView | null =
@@ -350,7 +350,7 @@ export function OpsAnalyticsScreen() {
   };
 
   const retry = (): void => {
-    for (const q of active) if (q.isError) void q.refetch();
+    for (const q of active) if (q.isLoadingError) void q.refetch();
   };
 
   const header = (
@@ -370,6 +370,7 @@ export function OpsAnalyticsScreen() {
       <div className="flex flex-col gap-5">
         {header}
         <ErrorState
+          error={failed.error}
           title="Analytics didn't load"
           message={isFailure(failed.error) ? failed.error.message : LOAD_FAILED}
           onRetry={retry}

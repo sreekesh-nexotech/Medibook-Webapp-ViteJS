@@ -5,7 +5,7 @@ import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
 import type { SortState } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, formatInstant, rupeesFromPaise } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -51,7 +51,6 @@ import {
   fromLabel,
   isNotImplemented,
   isUnpaid,
-  paiseToRupees,
   plural,
   rupees,
   saveFile,
@@ -226,8 +225,8 @@ export function OpsBillingScreen() {
       label: 'Open Invoices',
       value: countOf(openCount),
       sub: 'Issued and not yet paid',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
       subClass: 'text-text-muted',
     },
     {
@@ -235,8 +234,8 @@ export function OpsBillingScreen() {
       label: 'Overdue',
       value: countOf(overdueCount),
       sub: 'Past their due date',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       subClass: 'text-text-muted',
     },
     {
@@ -244,8 +243,8 @@ export function OpsBillingScreen() {
       label: 'Failed Payments',
       value: countOf(failedCount),
       sub: 'Gateway attempts that did not go through',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
     },
   ];
@@ -267,8 +266,8 @@ export function OpsBillingScreen() {
             label: 'Outstanding',
             value: rupees(money.outstandingPaise),
             sub: `${plural(money.unpaidInvoices, 'unpaid invoice')}`,
-            iconClass: 'bg-y-100 text-y-600',
-            valueClass: 'text-y-600',
+            iconClass: 'bg-y-100 text-y-800',
+            valueClass: 'text-y-800',
             subClass: 'text-text-muted',
           },
           {
@@ -276,8 +275,8 @@ export function OpsBillingScreen() {
             label: 'Overdue',
             value: rupees(money.overduePaise),
             sub: 'Past their due date',
-            iconClass: 'bg-d-100 text-d-500',
-            valueClass: 'text-d-500',
+            iconClass: 'bg-d-100 text-d-600',
+            valueClass: 'text-d-600',
             subClass: 'text-text-muted',
           },
           {
@@ -285,8 +284,8 @@ export function OpsBillingScreen() {
             label: 'Collected',
             value: rupees(money.collectedPaise),
             sub: 'Captured this month (IST)',
-            iconClass: 'bg-g-100 text-g-600',
-            valueClass: 'text-g-600',
+            iconClass: 'bg-g-100 text-g-800',
+            valueClass: 'text-g-800',
             subClass: 'text-text-muted',
           },
         ]
@@ -365,6 +364,7 @@ export function OpsBillingScreen() {
           toast(
             isNotImplemented(error) ? PDF_UNAVAILABLE : failureText(error, PDF_FAILED),
             'error',
+            error,
           ),
       },
     );
@@ -377,7 +377,7 @@ export function OpsBillingScreen() {
           saveFile(file);
           toast(`Exported ${file.filename}`, 'success');
         },
-        onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error'),
+        onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error', error),
       });
       return;
     }
@@ -404,7 +404,7 @@ export function OpsBillingScreen() {
             p.gatewayPaymentId ?? p.id,
             p.invoiceNo,
             METHOD_LABELS[p.method],
-            paiseToRupees(p.amountPaise),
+            rupeesFromPaise(p.amountPaise),
             p.attemptedAt,
             PAYMENT_STATUS_BADGES[p.status].label,
             p.attemptNo,
@@ -418,12 +418,12 @@ export function OpsBillingScreen() {
           'success',
         );
       },
-      onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error'),
+      onError: (error) => toast(failureText(error, EXPORT_FAILED), 'error', error),
     });
   };
 
   const dateInputClass =
-    'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+    'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
   const filtersActive = Boolean(
     q || statusF !== STATUS_ALL || methodF !== METHOD_ALL || dateF || dateT,
   );
@@ -440,9 +440,10 @@ export function OpsBillingScreen() {
     icon: 'file-text' | 'indian-rupee',
   ): TableStateSpec | undefined => {
     if (activeQuery.isPending) return { kind: 'loading', rows: OPS_BILL_PAGE };
-    if (activeQuery.isError)
+    if (activeQuery.isLoadingError)
       return {
         kind: 'error',
+        error: activeQuery.error,
         message: failureText(activeQuery.error, `The ${noun} could not be loaded.`),
         onRetry: () => void activeQuery.refetch(),
       };
@@ -562,10 +563,7 @@ export function OpsBillingScreen() {
               {activeQuery.dataUpdatedAt > 0 && (
                 <span className="text-caption text-text-muted">
                   Updated{' '}
-                  {new Date(activeQuery.dataUpdatedAt).toLocaleTimeString('en-IN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatInstant(activeQuery.dataUpdatedAt, { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
               <Button

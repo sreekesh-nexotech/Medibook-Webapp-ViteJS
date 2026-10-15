@@ -33,7 +33,7 @@ interface AppointmentTokenModalProps {
 export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTokenModalProps) {
   const slip = useTokenSlipQuery(appointmentId);
   const timeZone = useHospitalTimeZone();
-  const { ref, print } = usePrintArea<HTMLDivElement>();
+  const { ref, print } = usePrintArea<HTMLDivElement>('slip');
   const pdf = useTokenSlipPdfMutation();
 
   const downloadPdf = (): void => {
@@ -94,8 +94,9 @@ export function AppointmentTokenModal({ appointmentId, onClose }: AppointmentTok
         <div className="text-text-muted flex justify-center py-10">
           <Spinner size={28} label="Loading the token slip" />
         </div>
-      ) : slip.isError ? (
+      ) : slip.isLoadingError ? (
         <ErrorState
+          error={slip.error}
           inline
           title="No token slip"
           message={isFailure(slip.error) ? slip.error.message : undefined}

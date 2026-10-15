@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { isFailure } from '@/core/error/failure';
 
@@ -104,6 +104,11 @@ export function useForm<T extends object>({
   // as soon as the user edits that field; client errors always win.
   const [serverErrors, setServerErrors] = useState<ErrorMap<T>>(() => ({}) as ErrorMap<T>);
   const [serverSummary, setServerSummary] = useState<readonly string[]>([]);
+  /**
+   * Set synchronously on submit. `submitting` only shows on the next render, so
+   * without this a fast double click would send the request twice (DATA-11).
+   */
+  const inFlight = useRef(false);
 
   // The baseline `isDirty` compares against; `reset(next)` moves it. Held as
   // state rather than a ref so `isDirty` can be derived during render.
@@ -178,14 +183,19 @@ export function useForm<T extends object>({
   };
 
   const handleSubmit = (): void => {
+    if (inFlight.current) return;
     setSubmitted(true);
     setServerErrors({} as ErrorMap<T>);
     setServerSummary([]);
     if (!isValid || !onSubmit) return;
     const result = onSubmit(values);
     if (result instanceof Promise) {
+      inFlight.current = true;
       setSubmitting(true);
-      result.finally(() => setSubmitting(false));
+      void result.finally(() => {
+        inFlight.current = false;
+        setSubmitting(false);
+      });
     }
   };
 
@@ -198,6 +208,7 @@ export function useForm<T extends object>({
     setSubmitting(false);
     setServerErrors({} as ErrorMap<T>);
     setServerSummary([]);
+    inFlight.current = false;
   };
 
   return {

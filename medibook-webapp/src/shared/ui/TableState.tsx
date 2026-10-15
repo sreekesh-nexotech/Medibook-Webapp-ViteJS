@@ -45,6 +45,8 @@ export interface TableStateSpec {
   onAction?: () => void;
   /** `error`: renders the Retry button. */
   onRetry?: () => void;
+  /** `error`: what failed, so a failed request shows its support reference. */
+  error?: unknown;
 }
 
 export interface TableStateProps extends TableStateSpec {
@@ -66,6 +68,7 @@ export function TableState({
   actionLabel,
   onAction,
   onRetry,
+  error,
 }: TableStateProps) {
   if (kind === 'loading') {
     return (
@@ -95,6 +98,7 @@ export function TableState({
             title={title ?? DEFAULT_ERROR_TITLE}
             message={message}
             onRetry={onRetry}
+            error={error}
           />
         ) : (
           <EmptyState

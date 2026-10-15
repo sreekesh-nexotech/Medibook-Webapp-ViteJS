@@ -91,7 +91,7 @@ export function RaiseTicketModal({ open, onClose, onRaised }: RaiseTicketModalPr
           },
           onError: (failure) => {
             setServerErrors(isFailure(failure) ? failure.fieldErrors : {});
-            toast(isFailure(failure) ? failure.message : SEND_FAILED, 'error');
+            toast(isFailure(failure) ? failure.message : SEND_FAILED, 'error', failure);
           },
         },
       );
@@ -110,6 +110,7 @@ export function RaiseTicketModal({ open, onClose, onRaised }: RaiseTicketModalPr
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={close}
       title="Raise a Support Ticket"

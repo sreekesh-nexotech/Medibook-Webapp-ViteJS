@@ -180,6 +180,7 @@ export function PlanBilling() {
         toast(
           isFailure(failure) ? failure.message : 'Could not send the plan change request.',
           'error',
+          failure,
         );
       }
     },
@@ -196,7 +197,7 @@ export function PlanBilling() {
 
   const subscriptionCard = subscriptionQuery.isPending ? (
     <SkeletonCards count={1} lines={4} />
-  ) : subscriptionQuery.isError ? (
+  ) : subscriptionQuery.isLoadingError ? (
     isFailure(subscriptionQuery.error) && subscriptionQuery.error.kind === NOT_FOUND_KIND ? (
       <Card>
         <EmptyState
@@ -208,6 +209,7 @@ export function PlanBilling() {
     ) : (
       <Card>
         <ErrorState
+          error={subscriptionQuery.error}
           inline
           title="Your plan didn't load"
           message={isFailure(subscriptionQuery.error) ? subscriptionQuery.error.message : undefined}
@@ -331,7 +333,7 @@ export function PlanBilling() {
                       'text-caption rounded-full px-3 py-1.5',
                       latestDecided.status === 'rejected'
                         ? 'text-d-700 bg-d-100'
-                        : 'text-g-700 bg-g-100',
+                        : 'text-g-800 bg-g-100',
                     )}
                   >
                     Your request to change to {decidedPlanName ?? 'a new plan'} (
@@ -361,8 +363,9 @@ export function PlanBilling() {
       </div>
       {usageQuery.isPending ? (
         <SkeletonCards count={1} lines={3} />
-      ) : usageQuery.isError ? (
+      ) : usageQuery.isLoadingError ? (
         <ErrorState
+          error={usageQuery.error}
           inline
           title="Usage didn't load"
           message={isFailure(usageQuery.error) ? usageQuery.error.message : undefined}
@@ -385,7 +388,7 @@ export function PlanBilling() {
                     <div
                       className={cn(
                         'h-full rounded-full',
-                        pct > QUOTA_ALERT_PCT ? 'bg-d-500' : 'bg-blue',
+                        pct > QUOTA_ALERT_PCT ? 'bg-d-600' : 'bg-blue',
                       )}
                       style={{ width: `${pct}%` }}
                     />
@@ -411,9 +414,10 @@ export function PlanBilling() {
   const creditNotes = creditNotesQuery.data ?? [];
   const invoiceState: TableStateSpec | undefined = invoicesQuery.isPending
     ? { kind: 'loading', rows: 3 }
-    : invoicesQuery.isError
+    : invoicesQuery.isLoadingError
       ? {
           kind: 'error',
+          error: invoicesQuery.error,
           message: isFailure(invoicesQuery.error) ? invoicesQuery.error.message : undefined,
           onRetry: () => void invoicesQuery.refetch(),
         }
@@ -525,13 +529,14 @@ export function PlanBilling() {
       )}
 
       <FormModal
+        dirty={form.isDirty}
         open={reqOpen}
         onClose={() => setReqOpen(false)}
         title="Request Plan Change"
         width={460}
         submitLabel="Send Request"
         busy={form.submitting || requestMutation.isPending}
-        disabled={plansQuery.isPending || plansQuery.isError}
+        disabled={plansQuery.isPending || plansQuery.isLoadingError}
         onSubmit={form.handleSubmit}
       >
         <p className="text-body-lg text-text-body m-0 mb-3.5">
@@ -539,8 +544,9 @@ export function PlanBilling() {
           {sub ? ` (${billingPeriodLabel(sub.billingPeriod).toLowerCase()})` : ''}.{' '}
           {"Medibook operations reviews and applies plan changes — you'll see the result here."}
         </p>
-        {plansQuery.isError ? (
+        {plansQuery.isLoadingError ? (
           <ErrorState
+            error={plansQuery.error}
             inline
             title="Plans didn't load"
             message={isFailure(plansQuery.error) ? plansQuery.error.message : undefined}
@@ -601,7 +607,7 @@ export function PlanBilling() {
                   maxLength={NOTE_MAX_LENGTH}
                   onChange={(e) => form.setField('note', e.target.value)}
                   placeholder="e.g. We are adding three doctors next month"
-                  className="border-border rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
+                  className="border-border-control rounded-input text-body-lg text-text-strong h-18 w-full resize-none border p-3"
                 />
               )}
             </Field>

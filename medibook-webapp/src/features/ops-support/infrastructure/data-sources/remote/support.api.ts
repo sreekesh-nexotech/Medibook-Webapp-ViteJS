@@ -10,6 +10,9 @@ import {
   toTicketListParams,
   toTicketPatchBody,
   toTicketReplyBody,
+  type TicketListQueryDto,
+  type TicketMessageRequest,
+  type TicketUpdateRequest,
 } from '@/features/ops-support/infrastructure/data-sources/remote/support.request';
 import type {
   TicketDetailResponse,
@@ -23,12 +26,14 @@ import {
 } from '@/features/ops-support/infrastructure/data-sources/remote/support.response';
 
 const TICKETS_PATH = '/support/tickets';
-
 const ticketPath = (id: string): string => `${TICKETS_PATH}/${encodeURIComponent(id)}`;
 
 /** `GET /platform/support/tickets` (`support.view`). */
-export async function getTickets(query: TicketListQuery): Promise<TicketPageResponse> {
-  const response = await platformApi.get(TICKETS_PATH, { params: toTicketListParams(query) });
+export async function getTickets(
+  query: TicketListQuery | TicketListQueryDto | Record<string, unknown>,
+): Promise<TicketPageResponse> {
+  const params = 'statuses' in query ? toTicketListParams(query as TicketListQuery) : query;
+  const response = await platformApi.get(TICKETS_PATH, { params });
   return ticketPageResponseSchema.parse(response.data);
 }
 
@@ -45,10 +50,11 @@ export async function getTicket(id: string): Promise<TicketDetailResponse> {
  */
 export async function patchTicket(
   id: string,
-  changes: TicketChanges,
+  changes: TicketChanges | TicketUpdateRequest,
   version: number,
 ): Promise<TicketDetailResponse> {
-  const response = await platformApi.patch(ticketPath(id), toTicketPatchBody(changes), {
+  const body = 'assigned_to_id' in changes ? changes : toTicketPatchBody(changes as TicketChanges);
+  const response = await platformApi.patch(ticketPath(id), body, {
     headers: ifMatch(version),
   });
   return ticketDetailResponseSchema.parse(response.data);
@@ -57,8 +63,12 @@ export async function patchTicket(
 /** `POST /platform/support/tickets/{id}/messages` (`support.add`); closed → 409. */
 export async function postTicketMessage(
   id: string,
-  reply: TicketReply,
+  reply: TicketReply | TicketMessageRequest,
 ): Promise<TicketMessageResponse> {
-  const response = await platformApi.post(`${ticketPath(id)}/messages`, toTicketReplyBody(reply));
+  const body =
+    'is_internal' in reply && !('attachmentFileIds' in reply)
+      ? reply
+      : toTicketReplyBody(reply as TicketReply);
+  const response = await platformApi.post(`${ticketPath(id)}/messages`, body);
   return ticketMessageResponseSchema.parse(response.data);
 }

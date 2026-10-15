@@ -1,6 +1,12 @@
 import { isFailure } from '@/core/error/failure';
 import { downloadFromUrl } from '@/shared/lib/download';
-import { addDaysISO, daysFromTodayISO, money, toLocalISO } from '@/shared/lib/format';
+import {
+  addDaysISO,
+  calendarDate,
+  daysFromTodayISO,
+  formatInstant,
+  money,
+} from '@/shared/lib/format';
 
 import {
   UNPAID_INVOICE_STATUSES,
@@ -57,7 +63,7 @@ export function fmtDateTime(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-IN', {
+  return formatInstant(d, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -69,14 +75,14 @@ export function fmtDateTime(iso: string | null): string {
 const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * The browser's calendar date of an ISO date-time, for date-only columns. The
- * UTC prefix would put anything issued 00:00–05:30 IST on the day before
- * (11·F6). A bare date passes through unchanged.
+ * The calendar date of an ISO date-time on the hospital's calendar, for
+ * date-only columns. Never the UTC date: an invoice generated at 00:30 IST is
+ * dated that Indian day, not the day before (DATA-01). A bare date passes
+ * through unchanged (11·F6).
  */
 export function dateOf(iso: string): string {
   if (ISO_DATE_ONLY.test(iso)) return iso;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : toLocalISO(d);
+  return calendarDate(iso);
 }
 
 export const INVOICE_STATUS_BADGES: Readonly<Record<InvoiceStatus, BadgeSpec>> = {

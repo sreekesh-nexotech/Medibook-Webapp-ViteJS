@@ -22,7 +22,12 @@ export type FailureKind =
   | 'conflict'
   /** 423 / 429 — locked out or rate limited; retry later. */
   | 'rateLimited'
-  /** 5xx — the server failed. */
+  /**
+   * 501 — the server doesn't offer this yet: a feature that is off or not
+   * built in this phase, or PDFs on a server without the renderer (PRD-09).
+   */
+  | 'unavailable'
+  /** Any other 5xx — the server failed. */
   | 'server'
   /** A 2xx response whose body did not match the expected schema. */
   | 'parse'

@@ -105,7 +105,7 @@ export function FirstAdminInvitationCard({
         <div
           className={cn(
             'flex size-9 flex-none items-center justify-center rounded-md',
-            accepted ? 'bg-g-100 text-g-600' : 'bg-y-100 text-y-600',
+            accepted ? 'bg-g-100 text-g-800' : 'bg-y-100 text-y-800',
           )}
         >
           <Icon name={accepted ? 'user-check' : 'user-plus'} size={17} />

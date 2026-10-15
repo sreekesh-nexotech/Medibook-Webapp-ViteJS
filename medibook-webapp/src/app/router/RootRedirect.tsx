@@ -30,7 +30,7 @@ export function RootRedirect() {
     if (hospital.isPending && hospital.fetchStatus !== 'idle') return <SessionLoading />;
     // Could not check (network/server): hand over to the guard, which offers a retry.
     if (
-      hospital.isError &&
+      hospital.isLoadingError &&
       !(isFailure(hospital.error) && hospital.error.kind === 'unauthorized')
     ) {
       return <Navigate to={hospitalDashboardPath(FALLBACK_HOSPITAL_ROLE)} replace />;

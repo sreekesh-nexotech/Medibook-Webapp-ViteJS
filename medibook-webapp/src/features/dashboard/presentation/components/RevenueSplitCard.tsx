@@ -36,7 +36,7 @@ export function RevenueSplitCard({ period, loading, byChannel, byMethod }: Reven
             <td className={cn(tdClass, 'text-right tabular-nums')}>{money(r.collected)}</td>
             {hasRefundSplit && (
               <>
-                <td className={cn(tdClass, 'text-d-500 text-right tabular-nums')}>
+                <td className={cn(tdClass, 'text-d-600 text-right tabular-nums')}>
                   {r.refunded === null ? '—' : money(r.refunded)}
                 </td>
                 <td className={cn(tdClass, 'text-right font-semibold tabular-nums')}>

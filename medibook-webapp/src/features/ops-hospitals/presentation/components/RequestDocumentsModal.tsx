@@ -59,6 +59,7 @@ export function RequestDocumentsModal({
           toast(
             `Not every document was added — ${isFailure(error) ? error.message : 'please try again.'}`,
             'error',
+            error,
           ),
       },
     );
@@ -85,8 +86,9 @@ export function RequestDocumentsModal({
       <div className="flex flex-col gap-4.5">
         {requirements.isPending ? (
           <SkeletonCards count={1} lines={5} />
-        ) : requirements.isError ? (
+        ) : requirements.isLoadingError ? (
           <ErrorState
+            error={requirements.error}
             inline
             title="The document catalogue did not load"
             message={

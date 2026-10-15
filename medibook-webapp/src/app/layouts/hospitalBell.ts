@@ -56,7 +56,7 @@ export function buildHospitalNotifs(
   if (alerts && alerts.unpaidWalkInsToday > 0) {
     out.push({
       icon: 'indian-rupee',
-      boxClass: 'bg-d-100 text-d-500',
+      boxClass: 'bg-d-100 text-d-600',
       t: `${plural(alerts.unpaidWalkInsToday, 'walk-in payment')} pending`,
       s: 'Collect at the desk to issue tokens',
       go: 'appointments',
@@ -83,7 +83,7 @@ export function buildHospitalNotifs(
   if (access.isAdmin && alerts && alerts.cashSessionsToReconcile > 0) {
     out.push({
       icon: 'scale',
-      boxClass: 'bg-y-100 text-y-600',
+      boxClass: 'bg-y-100 text-y-800',
       t: `${plural(alerts.cashSessionsToReconcile, 'cash session')} to reconcile`,
       s: 'Closed desk drawers awaiting a check',
       go: 'payments',
@@ -94,7 +94,7 @@ export function buildHospitalNotifs(
   if (onHold.length) {
     out.push({
       icon: 'triangle-alert',
-      boxClass: 'bg-y-100 text-y-600',
+      boxClass: 'bg-y-100 text-y-800',
       t: `${plural(onHold.length, 'settlement')} on hold`,
       s: `${money(netRupees(onHold))} held by Medibook`,
       go: 'settlements',
@@ -104,7 +104,7 @@ export function buildHospitalNotifs(
   if (awaiting.length) {
     out.push({
       icon: 'circle-check',
-      boxClass: 'bg-g-100 text-g-600',
+      boxClass: 'bg-g-100 text-g-800',
       t: `${plural(awaiting.length, 'settlement')} awaiting payout`,
       s: `${money(netRupees(awaiting))} expected from Medibook`,
       go: 'settlements',
@@ -131,25 +131,25 @@ const ALERT_PRESENTATION: Readonly<
   },
   unpaid_walk_ins_today: {
     icon: 'indian-rupee',
-    boxClass: 'bg-d-100 text-d-500',
+    boxClass: 'bg-d-100 text-d-600',
     sub: 'Collect at the desk to issue tokens',
     go: 'appointments',
   },
   cash_sessions_to_reconcile: {
     icon: 'scale',
-    boxClass: 'bg-y-100 text-y-600',
+    boxClass: 'bg-y-100 text-y-800',
     sub: 'Closed desk drawers awaiting a check',
     go: 'payments',
   },
   settlements_on_hold: {
     icon: 'triangle-alert',
-    boxClass: 'bg-y-100 text-y-600',
+    boxClass: 'bg-y-100 text-y-800',
     sub: 'Held by Medibook',
     go: 'settlements',
   },
   settlements_awaiting_payout: {
     icon: 'circle-check',
-    boxClass: 'bg-g-100 text-g-600',
+    boxClass: 'bg-g-100 text-g-800',
     sub: 'Expected from Medibook',
     go: 'settlements',
   },

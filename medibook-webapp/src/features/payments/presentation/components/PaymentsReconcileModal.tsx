@@ -135,7 +135,7 @@ export function PaymentsReconcileModal({ session, onClose }: PaymentsReconcileMo
           <div
             className={cn(
               'text-body rounded-md px-3.5 py-2.5',
-              balance === 'balanced' && 'bg-g-100 text-g-700',
+              balance === 'balanced' && 'bg-g-100 text-g-800',
               balance === 'short' && 'bg-d-100 text-d-700',
               balance === 'over' && 'bg-y-100 text-y-800',
             )}

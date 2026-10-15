@@ -117,7 +117,7 @@ export function DataRequestDrawer({
               </Button>
             )}
             {actions.canReject && (
-              <Button size="sm" variant="ghost" className="text-d-500" onClick={() => onReject(r)}>
+              <Button size="sm" variant="ghost" className="text-d-600" onClick={() => onReject(r)}>
                 Reject
               </Button>
             )}

@@ -1,5 +1,11 @@
 # Presentation Layer Build Spec — Medibook mbAdmin + Operations Console
 
+> **Historical — no longer binding.** This spec drove the first presentation build, on
+> static seed data, before the app was wired to the backend. It refers to files that no
+> longer exist (for example `src/core/config/demo.ts`) and is kept only as a record. The
+> current rules are [`REACT_VITEJS_ARCHITECTURE.md`](REACT_VITEJS_ARCHITECTURE.md) and
+> [`REACT_VITEJS_CODING_STANDARDS.md`](REACT_VITEJS_CODING_STANDARDS.md).
+
 **Binding for every agent working on the presentation build.** Read this file, then
 `docs/CLAUDE.md`, `docs/REACT_VITEJS_ARCHITECTURE.md`, and
 `docs/REACT_VITEJS_CODING_STANDARDS.md` (all binding), then your assigned design source
@@ -90,7 +96,7 @@ src/
 │   ├── providers/AppProviders.tsx        # QueryClientProvider (idle), Router
 │   ├── router/                           # route tree, guards, route constants
 │   └── layouts/                          # HospitalShell, OpsShell + their Sidebar/Topbar/bell
-├── core/config/demo.ts                   # DEMO_TODAY, APOLLO_HID, SETTLE_COMMISSION  [done]
+├── core/config/demo.ts                   # DEMO_TODAY, SAMPLE_HOSPITAL_ID, SETTLE_COMMISSION  [done]
 ├── shared/
 │   ├── lib/cn.ts, format.ts              # [done]
 │   └── ui/                               # design-system components (§5)
@@ -162,7 +168,7 @@ Persist nothing.
 | `ops-hospitals`      | `/ops/hospitals`, `/ops/hospitals/:id`                                   | `OpsHospitals`, `OpsHospitalDetail`, `OnboardHospitalModal`                                        | hospitals.store (registry + KYC helpers, `hospName`, `bankOf`, `gstinOf`, `opsDeptsFor`, `opsDocsFor`, `opsBookingsFor`) |
 | `ops-plans`          | `/ops/plans`                                                             | `OpsPlans`, `PlanModal`                                                                            | plans.store (catalog + planChanges)                                                                                      |
 | `ops-billing`        | `/ops/billing`, `/ops/billing/invoices/:id`, `/ops/billing/payments/:id` | `OpsBilling`, `OpsInvoiceDetail`, `OpsPaymentDetail`                                               | billing.store (invoices + payments)                                                                                      |
-| `ops-settlements`    | `/ops/settlements`                                                       | `OpsSettlements` (payout runs + flat list + release modals)                                        | ops-settlements.store (non-Apollo rows; screen merges hospital settlements.store — the live link)                        |
+| `ops-settlements`    | `/ops/settlements`                                                       | `OpsSettlements` (payout runs + flat list + release modals)                                        | ops-settlements.store (non-Example Hospital rows; screen merges hospital settlements.store — the live link)              |
 | `ops-analytics`      | `/ops/analytics`                                                         | `OpsAnalytics`                                                                                     | —                                                                                                                        |
 | `ops-reports`        | `/ops/reports`                                                           | `OpsReports`                                                                                       | ops-reports.store (reportsGen)                                                                                           |
 | `ops-logs`           | `/ops/logs`                                                              | `OpsLogs`                                                                                          | logs.store (written to by many features' actions)                                                                        |

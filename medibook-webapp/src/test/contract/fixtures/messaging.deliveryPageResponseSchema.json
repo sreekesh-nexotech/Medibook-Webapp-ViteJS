@@ -67,7 +67,7 @@
       "id": "01a10f42-d734-7130-adab-242785b4de60",
       "channel": "email",
       "event_code": "invoice.reminder",
-      "recipient_address": "anita.menon@lakeshore.medibook.example.com",
+      "recipient_address": "anita.menon@example.medibook.example.com",
       "recipient_user_id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
       "status": "sent",
       "provider": "ses",

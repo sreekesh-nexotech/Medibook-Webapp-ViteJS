@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { formatInstant } from '@/shared/lib/format';
 
 import { END_OF_DAY_LABEL, TIME_OPTS } from '@/features/doctors/domain/calendar';
 import {
@@ -88,7 +89,7 @@ function plural(n: number, noun: string): string {
 }
 
 function bookingLine(b: AffectedBooking, timeZone: string | null): string {
-  const time = new Date(b.scheduledStartAt).toLocaleString('en-IN', {
+  const time = formatInstant(b.scheduledStartAt, {
     day: 'numeric',
     month: 'short',
     hour: 'numeric',
@@ -276,7 +277,7 @@ export function BulkSlotModal({
             return;
           }
           // The confirm stays open; Apply retries with the same key.
-          toast(describeFailure(error, APPLY_FAILED), 'error');
+          toast(describeFailure(error, APPLY_FAILED), 'error', error);
         },
       },
     );
@@ -295,6 +296,7 @@ export function BulkSlotModal({
   return (
     <>
       <FormModal
+        dirty={form.isDirty}
         open={!confirming}
         onClose={onClose}
         title="Bulk Update Slots"
@@ -400,17 +402,17 @@ export function BulkSlotModal({
           >
             <Icon
               name={
-                preview.isError || bookings.length > 0
+                preview.isLoadingError || bookings.length > 0
                   ? 'triangle-alert'
                   : isReady
                     ? 'layers'
                     : 'circle-alert'
               }
               size={16}
-              className={cn('flex-none', bookings.length > 0 && 'text-d-500')}
+              className={cn('flex-none', bookings.length > 0 && 'text-d-600')}
             />
             <span>{hint}</span>
-            {preview.isError && (
+            {preview.isLoadingError && (
               <button
                 type="button"
                 onClick={() => void preview.refetch()}

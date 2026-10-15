@@ -12,6 +12,7 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
 import { useSessionQuery } from '@/features/auth/application/queries/useSessionQuery';
+
 import { useMessagingTemplatesQuery } from '@/features/messaging/application/queries/useMessagingTemplatesQuery';
 import { renderTemplate } from '@/features/messaging/application/store/messaging.logic';
 import {
@@ -163,7 +164,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
       ? // The values the server fills in (`messaging/services/context.py`): the
         // patient's first name, its own date and time format, the token label.
         renderTemplate(template.body, {
-          ...messagingSampleValues(),
+          ...messagingSampleValues(hospitalName ?? undefined),
           '{{patientName}}': patient.firstName,
           '{{name}}': patient.firstName,
           '{{doctorName}}': appt.doctorName,
@@ -177,7 +178,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   const patientPlaceholder = patientsQuery.isLoading
     ? 'Loading patients…'
-    : patientsQuery.isError
+    : patientsQuery.isLoadingError
       ? 'Patients could not be loaded — close and try again'
       : patients.length === 0
         ? 'No patients match this search'
@@ -187,7 +188,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
     ? 'Pick a patient first'
     : appointmentsQuery.isLoading
       ? 'Loading appointments…'
-      : appointmentsQuery.isError
+      : appointmentsQuery.isLoadingError
         ? 'Appointments could not be loaded — pick the patient again'
         : appointments.length === 0
           ? 'No upcoming appointments for this patient'
@@ -198,6 +199,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
 
   return (
     <FormModal
+      dirty={form.isDirty}
       open={open}
       onClose={onClose}
       title="Send a message"
@@ -279,7 +281,7 @@ export function SendMessageModal({ open, onClose, onReview }: SendMessageModalPr
           </Field>
         </div>
 
-        {templatesQuery.isError ? (
+        {templatesQuery.isLoadingError ? (
           <div className="text-body text-y-800 bg-y-100 flex items-start gap-2 rounded-md px-3.5 py-3">
             <Icon name="triangle-alert" size={16} className="mt-0.5 flex-none" />
             <span>

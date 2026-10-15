@@ -52,6 +52,7 @@ const message = (over: Partial<TicketMessage> = {}): TicketMessage => ({
   authorName: 'Kavya Iyer',
   body: 'Looking into it.',
   attachmentFileIds: [],
+  attachmentIds: [],
   isInternal: false,
   occurredAt: '2026-10-01T10:00:00Z',
   ...over,

@@ -28,7 +28,7 @@ export function SearchField({
 }: SearchFieldProps) {
   const field = useFieldContext();
   return (
-    <div className="border-border text-text-muted flex h-12 w-full items-center gap-3 rounded-lg border bg-white px-4.5">
+    <div className="border-border-control text-text-muted flex h-12 w-full items-center gap-3 rounded-lg border bg-white px-4.5">
       <Icon name="search" size={20} />
       <input
         id={id ?? field?.id}

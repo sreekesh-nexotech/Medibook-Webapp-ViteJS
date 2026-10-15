@@ -73,6 +73,7 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
       status === GONE_STATUS ? (
         <ErrorState
           icon="file-text"
+          error={file.error}
           title="This report has expired"
           message="Exports are kept for 7 days. Export it again from Reports."
         >
@@ -81,6 +82,7 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
       ) : gone ? (
         <ErrorState
           icon="file-text"
+          error={file.error}
           title="This download link is no longer valid"
           message="The report may have expired or been removed, or it was prepared for a different account. Export it again from Reports."
         >
@@ -88,6 +90,7 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
         </ErrorState>
       ) : (
         <ErrorState
+          error={file.error}
           title="Your report didn’t load"
           message={isFailure(file.error) ? file.error.message : undefined}
           onRetry={() => void file.refetch()}
@@ -130,7 +133,7 @@ export function ReportDownloadScreen({ homePath }: ReportDownloadScreenProps) {
     const f = file.data;
     content = (
       <Card pad={32} className="w-115 max-w-full text-center">
-        <div className="bg-g-100 text-g-600 mx-auto mb-4 flex size-14 items-center justify-center rounded-lg">
+        <div className="bg-g-100 text-g-800 mx-auto mb-4 flex size-14 items-center justify-center rounded-lg">
           <Icon name="file-down" size={26} />
         </div>
         <div className="text-h2 text-text-strong mb-2">Your report is ready</div>

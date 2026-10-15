@@ -107,7 +107,7 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
             if (formKey) fromServer[formKey] = messages[0] ?? null;
           }
           setErr((p) => ({ ...p, ...fromServer }));
-          toast(failure.message, 'error');
+          toast(failure.message, 'error', failure);
         },
       },
     );
@@ -153,7 +153,6 @@ export function OpsSettingsForm({ settings }: OpsSettingsFormProps) {
           ))}
         </div>
       </Card>
-
       {canEdit && <UnsavedBar dirty={dirty} busy={saving} onSave={onSave} onDiscard={onDiscard} />}
 
       <ConfirmModal

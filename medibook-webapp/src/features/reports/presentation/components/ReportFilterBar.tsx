@@ -10,7 +10,7 @@ import type {
 import { valueLabel } from './reportsFormat';
 
 const DATE_INPUT_CLASS =
-  'rounded-input border-border text-body text-text-body h-11 border bg-white px-3';
+  'rounded-input border-border-control text-body text-text-body h-11 border bg-white px-3';
 
 const ALL_DEPARTMENTS = 'All departments';
 const ALL_DOCTORS = 'All doctors';

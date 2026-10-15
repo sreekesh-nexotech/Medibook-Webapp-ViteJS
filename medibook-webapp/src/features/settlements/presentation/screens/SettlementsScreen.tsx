@@ -5,7 +5,7 @@ import type { SortAccessors } from '@/shared/hooks/useSort';
 import { useSort } from '@/shared/hooks/useSort';
 import { cn } from '@/shared/lib/cn';
 import { downloadCsv } from '@/shared/lib/download';
-import { fmtDate } from '@/shared/lib/format';
+import { fmtDate, rupeesFromPaise } from '@/shared/lib/format';
 import { dateRange } from '@/shared/lib/validate';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -48,8 +48,6 @@ import {
 const PAGE = 7;
 const KPI_COUNT = 4;
 const PERCENT = 100;
-const PAISE_PER_RUPEE = 100;
-
 const TAB_SETTLEMENTS = 'Settlements';
 const TAB_STATEMENTS = 'Statements';
 const TAB_PAYOUTS = 'Payouts';
@@ -150,25 +148,26 @@ export function SettlementsScreen() {
       label: 'Paid Out',
       value: rupeesShort(paid),
       sub: `${total ? Math.round((paid / total) * PERCENT) : 0}% of total`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'clock',
       label: 'Awaiting Payout',
       value: rupees(sumNet(awaiting)),
       sub: `${awaiting.length} closed period${awaiting.length === 1 ? '' : 's'}`,
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'triangle-alert',
       label: 'On Hold',
       value: rupees(sumNet(onHold)),
       sub: `${onHold.length} period${onHold.length === 1 ? '' : 's'}`,
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
     },
+
   ];
 
   const ordered = sorted(filtered, ACC);
@@ -191,9 +190,10 @@ export function SettlementsScreen() {
 
   let tableState: TableStateSpec | undefined;
   if (periodsQuery.isPending) tableState = { kind: 'loading', rows: 5 };
-  else if (periodsQuery.isError)
+  else if (periodsQuery.isLoadingError)
     tableState = {
       kind: 'error',
+      error: periodsQuery.error,
       message: isFailure(periodsQuery.error) ? periodsQuery.error.message : undefined,
       onRetry: () => void periodsQuery.refetch(),
     };
@@ -211,7 +211,7 @@ export function SettlementsScreen() {
 
   /** Real CSV file of the rows the filters select — amounts in rupees. */
   const exportCsv = (): void => {
-    const inRupees = (paise: number): number => paise / PAISE_PER_RUPEE;
+    const inRupees = rupeesFromPaise;
     downloadCsv('medibook-settlements.csv', [
       [
         'Period start',
@@ -272,7 +272,7 @@ export function SettlementsScreen() {
         <>
           {periodsQuery.isPending ? (
             <SkeletonKpiStrip count={KPI_COUNT} />
-          ) : periodsQuery.isError ? null : (
+          ) : periodsQuery.isLoadingError ? null : (
             <KpiStrip items={KPIS} />
           )}
           <Card pad={16} className="flex flex-wrap items-center gap-3.5">

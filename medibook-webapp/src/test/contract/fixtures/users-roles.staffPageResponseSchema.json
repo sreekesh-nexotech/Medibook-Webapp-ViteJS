@@ -6,15 +6,15 @@
         "id": "01a0ee28-83cd-76d2-be6f-37a1d5564d45",
         "first_name": "Anita",
         "last_name": "Menon",
-        "email": "anita.menon@lakeshore.medibook.example.com",
+        "email": "anita.menon@example.medibook.example.com",
         "phone_e164": "+910000000000",
-        "last_login_at": "2026-10-06T17:03:54.752618Z"
+        "last_login_at": "2026-10-06T07:50:41.516215Z"
       },
       "role": {
         "code": "admin",
         "name": "Admin"
       },
-      "employee_code": "LKS-A1",
+      "employee_code": "EXM-A1",
       "designation": "Hospital Administrator",
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -29,15 +29,15 @@
         "id": "01a0ee28-8a3c-7d91-9672-c599b8159456",
         "first_name": "Vineeth",
         "last_name": "Kumar",
-        "email": "vineeth.kumar@lakeshore.medibook.example.com",
+        "email": "vineeth.kumar@example.medibook.example.com",
         "phone_e164": "+910000000000",
-        "last_login_at": "2026-10-06T11:50:55.926160Z"
+        "last_login_at": "2026-10-06T06:38:46.948899Z"
       },
       "role": {
         "code": "receptionist",
         "name": "Receptionist"
       },
-      "employee_code": "LKS-01",
+      "employee_code": "EXM-01",
       "designation": null,
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -52,7 +52,7 @@
         "id": "01a0ee28-8b60-76e1-bd9e-56b7744ff289",
         "first_name": "Shalini",
         "last_name": "Thomas",
-        "email": "shalini.thomas@lakeshore.medibook.example.com",
+        "email": "shalini.thomas@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.049994Z"
       },
@@ -60,7 +60,7 @@
         "code": "receptionist",
         "name": "Receptionist"
       },
-      "employee_code": "LKS-02",
+      "employee_code": "EXM-02",
       "designation": null,
       "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
       "status": "active",
@@ -75,15 +75,15 @@
         "id": "01a0ee28-8c89-7360-ad91-09fdc9a72588",
         "first_name": "Joseph",
         "last_name": "Kurian",
-        "email": "joseph.kurian@lakeshore.medibook.example.com",
+        "email": "joseph.kurian@example.medibook.example.com",
         "phone_e164": "+910000000000",
-        "last_login_at": "2026-10-06T09:02:29.034312Z"
+        "last_login_at": "2026-08-06T04:30:02.336515Z"
       },
       "role": {
         "code": "accountant",
         "name": "Accountant"
       },
-      "employee_code": "LKS-03",
+      "employee_code": "EXM-03",
       "designation": null,
       "counter_id": "01a0ee28-847e-78c2-b4e3-9fdd22f932cf",
       "status": "active",
@@ -98,7 +98,7 @@
         "id": "01a0ee28-8da1-7ac0-a00f-7556c7059c79",
         "first_name": "Nimmy",
         "last_name": "George",
-        "email": "nimmy.george@lakeshore.medibook.example.com",
+        "email": "nimmy.george@example.medibook.example.com",
         "phone_e164": "+910000000000",
         "last_login_at": "2026-08-06T04:30:02.614714Z"
       },
@@ -106,7 +106,7 @@
         "code": "dept_front_desk",
         "name": "Department Front Desk"
       },
-      "employee_code": "LKS-04",
+      "employee_code": "EXM-04",
       "designation": null,
       "counter_id": "01a0ee28-8485-7ad3-b9c8-83490c7ed3b3",
       "status": "active",

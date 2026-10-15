@@ -72,6 +72,32 @@ export async function fetchAllPages<D>(
   );
 }
 
+/** Rows read by a capped page walk, and whether the list went on past the cap. */
+export interface CappedRows<T> {
+  readonly rows: T[];
+  readonly truncated: boolean;
+}
+
+/**
+ * Read pages until the list ends or `maxPages` pages are in. Unlike
+ * `fetchAllPages` it never fails: `truncated` tells the screen to say "first N
+ * shown" rather than present a partial figure as the whole (DATA-07).
+ */
+export async function fetchCappedPages<T>(
+  fetchPage: (
+    page: number,
+  ) => Promise<{ readonly results: readonly T[]; readonly has_next: boolean }>,
+  maxPages: number,
+): Promise<CappedRows<T>> {
+  const rows: T[] = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    const body = await fetchPage(page);
+    rows.push(...body.results);
+    if (!body.has_next) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+}
+
 /** Map a validated page DTO to a `Page`, converting each row with `toEntity`. */
 export function toPage<D, T>(dto: PageDto<D>, toEntity: (row: D) => T): Page<T> {
   return {

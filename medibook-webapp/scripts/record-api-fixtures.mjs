@@ -7,8 +7,9 @@
  * response is scrubbed before it is written, because the fixtures are
  * committed: GSTIN, PAN, bank and phone numbers keep their format but lose
  * their digits, IP addresses and user agents are replaced, email addresses
- * outside example domains are replaced, and URLs lose their host and
- * signature.
+ * outside example domains are replaced, URLs lose their host and signature,
+ * street addresses and exact coordinates are replaced, and the seeded hospital
+ * names (which resemble real hospitals) become sample names.
  *
  * Usage, against a seeded backend (staging or the dev proxy):
  *
@@ -22,34 +23,22 @@
  *
  * Use a hospital admin (every hospital endpoint) and a platform owner.
  *
- * `FIXTURE_ONLY=key1,key2` still reads every endpoint (later entries take
- * their ids from earlier ones) but writes only the listed fixtures, so a new
- * schema can be recorded without re-recording — and churning — the others.
+ * After changing the scrubbing rules, apply them to the committed fixtures
+ * without contacting the backend:
+ *
+ *   node scripts/record-api-fixtures.mjs --rescrub
+ *
+ * To record only some fixtures (a new endpoint), pass key prefixes; the
+ * others are left as they are:
+ *
+ *   node scripts/record-api-fixtures.mjs --only ops-support.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const OUT_DIR = fileURLToPath(new URL('../src/test/contract/fixtures/', import.meta.url));
 const LIST = { page_size: 5 };
 const WIDE_DATES = { date_from: '2026-01-01', date_to: '2026-12-31' };
-
-const base = required('FIXTURE_API_BASE').replace(/\/+$/, '');
-/**
- * Optional comma list of fixture keys to (re)write; the others are still read
- * (later entries need their ids) but their files are left untouched.
- */
-const only = new Set(
-  (process.env.FIXTURE_ONLY ?? '')
-    .split(',')
-    .map((k) => k.trim())
-    .filter(Boolean),
-);
-const password = required('FIXTURE_PASSWORD');
-const accounts = {
-  hospital: required('FIXTURE_HOSPITAL_EMAIL'),
-  platform: required('FIXTURE_PLATFORM_EMAIL'),
-};
-
 function required(name) {
   const value = process.env[name];
   if (!value) {
@@ -71,6 +60,28 @@ function first(fx, key, test = () => true) {
  * (`{id}`) come from `needs`, which reads earlier fixtures; an entry whose
  * needs cannot be met (an empty list) is skipped and reported.
  */
+/** Free text people type into tickets: replaced outright, since any of it could name someone. */
+const TICKET_TEXT = {
+  subject: 'Sample subject',
+  description: 'Sample description.',
+  body: 'Sample message.',
+  author_name: 'Sample Person',
+};
+
+/** Replaces the values of `fields` at any depth (`redact` on a SPEC entry). */
+function redact(node, fields) {
+  if (Array.isArray(node)) return node.map((item) => redact(item, fields));
+  if (node && typeof node === 'object') {
+    return Object.fromEntries(
+      Object.entries(node).map(([k, v]) => [
+        k,
+        k in fields && typeof v === 'string' ? fields[k] : redact(v, fields),
+      ]),
+    );
+  }
+  return node;
+}
+
 const SPEC = [
   // shared and auth
   { key: 'core.appConfigResponseSchema', surface: 'public', path: '/shared/app-config' },
@@ -300,6 +311,7 @@ const SPEC = [
     surface: 'hospital',
     path: '/hospital/token-policy',
   },
+  { key: 'settings.numberingListResponseSchema', surface: 'hospital', path: '/hospital/numbering' },
   {
     key: 'settings.holidayPageResponseSchema',
     surface: 'hospital',
@@ -652,6 +664,21 @@ const SPEC = [
     path: '/platform/staff',
     params: LIST,
   },
+  // Resolved tickets carry a thread: replies, internal notes and attachments.
+  {
+    key: 'ops-support.ticketPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets',
+    params: { ...LIST, status: 'resolved' },
+    redact: TICKET_TEXT,
+  },
+  {
+    key: 'ops-support.ticketDetailResponseSchema',
+    surface: 'platform',
+    path: '/platform/support/tickets/{id}',
+    needs: (fx) => ({ id: first(fx, 'ops-support.ticketPageResponseSchema')?.id }),
+    redact: TICKET_TEXT,
+  },
   {
     key: 'ops-users.assignableStaffPageResponseSchema',
     surface: 'platform',
@@ -876,13 +903,46 @@ const PHONE_KEY = /(phone|mobile|whatsapp)/i;
 /** Phone numbers also turn up under neutral keys, e.g. a delivery's `recipient_address`. */
 const E164 = /^\+[1-9]\d{7,14}$/;
 const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+/** Street-address fields; not `recipient_address`, which holds a phone number or email. */
+const ADDRESS_KEY = /(^|_)(address_line_?\d|address_?\d|line_?[12]|street|landmark)$|^address$/i;
+const COORDINATE_KEY = /^(lat|lng|lon|latitude|longitude)$/i;
+/**
+ * The test backend seeds hospitals named after real ones. Each word is replaced
+ * wherever it appears, keeping its case, including inside email domains.
+ */
+const SEEDED_NAMES = { lakeshore: 'example', sahyadri: 'sample', nilgiri: 'model', deccan: 'demo' };
+const SEEDED_NAME = new RegExp(`\\b(${Object.keys(SEEDED_NAMES).join('|')})`, 'gi');
+/**
+ * …and gives each a short code that starts its booking, MRN and receipt
+ * numbers (`LKSB-2610-00211`, `LKSR/26-27/00002`) and registration number.
+ * Only a code followed by a series letter, a separator, a digit or the end is
+ * replaced, so words like `SCHEDULED` are left alone.
+ */
+const SEEDED_CODES = { LKS: 'EXM', SCH: 'SMP', NFC: 'MDL', DHI: 'DMO' };
+const SEEDED_CODE = new RegExp(
+  `(?<![A-Za-z])(${Object.keys(SEEDED_CODES).join('|')})(?=[BMR]?(?:[-/0-9]|$))`,
+  'g',
+);
 
 /** Keep the shape (length, digit/letter positions, case) and drop the content. */
 function maskFormat(value) {
   return value.replace(/[0-9]/g, '0').replace(/[A-Z]/g, 'A').replace(/[a-z]/g, 'a');
 }
 
+function sampleNames(value) {
+  return value.replace(SEEDED_NAME, (word) => {
+    const sample = SEEDED_NAMES[word.toLowerCase()];
+    if (word === word.toUpperCase()) return sample.toUpperCase();
+    return word[0] === word[0].toUpperCase() ? sample[0].toUpperCase() + sample.slice(1) : sample;
+  });
+}
+
+function sampleCodes(value) {
+  return value.replace(SEEDED_CODE, (code) => SEEDED_CODES[code]);
+}
+
 function scrubString(key, value) {
+  if (ADDRESS_KEY.test(key)) return value ? '1 Example Road' : value;
   if (/^(ip|ip_address|client_ip|remote_addr)$/i.test(key))
     return value.includes(':') ? '2001:db8::1' : '203.0.113.10';
   if (/user_agent/i.test(key)) return 'Mozilla/5.0 (fixture)';
@@ -903,7 +963,7 @@ function scrubString(key, value) {
       return 'https://files.example.test/';
     }
   }
-  return value.replace(IPV4, '203.0.113.10');
+  return sampleCodes(sampleNames(value.replace(IPV4, '203.0.113.10')));
 }
 
 function scrub(node, key = '') {
@@ -911,10 +971,33 @@ function scrub(node, key = '') {
   if (node && typeof node === 'object') {
     return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, scrub(v, k)]));
   }
+  if (typeof node === 'number' && COORDINATE_KEY.test(key)) return Math.round(node * 10) / 10;
   return typeof node === 'string' ? scrubString(key, node) : node;
 }
 
+/** Applies the current rules to the committed fixtures; nothing is fetched. */
+function rescrubFixtures() {
+  const files = readdirSync(OUT_DIR).filter((name) => name.endsWith('.json'));
+  for (const name of files) {
+    const body = JSON.parse(readFileSync(`${OUT_DIR}${name}`, 'utf8'));
+    writeFileSync(`${OUT_DIR}${name}`, `${JSON.stringify(scrub(body), null, 2)}\n`);
+  }
+  process.stdout.write(`Re-scrubbed ${files.length} fixtures in src/test/contract/fixtures/\n`);
+}
+
 /* --------------------------------------------------------------- record */
+
+if (process.argv.includes('--rescrub')) {
+  rescrubFixtures();
+  process.exit(0);
+}
+
+const base = required('FIXTURE_API_BASE').replace(/\/+$/, '');
+const password = required('FIXTURE_PASSWORD');
+const accounts = {
+  hospital: required('FIXTURE_HOSPITAL_EMAIL'),
+  platform: required('FIXTURE_PLATFORM_EMAIL'),
+};
 
 async function login(surface) {
   const response = await fetch(`${base}/${surface}/auth/login`, {
@@ -929,9 +1012,14 @@ async function login(surface) {
 const tokens = { hospital: await login('hospital'), platform: await login('platform') };
 mkdirSync(OUT_DIR, { recursive: true });
 
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt === -1 ? [] : process.argv.slice(onlyAt + 1).filter((a) => !a.startsWith('--'));
+const selected =
+  only.length === 0 ? SPEC : SPEC.filter((e) => only.some((p) => e.key.startsWith(p)));
+
 const fixtures = {};
 const report = [];
-for (const entry of SPEC) {
+for (const entry of selected) {
   const ids = entry.needs ? entry.needs(fixtures) : {};
   const missing = Object.entries(ids)
     .filter(([, v]) => !v)
@@ -954,17 +1042,14 @@ for (const entry of SPEC) {
   }
   const body = await response.json();
   fixtures[entry.key] = body;
-  if (only.size > 0 && !only.has(entry.key)) {
-    report.push([entry.key, 'read, not written (FIXTURE_ONLY)']);
-    continue;
-  }
-  writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(body), null, 2)}\n`);
+  const safe = entry.redact ? redact(body, entry.redact) : body;
+  writeFileSync(`${OUT_DIR}${entry.key}.json`, `${JSON.stringify(scrub(safe), null, 2)}\n`);
   report.push([entry.key, 'recorded']);
 }
 
 const recorded = report.filter(([, s]) => s === 'recorded').length;
 process.stdout.write(
-  `Recorded ${recorded} of ${SPEC.length} responses into src/test/contract/fixtures/\n`,
+  `Recorded ${recorded} of ${selected.length} responses into src/test/contract/fixtures/\n`,
 );
 for (const [key, status] of report) {
   if (status !== 'recorded' && !status.startsWith('read,'))

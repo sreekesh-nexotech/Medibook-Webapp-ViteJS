@@ -19,6 +19,14 @@ blob-report
 e2e/.auth
 *.local
 
+# Environment files: only the documented example is committed (DEP-14)
+.env
+.env.*
+!.env.example
+
+# Local AI-assistant settings
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

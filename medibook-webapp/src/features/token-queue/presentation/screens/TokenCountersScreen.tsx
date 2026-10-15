@@ -61,22 +61,21 @@ const ALL_DOCTORS = 'All Doctors';
 const LIVE_COPY: Readonly<
   Record<SocketStatus, { readonly label: string; readonly title: string; readonly dot: string }>
 > = {
-  open: { label: 'Live', title: 'Live updates on', dot: 'bg-g-600' },
+  open: { label: 'Live', title: 'Live updates on', dot: 'bg-g-800' },
   connecting: { label: 'Connecting', title: 'Connecting to live updates', dot: 'bg-y-700' },
   reconnecting: { label: 'Reconnecting', title: 'Live updates reconnecting', dot: 'bg-y-700' },
   closed: { label: 'Offline', title: 'Live updates are off', dot: 'bg-grey-300' },
   unauthorized: {
     label: 'Live updates stopped',
     title: 'Your sign-in for live updates expired — reload the page to resume them',
-    dot: 'bg-d-500',
+    dot: 'bg-d-600',
   },
   forbidden: {
     label: 'No access to live updates',
     title: 'Your role cannot receive live queue updates; the screen refreshes every minute',
-    dot: 'bg-d-500',
+    dot: 'bg-d-600',
   },
 };
-
 /**
  * Live token queue (design `TokenCounters`) on the hospital API: one card per
  * doctor **session** today (the backend's queue unit), kept live over the
@@ -174,7 +173,7 @@ export function TokenCountersScreen() {
     {
       label: 'Longest',
       val: longest ? `${longest}m` : '—',
-      color: longestOver ? 'text-d-500' : 'text-g-600',
+      color: longestOver ? 'text-d-600' : 'text-g-800',
     },
   ];
 
@@ -198,6 +197,10 @@ export function TokenCountersScreen() {
   // (doctor "Doctor"), and without the bookings they still take commands.
   const isLoading = sessionsQuery.isPending;
   const live = LIVE_COPY[socketStatus];
+  // Only a failed first load hides the queue; a failed refresh keeps the cards (RUN-04).
+  const loadError =
+    (sessionsQuery.isLoadingError ? sessionsQuery.error : null) ??
+    (doctorsQuery.isLoadingError ? doctorsQuery.error : null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -276,6 +279,7 @@ export function TokenCountersScreen() {
         <Card pad={24}>
           <ErrorState
             inline
+            error={loadError}
             title="The live queue didn't load"
             message={isFailure(sessionsQuery.error) ? sessionsQuery.error.message : undefined}
             onRetry={() => void sessionsQuery.refetch()}

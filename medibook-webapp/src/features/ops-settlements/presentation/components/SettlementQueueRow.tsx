@@ -85,7 +85,7 @@ export function SettlementQueueRow({ s, showDate, onOpen, onRelease }: Settlemen
             )}
           </CanOps>
         ) : s.status === 'Released' ? (
-          <span className="text-caption text-g-600 inline-flex items-center gap-1.25">
+          <span className="text-caption text-g-800 inline-flex items-center gap-1.25">
             <Icon name="check" size={15} /> {fmtDate(datePart(s.payout?.releasedAt ?? null))}
           </span>
         ) : (

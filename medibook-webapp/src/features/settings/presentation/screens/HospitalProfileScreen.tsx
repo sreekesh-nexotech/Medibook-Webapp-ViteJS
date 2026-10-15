@@ -250,7 +250,7 @@ export function HospitalProfileScreen() {
         toast(holidayOpSuccessCopy(op, change.affectedBookings.length), 'success'),
       onError: (error) => {
         if (!state.asking && state.early === null) state.early = { status: 'failed', error };
-        else toast(errorCopy(error), 'error');
+        else toast(errorCopy(error), 'error', error);
       },
     });
     return state.early ?? { status: 'done' };
@@ -281,14 +281,14 @@ export function HospitalProfileScreen() {
       { id: b.id, changes: { isEnabled: nowEnabled }, version: b.version },
       {
         onSuccess: () => toast(nowEnabled ? 'Banner resumed' : 'Banner paused', 'info'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
 
   const moveBanner = (index: number, dir: -1 | 1): void => {
     reorderBanners.mutate(moved(banners, index, dir), {
-      onError: (error) => toast(`Order not fully saved — ${errorCopy(error)}`, 'error'),
+      onError: (error) => toast(`Order not fully saved — ${errorCopy(error)}`, 'error', error),
     });
   };
 
@@ -302,15 +302,16 @@ export function HospitalProfileScreen() {
         holiday: { id: target.id, version: target.version },
         name: target.label,
       }).then((outcome) => {
-        if (outcome.status === 'failed') toast(errorCopy(outcome.error), 'error');
+        if (outcome.status === 'failed') toast(errorCopy(outcome.error), 'error', outcome.error);
       });
+      return;
       return;
     }
     deleteBanner.mutate(
       { id: target.id, version: target.version },
       {
         onSuccess: () => toast('Banner deleted — it is off the patient app', 'info'),
-        onError: (error) => toast(errorCopy(error), 'error'),
+        onError: (error) => toast(errorCopy(error), 'error', error),
       },
     );
   };
@@ -329,9 +330,10 @@ export function HospitalProfileScreen() {
 
   const holidayTableState: TableStateSpec | undefined = holidaysQuery.isPending
     ? { kind: 'loading', rows: 4 }
-    : holidaysQuery.isError
+    : holidaysQuery.isLoadingError
       ? {
           kind: 'error',
+          error: holidaysQuery.error,
           title: 'The holiday calendar did not load',
           message: 'Nothing has changed. Retry to load it again.',
           onRetry: () => void holidaysQuery.refetch(),
@@ -434,7 +436,7 @@ export function HospitalProfileScreen() {
             <div
               className={cn(
                 'text-body mb-4 flex items-start gap-2 rounded-md px-3.5 py-3',
-                nextClosure ? 'bg-y-100 text-y-800' : 'bg-g-100 text-g-700',
+                nextClosure ? 'bg-y-100 text-y-800' : 'bg-g-100 text-g-800',
               )}
             >
               <Icon
@@ -545,7 +547,7 @@ export function HospitalProfileScreen() {
                           title={`Remove ${h.name}`}
                           box={36}
                           size={15}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() =>
                             setToDelete({
                               kind: 'holiday',
@@ -571,7 +573,7 @@ export function HospitalProfileScreen() {
       {tab === 'Patient App Banners' && (
         <>
           <Card pad={16} className="flex items-center gap-3">
-            <div className="bg-g-100 text-g-600 flex size-9.5 flex-none items-center justify-center rounded-md">
+            <div className="bg-g-100 text-g-800 flex size-9.5 flex-none items-center justify-center rounded-md">
               <Icon name="smartphone" size={18} />
             </div>
             <div className="min-w-0">
@@ -606,8 +608,9 @@ export function HospitalProfileScreen() {
             </div>
             {bannersQuery.isPending ? (
               <SkeletonCards count={2} lines={3} />
-            ) : bannersQuery.isError ? (
+            ) : bannersQuery.isLoadingError ? (
               <ErrorState
+                error={bannersQuery.error}
                 inline
                 title="Banners did not load"
                 message="Nothing has changed. Retry to load them again."
@@ -717,7 +720,7 @@ export function HospitalProfileScreen() {
                           title={`Delete “${b.title}”`}
                           box={36}
                           size={15}
-                          color="var(--color-d-500)"
+                          color="var(--color-d-600)"
                           onClick={() =>
                             setToDelete({
                               kind: 'banner',

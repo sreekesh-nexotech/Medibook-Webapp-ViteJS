@@ -139,9 +139,10 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
         ))}
       </div>
     );
-  } else if (detailQuery.isError || !detail) {
+  } else if (detailQuery.isLoadingError || !detail) {
     body = (
       <ErrorState
+        error={detailQuery.error}
         inline
         title="This settlement didn't load"
         message={isFailure(detailQuery.error) ? detailQuery.error.message : undefined}
@@ -253,7 +254,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
               <Line label="Transfer ref (UTR)" value={payout.utrRef ?? '—'} />
               <Line label="Released on" value={fmtDateTime(payout.releasedAt)} />
               {payout.failureReason && (
-                <p className="text-caption text-d-500 m-0 mt-1.5">{payout.failureReason}</p>
+                <p className="text-caption text-d-600 m-0 mt-1.5">{payout.failureReason}</p>
               )}
               {payout.notes && (
                 <p className="text-caption text-text-body m-0 mt-1.5">

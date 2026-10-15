@@ -51,35 +51,35 @@
   ],
   "rows": [
     {
-      "patient": "Imran Sheikh (LKSM000016)",
+      "patient": "Imran Sheikh (EXMM000016)",
       "doctor": "Dr. Suresh Pillai",
       "department": "General Medicine",
       "appointment_date": "2026-10-10",
       "status": "scheduled"
     },
     {
-      "patient": "Jacob Mathew (LKSM000007)",
+      "patient": "Jacob Mathew (EXMM000007)",
       "doctor": "Dr. Harish Menon",
       "department": "Cardiology",
       "appointment_date": "2026-10-07",
       "status": "scheduled"
     },
     {
-      "patient": "Priya Nair (LKSM000006)",
+      "patient": "Priya Nair (EXMM000006)",
       "doctor": "Dr. Thomas Chacko",
       "department": "Orthopaedics",
       "appointment_date": "2026-10-07",
       "status": "scheduled"
     },
     {
-      "patient": "Testbaby (LKSM000043)",
+      "patient": "Testbaby (EXMM000043)",
       "doctor": "Dr. Suresh Pillai",
       "department": "General Medicine",
       "appointment_date": "2026-10-06",
       "status": "scheduled"
     },
     {
-      "patient": "Jacob Mathew (LKSM000007)",
+      "patient": "Jacob Mathew (EXMM000007)",
       "doctor": "Dr. Harish Menon",
       "department": "Cardiology",
       "appointment_date": "2026-10-02",

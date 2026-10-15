@@ -140,6 +140,8 @@ const EXPORT_FORMATS: readonly { readonly format: PaymentExportFormat; readonly 
 /** Revoking an object URL in the same tick can cancel the download. */
 const REVOKE_DELAY_MS = 10_000;
 
+const PAISE_PER_RUPEE = 100;
+
 function saveExport(file: PaymentExportFile): void {
   const url = URL.createObjectURL(file.blob);
   downloadFromUrl(url, file.filename);
@@ -250,9 +252,10 @@ export function PaymentsScreen() {
   const refundsQuery = useRefundsQuery(today.dateFrom, today.dateTo);
   const processedToday = (refundsQuery.data ?? []).filter((r) => r.status === 'processed');
   const hasRefundChannel = processedToday.every((r) => r.channel !== null);
-  const refundedToday = processedToday
-    .filter((r) => !hasRefundChannel || r.channel === 'desk')
-    .reduce((sum, r) => sum + r.amountRupees, 0);
+  const refundedToday =
+    processedToday
+      .filter((r) => !hasRefundChannel || r.channel === 'desk')
+      .reduce((sum, r) => sum + Math.round(r.amountRupees * PAISE_PER_RUPEE), 0) / PAISE_PER_RUPEE;
   // The desk's own rule: never collected, or refunded while the visit is
   // still on (BACKEND_BLOCKERS APPT-01) — both are due at the counter.
   const isUnpaid = (a: DeskAppointment): boolean => needsPayment(a);
@@ -309,8 +312,8 @@ export function PaymentsScreen() {
           ? ` · ${money(refundedToday)} refunded today${hasRefundChannel ? '' : ' (desk and online)'}`
           : ''
       }`,
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
     },
     {
       icon: 'banknote',
@@ -325,16 +328,16 @@ export function PaymentsScreen() {
       label: 'Prepaid Online',
       value: totalsQuery.data ? money(totals.onlineTotal) : '—',
       sub: 'via Medibook · settled later',
-      iconClass: 'bg-y-100 text-y-600',
-      valueClass: 'text-y-600',
+      iconClass: 'bg-y-100 text-y-800',
+      valueClass: 'text-y-800',
     },
     {
       icon: 'circle-alert',
       label: 'Pending Collection',
       value: todayApptsQuery.data ? pendingToday : '—',
       sub: 'Walk-ins to collect today',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
     },
   ];
 
@@ -395,7 +398,7 @@ export function PaymentsScreen() {
           }
           toast(`Exported ${file.filename}`, 'success');
         },
-        onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error'),
+        onError: (error) => toast(errorCopy(error) ?? 'The export failed.', 'error', error),
       },
     );
   };
@@ -440,6 +443,7 @@ export function PaymentsScreen() {
       : failed
         ? {
             kind: 'error',
+            error: linesQuery.error ?? apptsQuery.error,
             message: errorCopy(linesQuery.error ?? apptsQuery.error),
             onRetry: () => void refresh(),
           }
@@ -575,7 +579,7 @@ export function PaymentsScreen() {
             Updated {updatedCopy(updatedAt)}
           </span>
         </div>
-        {customError && <div className="text-body text-d-500 mb-3">{customError}</div>}
+        {customError && <div className="text-body text-d-600 mb-3">{customError}</div>}
         {!isChannelFiltered && linesTab && (
           <div className="text-caption text-text-muted mb-3">
             Source filters this page only — this server cannot filter payments by source yet.

@@ -15,10 +15,10 @@ import type { IconName } from '@/shared/ui/icon-registry';
 export const OPS_TINTS = {
   primary: ['bg-blue-soft-bg', 'text-text-navy'],
   info: ['bg-blue-soft-bg', 'text-blue'],
-  success: ['bg-g-100', 'text-g-600'],
-  warning: ['bg-y-100', 'text-y-600'],
-  danger: ['bg-d-100', 'text-d-500'],
-  orange: ['bg-badge-noshow-bg', 'text-orange'],
+  success: ['bg-g-100', 'text-g-800'],
+  warning: ['bg-y-100', 'text-y-800'],
+  danger: ['bg-d-100', 'text-d-600'],
+  orange: ['bg-badge-noshow-bg', 'text-orange-strong'],
   neutral: ['bg-grey-300', 'text-text-muted'],
 } as const satisfies Record<string, readonly [string, string]>;
 
@@ -53,9 +53,10 @@ interface OpsConfirmProps {
  * block). The prototype positioned this absolutely inside its windowed stage —
  * ported as a fixed full-viewport overlay (same visual at 100% zoom).
  *
- * A real dialog (UAT-76, 01·F32): `role="dialog"` named by its title, focus
- * moves in and is trapped, Escape cancels (unless the action is in flight),
- * focus returns to the trigger.
+ * A real dialog (A11Y-02, UAT-76, 01·F32): announced as an alert dialog with
+ * its title and message, focus moves into it and stays there, Escape cancels,
+ * and focus returns to the button that opened it. While the action runs, it
+ * cannot be dismissed.
  */
 export function OpsConfirm({
   open,
@@ -86,7 +87,7 @@ export function OpsConfirm({
     >
       <div
         ref={panelRef}
-        role="dialog"
+        role="alertdialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={body ? descriptionId : undefined}

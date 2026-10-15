@@ -29,7 +29,7 @@ interface DeadEndProps {
 function DeadEnd({ title, message, onBack }: DeadEndProps) {
   return (
     <div className="text-center">
-      <div className="bg-d-100 text-d-500 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
+      <div className="bg-d-100 text-d-600 mx-auto mb-5.5 flex size-18 items-center justify-center rounded-full">
         <Icon name="triangle-alert" size={34} />
       </div>
       <div className="text-h2 text-text-strong mb-2.5">{title}</div>
@@ -74,7 +74,7 @@ export function AcceptInvitationScreen() {
         <Spinner size={32} label="Loading your invitation" />
       </div>
     );
-  } else if (invitation.isError) {
+  } else if (invitation.isLoadingError) {
     body =
       isFailure(invitation.error) && invitation.error.code === INVITATION_EXPIRED_CODE ? (
         <DeadEnd
@@ -84,6 +84,7 @@ export function AcceptInvitationScreen() {
         />
       ) : (
         <ErrorState
+          error={invitation.error}
           inline
           title="We could not load your invitation"
           message={isFailure(invitation.error) ? invitation.error.message : undefined}
@@ -108,9 +109,9 @@ export function AcceptInvitationScreen() {
   return (
     <div className="flex h-full bg-white">
       <BrandPanel />
-      <div className="flex flex-1 items-center justify-center overflow-y-auto p-10">
+      <main className="flex flex-1 items-center justify-center overflow-y-auto p-10">
         <div className="w-full max-w-100">{body}</div>
-      </div>
+      </main>
     </div>
   );
 }

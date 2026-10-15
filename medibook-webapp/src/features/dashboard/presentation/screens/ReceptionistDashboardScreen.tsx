@@ -93,9 +93,10 @@ export function ReceptionistDashboardScreen() {
   const data = reception.data;
   const loading = reception.isLoading;
 
-  if (reception.isError && !data) {
+  if (reception.isLoadingError && !data) {
     return (
       <ErrorState
+        error={reception.error}
         title="The front desk view could not load"
         message={
           isFailure(reception.error)
@@ -133,8 +134,8 @@ export function ReceptionistDashboardScreen() {
       label: 'Appointments Today',
       value: summary?.total ?? 0,
       sub: 'Across all departments',
-      iconClass: 'bg-g-100 text-g-600',
-      valueClass: 'text-g-600',
+      iconClass: 'bg-g-100 text-g-800',
+      valueClass: 'text-g-800',
       to: hospitalAppointmentsPath(activeRole),
       perm: 'Appointments.view',
     },
@@ -153,8 +154,8 @@ export function ReceptionistDashboardScreen() {
       label: 'Pending Payment',
       value: data?.unpaidWalkIns.count ?? 0,
       sub: 'Walk-ins to collect',
-      iconClass: 'bg-d-100 text-d-500',
-      valueClass: 'text-d-500',
+      iconClass: 'bg-d-100 text-d-600',
+      valueClass: 'text-d-600',
       to: hospitalAppointmentsPath(activeRole, { tab: 'pending-payment' }),
       perm: 'Appointments.view',
     },
@@ -166,8 +167,8 @@ export function ReceptionistDashboardScreen() {
         todayFigures && !todayFigures.bySourceIsLive
           ? 'Booked at the desk, cancellations included'
           : 'Booked at the desk',
-      iconClass: 'bg-badge-noshow-bg text-orange',
-      valueClass: 'text-orange',
+      iconClass: 'bg-badge-noshow-bg text-orange-strong',
+      valueClass: 'text-orange-strong',
       to: hospitalAppointmentsPath(activeRole, { tab: 'walk-in' }),
       perm: 'Appointments.view',
     },
@@ -175,14 +176,14 @@ export function ReceptionistDashboardScreen() {
 
   const collections: readonly { label: string; value: number; cls: string; note?: string }[] = [
     { label: 'Desk Cash', value: deskCash, cls: 'text-blue' },
-    { label: 'Desk UPI / Card / Other', value: deskOther, cls: 'text-y-600' },
-    { label: 'Collected at Desk', value: deskTotal, cls: 'text-g-600' },
+    { label: 'Desk UPI / Card / Other', value: deskOther, cls: 'text-y-800' },
+    { label: 'Collected at Desk', value: deskTotal, cls: 'text-g-800' },
     deskRefunds === null
-      ? { label: 'Refunded Today', value: todayFigures?.refundedRupees ?? 0, cls: 'text-d-500' }
+      ? { label: 'Refunded Today', value: todayFigures?.refundedRupees ?? 0, cls: 'text-d-600' }
       : {
           label: 'Refunded at Desk',
           value: deskRefunds,
-          cls: 'text-d-500',
+          cls: 'text-d-600',
           note: onlineRefunds ? `${money(onlineRefunds)} online` : undefined,
         },
   ];
@@ -265,7 +266,7 @@ export function ReceptionistDashboardScreen() {
 
       {cash ? (
         <Card className="flex flex-wrap items-center gap-5">
-          <div className="bg-g-100 text-g-600 flex size-10 flex-none items-center justify-center rounded-md">
+          <div className="bg-g-100 text-g-800 flex size-10 flex-none items-center justify-center rounded-md">
             <Icon name="wallet" size={20} />
           </div>
           <div className="min-w-40 flex-1">
@@ -283,7 +284,7 @@ export function ReceptionistDashboardScreen() {
           </div>
           <div className="text-center">
             <div className="text-caption text-text-muted">Expected cash now</div>
-            <div className="text-h3 text-g-600 tabular-nums">{money(cash.expectedCashRupees)}</div>
+            <div className="text-h3 text-g-800 tabular-nums">{money(cash.expectedCashRupees)}</div>
           </div>
           {canPayments && (
             <button type="button" onClick={() => go('payments')} className={LINK_CLASS}>
@@ -329,13 +330,18 @@ export function ReceptionistDashboardScreen() {
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            {loading || departments.isLoading ? (
+            {loading || departments.isLoading || doctors.isLoading ? (
               <SkeletonTable rows={3} cols={3} card={false} />
-            ) : departments.isError ? (
+            ) : departments.isLoadingError || doctors.isLoadingError ? (
+              // Without the doctor list every department would read "idle, 0 waiting" (RUN-05).
               <ErrorState
                 inline
+                error={departments.error ?? doctors.error}
                 title="Departments could not be loaded"
-                onRetry={() => void departments.refetch()}
+                onRetry={() => {
+                  void departments.refetch();
+                  void doctors.refetch();
+                }}
               />
             ) : deptRows.length === 0 ? (
               <EmptyState compact icon="ticket" title="No departments set up yet." />
@@ -345,7 +351,7 @@ export function ReceptionistDashboardScreen() {
                   <>
                     <span className="text-text-body flex-1">{d.name}</span>
                     {d.isServing ? (
-                      <span className="text-caption text-g-600">
+                      <span className="text-caption text-g-800">
                         serving{' '}
                         {d.servingLabel ? <b className="text-blue">{d.servingLabel}</b> : 'now'}
                       </span>
@@ -474,6 +480,7 @@ export function ReceptionistDashboardScreen() {
         </div>
         {todayFiguresQuery.isError && !todayFigures ? (
           <ErrorState
+            error={todayFiguresQuery.error}
             inline
             title="Today's collection could not be loaded"
             onRetry={() => void todayFiguresQuery.refetch()}

@@ -84,6 +84,7 @@ export interface DoctorsRepository {
     mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
 
+
   createDateException(
     doctorId: string,
     input: DateExceptionInput,

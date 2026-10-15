@@ -27,7 +27,9 @@ export function useSaveDepartmentMutation() {
           ? updateDepartment(existing.id, input, existing.version)
           : createDepartment(input)),
       ),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: doctorsKeys.departments() });
+    },
   });
 }
 

@@ -1,10 +1,10 @@
 {
-  "hospital_name": "Lakeshore Multispeciality Hospital",
+  "hospital_name": "Example Multispeciality Hospital",
   "token_label": "W001",
   "token_no": 1,
   "token_source": "offline",
-  "booking_ref": "LKSB-2608-00002",
-  "mrn": "LKSM000002",
+  "booking_ref": "EXMB-2608-00002",
+  "mrn": "EXMM000002",
   "patient_name": "Ramesh Babu",
   "doctor_name": "Dr. Harish Menon",
   "doctor_room": "OPD-05",

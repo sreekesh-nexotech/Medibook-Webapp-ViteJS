@@ -20,13 +20,13 @@ interface BarChartProps {
   money?: boolean;
 }
 
-/** Lightweight vertical bar chart with value labels above each bar. */
+/** Lightweight vertical bar chart with value labels above each bar; it shrinks with its card. */
 export function BarChart({ data, height = 200, color = DEFAULT_BAR_COLOR, money }: BarChartProps) {
   const max = Math.max(...data.map((d) => d.v)) * MAX_HEADROOM || 1;
   return (
     <div className="flex items-end gap-4.5 px-1" style={{ height }}>
       {data.map((d, i) => (
-        <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+        <div key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
           <span className="text-caption text-text-muted font-semibold">
             {money ? '₹' + d.v.toLocaleString('en-IN') : d.v}
           </span>
@@ -42,7 +42,8 @@ export function BarChart({ data, height = 200, color = DEFAULT_BAR_COLOR, money 
               transition: 'height .3s',
             }}
           ></div>
-          <span className="text-caption text-text-muted whitespace-nowrap">{d.l}</span>
+          {/* Long labels wrap rather than push a narrow card wider (PERF-05). */}
+          <span className="text-caption text-text-muted text-center leading-tight">{d.l}</span>
         </div>
       ))}
     </div>

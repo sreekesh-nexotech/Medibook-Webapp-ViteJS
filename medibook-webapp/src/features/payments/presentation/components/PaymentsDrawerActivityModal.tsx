@@ -75,7 +75,7 @@ export function PaymentsDrawerActivityModal({ drawer, onClose }: PaymentsDrawerA
             <div className="mb-2 flex items-center gap-2">
               <SectionTitle size={15}>Cash taken</SectionTitle>
               <span className="flex-1" />
-              <span className="text-body text-g-700 font-semibold tabular-nums">
+              <span className="text-body text-g-800 font-semibold tabular-nums">
                 {money(cashIn)}
               </span>
             </div>

@@ -16,11 +16,11 @@ interface CardProps {
   ariaLabel?: string;
 }
 
-/** Enter and Space activate a clickable card like a button (UAT-76, 01·F31). */
-function activateOnKey(event: KeyboardEvent<HTMLDivElement>): void {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
-  event.preventDefault();
-  event.currentTarget.click();
+/** Enter or Space on a clickable card clicks it, like a button (A11Y-01, UAT-76, 01·F31). */
+function clickOnKey(e: KeyboardEvent<HTMLDivElement>): void {
+  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  e.currentTarget.click();
 }
 
 export function Card({
@@ -39,7 +39,7 @@ export function Card({
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? ariaLabel : undefined}
-      onKeyDown={isClickable ? activateOnKey : undefined}
+      onKeyDown={isClickable ? clickOnKey : undefined}
       className={cn(
         'border-border shadow-card rounded-xl border bg-white transition-shadow duration-150',
         hover && 'hover:shadow-pop',

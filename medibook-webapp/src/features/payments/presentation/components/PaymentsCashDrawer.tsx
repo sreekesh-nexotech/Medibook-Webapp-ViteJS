@@ -125,8 +125,9 @@ export function PaymentsCashDrawer() {
           <SkeletonLine w="40%" h={14} />
           <SkeletonLine w="65%" />
         </div>
-      ) : drawer.isError ? (
+      ) : drawer.isLoadingError ? (
         <ErrorState
+          error={drawer.error}
           inline
           title="Your cash drawer didn’t load"
           message={isFailure(drawer.error) ? drawer.error.message : undefined}
@@ -134,7 +135,7 @@ export function PaymentsCashDrawer() {
         />
       ) : drawer.data ? (
         <div className="flex flex-wrap items-center gap-4">
-          <div className="bg-g-100 text-g-600 flex size-11 flex-none items-center justify-center rounded-lg">
+          <div className="bg-g-100 text-g-800 flex size-11 flex-none items-center justify-center rounded-lg">
             <Icon name="banknote" size={22} />
           </div>
           <div className="min-w-60 flex-1">
@@ -164,7 +165,7 @@ export function PaymentsCashDrawer() {
         </div>
       ) : (
         <div className="flex flex-wrap items-start gap-4">
-          <div className="bg-y-100 text-y-600 flex size-11 flex-none items-center justify-center rounded-lg">
+          <div className="bg-y-100 text-y-800 flex size-11 flex-none items-center justify-center rounded-lg">
             <Icon name="banknote" size={22} />
           </div>
           <div className="min-w-60 flex-1">

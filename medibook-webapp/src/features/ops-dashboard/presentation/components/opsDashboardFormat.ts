@@ -61,8 +61,8 @@ export type AlertSeverity = 'danger' | 'warning';
 
 /** Severity tint: [icon-box bg, icon-box fg, glyph] (design `sevTint`). */
 export const ALERT_SEV_TINT: Record<AlertSeverity, readonly [string, string, IconName]> = {
-  danger: ['bg-d-100', 'text-d-500', 'circle-x'],
-  warning: ['bg-y-100', 'text-y-600', 'triangle-alert'],
+  danger: ['bg-d-100', 'text-d-600', 'circle-x'],
+  warning: ['bg-y-100', 'text-y-800', 'triangle-alert'],
 };
 
 /** Hospitals an alert links to directly before the rest collapse into "+N more". */

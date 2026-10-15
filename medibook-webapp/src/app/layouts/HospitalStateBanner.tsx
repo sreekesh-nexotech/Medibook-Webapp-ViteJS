@@ -36,8 +36,8 @@ export function HospitalStateBanner({ block, onOpenBilling }: HospitalStateBanne
       className={cn(
         'flex flex-none flex-wrap items-center gap-3 border-b px-4 py-2.5 lg:px-7',
         block === 'suspended'
-          ? 'bg-d-100 text-d-500 border-d-100'
-          : 'bg-y-100 text-y-800 border-y-100',
+          ? 'bg-d-100 text-d-600 border-d-100'
+          : 'bg-y-100 text-y-800 border-[var(--color-y-200)]',
       )}
     >
       <Icon name={block === 'suspended' ? 'ban' : 'lock'} size={18} />

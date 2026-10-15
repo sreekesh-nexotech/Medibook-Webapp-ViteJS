@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { isFailure } from '@/core/error/failure';
@@ -23,11 +23,18 @@ import { TableShell, tdClass } from '@/shared/ui/TableShell';
 import type { TableStateSpec } from '@/shared/ui/TableState';
 import { toast } from '@/shared/ui/toast/toast.store';
 
-import { hospitalBookForPatientPath, hospitalPath, isHospitalRole } from '@/app/router/paths';
+import {
+  hospitalBookForPatientPath,
+  hospitalPatientPath,
+  hospitalPath,
+  isHospitalRole,
+  isRecordId,
+} from '@/app/router/paths';
 
 import { useDeletePatientMutation } from '@/features/patients/application/queries/useDeletePatientMutation';
 import { usePatientAppointmentsQuery } from '@/features/patients/application/queries/usePatientAppointmentsQuery';
 import { usePatientByMrnQuery } from '@/features/patients/application/queries/usePatientByMrnQuery';
+import { usePatientQuery } from '@/features/patients/application/queries/usePatientQuery';
 import type {
   AppointmentPaymentStatus,
   AppointmentStatus,
@@ -51,8 +58,9 @@ import {
 
 /**
  * Patient Detail (no medical data) — identity, contact, booking history and a
- * billing summary. The MRN comes from the URL (`:mrn`) and is resolved to the
- * hospital's record through the API.
+ * billing summary. The record id comes from the URL (`:patientId`); the MRN is
+ * kept out of the address so it never reaches browser history or access logs
+ * (PHI-07). Older links that carried the MRN are resolved once and replaced.
  */
 
 const HISTORY_COLUMNS = ['Date', 'Doctor / Dept', 'Source', 'Payment', 'Token', 'Status'];
@@ -74,12 +82,21 @@ function sumPaise(list: readonly PatientAppointment[], keep: (a: PatientAppointm
 
 export function PatientDetailScreen() {
   const navigate = useNavigate();
-  const { role, mrn } = useParams();
+  const { role, patientId } = useParams();
   const hospitalRole = isHospitalRole(role) ? role : 'receptionist';
 
-  const patientQuery = usePatientByMrnQuery(mrn);
+  const legacyMrn = patientId && !isRecordId(patientId) ? patientId : undefined;
+  const byId = usePatientQuery(legacyMrn ? undefined : patientId);
+  const byMrn = usePatientByMrnQuery(legacyMrn);
+  const patientQuery = legacyMrn ? byMrn : byId;
   const rec = patientQuery.data;
   const historyQuery = usePatientAppointmentsQuery(rec?.id);
+
+  useEffect(() => {
+    if (legacyMrn && byMrn.data) {
+      navigate(hospitalPatientPath(hospitalRole, byMrn.data.id), { replace: true });
+    }
+  }, [legacyMrn, byMrn.data, hospitalRole, navigate]);
 
   const [edit, setEdit] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -89,7 +106,7 @@ export function PatientDetailScreen() {
   const { today, timeZone } = useHospitalToday();
   const backToList = () => navigate(hospitalPath(hospitalRole, 'patients'));
 
-  if (!mrn) {
+  if (!patientId) {
     return (
       <Card pad={32}>
         <EmptyState
@@ -105,7 +122,7 @@ export function PatientDetailScreen() {
 
   if (patientQuery.isPending) return <SkeletonCards count={1} lines={4} pad={22} />;
 
-  if (patientQuery.isError) {
+  if (patientQuery.isLoadingError) {
     const isMissing = isFailure(patientQuery.error) && patientQuery.error.kind === 'notFound';
     return (
       <Card pad={32}>
@@ -113,12 +130,17 @@ export function PatientDetailScreen() {
           <EmptyState
             icon="user-x"
             title="Patient not found."
-            message={`No record with MR number ${mrn} exists at this hospital.`}
+            message={
+              legacyMrn
+                ? `No record with MR number ${legacyMrn} exists at this hospital.`
+                : 'This patient record does not exist at this hospital.'
+            }
             actionLabel="Back to patients"
             onAction={backToList}
           />
         ) : (
           <ErrorState
+            error={patientQuery.error}
             inline
             title="This patient didn't load"
             message={patientQuery.error.message}
@@ -155,7 +177,7 @@ export function PatientDetailScreen() {
   );
 
   const book = () => {
-    navigate(hospitalBookForPatientPath(hospitalRole, p.mrn));
+    navigate(hospitalBookForPatientPath(hospitalRole, p.id));
   };
 
   const hasPendingChange = p.pendingChange !== null;
@@ -180,9 +202,10 @@ export function PatientDetailScreen() {
 
   const historyState: TableStateSpec | undefined = historyQuery.isPending
     ? { kind: 'loading', rows: HISTORY_LOADING_ROWS }
-    : historyQuery.isError
+    : historyQuery.isLoadingError
       ? {
           kind: 'error',
+          error: historyQuery.error,
           message: historyQuery.error.message,
           onRetry: () => void historyQuery.refetch(),
         }
@@ -266,8 +289,9 @@ export function PatientDetailScreen() {
           }}
         />
       )}
-      <div className="flex gap-5">
-        <div className="flex flex-[2] flex-col gap-5">
+      {/* Side by side on wide screens; stacked on tablets (PERF-05). */}
+      <div className="flex flex-col gap-5 xl:flex-row">
+        <div className="flex min-w-0 flex-col gap-5 xl:flex-2">
           <Card>
             <SectionTitle size={16} className="mb-3.5">
               Booking History
@@ -321,7 +345,7 @@ export function PatientDetailScreen() {
             )}
           </Card>
         </div>
-        <div className="flex flex-1 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 xl:flex-1">
           <Card>
             <SectionTitle size={16} className="mb-2">
               Contact Details
@@ -351,7 +375,7 @@ export function PatientDetailScreen() {
             )}
             {infoRow(
               'Outstanding',
-              <span className={cn('tabular-nums', pending ? 'text-d-500' : 'text-text-strong')}>
+              <span className={cn('tabular-nums', pending ? 'text-d-600' : 'text-text-strong')}>
                 {historyQuery.isSuccess ? money(paiseToRupees(pending)) : '—'}
               </span>,
             )}

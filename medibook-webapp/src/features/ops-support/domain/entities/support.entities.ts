@@ -1,8 +1,8 @@
 /**
- * Support tickets as the Medibook team works them (`/platform/support/tickets`,
- * backend `support/services/tickets.py`). Requesters are hospital staff or
- * patients; they hear back by email (Q127). Internal notes stay inside the
- * platform team and never reach the requester.
+ * Support tickets raised by hospitals (Help & Support) and patients (the
+ * Medibook app), as the ops console answers them (`/platform/support/tickets`,
+ * backend `support/services/tickets.py`). Requesters hear back by email (Q127).
+ * Internal notes stay inside the platform team and never reach the requester.
  */
 
 export const TICKET_STATUSES = [
@@ -12,11 +12,16 @@ export const TICKET_STATUSES = [
   'resolved',
   'closed',
 ] as const;
-
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
-export const TICKET_PRIORITIES = ['urgent', 'high', 'normal', 'low'] as const;
+/** Tickets that still need someone at Medibook. */
+export const UNRESOLVED_STATUSES: readonly TicketStatus[] = [
+  'open',
+  'in_progress',
+  'waiting_on_requester',
+];
 
+export const TICKET_PRIORITIES = ['urgent', 'high', 'normal', 'low'] as const;
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 
 export const TICKET_CATEGORIES = [
@@ -27,13 +32,16 @@ export const TICKET_CATEGORIES = [
   'complaint',
   'other',
 ] as const;
-
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 
 export const TICKET_RAISERS = ['hospital_staff', 'patient'] as const;
-
 export type TicketRaisedByKind = (typeof TICKET_RAISERS)[number];
 
+export const TICKET_REQUESTER_KINDS = ['hospital_staff', 'patient'] as const;
+export type TicketRequesterKind = (typeof TICKET_REQUESTER_KINDS)[number];
+
+export const MESSAGE_AUTHOR_KINDS = ['requester', 'platform_staff'] as const;
+export type MessageAuthorKind = (typeof MESSAGE_AUTHOR_KINDS)[number];
 export type TicketAuthorKind = 'requester' | 'platform_staff';
 
 /** Backend limits (`TicketMessageSerializer`). */
@@ -47,6 +55,8 @@ export interface SupportTicket {
   readonly raisedByKind: TicketRaisedByKind;
   /** The requester's name (B9); `null` on an older server or a deleted account. */
   readonly raisedByName: string | null;
+  readonly requesterKind?: TicketRequesterKind;
+  readonly requesterId?: string | null;
   readonly hospitalId: string | null;
   /** B9; `null` for patient tickets and on an older server. */
   readonly hospitalName: string | null;
@@ -59,13 +69,15 @@ export interface SupportTicket {
   readonly assignedToId: string | null;
   /** B9; `null` when unassigned or on an older server. */
   readonly assignedToName: string | null;
+  /** Alias for assignedToId used in ops support views. */
+  readonly assigneeId?: string | null;
   /** Statuses the server accepts next (B9, L-25); `null` when it does not say. */
   readonly allowedTransitions: readonly TicketStatus[] | null;
   readonly resolvedAt: string | null;
   readonly closedAt: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
-  /** `If-Match` token for a change. */
+  /** Row version, sent as `If-Match` on changes. */
   readonly version: number;
 }
 
@@ -75,6 +87,7 @@ export interface TicketMessage {
   readonly authorName: string | null;
   readonly body: string;
   readonly attachmentFileIds: readonly string[];
+  readonly attachmentIds: readonly string[];
   /** Platform-only note; never shown to the requester. */
   readonly isInternal: boolean;
   readonly occurredAt: string;
@@ -107,18 +120,34 @@ export interface TicketListQuery {
   readonly sortDir: 'asc' | 'desc';
 }
 
+export interface TicketListParams {
+  /** Empty = every status. */
+  readonly statuses: readonly TicketStatus[];
+  readonly priority: TicketPriority | null;
+  readonly category: TicketCategory | null;
+  /** Exact ticket number, e.g. `TKT-2026-0042`; empty = any. */
+  readonly ticketNo: string;
+  /** Server sort, e.g. `-updated_at`. */
+  readonly sort: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
 /** What a platform agent may change on a ticket (`support.edit`). */
 export interface TicketChanges {
   readonly status?: TicketStatus;
   readonly priority?: TicketPriority;
   /** `null` unassigns. */
   readonly assignedToId?: string | null;
+  readonly assigneeId?: string | null;
 }
 
 export interface TicketReply {
   readonly body: string;
   /** Clean `ticket_attachment` files this agent uploaded. */
-  readonly attachmentFileIds: readonly string[];
+  readonly attachmentFileIds?: readonly string[];
   /** An internal note: kept from the requester and sends no email. */
-  readonly isInternal: boolean;
+  readonly isInternal?: boolean;
+  /** Alias for isInternal. */
+  readonly internal?: boolean;
 }

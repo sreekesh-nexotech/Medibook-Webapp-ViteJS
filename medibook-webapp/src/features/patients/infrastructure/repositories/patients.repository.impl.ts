@@ -48,6 +48,8 @@ export const patientsRepository: PatientsRepository = {
       return toPatientRecord(await getPatient(hit.id));
     }),
 
+  getPatientById: (id) => attempt(async () => toPatientRecord(await getPatient(id))),
+
   createPatient: ({ demographics, confirmNewRecord }) =>
     attempt(async (): Promise<PatientCreateOutcome> => {
       const answer = await postPatient(toPatientRequestBody(demographics), confirmNewRecord);

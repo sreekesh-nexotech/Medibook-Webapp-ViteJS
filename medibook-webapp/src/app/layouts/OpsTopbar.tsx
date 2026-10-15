@@ -221,7 +221,7 @@ export function OpsTopbar({
             setNotif(false);
             if (target) navigate(target.to);
           }}
-          dotClass="bg-d-500"
+          dotClass="bg-d-600"
           panelWidthClass="w-85"
         />
         <div className="bg-border h-7 w-px" />
