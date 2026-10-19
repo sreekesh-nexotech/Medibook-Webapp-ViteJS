@@ -3,6 +3,7 @@ import type { ZodType } from 'zod';
 
 import { appConfigResponseSchema } from '@/core/api/appConfig.response';
 import { signedUrlResponseSchema, storedFileResponseSchema } from '@/core/api/files.response';
+import { serverVersionResponseSchema } from '@/core/api/serverVersion.response';
 import {
   appointmentPageSchema,
   eventPageSchema,
@@ -37,6 +38,7 @@ import {
   doctorResponseSchema,
   scheduleResponseSchema,
 } from '@/features/doctors/infrastructure/data-sources/remote/doctors.response';
+import { displayQueueResponseSchema } from '@/features/display/infrastructure/data-sources/remote/display.response';
 import {
   deliveryPageResponseSchema,
   templatePageResponseSchema,
@@ -224,6 +226,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'auth.hospitalMeResponseSchema': hospitalMeResponseSchema,
   'auth.platformMeResponseSchema': platformMeResponseSchema,
   'core.appConfigResponseSchema': appConfigResponseSchema,
+  'core.serverVersionResponseSchema': serverVersionResponseSchema,
   'core.signedUrlResponseSchema': signedUrlResponseSchema,
   'core.storedFileResponseSchema': storedFileResponseSchema,
   'dashboard.adminDashboardResponseSchema': adminDashboardResponseSchema,
@@ -232,6 +235,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'help.supportTicketDetailSchema': supportTicketDetailSchema,
   'help.supportTicketPageSchema': supportTicketPageSchema,
   'help.faqFeedSchema': faqFeedSchema,
+  'display.displayQueueResponseSchema': displayQueueResponseSchema,
   'doctors.departmentPageSchema': departmentPageSchema,
   'doctors.doctorPageSchema': doctorPageSchema,
   'doctors.doctorResponseSchema': doctorResponseSchema,

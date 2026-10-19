@@ -97,7 +97,11 @@ it up.
 
 My Account shows the version and commit of the running build, and every error report
 carries them as `release` and `commit`. The version comes from `package.json` (see
-[`RELEASING.md`](RELEASING.md)).
+[`RELEASING.md`](RELEASING.md)). The commit is `VITE_GIT_COMMIT` when the build
+sets it (needed where the build has no `.git` folder, e.g. a container build), else
+`GITHUB_SHA` in CI, else `git rev-parse --short HEAD`; "unknown" when none is
+available. My Account also shows the API's version and commit from the public
+`GET /api/v1/shared/version`, or leaves them out when it cannot be read.
 
 ## 4. Uptime alerts (OBS-05)
 

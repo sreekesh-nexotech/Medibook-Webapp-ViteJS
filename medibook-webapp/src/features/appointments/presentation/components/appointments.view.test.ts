@@ -56,6 +56,7 @@ function appt(over: Partial<DeskAppointment> = {}): DeskAppointment {
     convenienceRupees: 0,
     taxRupees: 0,
     totalRupees: 500,
+    hospitalCancelRefundRupees: 0,
     approvedAt: null,
     checkedInAt: null,
     completedAt: null,
@@ -160,9 +161,27 @@ describe('money back (B3 REFUND_REQUIRES_CANCEL, 03 F16)', () => {
     const unpaid = reasonCopy('cancel', appt(), '₹500');
     expect(unpaid.body).toContain('nothing to refund');
     expect(unpaid.confirm).toBe('Cancel booking');
-    const paid = reasonCopy('reject', appt({ paymentStatus: 'paid' }), '₹500');
+    const paid = reasonCopy(
+      'reject',
+      appt({ paymentStatus: 'paid', hospitalCancelRefundRupees: 500 }),
+      '₹500',
+    );
     expect(paid.body).toContain('refunded ₹500 in full');
     expect(paid.confirm).toBe('Reject & refund');
+  });
+
+  it("refunds only the doctor's booking fee when the hospital cancels an online booking (Q11)", () => {
+    const online = appt({
+      paymentStatus: 'paid',
+      totalRupees: 424,
+      convenienceRupees: 20,
+      hospitalCancelRefundRupees: 400,
+    });
+    const copy = reasonCopy('cancel', online, '₹424.00', '₹400.00');
+    expect(copy.body).toContain("refunded ₹400.00 — the doctor's booking fee");
+    expect(copy.body).toContain('convenience fee and its tax, is not refunded');
+    expect(copy.body).not.toContain('in full');
+    expect(copy.confirm).toBe('Cancel & refund');
   });
 });
 

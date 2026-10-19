@@ -33,7 +33,7 @@ import {
   toStaffDirectoryEntry,
 } from '@/features/ops-compliance/infrastructure/data-sources/remote/compliance.response';
 
-/** The backend answers 501 when the export renderer only runs in the nightly worker. */
+/** The backend answers 501 when this server cannot render the export's PDF (UB-54). */
 const HTTP_NOT_IMPLEMENTED = 501;
 
 export const complianceRepository: ComplianceRepository = {

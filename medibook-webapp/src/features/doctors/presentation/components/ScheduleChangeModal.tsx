@@ -3,6 +3,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { Modal } from '@/shared/ui/Modal';
 
 import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors.types';
+import { CANCEL_REFUND_NOTE } from '@/features/doctors/presentation/components/scheduleConfirm';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 
 /** How many affected bookings to name before summarising the rest. */
@@ -31,7 +32,7 @@ interface ScheduleChangeModalProps {
   onCancel: () => void;
 }
 
-/** Asks before a schedule change cancels existing bookings (refunded in full). */
+/** Asks before a schedule change cancels existing bookings (the doctor's fee is refunded, Q11). */
 export function ScheduleChangeModal({
   affected,
   kept = [],
@@ -82,8 +83,7 @@ export function ScheduleChangeModal({
         <>
           <p className="text-body text-text-body mb-3.5">
             This change removes time that {count} booking{count === 1 ? ' is' : 's are'} already in.
-            Applying it cancels {count === 1 ? 'that booking' : 'them'} and refunds the patient
-            {count === 1 ? '' : 's'} in full.
+            Applying it cancels {count === 1 ? 'that booking' : 'them'}; {CANCEL_REFUND_NOTE}.
           </p>
           <ul className="divide-border-soft border-border-soft divide-y rounded-md border">
             {(affected ?? []).slice(0, LISTED_BOOKINGS).map((b) => (

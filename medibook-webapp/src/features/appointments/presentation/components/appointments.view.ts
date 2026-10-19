@@ -250,10 +250,16 @@ export interface ReasonCopy {
 
 /**
  * What the reason prompt says. Cancel and reject promise a refund only when
- * something was paid (03 F16); a hospital cancel is always 100 % (Q11), so
- * the amount is the booking's total.
+ * something was paid (03 F16). A hospital cancel / reject refunds the doctor's
+ * booking fee (Q11): `refund` is that amount, and the convenience fee is named
+ * as not refunded when it was part of the total.
  */
-export function reasonCopy(kind: ReasonKind, a: DeskAppointment, total: string): ReasonCopy {
+export function reasonCopy(
+  kind: ReasonKind,
+  a: DeskAppointment,
+  total: string,
+  refund: string = total,
+): ReasonCopy {
   const paid = hasPaid(a);
   if (kind === 'refund') {
     return {
@@ -266,7 +272,7 @@ export function reasonCopy(kind: ReasonKind, a: DeskAppointment, total: string):
   return {
     title: kind === 'cancel' ? 'Cancel Appointment' : 'Reject Booking',
     body: paid
-      ? `The booking is ${action} and the patient is refunded ${total} in full — including any convenience fee — to the original payment method. Cash is handed back from your open cash drawer. This cannot be undone.`
+      ? `The booking is ${action} and the patient is refunded ${refundPhrase(a, total, refund)} to the original payment method. Cash is handed back from your open cash drawer. This cannot be undone.`
       : `The booking is ${action} and its slot is freed. Nothing was paid, so there is nothing to refund. This cannot be undone.`,
     confirm: paid
       ? kind === 'cancel'
@@ -276,6 +282,13 @@ export function reasonCopy(kind: ReasonKind, a: DeskAppointment, total: string):
         ? 'Cancel booking'
         : 'Reject booking',
   };
+}
+
+/** "₹400.00 — the doctor's booking fee (the ₹24.00 convenience fee is not refunded)" or "₹400.00 in full". */
+function refundPhrase(a: DeskAppointment, total: string, refund: string): string {
+  return a.hospitalCancelRefundRupees < a.totalRupees
+    ? `${refund} — the doctor's booking fee (the rest of the ${total} paid, the convenience fee and its tax, is not refunded)`
+    : `${refund} in full`;
 }
 
 /* ---------------------------------------------------------- desk refusals */

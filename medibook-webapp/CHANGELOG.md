@@ -17,6 +17,8 @@ All notable changes to the Medibook web app. The format follows
 - Landing page for emailed report links (`/reports/downloads/{id}` and
   `/ops/reports/downloads/{id}`); sign-in returns to the link.
 - My Account shows the running version and build commit.
+- My Account also shows the API's version and build commit (`GET /shared/version`), and
+  leaves them out quietly when the API cannot say (UB-07).
 - Unit tests, API contract tests against recorded backend responses, browser smoke
   tests for every screen, and a CI workflow that runs the QA gate, the tests and
   `npm audit` on every pull request.
@@ -67,6 +69,14 @@ All notable changes to the Medibook web app. The format follows
   the hospital's token format may not use.
 
 ### Fixed
+
+- The build commit comes from `VITE_GIT_COMMIT` when the build has no `.git` folder,
+  instead of showing "build unknown" (UB-41).
+- "Prepare now" on a data export says plainly that no file was made when the server
+  cannot render PDFs (HTTP 501), instead of promising the nightly run (UB-54, DEF-044).
+- Blocking slots, leave, holidays and other schedule changes no longer say a cancelled
+  booking was "refunded" — an unpaid walk-in has nothing to refund; the copy now says
+  any payment made is refunded in full.
 
 - Bank accounts, holidays, banners, the onboarding document catalogue and active
   sessions failed to load: their lists are paged.

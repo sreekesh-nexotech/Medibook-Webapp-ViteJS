@@ -6,6 +6,7 @@ import { Select } from '@/shared/ui/Select';
 import { Toggle } from '@/shared/ui/Toggle';
 
 import type {
+  CancellationChargeMode,
   HospitalProfile,
   HospitalRuleSettings,
 } from '@/features/settings/domain/entities/settings.entities';
@@ -34,6 +35,16 @@ interface SettingsBookingSectionProps {
  * follow-up pricing and patient-record rules. Every hint states what the
  * saved value does; the cancellation example is the server's own (07·F7).
  */
+const CHARGE_MODES: readonly CancellationChargeMode[] = ['percentage', 'fixed'];
+const CHARGE_MODE_LABEL: Readonly<Record<CancellationChargeMode, string>> = {
+  percentage: 'Percentage refund',
+  fixed: 'Fixed cancellation charge',
+};
+
+function chargeModeOf(label: string): CancellationChargeMode {
+  return CHARGE_MODES.find((m) => CHARGE_MODE_LABEL[m] === label) ?? 'percentage';
+}
+
 export function SettingsBookingSection({
   draft,
   rules,
@@ -144,31 +155,87 @@ export function SettingsBookingSection({
               onChange={(v) => set('cancellationCutoffHours', digitsText(v))}
             />
           </RuleRow>
-          <RuleRow label="Refund before the cut-off" hint="Of the amount paid, per payment line.">
-            <RuleNumberField
-              id="rule-refund-before"
-              value={value.refundBeforePct}
-              unit="%"
-              label="Refund before the cut-off in percent"
-              error={errors.refundBeforePct}
-              disabled={!mayEdit}
-              onChange={(v) => set('refundBeforePct', percentText(v))}
-            />
+          <RuleRow
+            label="How the refund is worked out"
+            hint="A percentage of what was paid, or a fixed charge kept from it (Q10)."
+          >
+            <div className="w-64">
+              <Select
+                value={CHARGE_MODE_LABEL[value.cancellationChargeMode]}
+                options={CHARGE_MODES.map((m) => CHARGE_MODE_LABEL[m])}
+                onChange={(v) => set('cancellationChargeMode', chargeModeOf(v))}
+                height={40}
+                aria-label="How the cancellation refund is worked out"
+                disabled={!mayEdit}
+              />
+            </div>
           </RuleRow>
-          <RuleRow label="Refund after the cut-off" hint="0% means no refund after the cut-off.">
-            <RuleNumberField
-              id="rule-refund-after"
-              value={value.refundAfterPct}
-              unit="%"
-              label="Refund after the cut-off in percent"
-              error={errors.refundAfterPct}
-              disabled={!mayEdit}
-              onChange={(v) => set('refundAfterPct', percentText(v))}
-            />
-          </RuleRow>
+          {value.cancellationChargeMode === 'fixed' ? (
+            <>
+              <RuleRow
+                label="Charge before the cut-off"
+                hint="Kept from the refund; the rest goes back. ₹0 = full refund."
+              >
+                <RuleNumberField
+                  id="rule-charge-before"
+                  value={value.chargeBeforeRupees}
+                  unit="₹"
+                  label="Cancellation charge before the cut-off in rupees"
+                  error={errors.chargeBeforeRupees}
+                  disabled={!mayEdit}
+                  onChange={(v) => set('chargeBeforeRupees', percentText(v))}
+                />
+              </RuleRow>
+              <RuleRow
+                label="Charge after the cut-off"
+                hint="Kept from the refund; the rest goes back."
+              >
+                <RuleNumberField
+                  id="rule-charge-after"
+                  value={value.chargeAfterRupees}
+                  unit="₹"
+                  label="Cancellation charge after the cut-off in rupees"
+                  error={errors.chargeAfterRupees}
+                  disabled={!mayEdit}
+                  onChange={(v) => set('chargeAfterRupees', percentText(v))}
+                />
+              </RuleRow>
+            </>
+          ) : (
+            <>
+              <RuleRow
+                label="Refund before the cut-off"
+                hint="Of the amount paid, per payment line."
+              >
+                <RuleNumberField
+                  id="rule-refund-before"
+                  value={value.refundBeforePct}
+                  unit="%"
+                  label="Refund before the cut-off in percent"
+                  error={errors.refundBeforePct}
+                  disabled={!mayEdit}
+                  onChange={(v) => set('refundBeforePct', percentText(v))}
+                />
+              </RuleRow>
+              <RuleRow
+                label="Refund after the cut-off"
+                hint="0% means no refund after the cut-off."
+              >
+                <RuleNumberField
+                  id="rule-refund-after"
+                  value={value.refundAfterPct}
+                  unit="%"
+                  label="Refund after the cut-off in percent"
+                  error={errors.refundAfterPct}
+                  disabled={!mayEdit}
+                  onChange={(v) => set('refundAfterPct', percentText(v))}
+                />
+              </RuleRow>
+            </>
+          )}
           <RuleRow
             label="Refund the convenience fee too"
-            hint="A cancellation by the hospital always refunds 100% including the fee (Q11)."
+            hint="A cancellation by the hospital refunds the doctor's fee in full; the convenience fee is not refunded (Q11)."
           >
             <Toggle
               value={value.refundIncludesConvenienceFee}

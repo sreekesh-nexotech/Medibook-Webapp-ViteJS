@@ -52,7 +52,8 @@ export function timeoutLabel(minutes: number): string {
 }
 
 /** The Session Timeout select's standard choices (a stored value off this list is added). */
-export const SESSION_TIMEOUT_OPTIONS: readonly string[] = ['15 min', '30 min', '60 min'];
+/** Q65 (client workbook, 19 Oct 2026): "logout if inactive 5 mins" — 5 is the default. */
+export const SESSION_TIMEOUT_OPTIONS: readonly string[] = ['5 min', '15 min', '30 min', '60 min'];
 
 /** Services named in a `TAX_RATE_IN_USE` refusal before "and N more". */
 const IN_USE_NAMES = 3;

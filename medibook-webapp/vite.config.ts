@@ -125,14 +125,22 @@ function cspMetaTag(env: Record<string, string>): Plugin {
   };
 }
 
-/** The commit a build comes from: CI's checkout, else the local repository. */
-function buildCommit(): string {
-  const fromCi = process.env.GITHUB_SHA;
-  if (fromCi) return fromCi.slice(0, COMMIT_LENGTH);
+/**
+ * The commit a build comes from (UB-41): `VITE_GIT_COMMIT` when the build host
+ * sets it (a CI or container build with no `.git`), CI's checkout, else the
+ * local repository. Never fails the build: "unknown" when none of them says.
+ */
+function buildCommit(env: Record<string, string>): string {
+  const fromHost = (env.VITE_GIT_COMMIT || process.env.GITHUB_SHA || '').trim();
+  if (fromHost) return fromHost.slice(0, COMMIT_LENGTH);
   try {
-    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+    const commit = execSync('git rev-parse --short HEAD', {
+      cwd: fileURLToPath(new URL('.', import.meta.url)),
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
       .toString()
       .trim();
+    return commit || 'unknown';
   } catch {
     // Not a git checkout (e.g. a source archive): say so rather than fail the build.
     return 'unknown';
@@ -151,7 +159,7 @@ export default defineConfig(({ mode }) => {
     // Read once in `src/core/config/build.ts` (checklist OBS-03).
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
-      __APP_COMMIT__: JSON.stringify(buildCommit()),
+      __APP_COMMIT__: JSON.stringify(buildCommit(env)),
     },
     resolve: {
       alias: {

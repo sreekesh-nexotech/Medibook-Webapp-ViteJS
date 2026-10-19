@@ -10,6 +10,7 @@ import {
 import {
   dataRequestActions,
   dataRequestNote,
+  exportUnavailableMessage,
   isFullUuid,
   loginInstanceLabel,
   phiReadLabel,
@@ -256,5 +257,15 @@ describe('hospital staff lookup (B9)', () => {
     expect(staffOptionLabel({ ...entry, status: 'deactivated', email: null })).toBe(
       'Anita Menon · Lakeshore Hospital · Admin · LK-001 (deactivated)',
     );
+  });
+});
+
+describe('exportUnavailableMessage (UB-54, DEF-044)', () => {
+  it('says plainly that no export was made and what to do', () => {
+    const msg = exportUnavailableMessage('DSR-2026-000001');
+    expect(msg).toBe(
+      'DSR-2026-000001: the export could not be prepared because PDF generation is not available on this server. The request stays open — try again later or contact support.',
+    );
+    expect(msg).not.toMatch(/nightly run will prepare/);
   });
 });

@@ -54,6 +54,9 @@ const rules: HospitalRuleSettings = {
   refundBeforeCutoffBp: 10_000,
   refundAfterCutoffBp: 5000,
   refundIncludesConvenienceFee: false,
+  cancellationChargeMode: 'percentage',
+  cancellationChargeBeforeCutoffPaise: 0,
+  cancellationChargeAfterCutoffPaise: 0,
   followUpWindowDays: 7,
   noShowCallAttempts: 3,
   tokenCancelLimitMin: null,
@@ -297,5 +300,34 @@ describe('bankInput (decision 4)', () => {
       upiId: null,
     });
     expect(bankInput({ ...form, account: '1234 5678 90' }).accountNumber).toBe('1234567890');
+  });
+});
+
+describe('Q10 fixed cancellation charge (keep both options)', () => {
+  it('round-trips the charge as rupees and sends paise only for what changed', () => {
+    const base = toRulesForm({
+      ...rules,
+      cancellationChargeMode: 'fixed',
+      cancellationChargeBeforeCutoffPaise: 5000,
+      cancellationChargeAfterCutoffPaise: 15050,
+    });
+    expect(base.chargeBeforeRupees).toBe('50');
+    expect(base.chargeAfterRupees).toBe('150.50');
+    const draft = { ...base, chargeAfterRupees: '200' };
+    expect(rulesErrors(draft)).toEqual({});
+    expect(rulesChanges(base, draft)).toEqual({ cancellationChargeAfterCutoffPaise: 20000 });
+  });
+
+  it('switching to fixed sends the mode; bad charges are refused only in fixed mode', () => {
+    const base = toRulesForm(rules);
+    const fixed = { ...base, cancellationChargeMode: 'fixed' as const, chargeBeforeRupees: '75' };
+    expect(rulesChanges(base, fixed)).toEqual({
+      cancellationChargeMode: 'fixed',
+      cancellationChargeBeforeCutoffPaise: 7500,
+    });
+    expect(rulesErrors({ ...fixed, chargeAfterRupees: '20000' }).chargeAfterRupees).toMatch(
+      /₹0 and ₹10,000/,
+    );
+    expect(rulesErrors({ ...base, chargeAfterRupees: 'abc' })).toEqual({});
   });
 });

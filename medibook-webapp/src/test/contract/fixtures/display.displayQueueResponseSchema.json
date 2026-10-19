@@ -1,0 +1,127 @@
+{
+  "hospital": {
+    "id": "01a1263f-8a37-78f1-9c45-56169f660dd9",
+    "name": "Lakeshore Multispeciality Hospital"
+  },
+  "date": "2026-10-16",
+  "selection": {
+    "doctor_ids": ["01a1263f-94dc-7000-83dd-8b231432b7c9", "01a1263f-9191-7731-8825-5422d8bd7e53"],
+    "counter_ids": []
+  },
+  "sessions": [
+    {
+      "session": {
+        "id": "01a12641-f3e4-7820-9829-9757ae914e82",
+        "code": "evening",
+        "label": "Evening OPD",
+        "status": "scheduled"
+      },
+      "doctor": {
+        "id": "01a1263f-9191-7731-8825-5422d8bd7e53",
+        "name": "Dr. Suresh Pillai",
+        "room": "OPD-01",
+        "department_id": "01a1263f-90c1-7432-98d2-8fd1620c3d15"
+      },
+      "counter": null,
+      "current_token": null,
+      "current_patient_display_name": null,
+      "last_called": null,
+      "waiting_count": 2,
+      "queue_state": "available"
+    },
+    {
+      "session": {
+        "id": "01a12641-f3e1-7ff2-b8b6-5639a8f71547",
+        "code": "morning",
+        "label": "Morning OPD",
+        "status": "scheduled"
+      },
+      "doctor": {
+        "id": "01a1263f-9191-7731-8825-5422d8bd7e53",
+        "name": "Dr. Suresh Pillai",
+        "room": "OPD-01",
+        "department_id": "01a1263f-90c1-7432-98d2-8fd1620c3d15"
+      },
+      "counter": null,
+      "current_token": null,
+      "current_patient_display_name": null,
+      "last_called": null,
+      "waiting_count": 1,
+      "queue_state": "available"
+    },
+    {
+      "session": {
+        "id": "01a12641-f418-7202-9faa-b3c4fe400a8b",
+        "code": "morning",
+        "label": "Morning OPD",
+        "status": "closed"
+      },
+      "doctor": {
+        "id": "01a1263f-94dc-7000-83dd-8b231432b7c9",
+        "name": "Dr. Thomas Chacko",
+        "room": "OPD-04",
+        "department_id": "01a1263f-90dc-75c2-8195-c5a867b11d3f"
+      },
+      "counter": {
+        "id": "01a1263f-90ae-70e1-92bd-7ee3481500cb",
+        "code": "C1",
+        "name": "Main Reception"
+      },
+      "current_token": {
+        "token_no": 2,
+        "label": null
+      },
+      "current_patient_display_name": null,
+      "last_called": {
+        "token_no": 2,
+        "at": "2026-10-15T23:36:55.187871Z"
+      },
+      "waiting_count": 0,
+      "queue_state": "available"
+    }
+  ],
+  "options": {
+    "doctors": [
+      {
+        "id": "01a1263f-9191-7731-8825-5422d8bd7e53",
+        "name": "Dr. Suresh Pillai"
+      },
+      {
+        "id": "01a14140-e378-7470-bff4-b344e2681a88",
+        "name": "Dr. UAT-Kavitha Rao 27348"
+      },
+      {
+        "id": "01a13ef6-0783-71c3-9f00-4f21a9ccb2a5",
+        "name": "Dr. UAT Tester"
+      },
+      {
+        "id": "01a1263f-92a3-7d90-a9ca-9c4ea2526042",
+        "name": "Dr. Meera Varghese"
+      },
+      {
+        "id": "01a1263f-93b2-7fb1-bca9-3d84f36e7a60",
+        "name": "Dr. Rekha Nambiar"
+      },
+      {
+        "id": "01a1263f-94dc-7000-83dd-8b231432b7c9",
+        "name": "Dr. Thomas Chacko"
+      },
+      {
+        "id": "01a1263f-95af-77b3-bf20-37927d4c456e",
+        "name": "Dr. Harish Menon"
+      }
+    ],
+    "counters": [
+      {
+        "id": "01a1263f-90ae-70e1-92bd-7ee3481500cb",
+        "code": "C1",
+        "name": "Main Reception"
+      },
+      {
+        "id": "01a1263f-90b8-72a2-9ef6-03cb0c62e461",
+        "code": "C2",
+        "name": "OPD Desk"
+      }
+    ]
+  }
+}

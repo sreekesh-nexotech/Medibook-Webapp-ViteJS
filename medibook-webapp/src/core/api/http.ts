@@ -311,6 +311,13 @@ function createPublicClient(basePath: string): AxiosInstance {
 /** `/api/v1/shared/…` with no credentials — public endpoints read before login. */
 export const publicApi = createPublicClient('/shared');
 
+/**
+ * `/api/v1/display/…` for the waiting-room screen. It signs in with its own
+ * device key, not a staff session, so the display feature sends its short-lived
+ * display token itself.
+ */
+export const displayApi = createPublicClient('/display');
+
 const publicSurfaceClients: Readonly<Record<ApiSurface, AxiosInstance>> = {
   hospital: createPublicClient('/hospital'),
   platform: createPublicClient('/platform'),

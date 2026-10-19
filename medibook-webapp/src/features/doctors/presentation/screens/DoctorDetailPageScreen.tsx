@@ -81,6 +81,7 @@ import { Stars } from '../components/Stars';
 import { UpcomingDays } from '../components/UpcomingDays';
 import { useScheduleConfirm } from '../components/useScheduleConfirm';
 import { WeeklyHours } from '../components/WeeklyHours';
+import { codeFromName } from '@/shared/lib/slug';
 
 /** Backend bound on `experience_years`. */
 const MAX_EXPERIENCE_YEARS = 80;
@@ -283,6 +284,10 @@ function toForm(d: DoctorProfile): DoctorForm {
 function toInput(values: DoctorForm, stored: DoctorProfile | null): DoctorInput {
   const slug = values.slug.trim();
   const typedSlug = slug !== '' && slug !== stored?.slug;
+  // A new doctor with no short code gets one made from the name, so a backend
+  // that still requires `slug` accepts the save (UAT 16 Oct, DEF-007).
+  const madeSlug =
+    stored === null && slug === '' ? codeFromName(values.name, SLUG_MAX_LENGTH) : null;
   const followUp = values.followUpFee.trim();
   return {
     name: values.name.trim(),
@@ -302,6 +307,7 @@ function toInput(values: DoctorForm, stored: DoctorProfile | null): DoctorInput 
     status: doctorStatusFromLabel(values.status),
     photoFileId: values.photoFileId,
     ...(typedSlug && { slug }),
+    ...(madeSlug !== null && { slug: madeSlug }),
   };
 }
 

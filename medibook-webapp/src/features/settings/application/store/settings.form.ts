@@ -8,9 +8,11 @@
  */
 
 import { minutesToTimeLabel, timeLabelToMinutes } from '@/features/doctors/domain/calendar';
+import { parseHundredths } from '@/shared/lib/format';
 import type {
   BankAccount,
   BankAccountInput,
+  CancellationChargeMode,
   HospitalHoursDay,
   HospitalProfile,
   HospitalProfileChanges,
@@ -73,6 +75,10 @@ export interface RulesForm {
   readonly refundBeforePct: string;
   readonly refundAfterPct: string;
   readonly refundIncludesConvenienceFee: boolean;
+  /** Q10: percentage tiers or a fixed charge per tier (rupees as typed). */
+  readonly cancellationChargeMode: CancellationChargeMode;
+  readonly chargeBeforeRupees: string;
+  readonly chargeAfterRupees: string;
   readonly followUpWindowDays: string;
   readonly noShowCallAttempts: string;
   /** Empty = tokens can be cancelled until they are called. */
@@ -199,6 +205,21 @@ export function isSectionDirty(
 }
 
 /** The rulebook fields whose draft differs from the server. */
+/** Q10: the largest fixed cancellation charge the API accepts (₹10,000 in paise). */
+const MAX_CHARGE_PAISE = 1_000_000;
+const CHARGE_ERROR = 'Enter a charge between ₹0 and ₹10,000.';
+
+/** Paise as the rupee text a person edits: 5000 → "50", 5050 → "50.50". */
+export function paiseToRupeeInput(paise: number): string {
+  return paise % 100 === 0 ? String(paise / 100) : (paise / 100).toFixed(2);
+}
+
+/** Typed rupees as paise, or `null` when not a plain amount within the API's range. */
+export function rupeeInputToPaise(text: string): number | null {
+  const paise = parseHundredths(text);
+  return paise === null || paise > MAX_CHARGE_PAISE ? null : paise;
+}
+
 export function dirtyRuleFields(base: RulesForm, draft: RulesForm): readonly (keyof RulesForm)[] {
   return (Object.keys(draft) as (keyof RulesForm)[]).filter((k) => !sameJson(base[k], draft[k]));
 }
@@ -380,6 +401,9 @@ export function toRulesForm(r: HospitalRuleSettings): RulesForm {
     refundBeforePct: bpToPercentInput(r.refundBeforeCutoffBp),
     refundAfterPct: bpToPercentInput(r.refundAfterCutoffBp),
     refundIncludesConvenienceFee: r.refundIncludesConvenienceFee,
+    cancellationChargeMode: r.cancellationChargeMode,
+    chargeBeforeRupees: paiseToRupeeInput(r.cancellationChargeBeforeCutoffPaise),
+    chargeAfterRupees: paiseToRupeeInput(r.cancellationChargeAfterCutoffPaise),
     followUpWindowDays: String(r.followUpWindowDays),
     noShowCallAttempts: String(r.noShowCallAttempts),
     tokenCancelLimitMin: intText(r.tokenCancelLimitMin),
@@ -433,6 +457,14 @@ export function rulesErrors(r: RulesForm): RulesErrors {
   if (percentInputToBp(r.refundAfterPct) === null) {
     out.refundAfterPct = 'Enter a refund between 0 and 100%.';
   }
+  if (r.cancellationChargeMode === 'fixed') {
+    if (rupeeInputToPaise(r.chargeBeforeRupees) === null) {
+      out.chargeBeforeRupees = CHARGE_ERROR;
+    }
+    if (rupeeInputToPaise(r.chargeAfterRupees) === null) {
+      out.chargeAfterRupees = CHARGE_ERROR;
+    }
+  }
   if (r.deskPaymentMethods !== null && r.deskPaymentMethods.length === 0) {
     out.deskPaymentMethods = 'Accept at least one payment method at the desk.';
   }
@@ -462,6 +494,15 @@ export function rulesChanges(base: RulesForm, draft: RulesForm): HospitalRuleCha
     }),
     ...(changed.has('refundIncludesConvenienceFee') && {
       refundIncludesConvenienceFee: draft.refundIncludesConvenienceFee,
+    }),
+    ...(changed.has('cancellationChargeMode') && {
+      cancellationChargeMode: draft.cancellationChargeMode,
+    }),
+    ...(changed.has('chargeBeforeRupees') && {
+      cancellationChargeBeforeCutoffPaise: rupeeInputToPaise(draft.chargeBeforeRupees) ?? 0,
+    }),
+    ...(changed.has('chargeAfterRupees') && {
+      cancellationChargeAfterCutoffPaise: rupeeInputToPaise(draft.chargeAfterRupees) ?? 0,
     }),
     ...(changed.has('followUpWindowDays') && { followUpWindowDays: int(draft.followUpWindowDays) }),
     ...(changed.has('noShowCallAttempts') && { noShowCallAttempts: int(draft.noShowCallAttempts) }),

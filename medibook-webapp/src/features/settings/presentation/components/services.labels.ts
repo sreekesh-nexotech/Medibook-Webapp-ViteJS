@@ -43,6 +43,8 @@ export function appliesToChoices(current: TaxAppliesTo | null): readonly TaxAppl
 }
 
 /** The backend's code shape for services and tax rates (BE-33). */
+/** Longest catalogue code the server accepts. */
+export const CATALOGUE_CODE_MAX_LENGTH = 40;
 const CATALOGUE_CODE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
 
 /** Why a typed code would be refused; empty is fine (the server makes one). */

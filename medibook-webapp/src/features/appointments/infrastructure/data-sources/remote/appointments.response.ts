@@ -82,6 +82,8 @@ export const appointmentResponseSchema = z.object({
   convenience_fee_paise: z.number().int(),
   tax_paise: z.number().int(),
   total_paise: z.number().int(),
+  /** Q11; optional until every backend sends it — older ones refunded the total. */
+  hospital_cancel_refund_paise: z.number().int().optional(),
   approved_at: z.string().nullable(),
   checked_in_at: z.string().nullable(),
   completed_at: z.string().nullable(),
@@ -252,6 +254,9 @@ export function toAppointment(dto: AppointmentResponse): DeskAppointment {
     convenienceRupees: rupees(dto.convenience_fee_paise),
     taxRupees: rupees(dto.tax_paise),
     totalRupees: rupees(dto.total_paise),
+    hospitalCancelRefundRupees: rupees(
+      dto.hospital_cancel_refund_paise ?? (dto.payment_status === 'paid' ? dto.total_paise : 0),
+    ),
     approvedAt: dto.approved_at,
     checkedInAt: dto.checked_in_at,
     completedAt: dto.completed_at,

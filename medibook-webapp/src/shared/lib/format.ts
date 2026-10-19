@@ -47,6 +47,15 @@ export function money(n: number | null | undefined): string {
   return moneyFromPaise(Math.round(Number(n) * PAISE_PER_RUPEE));
 }
 
+/**
+ * Like [money], but a deduction reads "−₹ 40.00" (minus sign before the
+ * rupee symbol), matching the appointment drawer's discount line.
+ */
+export function signedMoney(n: number | null | undefined): string {
+  if (n == null) return '—';
+  return n < 0 ? `−${money(-n)}` : money(n);
+}
+
 /** Compact rupee figures for KPI tiles: "₹ 2.6L", "₹ 9.8K". */
 export function moneyShort(n: number): string {
   if (n >= 100000) return '₹ ' + (n / 100000).toFixed(n % 100000 === 0 ? 0 : 1) + 'L';

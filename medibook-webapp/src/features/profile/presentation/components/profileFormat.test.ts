@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { isIdleExpired } from '@/features/profile/presentation/components/profileFormat';
+import {
+  apiBuildLabel,
+  isIdleExpired,
+} from '@/features/profile/presentation/components/profileFormat';
 
 const NOW = Date.parse('2026-10-07T10:00:00Z');
 
@@ -22,5 +25,16 @@ describe('isIdleExpired (UAT-69)', () => {
       false,
     );
     expect(isIdleExpired({ lastSeenAt: 'not a date', current: false }, 15, NOW)).toBe(false);
+  });
+});
+
+describe('apiBuildLabel (UB-07)', () => {
+  it('names the API version and commit, unknown values included', () => {
+    expect(apiBuildLabel({ version: '0.1.0', commit: 'abc1234' })).toBe(
+      'API version 0.1.0 · build abc1234',
+    );
+    expect(apiBuildLabel({ version: '0.1.0', commit: 'unknown' })).toBe(
+      'API version 0.1.0 · build unknown',
+    );
   });
 });

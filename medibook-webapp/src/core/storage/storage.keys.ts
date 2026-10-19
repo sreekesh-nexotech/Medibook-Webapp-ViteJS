@@ -28,3 +28,9 @@ export const STORAGE_KEY_LAST_ACTIVITY = {
  * it survives reloads and is shared by this browser's tabs (UAT-68).
  */
 export const STORAGE_KEY_BELL_SEEN_PREFIX = 'medibook.bell.seen.';
+
+/**
+ * The waiting-room display's device key (issued in Hospital Settings › Display
+ * Screens). Kept in localStorage so the TV signs itself in again after a restart.
+ */
+export const STORAGE_KEY_DISPLAY_DEVICE_KEY = 'medibook.display.deviceKey';

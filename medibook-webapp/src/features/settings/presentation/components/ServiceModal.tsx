@@ -17,11 +17,13 @@ import type {
 } from '@/features/settings/domain/entities/services.entities';
 import { chargedServiceRate, priceService } from '@/features/settings/domain/services.pricing';
 import {
+  CATALOGUE_CODE_MAX_LENGTH,
   catalogueCodeError,
   HOSPITAL_WIDE_LABEL,
   NO_TAX_LABEL,
   taxLabel,
 } from '@/features/settings/presentation/components/services.labels';
+import { codeFromName } from '@/shared/lib/slug';
 
 /** Editable shape — numbers are held as text while the field is being typed. */
 interface ServiceForm {
@@ -114,7 +116,8 @@ export function ServiceModal({
     onSubmit: async (v) => {
       try {
         await onSave({
-          code: v.code.trim(),
+          // A new service with no code gets one made from its name (DEF-012).
+          code: v.code.trim() || (service ? '' : codeFromName(v.name, CATALOGUE_CODE_MAX_LENGTH)),
           name: v.name.trim(),
           departmentId: v.departmentId || null,
           durationMinutes: Number(v.durationMinutes),

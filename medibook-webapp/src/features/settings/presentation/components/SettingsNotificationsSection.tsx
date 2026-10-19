@@ -17,8 +17,8 @@ const ADMIN_ALERTS: readonly [string, string, string][] = [
 
 /**
  * Settings › Notifications. The backend has no per-hospital notification
- * preferences, so these switches are shown off and disabled with that said
- * plainly. Message wording is Medibook's (templates are platform-only), and
+ * preferences, so these switches are disabled with that said plainly. Patient
+ * messages read on — patients receive every one of them today (DEF-019). Message wording is Medibook's (templates are platform-only), and
  * Medibook pays for messages — there are no messaging credits (UAT-52).
  */
 export function SettingsNotificationsSection() {
@@ -41,7 +41,9 @@ export function SettingsNotificationsSection() {
               <div className="text-body text-text-strong font-medium">{title}</div>
               <div className="text-caption text-text-muted">{caption}</div>
             </div>
-            <Toggle value={false} onChange={() => undefined} label={title} disabled />
+            {/* Patients get every one of these today, so the switch reads on (DEF-019). */}
+            <span className="text-caption text-text-muted">Always sent</span>
+            <Toggle value onChange={() => undefined} label={`${title}: always sent`} disabled />
           </div>
         ))}
         <div className="text-caption text-text-muted mt-4 flex items-center gap-1.5">

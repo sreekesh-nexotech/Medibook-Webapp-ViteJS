@@ -8,6 +8,7 @@ import { Icon } from '@/shared/ui/Icon';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 
+import { CANCEL_REFUND_NOTE } from '@/features/doctors/presentation/components/scheduleConfirm';
 import type { Holiday, HolidayInput } from '@/features/settings/domain/entities/profile.entities';
 import {
   HOLIDAY_SCOPE_OPTIONS,
@@ -219,7 +220,7 @@ export function HolidayModal({ open, holiday, departments, onClose, onSave }: Ho
                   form.values.scope === 'Whole hospital'
                     ? 'across the whole hospital'
                     : `for ${departmentName || 'the selected department'}`
-                }. Before anything is saved you will see any booked appointments it would cancel (with a full refund).`
+                }. Before anything is saved you will see any booked appointments it would cancel (${CANCEL_REFUND_NOTE}).`
               : 'Pick a date range to see how many days this closure removes from booking.'}
           </span>
         </div>

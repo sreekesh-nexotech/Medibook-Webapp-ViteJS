@@ -4,7 +4,6 @@ import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
-import { Toggle } from '@/shared/ui/Toggle';
 
 import {
   SHORT_OTP_LENGTH,
@@ -14,6 +13,8 @@ import {
 } from '@/features/ops-settings/presentation/components/opsSettingsForm';
 
 const UNAVAILABLE_HINT = 'Not available yet — the platform API does not store this setting.';
+const TWO_STEP_NOTE =
+  'Not part of this phase: staff and admins sign in with their email and password.';
 const INPUT_HEIGHT = 48;
 
 interface SettingsSecurityCardProps extends SettingsSectionProps {
@@ -157,22 +158,10 @@ export function SettingsSecurityCard({
         </OpsField>
       </div>
       <div className="border-border-soft mt-4 flex flex-col gap-4.5 border-t pt-4">
-        <div className="flex items-start gap-3">
-          <Toggle
-            value={false}
-            onChange={() => undefined}
-            label="Require 2FA for all admins"
-            disabled
-          />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-body text-text-strong font-medium">
-              Require 2FA for all admins
-            </span>
-            <span className="text-caption text-text-muted">
-              Admins without 2FA are prompted at next sign-in.
-            </span>
-            <span className="text-caption text-text-faint">{UNAVAILABLE_HINT}</span>
-          </div>
+        {/* UB-24 / Q64: two-step sign-in is "not now" — no switch that suggests otherwise. */}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-body text-text-strong font-medium">Two-step sign-in (2FA)</span>
+          <span className="text-caption text-text-muted">{TWO_STEP_NOTE}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-body text-text-strong font-medium">API Key</span>

@@ -62,6 +62,9 @@ export interface HospitalSettingsPutRequest {
   readonly refund_before_cutoff_bp?: number;
   readonly refund_after_cutoff_bp?: number;
   readonly refund_includes_convenience_fee?: boolean;
+  readonly cancellation_charge_mode?: 'percentage' | 'fixed';
+  readonly cancellation_charge_before_cutoff_paise?: number;
+  readonly cancellation_charge_after_cutoff_paise?: number;
   readonly follow_up_window_days?: number;
   readonly no_show_call_attempts?: number;
   readonly token_cancel_limit_min?: number | null;
@@ -91,6 +94,15 @@ export function toSettingsPutRequest(c: HospitalRuleChanges): HospitalSettingsPu
     ...(c.refundAfterCutoffBp !== undefined && { refund_after_cutoff_bp: c.refundAfterCutoffBp }),
     ...(c.refundIncludesConvenienceFee !== undefined && {
       refund_includes_convenience_fee: c.refundIncludesConvenienceFee,
+    }),
+    ...(c.cancellationChargeMode !== undefined && {
+      cancellation_charge_mode: c.cancellationChargeMode,
+    }),
+    ...(c.cancellationChargeBeforeCutoffPaise !== undefined && {
+      cancellation_charge_before_cutoff_paise: c.cancellationChargeBeforeCutoffPaise,
+    }),
+    ...(c.cancellationChargeAfterCutoffPaise !== undefined && {
+      cancellation_charge_after_cutoff_paise: c.cancellationChargeAfterCutoffPaise,
     }),
     ...(c.followUpWindowDays !== undefined && { follow_up_window_days: c.followUpWindowDays }),
     ...(c.noShowCallAttempts !== undefined && { no_show_call_attempts: c.noShowCallAttempts }),

@@ -229,3 +229,8 @@ export const OpsOnboardingDocumentsScreen = lazy(() =>
     }),
   ),
 );
+export const DisplayScreen = lazy(() =>
+  import('@/features/display/presentation/screens/DisplayScreen').then((m) => ({
+    default: m.DisplayScreen,
+  })),
+);

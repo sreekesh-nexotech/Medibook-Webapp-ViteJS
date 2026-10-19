@@ -25,9 +25,10 @@ interface AppointmentReasonModalProps {
 
 /**
  * A reason prompt for the desk's irreversible actions — cancel, reject and
- * refund. Whatever was paid is refunded in full to the original payment
- * method(s) (Q11, Q94, Q95), so there is no amount or channel to choose, only
- * the reason. The body says whether anything is refunded at all.
+ * refund. The refund is fixed by the backend — the doctor's booking fee for a
+ * cancel / reject (Q11), the whole payment for a refund — to the original
+ * method(s) (Q94, Q95), so there is no amount or channel to choose, only the
+ * reason. The body says what is refunded, if anything.
  */
 export function AppointmentReasonModal({
   open,

@@ -1,3 +1,4 @@
+import type { ServerVersion } from '@/core/api/serverVersion.response';
 import { formatInstant } from '@/shared/lib/format';
 
 /** Display helpers for the my-account screen. Pure functions, no React. */
@@ -52,4 +53,9 @@ export function isIdleExpired(
   if (session.current) return false;
   const lastSeen = new Date(session.lastSeenAt).getTime();
   return Number.isFinite(lastSeen) && lastSeen + idleMinutes * MS_PER_MINUTE <= now;
+}
+
+/** "API version 0.1.0 · build abc1234" — the deployed backend, beside the web build (UB-07). */
+export function apiBuildLabel(server: Pick<ServerVersion, 'version' | 'commit'>): string {
+  return `API version ${server.version} · build ${server.commit}`;
 }

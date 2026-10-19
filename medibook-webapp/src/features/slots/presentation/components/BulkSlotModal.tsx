@@ -16,7 +16,11 @@ import type {
   BulkSlotResult,
 } from '@/features/slots/domain/entities/slots.entities';
 import { timeLabelToHhMm } from '@/features/slots/presentation/components/slotsGridView';
-import { isPreviewStale } from '@/features/doctors/presentation/components/scheduleConfirm';
+import {
+  CANCEL_REFUND_NOTE,
+  cancelledBookingsCopy,
+  isPreviewStale,
+} from '@/features/doctors/presentation/components/scheduleConfirm';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { cn } from '@/shared/lib/cn';
 import { describeFailure } from '@/shared/lib/serverErrors';
@@ -115,8 +119,9 @@ function bookingsCopy(bookings: readonly AffectedBooking[], timeZone: string | n
  * one doctor over the next few weeks — narrowed by a time range. Every count
  * comes from the backend's dry run, so the hint and the confirmation state
  * exactly what will happen. A block also takes booked slots and cancels those
- * bookings with a full refund; when it would, the confirmation names them and
- * says so on the button.
+ * bookings (refunding whatever was paid — the dry run cannot say whether a
+ * booking was paid, so the copy never promises a refund); when it would, the
+ * confirmation names them and says so on the button.
  */
 export function BulkSlotModal({
   date,
@@ -242,7 +247,7 @@ export function BulkSlotModal({
               skippedCopy ? ` ${skippedCopy}.` : ''
             }${
               bookings.length > 0
-                ? ` ${plural(bookings.length, 'booking')} will be cancelled with a full refund.`
+                ? ` ${plural(bookings.length, 'booking')} will be cancelled; ${CANCEL_REFUND_NOTE}.`
                 : ''
             }`;
   const isReady = preview.isSuccess && count > 0;
@@ -261,7 +266,7 @@ export function BulkSlotModal({
           const cancelled = done.affectedBookings.length;
           toast(
             `${plural(done.affectedCount, 'slot')} ${verb}${
-              cancelled > 0 ? `, ${plural(cancelled, 'booking')} cancelled and refunded` : ''
+              cancelled > 0 ? `, ${cancelledBookingsCopy(cancelled)}` : ''
             }`,
             'success',
           );
@@ -288,7 +293,7 @@ export function BulkSlotModal({
     values.action === 'Block'
       ? `Block ${plural(count, 'slot')} for ${scopeCopy}? Patients can no longer book them in the Medibook app.${
           bookings.length > 0
-            ? ` This also cancels ${plural(bookings.length, 'booking')} with a full refund: ${bookingsCopy(bookings, timeZone)}.`
+            ? ` This also cancels ${plural(bookings.length, 'booking')} (${CANCEL_REFUND_NOTE}): ${bookingsCopy(bookings, timeZone)}.`
             : ''
         }`
       : `Open ${plural(count, 'slot')} for ${scopeCopy}? They become bookable in the Medibook app again.`;

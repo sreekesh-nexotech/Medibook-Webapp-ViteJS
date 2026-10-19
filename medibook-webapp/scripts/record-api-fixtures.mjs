@@ -85,6 +85,7 @@ function redact(node, fields) {
 const SPEC = [
   // shared and auth
   { key: 'core.appConfigResponseSchema', surface: 'public', path: '/shared/app-config' },
+  { key: 'core.serverVersionResponseSchema', surface: 'public', path: '/shared/version' },
   { key: 'auth.hospitalMeResponseSchema', surface: 'hospital', path: '/hospital/me' },
   { key: 'auth.platformMeResponseSchema', surface: 'platform', path: '/platform/me' },
   {

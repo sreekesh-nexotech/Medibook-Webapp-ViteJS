@@ -47,10 +47,10 @@ export function SettingsPatientAppCard({
               />
             </OpsField>
             <OpsField
-              label="Bookings per person, doctor and day"
+              label="Bookings per person, doctor and session"
               required
               error={err.maxDailyBookings}
-              hint="Upcoming bookings one person may hold with one doctor on one day (1–10)."
+              hint="Upcoming bookings one person may hold with one doctor in one session (shift) — a morning and an evening booking on the same day are both allowed (Q83; 1–10)."
             >
               <TextInput
                 value={f.maxDailyBookings}
@@ -67,7 +67,7 @@ export function SettingsPatientAppCard({
           label="Appointment reminders"
           required
           error={err.reminderOffsets}
-          hint="Before each appointment, e.g. 1w, 48h, 24h, 2h (m, h, d or w; up to 10)."
+          hint="Before each appointment, e.g. 24h, 2h — the client's rule, Q111 (m, h, d or w; up to 10)."
         >
           <TextInput
             value={f.reminderOffsets}

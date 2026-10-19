@@ -194,8 +194,9 @@ export interface DataExportDraft {
 }
 
 /**
- * What processing did: prepared now, or left for the nightly worker because
- * the export renderer is not available to a live request (HTTP 501).
+ * What processing did: prepared now, or `deferred` — no file was made because
+ * this server cannot render the export (HTTP 501); the request stays open for
+ * a later attempt or the nightly worker.
  */
 export type DataRequestProcessOutcome =
   { readonly status: 'processed'; readonly request: DataRequest } | { readonly status: 'deferred' };

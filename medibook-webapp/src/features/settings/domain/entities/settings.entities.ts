@@ -5,6 +5,9 @@
  */
 
 /** The hospital's own profile row (`GET /hospital/profile`). */
+/** Q10: how a patient cancellation's refund is worked out. */
+export type CancellationChargeMode = 'percentage' | 'fixed';
+
 export interface HospitalProfile {
   readonly id: string;
   readonly name: string;
@@ -88,6 +91,13 @@ export interface HospitalRuleSettings {
   readonly refundBeforeCutoffBp: number;
   readonly refundAfterCutoffBp: number;
   readonly refundIncludesConvenienceFee: boolean;
+  /**
+   * Q10 ("keep both options"): `percentage` refunds the tier % above; `fixed` keeps the tier's
+   * fixed charge (paise) and refunds the rest.
+   */
+  readonly cancellationChargeMode: CancellationChargeMode;
+  readonly cancellationChargeBeforeCutoffPaise: number;
+  readonly cancellationChargeAfterCutoffPaise: number;
   readonly followUpWindowDays: number;
   /** Q27: skips after which the desk is offered No-show (never automatic). */
   readonly noShowCallAttempts: number;

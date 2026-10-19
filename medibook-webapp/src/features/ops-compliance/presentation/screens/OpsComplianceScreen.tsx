@@ -21,6 +21,7 @@ import {
   type ExportFormValue,
 } from '@/features/ops-compliance/presentation/components/ExportRequestForm';
 import { ExportRequestsCard } from '@/features/ops-compliance/presentation/components/ExportRequestsCard';
+import { exportUnavailableMessage } from '@/features/ops-compliance/presentation/components/compliance.labels';
 import { LoginHistoryCard } from '@/features/ops-compliance/presentation/components/LoginHistoryCard';
 import { PhiAccessCard } from '@/features/ops-compliance/presentation/components/PhiAccessCard';
 
@@ -37,7 +38,7 @@ const TABS: readonly ComplianceTab[] = [
 /** The toast that says exactly what processing did — never more. */
 function announceOutcome(requestNo: string, outcome: DataRequestProcessOutcome): void {
   if (outcome.status === 'deferred') {
-    toast(`${requestNo} is filed — the nightly run will prepare the export.`, 'info');
+    toast(exportUnavailableMessage(requestNo), 'error');
     return;
   }
   const { request } = outcome;
@@ -90,8 +91,8 @@ export function OpsComplianceScreen() {
   /**
    * THE LAW: the request is filed first and shows as Requested; it is then
    * prepared, and only a file the server actually wrote is reported as an
-   * export. When the renderer is not available to a live request, the
-   * request stays filed for the nightly run and the toast says so.
+   * export. When the server cannot render the export (501), the request
+   * stays filed and an error toast says no file was made (UB-54).
    */
   const handleExport = (value: ExportFormValue): void => {
     if (createExport.isPending || processingId) return;

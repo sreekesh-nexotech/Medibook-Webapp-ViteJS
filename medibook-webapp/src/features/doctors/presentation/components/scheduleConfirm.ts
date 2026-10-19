@@ -50,11 +50,26 @@ export function unpreviewedBookings(
   return applied.filter((b) => !seen.has(b.appointmentId));
 }
 
-/** "2 more bookings were cancelled and refunded: Asha Rao (BK-1), …" */
+/**
+ * What a schedule change does to the money on the bookings it cancels. The
+ * backend refunds what was paid in full (Q11), but its affected-booking items
+ * (`materialise._booking_ref`: ref, token, status, time, patient) carry no
+ * payment state, so an unpaid walk-in cannot be told from a prepaid booking.
+ * The copy must not promise a refund that never happens.
+ */
+/** Q11: a hospital-side cancellation refunds the doctor's fee; the convenience fee is kept. */
+export const CANCEL_REFUND_NOTE = "the doctor's fee of a paid booking is refunded";
+
+/** "1 booking cancelled (the doctor's fee of a paid booking is refunded)" */
+export function cancelledBookingsCopy(n: number): string {
+  return `${n} booking${n === 1 ? '' : 's'} cancelled (${CANCEL_REFUND_NOTE})`;
+}
+
+/** "2 bookings were made after the preview and were also cancelled (…): Asha Rao (BK-1), …" */
 export function unpreviewedCopy(bookings: readonly AffectedBooking[]): string {
   const n = bookings.length;
   const names = bookings.map((b) => `${b.patientName} (${b.bookingRef})`).join(', ');
   return `${n} booking${n === 1 ? ' was' : 's were'} made after the preview and ${
     n === 1 ? 'was' : 'were'
-  } also cancelled and refunded: ${names}.`;
+  } also cancelled (${CANCEL_REFUND_NOTE}): ${names}.`;
 }

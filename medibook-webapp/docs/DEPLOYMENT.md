@@ -24,6 +24,7 @@ secret in a `VITE_` variable.
 | `VITE_WS_BASE_URL`    | `same-origin` when the app's host proxies `/ws` (recommended), else `wss://<ws host>`     |
 | `VITE_STORAGE_ORIGIN` | The file-storage origin signed links point at, e.g. `https://files.medibook.example`      |
 | `VITE_MONITORING_URL` | Where error reports are sent (`https://…`); optional, see `docs/MONITORING.md`            |
+| `VITE_GIT_COMMIT`     | The commit shown on My Account; set it when the build has no `.git` (e.g. a container)    |
 
 `npm run build` stops when the API or WebSocket setting is missing or not
 `https://`/`wss://` (DEP-10). The build writes a Content-Security-Policy that

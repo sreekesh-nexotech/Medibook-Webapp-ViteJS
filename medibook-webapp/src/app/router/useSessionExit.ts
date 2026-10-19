@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { loginPathFor } from '@/app/router/paths';
+import { loginPathFor, SESSION_ENDED_STATE } from '@/app/router/paths';
 
 import type { AuthSurface } from '@/features/auth/domain/entities/auth.types';
 import { useLogoutMutation } from '@/features/auth/application/queries/useLogoutMutation';
@@ -23,7 +23,13 @@ export function useSessionExit(surface: AuthSurface, onExit?: () => void) {
     navigate(loginPathFor(surface), { replace: true });
   }, [navigate, onExit, surface]);
 
-  useSessionExpiry(surface, toLogin);
+  // Ended by the server: the login screen explains why (X-057).
+  const toLoginEnded = useCallback(() => {
+    onExit?.();
+    navigate(loginPathFor(surface), { replace: true, state: SESSION_ENDED_STATE });
+  }, [navigate, onExit, surface]);
+
+  useSessionExpiry(surface, toLoginEnded);
 
   const logout = useCallback(() => {
     mutate(surface, { onSettled: toLogin });

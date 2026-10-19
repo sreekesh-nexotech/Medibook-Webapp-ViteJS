@@ -40,6 +40,12 @@ export const AUTH_RESET_PATH = '/reset-password';
 export const OPS_RESET_PATH = `${OPS_BASE_PATH}/reset-password`;
 export const AUTH_INVITE_PATH = '/accept-invite';
 
+/** The waiting-room display for the OPD hall TV — public, signs in with a device key. */
+export const DISPLAY_PATH = '/display';
+
+/** `?key=` on the display URL: a device key to sign in with (then kept and removed). */
+export const DISPLAY_KEY_PARAM = 'key';
+
 /** Query param carrying an emailed token (reset or invitation). */
 export const AUTH_TOKEN_PARAM = 'token';
 
@@ -84,6 +90,17 @@ export const OPS_REPORT_DOWNLOAD_PATH = `${OPS_BASE_PATH}${REPORT_DOWNLOAD_PATH}
 
 /** Query param carrying the emailed link to reopen after sign-in. */
 export const AUTH_NEXT_PARAM = 'next';
+
+/**
+ * Router state on the redirect to login when the server ended the session
+ * (signed out from another device, password changed, refresh refused), so the
+ * login screen can say why instead of silently showing an empty form.
+ */
+export const SESSION_ENDED_STATE = { sessionEnded: true } as const;
+
+export function isSessionEndedState(state: unknown): boolean {
+  return typeof state === 'object' && state !== null && 'sessionEnded' in state;
+}
 
 /** An emailed report link on either surface: `[/ops]/reports/downloads/<uuid>`. */
 const REPORT_DOWNLOAD_PATTERN =

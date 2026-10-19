@@ -14,7 +14,7 @@ export const REMATERIALISE_REFRESH_MS = 8_000;
 
 /** What an applied schedule-affecting write did, as far as other screens care. */
 export interface ScheduleRefreshInput {
-  /** Bookings the write cancelled (refunded in full). */
+  /** Bookings the write cancelled (the doctor's fee refunded, Q11). */
   readonly cancelledBookings: number;
   /** The server queued a re-materialisation of slots (they change shortly after). */
   readonly rematerialisationQueued: boolean;

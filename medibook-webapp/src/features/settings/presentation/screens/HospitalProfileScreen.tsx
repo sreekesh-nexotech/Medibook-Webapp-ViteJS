@@ -31,6 +31,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { ScheduleChangeModal } from '@/features/doctors/presentation/components/ScheduleChangeModal';
+import { cancelledBookingsCopy } from '@/features/doctors/presentation/components/scheduleConfirm';
 import { useScheduleConfirm } from '@/features/doctors/presentation/components/useScheduleConfirm';
 import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type {
@@ -122,9 +123,7 @@ function holidayOpSuccessCopy(op: HolidayOp, cancelled: number): string {
       : op.existing === null
         ? 'Holiday added — slots will not be generated'
         : 'Holiday saved';
-  return cancelled === 0
-    ? done
-    : `${done} — ${cancelled} ${cancelled === 1 ? 'booking' : 'bookings'} cancelled with a full refund`;
+  return cancelled === 0 ? done : `${done} — ${cancelledBookingsCopy(cancelled)}`;
 }
 
 /**
@@ -273,8 +272,14 @@ export function HospitalProfileScreen() {
       toast('Banner saved', 'success');
     } else {
       const nextOrder = banners.reduce((max, b) => Math.max(max, b.sortOrder + 1), 0);
-      await createBanner.mutateAsync({ input, sortOrder: nextOrder });
-      toast('Banner scheduled — it goes live on its start date', 'success');
+      const created = await createBanner.mutateAsync({ input, sortOrder: nextOrder });
+      // A banner that starts today is already live (DEF-010).
+      toast(
+        bannerStatusAt(created, new Date()) === 'Scheduled'
+          ? 'Banner scheduled — it goes live on its start date'
+          : 'Banner published',
+        'success',
+      );
     }
   };
 
@@ -307,7 +312,6 @@ export function HospitalProfileScreen() {
       }).then((outcome) => {
         if (outcome.status === 'failed') toast(errorCopy(outcome.error), 'error', outcome.error);
       });
-      return;
       return;
     }
     deleteBanner.mutate(

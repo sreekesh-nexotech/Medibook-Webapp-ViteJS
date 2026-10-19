@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/Button';
@@ -16,6 +16,7 @@ import {
   forgotPathFor,
   hospitalDashboardPath,
   isOpsReturnPath,
+  isSessionEndedState,
   OPS_BASE_PATH,
   returnPathAfterLogin,
   surfaceFromParam,
@@ -38,6 +39,9 @@ const MODES: readonly (readonly [LoginMode, string])[] = [
 ];
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** Shown when the server ended the session (another device, password change). */
+const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in again.';
 
 /**
  * Login screen (design `Auth.jsx` `Login`): the Hospital/Operations segmented
@@ -68,7 +72,10 @@ export function LoginScreen() {
   const [pwd, setPwd] = useState('');
   // Off by default: front-desk terminals are shared (SEC-02).
   const [remember, setRemember] = useState(false);
-  const [err, setErr] = useState('');
+  const location = useLocation();
+  const [err, setErr] = useState(() =>
+    isSessionEndedState(location.state) ? SESSION_ENDED_MESSAGE : '',
+  );
   const isOps = mode === 'ops';
 
   const pick = (m: LoginMode) => {
@@ -165,11 +172,7 @@ export function LoginScreen() {
             </div>
           )}
           {/* A form, so Enter signs in from either field (A11Y-04). */}
-          <form
-            noValidate
-            className="flex flex-col gap-5"
-            onSubmit={go}
-          >
+          <form noValidate className="flex flex-col gap-5" onSubmit={go}>
             <AuthField
               label="Email Address"
               type="email"

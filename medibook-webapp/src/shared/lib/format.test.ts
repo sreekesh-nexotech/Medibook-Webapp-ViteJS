@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  signedMoney,
   addDaysISO,
   calendarInstant,
   calendarDate,
@@ -236,5 +237,13 @@ describe('phoneDisplay', () => {
   it('shows anything else as stored', () => {
     expect(phoneDisplay('+441632960961')).toBe('+441632960961');
     expect(phoneDisplay('+9118002004567')).toBe('+9118002004567');
+  });
+});
+
+describe('signedMoney', () => {
+  it('puts the minus before the rupee symbol for a deduction', () => {
+    expect(signedMoney(-40)).toBe('−₹ 40.00');
+    expect(signedMoney(400)).toBe('₹ 400.00');
+    expect(signedMoney(null)).toBe('—');
   });
 });

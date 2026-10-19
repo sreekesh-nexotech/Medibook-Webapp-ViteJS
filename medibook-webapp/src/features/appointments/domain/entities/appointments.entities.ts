@@ -73,6 +73,11 @@ export interface DeskAppointment {
   readonly convenienceRupees: number;
   readonly taxRupees: number;
   readonly totalRupees: number;
+  /**
+   * What a hospital cancel / reject refunds now (Q11): the doctor's booking fee — the convenience
+   * fee and its GST stay with Medibook. 0 when nothing was paid.
+   */
+  readonly hospitalCancelRefundRupees: number;
   readonly approvedAt: string | null;
   readonly checkedInAt: string | null;
   readonly completedAt: string | null;

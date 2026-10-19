@@ -90,6 +90,7 @@ function appt(tokenNo: number, over: Partial<DeskAppointment> = {}): DeskAppoint
     convenienceRupees: 0,
     taxRupees: 0,
     totalRupees: 500,
+    hospitalCancelRefundRupees: 0,
     approvedAt: null,
     checkedInAt: null,
     completedAt: null,

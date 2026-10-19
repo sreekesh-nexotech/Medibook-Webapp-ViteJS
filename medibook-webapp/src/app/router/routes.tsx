@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { NotFoundScreen } from '@/app/layouts/NotFoundScreen';
@@ -12,6 +13,7 @@ import {
   AUTH_INVITE_PATH,
   AUTH_LOGIN_PATH,
   AUTH_RESET_PATH,
+  DISPLAY_PATH,
   HOSPITAL_VIEW_SEGMENT,
   OPS_BASE_PATH,
   OPS_REPORT_DOWNLOAD_PATH,
@@ -68,6 +70,7 @@ import {
   SlotsScreen,
   TokenCountersScreen,
   UsersRolesScreen,
+  DisplayScreen,
 } from '@/app/router/lazyScreens';
 
 import { AcceptInvitationScreen } from '@/features/auth/presentation/screens/AcceptInvitationScreen';
@@ -103,6 +106,15 @@ export const router = createBrowserRouter([
       { path: AUTH_RESET_PATH, element: <ResetPasswordScreen surface="hospital" /> },
       { path: OPS_RESET_PATH, element: <ResetPasswordScreen surface="platform" /> },
       { path: AUTH_INVITE_PATH, element: <AcceptInvitationScreen /> },
+      // The OPD hall TV: no staff session, its own device key (DEF-006).
+      {
+        path: DISPLAY_PATH,
+        element: (
+          <Suspense fallback={null}>
+            <DisplayScreen />
+          </Suspense>
+        ),
+      },
       // Emailed report links — matched ahead of `/:role` and `/ops/*` (static segments rank first).
       { path: REPORT_DOWNLOAD_PATH, element: <ReportDownloadGuard surface="hospital" /> },
       { path: OPS_REPORT_DOWNLOAD_PATH, element: <ReportDownloadGuard surface="platform" /> },
@@ -201,7 +213,10 @@ export const router = createBrowserRouter([
               { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
               { path: OPS_VIEW_SEGMENT['content'], element: <OpsContentScreen /> },
               { path: OPS_VIEW_SEGMENT['reviews'], element: <OpsReviewsScreen /> },
-              { path: OPS_VIEW_SEGMENT['message-templates'], element: <OpsMessageTemplatesScreen /> },
+              {
+                path: OPS_VIEW_SEGMENT['message-templates'],
+                element: <OpsMessageTemplatesScreen />,
+              },
               {
                 path: OPS_VIEW_SEGMENT['onboarding-documents'],
                 element: <OpsOnboardingDocumentsScreen />,

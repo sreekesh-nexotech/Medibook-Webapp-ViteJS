@@ -2,7 +2,7 @@ import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { usePrintArea } from '@/shared/hooks/usePrintArea';
 import { cn } from '@/shared/lib/cn';
 import { downloadFromUrl } from '@/shared/lib/download';
-import { money } from '@/shared/lib/format';
+import { money, signedMoney } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/Button';
 import { ErrorState } from '@/shared/ui/ErrorState';
 import { Modal } from '@/shared/ui/Modal';
@@ -177,7 +177,9 @@ function ReceiptBody({ receipt, timeZone }: { receipt: DeskReceipt; timeZone: st
                       {l.supplier === 'platform' ? ' · supplied by Medibook' : ''}
                     </span>
                   </td>
-                  <td className={cn(rcTd, 'text-right tabular-nums')}>{money(l.amountRupees)}</td>
+                  <td className={cn(rcTd, 'text-right tabular-nums')}>
+                    {signedMoney(l.amountRupees)}
+                  </td>
                   <td className={cn(rcTd, 'text-right tabular-nums')}>
                     {l.taxRatePercent === 0
                       ? '—'

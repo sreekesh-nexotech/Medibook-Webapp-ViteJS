@@ -106,6 +106,18 @@ export function dataRequestNote(r: DataRequest): string {
   return 'The nightly run prepares it if not now';
 }
 
+/**
+ * "Prepare now" answered 501: this server cannot render the export's PDF
+ * (WeasyPrint missing — backend `audit/services/dsr.py`, `NOT_IMPLEMENTED_YET`).
+ * The backend's own sentence is written for operators ("rendered by the
+ * nightly worker run"), and the nightly run fails the same way where the
+ * worker lacks the renderer too, so the user is told plainly that no file was
+ * made and what to do (UB-54, DEF-044). The request itself stays open.
+ */
+export function exportUnavailableMessage(requestNo: string): string {
+  return `${requestNo}: the export could not be prepared because PDF generation is not available on this server. The request stays open — try again later or contact support.`;
+}
+
 const PRINCIPAL_LABELS: Readonly<Record<string, string>> = {
   platform: 'Ops staff',
   hospital: 'Hospital staff',

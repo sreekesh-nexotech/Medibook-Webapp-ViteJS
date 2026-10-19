@@ -184,7 +184,7 @@ function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }
           <div className="text-caption text-text-muted mb-1">Desk confirmation</div>
           <div className="text-body text-text-body">
             This booking needs the hospital's approval. Approve it to confirm the slot, or reject it
-            {hasPaid(appt) ? ' — the patient is refunded in full.' : '.'}
+            {hasPaid(appt) ? " — the patient is refunded the doctor's booking fee." : '.'}
           </div>
         </Card>
       )}
@@ -395,7 +395,9 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
     );
   };
 
-  const copy = reason ? reasonCopy(reason, appt, total) : null;
+  const copy = reason
+    ? reasonCopy(reason, appt, total, money(appt.hospitalCancelRefundRupees))
+    : null;
 
   return (
     <>
