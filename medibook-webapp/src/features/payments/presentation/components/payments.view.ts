@@ -207,7 +207,7 @@ export function refundFailureCopy(error: unknown, canOpenDrawer: boolean): strin
       : 'Cash is handed back from an open cash drawer, and your role cannot open one. Ask a colleague who can.';
   }
   if (error.code === REFUND_REQUIRES_CANCEL) {
-    return 'This booking is still live. Cancel it from Appointments — cancelling refunds it in full.';
+    return "This booking is still live. Cancel it from Appointments — a hospital cancel refunds the doctor's booking fee.";
   }
   return error.message;
 }

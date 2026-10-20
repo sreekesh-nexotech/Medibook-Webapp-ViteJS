@@ -66,7 +66,7 @@ export interface SlotGridPage {
   readonly total: number;
 }
 
-/** A booking a block would cancel (with a 100% refund). */
+/** A booking a block would cancel (refunding the doctor's fee, Q11). */
 export interface AffectedBooking {
   readonly appointmentId: string;
   readonly bookingRef: string;

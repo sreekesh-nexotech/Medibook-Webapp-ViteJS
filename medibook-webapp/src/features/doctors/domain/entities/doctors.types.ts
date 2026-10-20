@@ -125,7 +125,7 @@ export interface ResolvedDay {
   readonly sessions: readonly ExceptionSession[];
 }
 
-/** A booking a schedule change would cancel (with a full refund) once confirmed. */
+/** A booking a schedule change would cancel (refunding the doctor's fee, Q11) once confirmed. */
 export interface AffectedBooking {
   readonly appointmentId: string;
   readonly bookingRef: string;

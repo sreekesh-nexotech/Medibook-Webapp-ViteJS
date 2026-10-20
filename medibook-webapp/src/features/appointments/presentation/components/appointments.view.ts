@@ -223,9 +223,9 @@ export function hasPaid(a: DeskAppointment): boolean {
 
 /**
  * How the desk returns money (B3): a booking that is over (completed,
- * no-show, cancelled) and still paid is refunded; a live paid booking is
- * cancelled with a full refund in one step — a refund on it is refused with
- * `REFUND_REQUIRES_CANCEL`.
+ * no-show, cancelled) and still paid is refunded in full; a live paid booking
+ * is cancelled and refunded in one step (the doctor's booking fee, Q11) — a
+ * refund on it is refused with `REFUND_REQUIRES_CANCEL`.
  */
 export function moneyBackAction(a: DeskAppointment): 'refund' | 'cancel-refund' | null {
   if (!hasPaid(a)) return null;
@@ -311,7 +311,7 @@ const DESK_REFUSALS: Readonly<Record<string, string>> = {
   CASH_SESSION_REQUIRED:
     'Open your cash drawer on the Payments screen first — cash is taken into, or handed back from, your own drawer.',
   REFUND_REQUIRES_CANCEL:
-    'This booking is still on. Cancel it to refund the patient — a hospital cancel refunds in full.',
+    "This booking is still on. Cancel it to refund the patient — a hospital cancel refunds the doctor's booking fee.",
   IDEMPOTENCY_CONFLICT:
     'This was already sent with different details. Refresh the list to see what was recorded.',
 };

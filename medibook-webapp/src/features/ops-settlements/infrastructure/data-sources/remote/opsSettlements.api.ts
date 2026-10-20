@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { clientFailure } from '@/core/error/toFailure';
 
+import { assertFileStoreReady } from '@/core/api/fileUrls';
 import { idempotencyKey } from '@/core/api/headers';
 import { platformApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE, paginatedSchema, fetchCappedPages } from '@/core/api/pagination';
@@ -217,6 +218,7 @@ export async function getStatementPdf(
   const blob = response.data;
   if (blob.type.includes('json')) {
     const link = statementPdfLinkSchema.parse(JSON.parse(await blob.text()));
+    assertFileStoreReady(link.url);
     return { url: link.url };
   }
   return { blob };

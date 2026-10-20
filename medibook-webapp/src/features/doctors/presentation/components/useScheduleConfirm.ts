@@ -45,7 +45,7 @@ function newKey(): string {
  * 2. applied already (an edit that touches no schedule) → done;
  * 3. nothing affected or kept → confirm straight away;
  * 4. otherwise hold it and let `ScheduleChangeModal` name the bookings that
- *    confirming cancels (with a full refund) and those it keeps because the
+ *    confirming cancels (refunding the doctor's fee, Q11) and those it keeps because the
  *    patient is already in consultation or done (L-21).
  *
  * The confirm is sent with the dry run's preview token (BE-33) and one

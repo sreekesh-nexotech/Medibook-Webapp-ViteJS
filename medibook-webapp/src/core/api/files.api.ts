@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 import { ifMatch } from '@/core/api/headers';
-import { isFileStoreUrl } from '@/core/api/fileUrls';
+import { assertFileStoreReady, isFileStoreUrl } from '@/core/api/fileUrls';
 import { sharedApi } from '@/core/api/http';
 import { activeSurface } from '@/core/api/surface';
 import { FILE_UPLOAD_MAX_BYTES, FILE_UPLOAD_RULES, normaliseMime } from '@/core/api/files.rules';
@@ -144,6 +144,7 @@ export function getFileUrl(fileId: string): Promise<Result<SignedFileUrl>> {
   return attempt(async () => {
     const response = await sharedApi.get(`/files/${encodeURIComponent(fileId)}/url`);
     const signed = toSignedFileUrl(signedUrlResponseSchema.parse(response.data));
+    assertFileStoreReady(signed.url);
     if (!isFileStoreUrl(signed.url)) {
       throw clientFailure(
         'forbidden',

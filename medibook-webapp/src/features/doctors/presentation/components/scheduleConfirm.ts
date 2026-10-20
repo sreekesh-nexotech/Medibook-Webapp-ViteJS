@@ -52,7 +52,7 @@ export function unpreviewedBookings(
 
 /**
  * What a schedule change does to the money on the bookings it cancels. The
- * backend refunds what was paid in full (Q11), but its affected-booking items
+ * backend refunds the doctor's booking fee (Q11), but its affected-booking items
  * (`materialise._booking_ref`: ref, token, status, time, patient) carry no
  * payment state, so an unpaid walk-in cannot be told from a prepaid booking.
  * The copy must not promise a refund that never happens.

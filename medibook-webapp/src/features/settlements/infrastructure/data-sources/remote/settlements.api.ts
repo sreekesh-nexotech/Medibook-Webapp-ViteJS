@@ -4,7 +4,7 @@ import {
   withJsonErrorBody,
   type FileOrUrl,
 } from '@/core/api/blobResponses';
-import { isFileStoreUrl } from '@/core/api/fileUrls';
+import { assertFileStoreReady, isFileStoreUrl } from '@/core/api/fileUrls';
 import { hospitalApi } from '@/core/api/http';
 import { MAX_PAGE_SIZE } from '@/core/api/pagination';
 import { clientFailure } from '@/core/error/toFailure';
@@ -106,6 +106,7 @@ export async function getStatementPdf(statementId: string): Promise<FileOrUrl> {
       { responseType: 'blob' },
     );
     const answer = await readFileOrUrl(response.data);
+    if (answer.kind === 'url') assertFileStoreReady(answer.url);
     if (answer.kind === 'url' && !isFileStoreUrl(answer.url)) {
       throw clientFailure('forbidden', OFF_STORE_LINK);
     }

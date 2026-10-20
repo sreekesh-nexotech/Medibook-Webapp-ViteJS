@@ -746,7 +746,7 @@ export function PaymentsScreen() {
                         {canRefund && availability.kind === 'live' && (
                           <span
                             className="text-caption text-text-muted"
-                            title="A refund ends the booking. Cancel it from Appointments; cancelling refunds it in full."
+                            title="A refund ends the booking. Cancel it from Appointments; a hospital cancel refunds the doctor's booking fee."
                           >
                             Cancel booking to refund
                           </span>

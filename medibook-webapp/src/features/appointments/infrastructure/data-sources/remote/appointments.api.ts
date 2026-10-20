@@ -1,3 +1,4 @@
+import { assertFileStoreReady } from '@/core/api/fileUrls';
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
 import { fetchAllPages, paginatedSchema } from '@/core/api/pagination';
@@ -232,7 +233,9 @@ export async function getReceipt(id: string) {
 
 export async function getReceiptPdfUrl(id: string) {
   const response = await hospitalApi.get(`${base(id)}/receipt.pdf`);
-  return receiptPdfResponseSchema.parse(response.data).url;
+  const { url } = receiptPdfResponseSchema.parse(response.data);
+  assertFileStoreReady(url);
+  return url;
 }
 
 /** The token slip as the backend renders it (`Content-Type: application/pdf`). */

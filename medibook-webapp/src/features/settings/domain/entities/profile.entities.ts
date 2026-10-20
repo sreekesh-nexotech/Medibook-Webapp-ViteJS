@@ -43,7 +43,7 @@ export interface AffectedBooking {
 
 /**
  * The outcome of a holiday write. A dry run applies nothing and lists what
- * confirming would cancel (with a 100% refund); a confirmed write applied it.
+ * confirming would cancel (refunding the doctor's fee, Q11); a confirmed write applied it.
  * Same envelope as every schedule-affecting write (`ScheduleChangeSerializer`).
  */
 export interface ScheduleChange {

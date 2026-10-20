@@ -40,11 +40,11 @@ export interface AppointmentsRepository {
   createWalkIn(input: WalkInInput, idempotencyKey: string): Promise<Result<WalkInResult>>;
   updateRemark(id: string, remark: string, version: number): Promise<Result<DeskAppointment>>;
   approve(id: string): Promise<Result<DeskAppointment>>;
-  /** Hospital rejection of a booking awaiting approval — refunds what was paid, in full. */
+  /** Hospital rejection of a booking awaiting approval — refunds the doctor's booking fee (Q11). */
   reject(id: string, reason: string, idempotencyKey: string): Promise<Result<RefundOutcome>>;
   checkIn(id: string, idempotencyKey: string): Promise<Result<DeskAppointment>>;
   noShow(id: string): Promise<Result<DeskAppointment>>;
-  /** Hospital cancellation — refunds what was paid, in full, to the original methods. */
+  /** Hospital cancellation — refunds the doctor's booking fee (Q11) to the original methods. */
   cancel(id: string, reason: string, idempotencyKey: string): Promise<Result<RefundOutcome>>;
   /** Collect a walk-in's fee (split lines); returns the issued receipt. */
   collectPayment(

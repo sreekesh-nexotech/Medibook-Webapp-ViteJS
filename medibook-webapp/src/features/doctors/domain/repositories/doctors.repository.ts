@@ -25,7 +25,7 @@ export interface VersionedRef {
 /**
  * The hospital's doctor & department catalogue. Writes that can cancel
  * bookings take a `ScheduleWriteMode`: a dry run reports the bookings it
- * would cancel; a confirm applies it (cancelling those with a full refund).
+ * would cancel; a confirm applies it (cancelling those and refunding the doctor's fee, Q11).
  */
 export interface DoctorsRepository {
   listDepartments(): Promise<Result<readonly Department[]>>;
@@ -83,7 +83,6 @@ export interface DoctorsRepository {
     leave: VersionedRef,
     mode: ScheduleWriteMode,
   ): Promise<Result<ScheduleChange>>;
-
 
   createDateException(
     doctorId: string,
