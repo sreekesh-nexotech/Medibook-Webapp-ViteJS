@@ -122,6 +122,9 @@ export interface PaymentFilters {
   readonly q: string;
 }
 
+/** The list filters without the line statuses — the base each tab count adds its statuses to. */
+export type PaymentCountFilters = Omit<PaymentFilters, 'statuses'>;
+
 export interface PaymentPageQuery extends PaymentFilters {
   /** 1-based. */
   readonly page: number;

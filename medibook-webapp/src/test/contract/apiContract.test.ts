@@ -11,6 +11,7 @@ import {
 import {
   appointmentResponseSchema,
   receiptResponseSchema,
+  refundListResponseSchema,
   tokenSlipResponseSchema,
 } from '@/features/appointments/infrastructure/data-sources/remote/appointments.response';
 import { auditLogPageResponseSchema } from '@/features/audit/infrastructure/data-sources/remote/audit.response';
@@ -221,6 +222,7 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'appointments.appointmentResponseSchema': appointmentResponseSchema,
   'appointments.eventPageSchema': eventPageSchema,
   'appointments.receiptResponseSchema': receiptResponseSchema,
+  'appointments.refundListResponseSchema': refundListResponseSchema,
   'appointments.tokenSlipResponseSchema': tokenSlipResponseSchema,
   'audit.auditLogPageResponseSchema': auditLogPageResponseSchema,
   'auth.hospitalMeResponseSchema': hospitalMeResponseSchema,

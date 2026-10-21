@@ -133,8 +133,8 @@ describe('cancel / reject response on both backend versions', () => {
       }),
     );
     expect(outcome.refunds).toEqual([
-      { id: 'r1', amountRupees: 300, status: 'processing', method: 'upi' },
-      { id: 'r2', amountRupees: 200, status: 'superseded', method: null },
+      { id: 'r1', amountRupees: 300, status: 'processing', method: 'upi', requestedAt: null },
+      { id: 'r2', amountRupees: 200, status: 'superseded', method: null, requestedAt: null },
     ]);
   });
 });

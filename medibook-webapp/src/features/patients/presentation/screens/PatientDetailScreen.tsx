@@ -351,8 +351,10 @@ export function PatientDetailScreen() {
               Contact Details
             </SectionTitle>
             {infoRow('Phone', phone || '—')}
+            {infoRow('Alternate phone', displayPhone(p.alternatePhone) || '—')}
             {infoRow('Email', p.email || '—')}
             {infoRow('Gender', gender || '—')}
+            {infoRow('Date of birth', p.dateOfBirth ? fmtDate(p.dateOfBirth) : '—')}
             {infoRow('Age', ageText(age))}
             <div className="flex justify-between gap-4 py-2.75">
               <span className="text-body text-text-muted">Address</span>

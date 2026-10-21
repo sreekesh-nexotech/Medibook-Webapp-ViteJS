@@ -18,6 +18,8 @@ import { useRefundPageQuery } from '@/features/payments/application/queries/useR
 import {
   REFUND_STATUS_BADGE,
   dateTimeCopy,
+  refundProblemCopy,
+  refundReasonCopy,
   type DateRange,
 } from '@/features/payments/presentation/components/payments.view';
 
@@ -115,8 +117,16 @@ export function PaymentsRefundsPanel({ range, method, search }: PaymentsRefundsP
               <td className={tdClass}>
                 <div className="flex flex-col items-start gap-0.75">
                   <Badge status={badge.status}>{badge.label}</Badge>
-                  {r.failureReason && (
-                    <span className="text-caption text-d-700">{r.failureReason}</span>
+                  {refundProblemCopy(r.status, r.failureReason) && (
+                    <span
+                      className={cn(
+                        'text-caption',
+                        r.status === 'failed' ? 'text-d-700' : 'text-text-muted',
+                      )}
+                      title={r.failureReason ?? undefined}
+                    >
+                      {refundProblemCopy(r.status, r.failureReason)}
+                    </span>
                   )}
                   {r.processedAt && (
                     <span className="text-caption text-text-muted">
@@ -126,7 +136,7 @@ export function PaymentsRefundsPanel({ range, method, search }: PaymentsRefundsP
                 </div>
               </td>
               <td className={cn(tdClass, 'max-w-70')}>
-                <span className="text-text-muted">{r.reason}</span>
+                <span className="text-text-muted">{refundReasonCopy(r.reason)}</span>
               </td>
             </tr>
           );

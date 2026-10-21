@@ -135,6 +135,13 @@ const SPEC = [
     }),
   },
   {
+    // The drawer reads a booking's refunds as `?appointment_id=`; the shape is the same.
+    key: 'appointments.refundListResponseSchema',
+    surface: 'hospital',
+    path: '/hospital/refunds',
+    params: { ...LIST, ...WIDE_DATES },
+  },
+  {
     key: 'dashboard.adminDashboardResponseSchema',
     surface: 'hospital',
     path: '/hospital/dashboard/admin',

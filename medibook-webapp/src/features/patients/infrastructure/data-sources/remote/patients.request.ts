@@ -12,6 +12,7 @@ export interface PatientRequestBody {
   first_name?: string;
   last_name?: string | null;
   phone_e164?: string | null;
+  alternate_phone_e164?: string | null;
   email?: string | null;
   date_of_birth?: string | null;
   gender?: PatientDemographics['gender'];
@@ -29,6 +30,7 @@ const REQUEST_KEYS: Readonly<Record<keyof PatientDemographics, keyof PatientRequ
   firstName: 'first_name',
   lastName: 'last_name',
   phone: 'phone_e164',
+  alternatePhone: 'alternate_phone_e164',
   email: 'email',
   dateOfBirth: 'date_of_birth',
   gender: 'gender',

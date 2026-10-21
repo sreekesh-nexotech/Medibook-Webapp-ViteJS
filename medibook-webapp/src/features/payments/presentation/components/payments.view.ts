@@ -300,3 +300,48 @@ export function clockCopy(iso: string | null): string {
   if (!iso) return '—';
   return formatInstant(iso, { hour: 'numeric', minute: '2-digit' });
 }
+
+/** "Paid (4)" — or just the tab's name while its count is unknown. */
+export function countedTabLabel(name: string, count: number | null | undefined): string {
+  return count === null || count === undefined ? name : `${name} (${count})`;
+}
+
+/**
+ * The reasons the backend writes on refunds it starts itself
+ * (`cancellation.py`, `online.py`). A reason staff typed is shown as typed.
+ */
+const SYSTEM_REFUND_REASONS: Readonly<Record<string, string>> = {
+  hospital_cancellation: 'Cancelled by the hospital',
+  patient_cancellation: 'Cancelled by the patient',
+  schedule_change: 'Cancelled after a schedule change',
+  patient_request: 'Patient request',
+  payment_after_deadline: 'Paid after the booking had expired',
+  amount_mismatch: 'Paid amount did not match the booking',
+  duplicate_payment: 'Duplicate payment',
+};
+
+/** "Cancelled by the hospital" for `hospital_cancellation`; a typed reason as it was typed. */
+export function refundReasonCopy(reason: string | null | undefined): string {
+  if (!reason) return '—';
+  return SYSTEM_REFUND_REASONS[reason] ?? reason;
+}
+
+const REFUND_RETRYING =
+  'The payment gateway has not confirmed this refund yet — Medibook keeps trying automatically.';
+const REFUND_STUCK =
+  'The payment gateway could not complete this refund. Contact Medibook support with the booking reference.';
+
+/**
+ * What the desk is told when the gateway side of a refund had a problem.
+ * The gateway's own text (`failure_reason`, e.g. a raw HTTP error from a
+ * status check) is for Medibook support: screens keep it as a tooltip only.
+ * Still requested or processing means the backend retries by itself; failed
+ * needs a person.
+ */
+export function refundProblemCopy(
+  status: RefundStatus,
+  failureReason: string | null | undefined,
+): string | null {
+  if (!failureReason || status === 'processed' || status === 'superseded') return null;
+  return status === 'failed' ? REFUND_STUCK : REFUND_RETRYING;
+}

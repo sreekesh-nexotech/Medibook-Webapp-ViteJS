@@ -221,7 +221,6 @@ export function paiseToRupees(paise: number): number {
   return paise / PAISE_PER_RUPEE;
 }
 
-
 const FIELD_LABELS: Readonly<Record<string, string>> = {
   first_name: 'first name',
   last_name: 'last name',
@@ -279,6 +278,7 @@ const DEMOGRAPHIC_KEYS: readonly (keyof PatientDemographics)[] = [
   'firstName',
   'lastName',
   'phone',
+  'alternatePhone',
   'email',
   'dateOfBirth',
   'gender',
@@ -297,6 +297,7 @@ export function demographicsOf(p: PatientRecord): PatientDemographics {
     firstName: p.firstName,
     lastName: p.lastName,
     phone: p.phone,
+    alternatePhone: p.alternatePhone,
     email: p.email,
     dateOfBirth: p.dateOfBirth,
     gender: p.gender,

@@ -25,6 +25,7 @@ const RECORD: PatientRecord = {
   lastName: 'Thomas',
   fullName: 'Mary Ann Thomas',
   phone: '+919876543210',
+  alternatePhone: null,
   email: null,
   dateOfBirth: '1990-04-02',
   gender: 'female',
@@ -96,6 +97,11 @@ describe('pincodeError', () => {
 });
 
 describe('diffDemographics', () => {
+  it('sends an alternate phone on its own when only it changed', () => {
+    const next = { ...demographicsOf(RECORD), alternatePhone: '+919812345678' };
+    expect(diffDemographics(RECORD, next)).toEqual({ alternatePhone: '+919812345678' });
+  });
+
   it('sends only the phone when only the phone changed (UAT-07)', () => {
     // A first name with a space used to be re-split into first/last on every edit.
     const next = { ...demographicsOf(RECORD), phone: '+919999999999' };

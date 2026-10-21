@@ -48,6 +48,8 @@ export interface PatientRecord {
   readonly fullName: string;
   /** E.164, e.g. `+919876543210`. */
   readonly phone: string | null;
+  /** A second contact number, E.164. */
+  readonly alternatePhone: string | null;
   readonly email: string | null;
   /** ISO `yyyy-mm-dd`. */
   readonly dateOfBirth: string | null;
@@ -81,6 +83,8 @@ export interface PatientDemographics {
   readonly lastName: string | null;
   /** E.164. */
   readonly phone: string | null;
+  /** A second contact number, E.164. */
+  readonly alternatePhone: string | null;
   readonly email: string | null;
   readonly dateOfBirth: string | null;
   readonly gender: PatientGender | null;

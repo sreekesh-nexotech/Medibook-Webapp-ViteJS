@@ -14,6 +14,7 @@ import { fetchAppointmentEvents } from '@/features/appointments/application/usec
 import { fetchAppointments } from '@/features/appointments/application/usecases/appointments.fetchAppointments';
 import { fetchAppointmentsPage } from '@/features/appointments/application/usecases/appointments.fetchAppointmentsPage';
 import { fetchReceipt } from '@/features/appointments/application/usecases/appointments.fetchReceipt';
+import { fetchRefunds } from '@/features/appointments/application/usecases/appointments.fetchRefunds';
 import { fetchTokenSlip } from '@/features/appointments/application/usecases/appointments.fetchTokenSlip';
 import { quoteWalkIn } from '@/features/appointments/application/usecases/appointments.quoteWalkIn';
 import {
@@ -112,6 +113,19 @@ export function useAppointmentEventsQuery(id: string | null) {
   return useQuery({
     queryKey: appointmentsKeys.events(id ?? ''),
     queryFn: async () => unwrap(await fetchAppointmentEvents(id ?? '')),
+    enabled: id !== null,
+  });
+}
+
+/**
+ * Refunds already started for an appointment — the drawer checks them before
+ * offering Refund, since the booking reads "paid" until a gateway refund is
+ * confirmed. `null` stays idle.
+ */
+export function useAppointmentRefundsQuery(id: string | null) {
+  return useQuery({
+    queryKey: appointmentsKeys.refunds(id ?? ''),
+    queryFn: async () => unwrap(await fetchRefunds(id ?? '')),
     enabled: id !== null,
   });
 }

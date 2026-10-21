@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { isFailure } from '@/core/error/failure';
+import { cn } from '@/shared/lib/cn';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -14,6 +15,8 @@ import {
   METHOD_LABEL,
   REFUND_STATUS_BADGE,
   dateTimeCopy,
+  refundProblemCopy,
+  refundReasonCopy,
 } from '@/features/payments/presentation/components/payments.view';
 
 const DRAWER_WIDTH = 480;
@@ -123,9 +126,19 @@ export function PaymentsDetailDrawer({ paymentId, onClose }: PaymentsDetailDrawe
                       Asked {dateTimeCopy(r.requestedAt)}
                       {r.processedAt ? ` · done ${dateTimeCopy(r.processedAt)}` : ''}
                     </div>
-                    <div className="text-caption text-text-body mt-1">“{r.reason}”</div>
-                    {r.failureReason && (
-                      <div className="text-caption text-d-700 mt-1">{r.failureReason}</div>
+                    <div className="text-caption text-text-body mt-1">
+                      {refundReasonCopy(r.reason)}
+                    </div>
+                    {refundProblemCopy(r.status, r.failureReason) && (
+                      <div
+                        className={cn(
+                          'text-caption mt-1',
+                          r.status === 'failed' ? 'text-d-700' : 'text-text-muted',
+                        )}
+                        title={r.failureReason ?? undefined}
+                      >
+                        {refundProblemCopy(r.status, r.failureReason)}
+                      </div>
                     )}
                   </div>
                 );

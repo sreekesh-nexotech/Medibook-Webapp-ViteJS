@@ -1,0 +1,123 @@
+{
+  "results": [
+    {
+      "id": "01a15a41-dfbf-7881-9a25-e270daf0a357",
+      "payment_id": "01a12647-bc10-75e1-a96c-456c7244f3d0",
+      "appointment_id": "01a12647-bbce-7ab0-a7ad-5fd6bb11e3d5",
+      "booking_ref": "EXMB-2610-00171",
+      "method": "card",
+      "channel": "online",
+      "amount_paise": 40000,
+      "reason": "hospital_cancellation",
+      "status": "requested",
+      "initiated_by_kind": "staff",
+      "initiated_by_staff_id": "01a1263f-8fca-78b2-8619-c4f193572bbf",
+      "requested_at": "2026-10-20T17:00:28.987826Z",
+      "processed_at": null,
+      "failure_reason": "reconcile failed: razorpay error 404: {\n  \"message\":\"no Route matched with those values\"\n}",
+      "cash_session_id": null,
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": false
+      },
+      "created_at": "2026-10-20T17:00:28.991222Z"
+    },
+    {
+      "id": "01a15860-5e14-7a52-8247-8187b2e403d2",
+      "payment_id": "01a1581a-7f4f-7630-b8d9-6a2f1f9acb79",
+      "appointment_id": "01a15819-fa50-77c0-9ed7-77db240d1818",
+      "booking_ref": "EXMB-2610-00214",
+      "method": "cash",
+      "channel": "desk",
+      "amount_paise": 35050,
+      "reason": "UAT – patient request",
+      "status": "processed",
+      "initiated_by_kind": "staff",
+      "initiated_by_staff_id": "01a1263f-8fca-78b2-8619-c4f193572bbf",
+      "requested_at": "2026-10-20T08:14:32.974076Z",
+      "processed_at": "2026-10-20T08:14:32.974076Z",
+      "failure_reason": null,
+      "cash_session_id": "01a1585f-efa7-7e73-ada5-09d7701d2d6f",
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": true
+      },
+      "created_at": "2026-10-20T08:14:32.980573Z"
+    },
+    {
+      "id": "01a15832-2eef-74d1-8cab-3975a089c1e1",
+      "payment_id": "01a12647-bb1b-7650-8fcb-b8be34c3719e",
+      "appointment_id": "01a12647-bae6-7e73-a5ec-c3074eaf8e21",
+      "booking_ref": "EXMB-2610-00170",
+      "method": "upi",
+      "channel": "online",
+      "amount_paise": 80000,
+      "reason": "hospital_cancellation",
+      "status": "requested",
+      "initiated_by_kind": "staff",
+      "initiated_by_staff_id": "01a1263f-9e4a-73c0-8106-c2ff68cf3b09",
+      "requested_at": "2026-10-20T07:24:06.250193Z",
+      "processed_at": null,
+      "failure_reason": "reconcile failed: razorpay error 404: {\n  \"message\":\"no Route matched with those values\"\n}",
+      "cash_session_id": null,
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": false
+      },
+      "created_at": "2026-10-20T07:24:06.255625Z"
+    },
+    {
+      "id": "01a152da-07c0-7ff0-8b12-d079590f6b63",
+      "payment_id": "01a152d9-7ba8-7720-b74d-6a6d42cd53f4",
+      "appointment_id": "01a152d8-ac3f-7f03-bd15-022e3486285d",
+      "booking_ref": "EXMB-2610-00213",
+      "method": "netbanking",
+      "channel": "online",
+      "amount_paise": 37450,
+      "reason": "hospital_cancellation",
+      "status": "processed",
+      "initiated_by_kind": "staff",
+      "initiated_by_staff_id": "01a1263f-9e4a-73c0-8106-c2ff68cf3b09",
+      "requested_at": "2026-10-19T06:29:42.971761Z",
+      "processed_at": "2026-10-19T06:45:00.140203Z",
+      "failure_reason": null,
+      "cash_session_id": null,
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": true
+      },
+      "created_at": "2026-10-19T06:29:42.976650Z"
+    },
+    {
+      "id": "01a152d4-1832-7cc1-afae-7eb174cbde1a",
+      "payment_id": "01a152d3-d167-7e20-90a2-10ca5e260426",
+      "appointment_id": "01a152c3-2d75-7ba3-8afe-3180fc66973b",
+      "booking_ref": "EXMB-2610-00212",
+      "method": "cash",
+      "channel": "desk",
+      "amount_paise": 35050,
+      "reason": "hospital_cancellation",
+      "status": "processed",
+      "initiated_by_kind": "staff",
+      "initiated_by_staff_id": "01a1263f-9e4a-73c0-8106-c2ff68cf3b09",
+      "requested_at": "2026-10-19T06:23:13.966356Z",
+      "processed_at": "2026-10-19T06:23:13.966356Z",
+      "failure_reason": null,
+      "cash_session_id": "01a152c4-c85b-7392-b318-2c91c72c08d1",
+      "policy_snapshot": {
+        "by": "hospital",
+        "refund_bp": 10000,
+        "includes_convenience_fee": true
+      },
+      "created_at": "2026-10-19T06:23:13.970377Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 39,
+  "has_next": true
+}

@@ -39,6 +39,7 @@ import type {
   BookingStatus,
   PaymentChannel,
   PaymentExportFile,
+  PaymentCountFilters,
   PaymentExportFormat,
   PaymentFilters,
   PaymentLine,
@@ -50,6 +51,7 @@ import { useExportPaymentsMutation } from '@/features/payments/application/queri
 import { useInvalidatePayments } from '@/features/payments/application/queries/useInvalidatePayments';
 import { useLineRefundsQuery } from '@/features/payments/application/queries/useLineRefundsQuery';
 import { usePaymentsQuery } from '@/features/payments/application/queries/usePaymentsQuery';
+import { usePaymentTabCountsQuery } from '@/features/payments/application/queries/usePaymentTabCountsQuery';
 import { usePaymentTotalsQuery } from '@/features/payments/application/queries/usePaymentTotalsQuery';
 import { useRefundsQuery } from '@/features/payments/application/queries/useRefundsQuery';
 import { PaymentsCashDrawer } from '@/features/payments/presentation/components/PaymentsCashDrawer';
@@ -66,10 +68,12 @@ import {
   PAYMENT_WINDOWS,
   REFUND_STATUS_BADGE,
   type PaymentWindow,
+  countedTabLabel,
   dateTimeCopy,
   lineRefundOf,
   rangeForWindow,
   refundAvailability,
+  refundProblemCopy,
   totalsOf,
   updatedCopy,
 } from '@/features/payments/presentation/components/payments.view';
@@ -212,14 +216,17 @@ export function PaymentsScreen() {
   const channel = SOURCE_CHANNEL[sourceF] ?? null;
 
   const linesTab = tab === 'All' || tab === 'Paid' || tab === 'Refunded';
-  const filters: PaymentFilters = {
+  const countFilters: PaymentCountFilters = {
     ...range,
-    statuses: linesTab ? TAB_STATUSES[tab] : [],
     method: MODE_FILTER[modeF] ?? null,
     channel,
     doctorId,
     departmentId,
     q: search,
+  };
+  const filters: PaymentFilters = {
+    ...countFilters,
+    statuses: linesTab ? TAB_STATUSES[tab] : [],
   };
   const sortField: PaymentSortField = sort.key === 'amount_paise' ? 'amount_paise' : 'captured_at';
   const linesQuery = usePaymentsQuery(
@@ -232,6 +239,7 @@ export function PaymentsScreen() {
     },
     linesTab,
   );
+  const tabCounts = usePaymentTabCountsQuery(countFilters, TAB_STATUSES);
   const apptsQuery = useAppointmentsQuery(range);
   const todayApptsQuery = useAppointmentsQuery(today);
   const totalsQuery = usePaymentTotalsQuery({
@@ -341,7 +349,18 @@ export function PaymentsScreen() {
     },
   ];
 
-  const tabLabel = (t: PayTab): string => (t === 'Pending' ? `Pending (${pendingRows.length})` : t);
+  // Every tab carries its count (as Appointments does). All lists the unpaid
+  // walk-ins above its payment lines, so it counts both.
+  const counts = tabCounts.data;
+  const tabCount = (t: PayTab): number | null | undefined => {
+    if (t === 'Pending') return pendingRows.length;
+    if (t === 'Refunds') return counts?.refunds;
+    const lineCount = counts?.lines[t];
+    return t === 'All' && typeof lineCount === 'number'
+      ? lineCount + pendingRows.length
+      : lineCount;
+  };
+  const tabLabel = (t: PayTab): string => countedTabLabel(t, tabCount(t));
   const onTab = (v: string): void => {
     setTab(PAY_TABS.find((t) => v.startsWith(t)) ?? 'All');
     setPage(0);
@@ -705,7 +724,9 @@ export function PaymentsScreen() {
                           <Badge status={refundBadge.status}>{refundBadge.label}</Badge>
                         )}
                         {refund?.status === 'failed' && refund.failureReason && (
-                          <span className="text-caption text-d-700">{refund.failureReason}</span>
+                          <span className="text-caption text-d-700" title={refund.failureReason}>
+                            {refundProblemCopy(refund.status, refund.failureReason)}
+                          </span>
                         )}
                       </div>
                     </td>

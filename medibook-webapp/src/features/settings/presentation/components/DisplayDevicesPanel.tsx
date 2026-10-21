@@ -20,6 +20,7 @@ import {
 } from '@/features/settings/application/queries/useDisplayDeviceMutations';
 import { useDisplayDevicesQuery } from '@/features/settings/application/queries/useDisplayDevicesQuery';
 
+import { displayAddress } from '@/features/settings/presentation/components/displayLinks';
 import { DeviceKeyModal } from './DeviceKeyModal';
 import { DisplayDeviceModal } from './DisplayDeviceModal';
 import { SettingsHead } from './SettingsHead';
@@ -105,6 +106,13 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
           </Button>
         )}
       </div>
+      <p className="text-caption text-text-muted mb-4">
+        On each TV, open{' '}
+        <span className="text-text-body font-semibold break-all">
+          {displayAddress(window.location.origin)}
+        </span>{' '}
+        in the browser and sign in with that screen&apos;s key.
+      </p>
       {devices.isPending ? (
         <SkeletonCards count={2} lines={2} />
       ) : devices.isError ? (

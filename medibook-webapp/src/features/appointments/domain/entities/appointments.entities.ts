@@ -168,6 +168,8 @@ export interface DeskRefund {
   readonly amountRupees: number;
   readonly status: RefundStatus;
   readonly method: string | null;
+  /** When the refund was asked for (ISO); `null` when the answer leaves it out. */
+  readonly requestedAt: string | null;
 }
 
 /** A cancel or reject: the booking as it now stands and the refunds it started. */

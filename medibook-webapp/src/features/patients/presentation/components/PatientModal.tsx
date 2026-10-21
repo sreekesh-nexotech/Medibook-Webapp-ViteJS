@@ -45,6 +45,7 @@ interface PatientForm {
   firstName: string;
   lastName: string;
   phone: string;
+  alternatePhone: string;
   dob: string;
   gender: string;
   email: string;
@@ -61,6 +62,7 @@ const BLANK: PatientForm = {
   firstName: '',
   lastName: '',
   phone: '',
+  alternatePhone: '',
   dob: '',
   gender: GENDER_NOT_SPECIFIED,
   email: '',
@@ -93,6 +95,7 @@ function validatorsFor(isPhoneRequired: boolean, today: string): FormValidators<
   return {
     firstName: (value) => required(value, 'First name'),
     phone: (value) => phoneError(value, isPhoneRequired),
+    alternatePhone: (value) => phoneError(value, false),
     dob: (value) =>
       value.trim() === '' ? undefined : notFutureDate(value, 'Date of birth', today),
     email: (value) => (value.trim() === '' ? undefined : emailRule(value)),
@@ -105,6 +108,7 @@ function toForm(p: PatientRecord): PatientForm {
     firstName: p.firstName,
     lastName: p.lastName ?? '',
     phone: displayPhone(p.phone),
+    alternatePhone: displayPhone(p.alternatePhone),
     dob: p.dateOfBirth ?? '',
     // A record with no gender must stay that way: defaulting the field would
     // turn an untouched edit into "gender changed to Male".
@@ -131,6 +135,7 @@ function formToDemographics(v: PatientForm): PatientDemographics {
     firstName: v.firstName.trim(),
     lastName: blankToNull(v.lastName),
     phone: toE164(v.phone),
+    alternatePhone: toE164(v.alternatePhone),
     email: blankToNull(v.email),
     dateOfBirth: blankToNull(v.dob),
     gender: genderFromLabel(v.gender),
@@ -307,6 +312,12 @@ function PatientRecordForm({ patient, onClose, onSaved }: Omit<PatientModalProps
           inputMode: 'tel',
           placeholder: '10-digit mobile',
           hint: 'For a number outside India, start with + and the country code.',
+        })}
+        {text('alternatePhone', 'Alternate Phone', {
+          maxLength: PHONE_INPUT_MAX_LENGTH,
+          autoComplete: 'tel',
+          inputMode: 'tel',
+          placeholder: 'Another number (optional)',
         })}
         <Field label="Date of Birth" error={form.errorFor('dob')}>
           <TextInput

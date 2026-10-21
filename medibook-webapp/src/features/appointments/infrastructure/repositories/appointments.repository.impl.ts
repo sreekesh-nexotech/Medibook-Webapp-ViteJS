@@ -64,6 +64,7 @@ export const appointmentsRepository: AppointmentsRepository = {
     attempt(async () => toReceipt(await api.postPayment(id, lines, key))),
   refund: (id, reason, key) =>
     attempt(async () => (await api.postRefund(id, reason, key)).map(toRefund)),
+  refunds: (id) => attempt(async () => (await api.getRefunds(id)).map(toRefund)),
   receipt: (id) => attempt(async () => toReceipt(await api.getReceipt(id))),
   receiptPdfUrl: (id) => attempt(() => api.getReceiptPdfUrl(id)),
   tokenSlip: (id) => attempt(async () => toTokenSlip(await api.getTokenSlip(id))),

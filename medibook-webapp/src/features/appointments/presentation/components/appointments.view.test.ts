@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { Failure } from '@/core/error/failure';
 
-import type { DeskAppointment } from '@/features/appointments/domain/entities/appointments.entities';
+import type {
+  DeskAppointment,
+  DeskRefund,
+} from '@/features/appointments/domain/entities/appointments.entities';
 import {
   acceptedMethodsOf,
   canCheckIn,
@@ -17,6 +20,8 @@ import {
   primaryAction,
   rangeFor,
   reasonCopy,
+  refundsUnderWay,
+  refundUnderWayCopy,
   windowForTab,
 } from '@/features/appointments/presentation/components/appointments.view';
 
@@ -262,5 +267,38 @@ describe('windowForTab', () => {
   it('keeps the chosen window on the other tabs', () => {
     expect(windowForTab('Online', 'Tomorrow')).toBe('Tomorrow');
     expect(windowForTab('All', 'Today')).toBe('Today');
+  });
+});
+
+describe('refund already started (no second Refund)', () => {
+  const TZ = 'Asia/Kolkata';
+  const refund = (status: DeskRefund['status'], amountRupees = 400): DeskRefund => ({
+    id: `r-${status}`,
+    amountRupees,
+    status,
+    method: 'card',
+    requestedAt: '2026-10-20T17:00:28Z',
+  });
+
+  it('counts requested, processing and processed refunds, not failed ones', () => {
+    expect(
+      refundsUnderWay([refund('requested'), refund('failed'), refund('superseded')]),
+    ).toHaveLength(1);
+    expect(refundsUnderWay([refund('failed')])).toHaveLength(0);
+  });
+
+  it('says a gateway refund is on its way, with when it started', () => {
+    const copy = refundUnderWayCopy([refund('requested')], TZ);
+    expect(copy).toMatch(/A refund of ₹\s?400\.00 was started on/);
+    expect(copy).toMatch(/no need to refund again/);
+  });
+
+  it('says it is done once processed', () => {
+    expect(refundUnderWayCopy([refund('processed', 350.5)], TZ)).toMatch(/350\.50 was refunded/);
+  });
+
+  it('says nothing when no refund counts', () => {
+    expect(refundUnderWayCopy([refund('failed')], TZ)).toBeNull();
+    expect(refundUnderWayCopy([], TZ)).toBeNull();
   });
 });

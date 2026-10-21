@@ -58,6 +58,8 @@ export interface AppointmentsRepository {
     reason: string,
     idempotencyKey: string,
   ): Promise<Result<readonly DeskRefund[]>>;
+  /** Refunds already started for the booking, newest first (any state). */
+  refunds(id: string): Promise<Result<readonly DeskRefund[]>>;
   receipt(id: string): Promise<Result<DeskReceipt>>;
   /** A short-lived URL for the receipt PDF. */
   receiptPdfUrl(id: string): Promise<Result<string>>;

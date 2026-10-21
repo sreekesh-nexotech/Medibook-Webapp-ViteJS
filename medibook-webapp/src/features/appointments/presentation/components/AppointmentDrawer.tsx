@@ -33,6 +33,7 @@ import {
 import {
   useAppointmentEventsQuery,
   useAppointmentQuery,
+  useAppointmentRefundsQuery,
 } from '@/features/appointments/application/queries/appointments.queries';
 import { AppointmentPaymentModal } from '@/features/appointments/presentation/components/AppointmentPaymentModal';
 import { AppointmentReasonModal } from '@/features/appointments/presentation/components/AppointmentReasonModal';
@@ -41,26 +42,27 @@ import { AppointmentRemarkModal } from '@/features/appointments/presentation/com
 import { AppointmentTokenModal } from '@/features/appointments/presentation/components/AppointmentTokenModal';
 import {
   actorLabel,
+  paymentBadge,
   canCancel,
   canCheckIn,
   canMarkNoShow,
   dateTimeOf,
   dayOf,
   deskErrorText,
-  eventLabel,
   hasPaid,
   hasTokenSlip,
+  timeOf,
   isClosed,
   isNothingDue,
   moneyBackAction,
   needsApproval,
   needsPayment,
-  paymentBadge,
   reasonCopy,
+  refundUnderWayCopy,
   sourceBadge,
   statusBadge,
   statusLabelOf,
-  timeOf,
+  eventLabel,
   type ReasonKind,
 } from '@/features/appointments/presentation/components/appointments.view';
 
@@ -101,6 +103,15 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
   const events = useAppointmentEventsQuery(id);
   const { timeZone } = useHospitalToday();
   const canViewPatients = useCan('Patients.view');
+  const canViewPayments = useCan('Payments.view');
+  // A finished booking still reads "paid" until a gateway refund is confirmed,
+  // so its refunds are checked before Refund is offered: one already started
+  // (e.g. by a schedule change) is shown instead of a second Refund button.
+  const refundCheckId =
+    appt.data && canViewPayments && moneyBackAction(appt.data) === 'refund' ? appt.data.id : null;
+  const refunds = useAppointmentRefundsQuery(refundCheckId);
+  const refundNote = refunds.data ? refundUnderWayCopy(refunds.data, timeZone) : null;
+  const refundBlocked = refunds.isLoading || refundNote !== null;
 
   return (
     <Drawer
@@ -109,7 +120,9 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
       title={appt.data?.patient?.fullName ?? 'Appointment'}
       subtitle={appt.data ? subtitleOf(appt.data) : undefined}
       width={440}
-      footer={appt.data ? <DrawerActions appt={appt.data} /> : undefined}
+      footer={
+        appt.data ? <DrawerActions appt={appt.data} refundBlocked={refundBlocked} /> : undefined
+      }
     >
       {appt.isPending ? (
         <div className="text-text-muted flex justify-center py-12">
@@ -126,6 +139,7 @@ export function AppointmentDrawer({ id, onClose, onViewPatient }: AppointmentDra
       ) : (
         <DrawerBody
           appt={appt.data}
+          refundNote={refundNote}
           timeZone={timeZone}
           history={events.data ?? []}
           isHistoryLoading={events.isPending}
@@ -159,6 +173,8 @@ function Row({ k, v }: { k: ReactNode; v: ReactNode }) {
 
 interface DrawerBodyProps {
   appt: DeskAppointment;
+  /** A refund already started or done for this booking (in place of a Refund button). */
+  refundNote: string | null;
   timeZone: string;
   history: readonly AppointmentEvent[];
   isHistoryLoading: boolean;
@@ -166,7 +182,14 @@ interface DrawerBodyProps {
   onViewPatient?: () => void;
 }
 
-function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }: DrawerBodyProps) {
+function DrawerBody({
+  appt,
+  refundNote,
+  timeZone,
+  history,
+  isHistoryLoading,
+  onViewPatient,
+}: DrawerBodyProps) {
   const payBadge = paymentBadge(appt);
   const status = statusBadge(appt.status);
   const source = sourceBadge(appt.source);
@@ -195,6 +218,12 @@ function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }
             This consultation is free (a follow-up or a doctor without a fee). No receipt is issued;
             the patient can be checked in on the day.
           </div>
+        </Card>
+      )}
+      {refundNote && (
+        <Card pad={16} className="mb-4">
+          <div className="text-caption text-text-muted mb-1">Refund</div>
+          <div className="text-body text-text-body">{refundNote}</div>
         </Card>
       )}
       {refundedButLive && (
@@ -308,8 +337,14 @@ function DrawerBody({ appt, timeZone, history, isHistoryLoading, onViewPatient }
   );
 }
 
+interface DrawerActionsProps {
+  appt: DeskAppointment;
+  /** A refund is already started or done (or is still being checked): no Refund button. */
+  refundBlocked: boolean;
+}
+
 /** The drawer footer: the actions this appointment allows, with their modals. */
-function DrawerActions({ appt }: { appt: DeskAppointment }) {
+function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
   const approve = useApproveMutation();
   const reject = useRejectMutation();
   const checkIn = useCheckInMutation();
@@ -471,7 +506,7 @@ function DrawerActions({ appt }: { appt: DeskAppointment }) {
             </Button>
           </Can>
         )}
-        {moneyBack === 'refund' && (
+        {moneyBack === 'refund' && !refundBlocked && (
           <Can perm="Payments.del">
             <Button variant="ghost" icon="undo-2" onClick={() => setReason('refund')}>
               Refund

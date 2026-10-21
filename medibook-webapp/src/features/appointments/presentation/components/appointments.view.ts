@@ -1,4 +1,5 @@
 import type { PermissionKey } from '@/shared/hooks/usePermission';
+import { money } from '@/shared/lib/format';
 import {
   addIsoDays,
   formatDateTimeIn,
@@ -16,7 +17,9 @@ import type {
   ApptSource,
   ApptStatus,
   DeskAppointment,
+  DeskRefund,
   PaymentMethod,
+  RefundStatus,
 } from '@/features/appointments/domain/entities/appointments.entities';
 import type { AppointmentTab } from '@/features/appointments/domain/appointments.listFilters';
 
@@ -529,4 +532,42 @@ export function paymentBadge(a: DeskAppointment): BadgeSpec {
   }
   const label = PAYMENT_LABEL[a.paymentStatus];
   return { status: label, label };
+}
+
+/** Refund states that mean the money is on its way back or already back. */
+const REFUND_UNDER_WAY: ReadonlySet<RefundStatus> = new Set([
+  'requested',
+  'processing',
+  'processed',
+]);
+
+/**
+ * The refunds of a booking that are started or done. While there are any the
+ * desk must not refund it again (the backend refuses a second refund of a
+ * line); a failed or superseded one does not count, as a new attempt is allowed.
+ */
+export function refundsUnderWay(refunds: readonly DeskRefund[]): readonly DeskRefund[] {
+  return refunds.filter((r) => REFUND_UNDER_WAY.has(r.status));
+}
+
+/**
+ * What the drawer says in place of the Refund button once a refund exists —
+ * e.g. after a schedule change cancelled the booking: an online refund reads
+ * "paid" on the booking until the gateway confirms it.
+ */
+export function refundUnderWayCopy(
+  refunds: readonly DeskRefund[],
+  timeZone: string,
+): string | null {
+  const live = refundsUnderWay(refunds);
+  if (live.length === 0) return null;
+  const total = money(live.reduce((sum, r) => sum + r.amountRupees, 0));
+  const started = live
+    .map((r) => r.requestedAt)
+    .filter((at): at is string => at !== null)
+    .sort()[0];
+  const when = started ? ` on ${formatDateTimeIn(started, timeZone)}` : '';
+  return live.every((r) => r.status === 'processed')
+    ? `${total} was refunded${when}. There is nothing more to refund.`
+    : `A refund of ${total} was started${when}. It shows as refunded once the payment gateway confirms it — no need to refund again.`;
 }

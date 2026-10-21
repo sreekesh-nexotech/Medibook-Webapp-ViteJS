@@ -6,6 +6,7 @@ import type {
   PaymentRefund,
 } from '@/features/payments/domain/entities/payments.entities';
 import {
+  countedTabLabel,
   drawerBalance,
   lineRefundOf,
   orderRefundTotal,
@@ -13,6 +14,8 @@ import {
   rangeForWindow,
   refundAvailability,
   refundFailureCopy,
+  refundProblemCopy,
+  refundReasonCopy,
   rupeesToPaise,
   summaryVariance,
 } from '@/features/payments/presentation/components/payments.view';
@@ -250,5 +253,47 @@ describe('payment presets follow the hospital’s today (UAT-47)', () => {
       dateFrom: '2026-11-01',
       dateTo: '2026-11-01',
     });
+  });
+});
+
+describe('countedTabLabel', () => {
+  it('adds the count, including zero', () => {
+    expect(countedTabLabel('Paid', 4)).toBe('Paid (4)');
+    expect(countedTabLabel('Refunds', 0)).toBe('Refunds (0)');
+  });
+
+  it('keeps the bare name while the count is unknown', () => {
+    expect(countedTabLabel('All', undefined)).toBe('All');
+    expect(countedTabLabel('Refunds', null)).toBe('Refunds');
+  });
+});
+
+describe('refund wording (no raw backend text)', () => {
+  const RAW =
+    'reconcile failed: razorpay error 404: { "message":"no Route matched with those values" }';
+
+  it('names the reasons the system writes and keeps typed ones', () => {
+    expect(refundReasonCopy('hospital_cancellation')).toBe('Cancelled by the hospital');
+    expect(refundReasonCopy('patient_cancellation')).toBe('Cancelled by the patient');
+    expect(refundReasonCopy('UAT – patient request')).toBe('UAT – patient request');
+    expect(refundReasonCopy(null)).toBe('—');
+  });
+
+  it('says the gateway is being retried while the refund is still in progress', () => {
+    const copy = refundProblemCopy('requested', RAW);
+    expect(copy).toMatch(/keeps trying automatically/);
+    expect(copy).not.toMatch(/razorpay|404|reconcile/i);
+    expect(refundProblemCopy('processing', RAW)).toBe(copy);
+  });
+
+  it('points a failed refund to support without the gateway text', () => {
+    const copy = refundProblemCopy('failed', RAW);
+    expect(copy).toMatch(/Contact Medibook support/);
+    expect(copy).not.toMatch(/razorpay|404/i);
+  });
+
+  it('says nothing when there is no problem', () => {
+    expect(refundProblemCopy('requested', null)).toBeNull();
+    expect(refundProblemCopy('processed', RAW)).toBeNull();
   });
 });

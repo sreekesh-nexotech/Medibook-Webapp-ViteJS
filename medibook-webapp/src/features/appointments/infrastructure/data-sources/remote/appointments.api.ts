@@ -1,7 +1,7 @@
 import { assertFileStoreReady } from '@/core/api/fileUrls';
 import { idempotencyKey, ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
-import { fetchAllPages, paginatedSchema } from '@/core/api/pagination';
+import { MAX_PAGE_SIZE, fetchAllPages, paginatedSchema } from '@/core/api/pagination';
 
 import type {
   AppointmentListParams,
@@ -223,6 +223,14 @@ export async function postRefund(id: string, reason: string, key: string) {
     { reason },
     { headers: idempotencyKey(key) },
   );
+  return refundListResponseSchema.parse(response.data).results;
+}
+
+/** Refunds already started for this booking (`GET /refunds?appointment_id`), newest first. */
+export async function getRefunds(id: string) {
+  const response = await hospitalApi.get('/refunds', {
+    params: { appointment_id: id, page_size: MAX_PAGE_SIZE },
+  });
   return refundListResponseSchema.parse(response.data).results;
 }
 

@@ -112,6 +112,8 @@ describe('patient record', () => {
       }),
     );
     expect(record.legacyMrn).toBe('OLD-77');
+    // Older answers leave the alternate phone out; it reads as none.
+    expect(record.alternatePhone).toBeNull();
     expect(record.pendingChange?.changedFields).toEqual(['phone_e164', 'date_of_birth']);
     expect(record.pendingChange?.requestedByName).toBe('Vineeth Kumar');
     expect(record.pendingChange?.requestedByUserId).toBe('u-5');
@@ -126,6 +128,11 @@ describe('toPatientRequestBody', () => {
     expect(
       toPatientRequestBody({ city: null, legacyMrn: 'OLD-77', addressLine3: 'Near X' }),
     ).toEqual({ city: null, legacy_mrn: 'OLD-77', address_line3: 'Near X' });
+  });
+  it('sends the alternate phone as alternate_phone_e164', () => {
+    expect(toPatientRequestBody({ alternatePhone: '+919812345678' })).toEqual({
+      alternate_phone_e164: '+919812345678',
+    });
   });
 });
 
@@ -157,5 +164,38 @@ describe('possible duplicates (409 PATIENT_MATCH_REVIEW, B6 M-14)', () => {
     });
     expect(second?.fullName).toBe('Priya');
     expect(second?.createdAt).toBeNull();
+  });
+});
+
+describe('alternate phone on the record', () => {
+  it('is read from alternate_phone_e164', () => {
+    const record = toPatientRecord(
+      hospitalPatientResponseSchema.parse({
+        id: 'p-2',
+        mrn: 'LKSM000044',
+        legacy_mrn: null,
+        first_name: 'Ravi',
+        last_name: null,
+        full_name: 'Ravi',
+        phone_e164: '+919876543210',
+        alternate_phone_e164: '+919812345678',
+        email: null,
+        date_of_birth: '1985-09-09',
+        gender: 'male',
+        address_line1: null,
+        address_line2: null,
+        address_line3: null,
+        city: null,
+        state: null,
+        pincode: null,
+        source: 'online',
+        is_linked: true,
+        pending_request: null,
+        created_at: '2026-10-01T09:00:00Z',
+        version: 1,
+      }),
+    );
+    expect(record.alternatePhone).toBe('+919812345678');
+    expect(record.dateOfBirth).toBe('1985-09-09');
   });
 });

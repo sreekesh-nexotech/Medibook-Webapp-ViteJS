@@ -37,6 +37,7 @@ export function invalidateDeskViews(queryClient: QueryClient, appointmentId?: st
   if (appointmentId) {
     void queryClient.invalidateQueries({ queryKey: appointmentsKeys.detail(appointmentId) });
     void queryClient.invalidateQueries({ queryKey: appointmentsKeys.events(appointmentId) });
+    void queryClient.invalidateQueries({ queryKey: appointmentsKeys.refunds(appointmentId) });
   }
   void queryClient.invalidateQueries({ queryKey: tokenQueueKeys.all });
   void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });

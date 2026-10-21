@@ -1,4 +1,5 @@
 import type {
+  PaymentCountFilters,
   PaymentFilters,
   PaymentPageQuery,
   RefundListQuery,
@@ -10,6 +11,10 @@ export const paymentsKeys = {
   pages: () => [...paymentsKeys.all, 'page'] as const,
   page: (query: PaymentPageQuery) => [...paymentsKeys.pages(), query] as const,
   totals: (filters: PaymentFilters) => [...paymentsKeys.all, 'totals', filters] as const,
+  tabCounts: (
+    filters: PaymentCountFilters,
+    statusSets: Readonly<Record<string, readonly string[]>>,
+  ) => [...paymentsKeys.all, 'tab-counts', filters, statusSets] as const,
   detail: (paymentId: string) => [...paymentsKeys.all, 'detail', paymentId] as const,
   orderLines: (orderId: string) => [...paymentsKeys.all, 'order-lines', orderId] as const,
   refundPage: (query: RefundListQuery) => [...paymentsKeys.all, 'refund-page', query] as const,

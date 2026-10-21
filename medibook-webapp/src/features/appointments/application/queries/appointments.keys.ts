@@ -19,6 +19,7 @@ export const appointmentsKeys = {
   /** Every appointment history. */
   eventLists: () => [...appointmentsKeys.all, 'events'] as const,
   events: (id: string) => [...appointmentsKeys.eventLists(), id] as const,
+  refunds: (id: string) => [...appointmentsKeys.all, 'refunds', id] as const,
   receipt: (id: string) => [...appointmentsKeys.all, 'receipt', id] as const,
   tokenSlip: (id: string) => [...appointmentsKeys.all, 'token-slip', id] as const,
   quote: (input: QuoteInput) => [...appointmentsKeys.all, 'quote', input] as const,

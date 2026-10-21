@@ -187,6 +187,7 @@ const refundBriefSchema = z.object({
   amount_paise: z.number().int(),
   status: z.enum(['requested', 'processing', 'processed', 'failed', 'superseded']),
   method: z.string().nullable().optional(),
+  requested_at: z.string().nullable().optional(),
 });
 
 /** Cancel / reject answer `{appointment, refunds}`. */
@@ -361,6 +362,7 @@ export function toRefund(dto: z.infer<typeof refundBriefSchema>): DeskRefund {
     amountRupees: rupees(dto.amount_paise),
     status: dto.status,
     method: dto.method ?? null,
+    requestedAt: dto.requested_at ?? null,
   };
 }
 
