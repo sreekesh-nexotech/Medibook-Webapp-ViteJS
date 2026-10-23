@@ -7,22 +7,48 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// An optional directory argument lets the self-checks point at temp fixtures.
+const customRoot = process.argv[2];
+const root = customRoot
+  ? resolve(customRoot)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const problems = [];
 
-const ALLOWED_TOKEN = /^[a-z0-9_-]{1,32}$/;
-const ALLOWED_URL = /^(?:(?:https?|wss?):\/\/\S+|\/\S*)$/;
+/**
+ * Enum-like values a VITE_* setting may hold. Derived from .env.example, where
+ * the only non-URL, non-boolean setting is VITE_API_BASE_URL / VITE_WS_BASE_URL
+ * = `same-origin`. Add a value here only when a new setting really needs it;
+ * an open-ended token pattern would also accept keys like `sk_live_abc123`.
+ */
+const ALLOWED_ENUM_VALUES = new Set(['same-origin']);
+const ALLOWED_BOOLEANS = new Set(['true', 'false', '0', '1']);
+const ALLOWED_URL = /^(?:(?:https?|wss?):\/\/[^\s/?#]+[^\s]*|\/\S*)$/;
 
-/** Empty, a URL or relative path, `same-origin`, a boolean flag, or a short enum token. */
+/** True for a URL whose authority carries `user[:password]@`. */
+function hasUserinfo(value) {
+  return /^(?:https?|wss?):\/\/[^/?#\s]*@/.test(value);
+}
+
+/** Empty, a credential-free URL or relative path, `same-origin`, or a boolean flag. */
 function isAllowedValue(raw) {
   const value = raw.trim().replace(/^(['"])(.*)\1$/, '$2');
-  return value === '' || ALLOWED_URL.test(value) || ALLOWED_TOKEN.test(value);
+  if (value === '' || ALLOWED_ENUM_VALUES.has(value) || ALLOWED_BOOLEANS.has(value)) return true;
+  return ALLOWED_URL.test(value) && !hasUserinfo(value);
 }
 
 // 1. No tracked .env* file other than .env.example.
-const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
-  .split('\0')
-  .filter(Boolean);
+let tracked = [];
+try {
+  tracked = execFileSync('git', ['ls-files', '-z'], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', customRoot ? 'ignore' : 'inherit'],
+  })
+    .split('\0')
+    .filter(Boolean);
+} catch (error) {
+  if (!customRoot) throw error;
+}
 for (const file of tracked) {
   const name = basename(file);
   if (name.startsWith('.env') && name !== '.env.example') {
@@ -39,7 +65,7 @@ if (existsSync(examplePath)) {
       const match = /^\s*(VITE_[A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
       if (match && !isAllowedValue(match[2])) {
         problems.push(
-          `.env.example:${index + 1}: ${match[1]} has a value that is not a URL, boolean or short enum token.`,
+          `.env.example:${index + 1}: ${match[1]} has a value that is not an empty value, a credential-free URL, a boolean or a known enum value.`,
         );
       }
     });
@@ -62,6 +88,17 @@ if (existsSync(configPath)) {
     const reads = body.matchAll(
       /\b(?:process\.env|env)\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"]([^'"]+)['"]\s*\])/g,
     );
+    // A whole-environment reference ships every value: bare `process.env`, or
+    // `env` spread, used as a value, or passed to JSON.stringify / Object.*.
+    // Passing `env` to a local helper (e.g. buildCommit(env)) is allowed.
+    const wholeEnv =
+      /\bprocess\.env\b(?!\s*[.[])/.test(body) ||
+      /(?:\.\.\.\s*|:\s*|\b(?:JSON\.stringify|Object\.\w+)\(\s*)env\b(?!\s*[.[])/.test(body);
+    if (wholeEnv) {
+      problems.push(
+        'vite.config.ts define uses the whole environment object; read VITE_* keys one by one.',
+      );
+    }
     for (const read of reads) {
       const key = read[1] ?? read[2];
       if (!key.startsWith('VITE_')) {
