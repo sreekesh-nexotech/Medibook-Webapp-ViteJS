@@ -22,16 +22,27 @@ const problems = [];
  */
 const ALLOWED_ENUM_VALUES = new Set(['same-origin']);
 const ALLOWED_BOOLEANS = new Set(['true', 'false', '0', '1']);
-const ALLOWED_URL = /^(?:(?:https?|wss?):\/\/[^\s/?#]+[^\s]*|\/\S*)$/;
+// Absolute URLs, or a same-origin path such as `/api`. Paths are lowercase
+// segments only (no `_`, no uppercase) and may not start with `//`, so neither
+// `/sk_live_abc123` nor protocol-relative `//user:pass@host` is accepted.
+const ALLOWED_URL = /^(?:(?:https?|wss?):\/\/[^\s/?#]+[^\s]*|\/(?!\/)[a-z0-9\-./]*)$/;
 
 /** True for a URL whose authority carries `user[:password]@`. */
 function hasUserinfo(value) {
   return /^(?:https?|wss?):\/\/[^/?#\s]*@/.test(value);
 }
 
+/** dotenv semantics: a quoted value ends at its closing quote; otherwise ` # comment` is stripped. */
+function unquote(raw) {
+  const text = raw.trim();
+  const quoted = /^(['"`])(.*?)\1\s*(?:#.*)?$/.exec(text);
+  if (quoted) return quoted[2];
+  return text.replace(/(?:^|\s)#.*$/, '').trim();
+}
+
 /** Empty, a credential-free URL or relative path, `same-origin`, or a boolean flag. */
 function isAllowedValue(raw) {
-  const value = raw.trim().replace(/^(['"])(.*)\1$/, '$2');
+  const value = unquote(raw);
   if (value === '' || ALLOWED_ENUM_VALUES.has(value) || ALLOWED_BOOLEANS.has(value)) return true;
   return ALLOWED_URL.test(value) && !hasUserinfo(value);
 }
@@ -62,7 +73,7 @@ if (existsSync(examplePath)) {
   readFileSync(examplePath, 'utf8')
     .split(/\r?\n/)
     .forEach((line, index) => {
-      const match = /^\s*(VITE_[A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
+      const match = /^\s*(?:export\s+)?(VITE_[A-Za-z0-9_]*)\s*=(.*)$/.exec(line);
       if (match && !isAllowedValue(match[2])) {
         problems.push(
           `.env.example:${index + 1}: ${match[1]} has a value that is not an empty value, a credential-free URL, a boolean or a known enum value.`,

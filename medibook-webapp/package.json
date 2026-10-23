@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "check:env": "node scripts/check-env-hygiene.mjs",
+    "test:env-hygiene": "node --test scripts/check-env-hygiene.selftest.mjs",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "uat": "playwright test -c playwright.uat.config.ts"
