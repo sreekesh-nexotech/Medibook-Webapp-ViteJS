@@ -41,6 +41,8 @@ jobs:
         run: npm run format:check
       - name: Unit and API contract tests
         run: npm test
+      - name: Env hygiene
+        run: npm run check:env
       - name: Build
         run: npm run build
         # A release build must name its backend origins (DEP-10); CI checks the
