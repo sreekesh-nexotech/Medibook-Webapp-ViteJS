@@ -33,6 +33,8 @@ jobs:
           cache: npm
           cache-dependency-path: medibook-webapp/package-lock.json
       - run: npm ci
+      - name: Env hygiene
+        run: npm run check:env
       - name: Lint
         run: npm run lint
       - name: Typecheck
