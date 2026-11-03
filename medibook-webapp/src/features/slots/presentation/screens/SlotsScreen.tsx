@@ -38,6 +38,7 @@ import { describeFailure } from '@/shared/lib/serverErrors';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
+import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { ClearChip } from '@/shared/ui/ClearChip';
 import { EmptyState } from '@/shared/ui/EmptyState';
 import { ErrorState } from '@/shared/ui/ErrorState';
@@ -137,6 +138,10 @@ export function SlotsScreen() {
   const dayHours = hoursQuery.data?.find((d) => d.weekday === isoWeekdayIndex(date));
   const hospitalClosed = dayHours?.isClosed === true;
   const hoursCopy = hoursLabel(dayHours?.opensAt ?? null, dayHours?.closesAt ?? null);
+  const [slotToBlock, setSlotToBlock] = useState<{
+    readonly row: SlotRowView;
+    readonly slot: SlotCellView;
+  } | null>(null);
   const onlineBookingOff = profileQuery.data?.onlineBookingEnabled === false;
   const hasFilters = deptF !== ALL_DEPTS || doctorF !== ALL_DOCTORS || date !== today;
   const clearFilters = (): void => {
@@ -149,7 +154,14 @@ export function SlotsScreen() {
   };
 
   const toggleSlot = (row: SlotRowView, slot: SlotCellView): void => {
-    const action = slot.state === 'blocked' ? 'open' : 'block';
+    if (slot.state !== 'blocked') {
+      setSlotToBlock({ row, slot });
+      return;
+    }
+    runToggle(row, slot, 'open');
+  };
+
+  const runToggle = (row: SlotRowView, slot: SlotCellView, action: 'open' | 'block'): void => {
     toggle.mutate(
       { slotId: slot.id, action },
       {
@@ -435,6 +447,22 @@ export function SlotsScreen() {
         doctorName={doctorId ? doctorF : null}
         doctorNames={doctorNames}
         timeZone={timeZone}
+      />
+      <ConfirmModal
+        open={slotToBlock !== null}
+        title="Block this slot?"
+        body={
+          slotToBlock
+            ? `${slotToBlock.row.doctorName} · ${slotToBlock.slot.label} stops taking bookings immediately.`
+            : ''
+        }
+        confirmLabel="Block slot"
+        danger
+        onClose={() => setSlotToBlock(null)}
+        onConfirm={() => {
+          if (slotToBlock) runToggle(slotToBlock.row, slotToBlock.slot, 'block');
+          setSlotToBlock(null);
+        }}
       />
     </div>
   );

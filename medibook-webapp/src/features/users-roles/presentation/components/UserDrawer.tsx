@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { useNow } from '@/shared/hooks/useNow';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { Drawer } from '@/shared/ui/Drawer';
@@ -68,6 +69,7 @@ export function UserDrawer({
   const unlock = useUnlockStaffMutation();
   const resend = useResendInvitationMutation();
   const revoke = useRevokeInvitationMutation();
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   const role = roles.find((r) => r.id === user.roleId);
   const active = user.status === 'Active';
@@ -156,7 +158,7 @@ export function UserDrawer({
                 variant="ghost"
                 icon="user-x"
                 style={{ color: 'var(--color-d-600)' }}
-                onClick={handleRevoke}
+                onClick={() => setConfirmRevoke(true)}
                 busy={revoke.isPending}
               >
                 Revoke Invite
@@ -300,6 +302,18 @@ export function UserDrawer({
               ? 'This is your own account. Another administrator changes your role or deactivates you; you can still edit your employee code, designation, counter and department.'
               : 'Edit Details changes their role, employee code, designation, counter and department. Name, email and phone belong to their own account.'}
       </div>
+      <ConfirmModal
+        open={confirmRevoke}
+        title="Revoke this invitation?"
+        body={`The link sent to ${user.email} stops working immediately. You can send a new invitation later.`}
+        confirmLabel="Revoke invite"
+        danger
+        onClose={() => setConfirmRevoke(false)}
+        onConfirm={() => {
+          setConfirmRevoke(false);
+          handleRevoke();
+        }}
+      />
     </Drawer>
   );
 }

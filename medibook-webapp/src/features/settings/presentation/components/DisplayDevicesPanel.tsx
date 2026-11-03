@@ -36,7 +36,8 @@ function lastSeen(iso: string | null): string {
 
 type Pending =
   | { readonly kind: 'rotate'; readonly device: DisplayDevice }
-  | { readonly kind: 'delete'; readonly device: DisplayDevice };
+  | { readonly kind: 'delete'; readonly device: DisplayDevice }
+  | { readonly kind: 'toggle'; readonly device: DisplayDevice };
 
 interface DisplayDevicesPanelProps {
   access: DisplayDeviceAccess;
@@ -57,6 +58,10 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
   const [pending, setPending] = useState<Pending | null>(null);
 
   const toggleActive = (d: DisplayDevice): void => {
+    setPending({ kind: 'toggle', device: d });
+  };
+
+  const confirmToggleActive = (d: DisplayDevice): void => {
     update.mutate(
       { id: d.id, changes: { isActive: !d.isActive }, version: d.version },
       {
@@ -75,6 +80,10 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
     if (!pending) return;
     const { kind, device } = pending;
     setPending(null);
+    if (kind === 'toggle') {
+      confirmToggleActive(device);
+      return;
+    }
     if (kind === 'rotate') {
       rotate.mutate(device.id, {
         onSuccess: (out) => setIssued({ name: out.device.name, key: out.deviceKey }),
@@ -190,13 +199,31 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
       <ConfirmModal
         open={pending !== null}
         danger
-        title={pending?.kind === 'rotate' ? 'Rotate this screen’s key?' : 'Remove this screen?'}
-        confirmLabel={pending?.kind === 'rotate' ? 'Rotate key' : 'Remove'}
+        title={
+          pending?.kind === 'rotate'
+            ? 'Rotate this screen’s key?'
+            : pending?.kind === 'delete'
+              ? 'Remove this screen?'
+              : `${pending?.device.isActive ? 'Deactivate' : 'Reactivate'} this screen?`
+        }
+        confirmLabel={
+          pending?.kind === 'rotate'
+            ? 'Rotate key'
+            : pending?.kind === 'delete'
+              ? 'Remove'
+              : pending?.device.isActive
+                ? 'Deactivate'
+                : 'Reactivate'
+        }
         body={
           pending
             ? pending.kind === 'rotate'
               ? `${pending.device.name} is signed out at once and needs the new key to show the queue again.`
-              : `${pending.device.name} is signed out and removed. Register it again to use it.`
+              : pending.kind === 'delete'
+                ? `${pending.device.name} is signed out and removed. Register it again to use it.`
+                : pending.device.isActive
+                  ? `${pending.device.name} is signed out and stops showing the queue until it is reactivated.`
+                  : `${pending.device.name} can show the queue again once it signs in.`
             : ''
         }
         onClose={() => setPending(null)}
