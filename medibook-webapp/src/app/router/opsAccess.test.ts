@@ -91,6 +91,11 @@ describe('ops access to the screens added for UAT report §8', () => {
     expect(canOpenOpsView('reviews', opsPermissionChecks(['notifications.view']))).toBe(false);
   });
 
+  it('lets support open Notifications while banner content stays behind settings.view', () => {
+    expect(canOpenOpsView('notifications', opsPermissionChecks(SUPPORT))).toBe(true);
+    expect(canOpenOpsView('notifications', opsPermissionChecks(['notifications.view']))).toBe(false);
+  });
+
   it('keeps message templates and onboarding documents behind settings.view', () => {
     for (const view of ['message-templates', 'onboarding-documents'] as const) {
       expect(canOpenOpsView(view, opsPermissionChecks(['settings.view']))).toBe(true);

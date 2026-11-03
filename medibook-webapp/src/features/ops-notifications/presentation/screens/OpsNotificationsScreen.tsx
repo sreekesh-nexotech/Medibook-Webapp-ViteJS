@@ -17,6 +17,8 @@ import { SegTabs } from '@/shared/ui/SegTabs';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import { useOpsPermission } from '@/shared/hooks/useOpsPermission';
+
 import { useBannerPermissions } from '@/features/ops-notifications/application/queries/useBannerPermissions';
 import { useBannersQuery } from '@/features/ops-notifications/application/queries/useBannersQuery';
 import { useDeleteBannerMutation } from '@/features/ops-notifications/application/queries/useDeleteBannerMutation';
@@ -65,7 +67,9 @@ type EditState = EditNew | EditBanner | null;
  * data that is not real.
  */
 export function OpsNotificationsScreen() {
-  const bannersQuery = useBannersQuery();
+  const { can } = useOpsPermission();
+  const canBanners = can('settings.view');
+  const bannersQuery = useBannersQuery(canBanners);
   const banners = bannersQuery.data ?? EMPTY_BANNERS;
   const saveMutation = useSaveBannerMutation();
   const deleteMutation = useDeleteBannerMutation();
@@ -140,6 +144,18 @@ export function OpsNotificationsScreen() {
 
   /** The banner the editor is opened on — also its remount key (no sync effect). */
   const editKey = editBanner ? `banner-${editBanner.id}` : edit ? 'new' : 'closed';
+
+  if (!canBanners) {
+    return (
+      <Card>
+        <EmptyState
+          icon="lock"
+          title="App banners need Platform Settings view"
+          message="Your role can open Notifications but cannot read or edit app banners. Review Moderation is available with your notifications permission."
+        />
+      </Card>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

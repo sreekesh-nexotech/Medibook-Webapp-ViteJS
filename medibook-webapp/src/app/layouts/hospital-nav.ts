@@ -105,6 +105,12 @@ export const NAV_PERMISSION_MODULE: Readonly<Partial<Record<HospitalNavView, Rba
   audit: 'Hospital Settings',
 };
 
+/** The effective permission a nav row needs, shown as its tooltip (B08). */
+export function navPermissionHint(view: HospitalNavView): string | null {
+  const module = NAV_PERMISSION_MODULE[view];
+  return module ? `Needs ${module} · View` : null;
+}
+
 /** Detail/child views highlight their parent nav item (design `NAV_PARENT`). */
 export const NAV_PARENT: Readonly<Partial<Record<HospitalView, HospitalNavView>>> = {
   create: 'appointments',

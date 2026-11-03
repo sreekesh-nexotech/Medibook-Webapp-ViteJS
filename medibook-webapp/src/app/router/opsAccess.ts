@@ -25,7 +25,9 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   users: 'staff.view',
   'platform-users': 'platform_users.view',
   'platform-user-detail': 'platform_users.view',
-  notifications: 'settings.view',
+  // Banners themselves still need settings.view; notifications.edit lets Support
+  // open the screen and be pointed at Review Moderation instead of a 403.
+  notifications: 'notifications.edit',
   settings: 'settings.view',
   content: 'settings.view',
   reviews: 'notifications.edit',

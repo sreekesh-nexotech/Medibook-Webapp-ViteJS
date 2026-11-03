@@ -3,7 +3,7 @@ import { Icon } from '@/shared/ui/Icon';
 
 import type { HospitalView } from '@/app/router/paths';
 
-import type { HospitalNavEntry, HospitalNavView } from './hospital-nav';
+import { navPermissionHint, type HospitalNavEntry, type HospitalNavView } from './hospital-nav';
 
 interface HospitalNavItemProps {
   item: HospitalNavEntry;
@@ -15,11 +15,13 @@ interface HospitalNavItemProps {
 /** One sidebar nav row (design `NavItem` in `Sidebar.jsx`). */
 export function HospitalNavItem({ item, active, onClick, collapsed }: HospitalNavItemProps) {
   const isActive = active === item.id;
+  const hint = navPermissionHint(item.id);
+  const title = hint ?? item.label;
   return (
     <button
       type="button"
       onClick={() => onClick(item.id)}
-      title={collapsed ? item.label : undefined}
+      title={title}
       aria-label={collapsed ? item.label : undefined}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
