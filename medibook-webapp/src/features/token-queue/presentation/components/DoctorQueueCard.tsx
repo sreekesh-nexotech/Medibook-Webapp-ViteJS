@@ -132,7 +132,7 @@ export function DoctorQueueCard({
   onShowCalls,
   onStale,
 }: DoctorQueueCardProps) {
-  const canRunQueue = useCan('Token Management.edit');
+  const canRunQueue = useCan('Token Management.edit', { readOnlyExempt: true });
   const sessionCommand = useSessionCommandMutation();
   const tokenCommand = useTokenCommandMutation();
   const skip = useSkipTokenMutation();
@@ -365,6 +365,7 @@ export function DoctorQueueCard({
 
       <Can
         perm="Token Management.edit"
+        readOnlyExempt
         disableInstead
         disabledTitle="Your role cannot run the queue"
       >

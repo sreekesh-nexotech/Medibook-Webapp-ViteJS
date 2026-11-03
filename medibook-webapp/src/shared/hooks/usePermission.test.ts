@@ -76,6 +76,19 @@ describe('write blocks (UAT-38)', () => {
     expect(checks.canViewModule('Appointments')).toBe(true);
   });
 
+  it('lets visit-day fulfilment opt in while read-only, but not settings or new bookings (UAT-4)', () => {
+    const checks = permissionChecks(
+      [...RECEPTIONIST, 'appointments.del'],
+      'read_only',
+    );
+    expect(checks.can('Appointments.edit')).toBe(false);
+    expect(checks.can('Appointments.edit', { readOnlyExempt: true })).toBe(true);
+    expect(checks.can('Appointments.del', { readOnlyExempt: true })).toBe(true);
+    expect(checks.can('Token Management.edit', { readOnlyExempt: true })).toBe(true);
+    expect(checks.can('Appointments.add', { readOnlyExempt: true })).toBe(false);
+    expect(checks.can('Payments.add', { readOnlyExempt: true })).toBe(false);
+  });
+
   it('derives the block from the hospital state', () => {
     expect(hospitalWriteBlock({ status: 'active', readOnly: false })).toBeNull();
     expect(hospitalWriteBlock({ status: 'active', readOnly: true })).toBe('read_only');

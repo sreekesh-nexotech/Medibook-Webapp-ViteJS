@@ -173,7 +173,7 @@ function errorCopy(error: unknown): string | undefined {
  */
 export function PaymentsScreen() {
   const { role } = useParams();
-  const canRefund = useCan('Payments.del');
+  const canRefund = useCan('Payments.del', { readOnlyExempt: true });
   const cashAccess = useCashDeskAccess();
 
   const [tab, setTab] = useState<PayTab>('All');

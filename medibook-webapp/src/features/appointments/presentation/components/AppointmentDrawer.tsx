@@ -477,7 +477,7 @@ function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
                 Approve
               </Button>
             </Can>
-            <Can perm="Appointments.edit">
+            <Can perm="Appointments.edit" readOnlyExempt>
               <Button variant="ghost" className="text-d-600!" onClick={() => setReason('reject')}>
                 Reject
               </Button>
@@ -495,7 +495,7 @@ function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
           </span>
         )}
         {canCheckIn(appt, today) && (
-          <Can perm="Appointments.edit">
+          <Can perm="Appointments.edit" readOnlyExempt>
             <Button icon="log-in" busy={checkIn.isPending} onClick={doCheckIn}>
               Check in
             </Button>
@@ -521,21 +521,21 @@ function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
           </Can>
         )}
         {canMarkNoShow(appt, today, now) && (
-          <Can perm="Token Management.edit">
+          <Can perm="Token Management.edit" readOnlyExempt>
             <Button variant="ghost" onClick={() => setConfirmNoShow(true)}>
               No-show
             </Button>
           </Can>
         )}
         {moneyBack === 'refund' && !refundBlocked && (
-          <Can perm="Payments.del">
+          <Can perm="Payments.del" readOnlyExempt>
             <Button variant="ghost" icon="undo-2" onClick={() => setReason('refund')}>
               Refund
             </Button>
           </Can>
         )}
         {!awaiting && canCancel(appt) && isAdmin && (
-          <Can perm="Appointments.del">
+          <Can perm="Appointments.del" readOnlyExempt>
             <Button variant="ghost" className="text-d-600!" onClick={() => setReason('cancel')}>
               {moneyBack === 'cancel-refund' ? 'Cancel & refund' : 'Cancel'}
             </Button>

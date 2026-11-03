@@ -104,11 +104,19 @@ function parseKey(key: PermissionKey): { module: RbacModule; action: PermAction 
  */
 export type HospitalWriteBlock = 'read_only' | 'suspended' | null;
 
+export interface UsePermissionOptions {
+  /**
+   * Visit-day fulfilment keeps working while a hospital is read-only (UAT-4).
+   * Only the backend's `read_only_exempt` actions may opt in.
+   */
+  readonly readOnlyExempt?: boolean;
+}
+
 export interface UsePermissionResult {
   /** Set when the hospital refuses every write (see `HospitalWriteBlock`). */
   writeBlock: HospitalWriteBlock;
   /** True when the current role has this permission. */
-  can: (perm: PermissionKey) => boolean;
+  can: (perm: PermissionKey, options?: UsePermissionOptions) => boolean;
   /** True when the role has at least one of these. */
   canAny: (...perms: readonly PermissionKey[]) => boolean;
   /** True when the role has all of these. */
@@ -124,6 +132,18 @@ export interface UsePermissionResult {
 
 /** The checks `usePermission` answers with, before the role's name is attached. */
 export type PermissionChecks = Omit<UsePermissionResult, 'roleId' | 'roleName'>;
+
+/**
+ * The write actions the backend still accepts while a hospital is read-only
+ * (`read_only_exempt` views): visit-day check-in, reject, cancel, no-show,
+ * queue commands and refunds.
+ */
+const READ_ONLY_EXEMPT_PERMISSIONS: ReadonlySet<PermissionKey> = new Set([
+  'Appointments.edit',
+  'Appointments.del',
+  'Token Management.edit',
+  'Payments.del',
+]);
 
 /** The write block for a hospital's status and subscription state. */
 export function hospitalWriteBlock(hospital: {
@@ -146,18 +166,21 @@ export function permissionChecks(
   writeBlock: HospitalWriteBlock = null,
 ): PermissionChecks {
   const perms = codes ? toGrid(codes) : null;
-  const can = (perm: PermissionKey): boolean => {
+  const can = (perm: PermissionKey, options?: UsePermissionOptions): boolean => {
     if (!perms) return true;
     const parsed = parseKey(perm);
     if (!parsed) return false;
-    if (writeBlock !== null && parsed.action !== 'view') return false;
+    if (writeBlock !== null && parsed.action !== 'view') {
+      const exempt = options?.readOnlyExempt === true && READ_ONLY_EXEMPT_PERMISSIONS.has(perm);
+      if (!exempt) return false;
+    }
     return perms[parsed.module][parsed.action];
   };
   return {
     writeBlock: perms ? writeBlock : null,
     can,
-    canAny: (...list) => list.length === 0 || list.some(can),
-    canAll: (...list) => list.every(can),
+    canAny: (...list) => list.length === 0 || list.some((key) => can(key)),
+    canAll: (...list) => list.every((key) => can(key)),
     canViewModule: (module) => (perms ? perms[module].view : true),
     perms,
   };
@@ -184,6 +207,6 @@ export function usePermission(): UsePermissionResult {
 }
 
 /** One-liner for a single check: `const mayRefund = useCan('Payments.del');` */
-export function useCan(perm: PermissionKey): boolean {
-  return usePermission().can(perm);
+export function useCan(perm: PermissionKey, options?: UsePermissionOptions): boolean {
+  return usePermission().can(perm, options);
 }
