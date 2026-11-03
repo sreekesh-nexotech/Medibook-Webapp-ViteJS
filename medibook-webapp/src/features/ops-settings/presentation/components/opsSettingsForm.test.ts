@@ -11,7 +11,7 @@ import {
   toSettingsForm,
   toSettingsValues,
   validateSettingsForm,
-} from '@/features/ops-settings/presentation/components/opsSettingsForm';
+} from '@/features/ops-settings/presentation/components/opsSettingsFormModel';
 import { taxRateInUseMessage } from '@/features/ops-settings/presentation/components/opsSettingsFormat';
 
 const DTO = {

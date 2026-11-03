@@ -46,6 +46,7 @@ import { useBannersQuery } from '@/features/settings/application/queries/useBann
 import { useCreateBannerMutation } from '@/features/settings/application/queries/useCreateBannerMutation';
 import { useDeleteBannerMutation } from '@/features/settings/application/queries/useDeleteBannerMutation';
 import { useHolidaysQuery } from '@/features/settings/application/queries/useHolidaysQuery';
+import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 import { useRemoveHolidayMutation } from '@/features/settings/application/queries/useRemoveHolidayMutation';
 import { useReorderBannersMutation } from '@/features/settings/application/queries/useReorderBannersMutation';
 import { useSaveHolidayMutation } from '@/features/settings/application/queries/useSaveHolidayMutation';
@@ -140,6 +141,10 @@ export function HospitalProfileScreen() {
   const mayAdd = can('Hospital Settings.add');
 
   const holidaysQuery = useHolidaysQuery(canView);
+  const profileQuery = useHospitalProfileQuery();
+  const profile = profileQuery.data;
+  const listed = profile?.appVisibility === null ? null : profile?.appVisibility === 'visible';
+
   const bannersQuery = useBannersQuery(canView);
   const departmentsQuery = useDepartmentsQuery();
   const doctorsQuery = useDoctorsQuery();
@@ -366,6 +371,38 @@ export function HospitalProfileScreen() {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* How patients see the hospital — set by Medibook operations, read-only here (PR-019). */}
+      <Card pad={16} className="flex flex-wrap items-center gap-3.5" data-testid="app-visibility-card">
+        <div className="bg-p-100 text-p-500 flex size-11 flex-none items-center justify-center rounded-lg">
+          <Icon name="smartphone" size={22} />
+        </div>
+        <div className="min-w-60 flex-1">
+          <div className="text-body text-text-strong font-medium">Your hospital, as patients see it</div>
+          <div className="text-caption text-text-muted">
+            Listing and online booking are switched by Medibook operations. If either is off and
+            should not be, raise a ticket under Help &amp; Support.
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {profile ? (
+            <>
+              {listed !== null && (
+                <Badge status={listed ? 'Active' : 'Suspended'}>
+                  {listed ? 'Listed in the patient app' : 'Hidden from the patient app'}
+                </Badge>
+              )}
+              <Badge status={profile.onlineBookingEnabled ? 'Active' : 'Suspended'}>
+                {profile.onlineBookingEnabled ? 'Online booking on' : 'Online booking off'}
+              </Badge>
+            </>
+          ) : (
+            <span className="text-caption text-text-muted">
+              {profileQuery.isError ? 'Could not load' : 'Loading…'}
+            </span>
+          )}
+        </div>
+      </Card>
+
       <Card pad={16} className="flex flex-wrap items-center gap-3.5">
         <div className="bg-blue-soft-bg text-blue flex size-11 flex-none items-center justify-center rounded-lg">
           <Icon name="building-2" size={22} />

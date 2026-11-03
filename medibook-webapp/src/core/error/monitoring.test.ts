@@ -6,7 +6,11 @@ import type { Failure } from '@/core/error/failure';
 
 const MONITOR = 'https://monitor.example.test/collect';
 
-vi.mock('@/core/config/env', () => ({ MONITORING_URL: 'https://monitor.example.test/collect' }));
+vi.mock('@/core/config/env', () => ({
+  MONITORING_URL: 'https://monitor.example.test/collect',
+  SENTRY_DSN: '',
+  SENTRY_ENVIRONMENT: 'test',
+}));
 
 /** A fresh copy of the module, so the per-page cap and memory start empty. */
 async function monitoring() {

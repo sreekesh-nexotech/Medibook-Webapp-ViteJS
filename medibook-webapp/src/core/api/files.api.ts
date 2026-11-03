@@ -1,7 +1,13 @@
 import axios from 'axios';
 
 import { ifMatch } from '@/core/api/headers';
-import { assertFileStoreReady, isFileStoreUrl } from '@/core/api/fileUrls';
+import {
+  FILE_STORE_NOT_READY_CODE,
+  FILE_STORE_NOT_READY_UPLOAD_MESSAGE,
+  assertFileStoreReady,
+  isFileStoreUrl,
+  isPlaceholderFileUrl,
+} from '@/core/api/fileUrls';
 import { sharedApi } from '@/core/api/http';
 import { activeSurface } from '@/core/api/surface';
 import { FILE_UPLOAD_MAX_BYTES, FILE_UPLOAD_RULES, normaliseMime } from '@/core/api/files.rules';
@@ -28,7 +34,7 @@ import { clientFailure } from '@/core/error/toFailure';
  * The presigned PUT must *start* within 2 minutes (B6, M-38); the transfer
  * itself may take longer on a slow line, so allow it 5.
  */
-const STORAGE_PUT_TIMEOUT_MS = 5 * 60_000;
+const STORAGE_PUT_TIMEOUT_MS = 90_000;
 
 const BYTES_PER_MB = 1024 * 1024;
 
@@ -104,6 +110,12 @@ export async function uploadFile(input: FileUploadInput): Promise<Result<StoredF
       ...(input.hospitalId ? { hospital_id: input.hospitalId } : {}),
     });
     const ticket = uploadTicketResponseSchema.parse(created.data);
+    // A placeholder store (`storage.fake.local`) never answers; `.local` hosts
+    // also stall the browser on mDNS, which is why the tile used to show
+    // "Uploading…" for good (PR-006). Say so at once instead.
+    if (isPlaceholderFileUrl(ticket.upload_url)) {
+      throw clientFailure('unavailable', FILE_STORE_NOT_READY_UPLOAD_MESSAGE, FILE_STORE_NOT_READY_CODE);
+    }
     if (!isFileStoreUrl(ticket.upload_url)) {
       throw clientFailure(
         'forbidden',

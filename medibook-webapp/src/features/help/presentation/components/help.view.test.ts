@@ -17,17 +17,16 @@ import {
   topicsOf,
 } from '@/features/help/presentation/components/help.view';
 
-const FALLBACK = 'support@medibook.in';
-
 describe('support contacts (UAT-51)', () => {
-  it('shows one email and no invented phone when the platform set none', () => {
-    const contacts = supportContacts(null, null, FALLBACK);
-    expect(contacts).toHaveLength(1);
-    expect(contacts[0]).toMatchObject({ detail: FALLBACK, href: `mailto:${FALLBACK}` });
+  it('invents neither an email nor a phone when the platform set none (PR-018)', () => {
+    expect(supportContacts(null, null)).toHaveLength(0);
+    expect(supportContacts(null, 'help@medibook.in').map((c) => c.title)).toEqual([
+      'Email Support',
+    ]);
   });
 
   it('uses the platform phone and email from app-config, dialling the same number it shows', () => {
-    const contacts = supportContacts('+919876543210', 'help@medibook.in', FALLBACK);
+    const contacts = supportContacts('+919876543210', 'help@medibook.in');
     expect(contacts.map((c) => c.href)).toEqual(['mailto:help@medibook.in', 'tel:+919876543210']);
     expect(contacts[1].detail).toBe('+91 98765 43210');
   });

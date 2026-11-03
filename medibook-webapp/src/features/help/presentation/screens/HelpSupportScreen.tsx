@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-import { SUPPORT_EMAIL_FALLBACK } from '@/core/config/support';
 import { useAppConfigQuery } from '@/shared/hooks/useAppConfigQuery';
 import { useHospitalTimeZone } from '@/shared/hooks/useHospitalTime';
 import { cn } from '@/shared/lib/cn';
@@ -50,7 +49,6 @@ export function HelpSupportScreen() {
   const contacts = supportContacts(
     appConfig.data?.supportPhoneE164 ?? null,
     appConfig.data?.supportEmail ?? null,
-    SUPPORT_EMAIL_FALLBACK,
   );
 
   const faqsQuery = useHelpFaqsQuery();

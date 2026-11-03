@@ -25,7 +25,7 @@ import {
   type SettingsForm,
   type SettingsFormErrors,
   type SettingsFormKey,
-} from '@/features/ops-settings/presentation/components/opsSettingsForm';
+} from '@/features/ops-settings/presentation/components/opsSettingsFormModel';
 import { SettingsBillingCard } from '@/features/ops-settings/presentation/components/SettingsBillingCard';
 import { SettingsOrganisationCard } from '@/features/ops-settings/presentation/components/SettingsOrganisationCard';
 import { SettingsPatientAppCard } from '@/features/ops-settings/presentation/components/SettingsPatientAppCard';

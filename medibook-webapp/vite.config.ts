@@ -53,6 +53,8 @@ function contentSecurityPolicy(env: Record<string, string>): string {
   const ws = originOf(env.VITE_WS_BASE_URL);
   const storage = originOf(env.VITE_STORAGE_ORIGIN);
   const monitoring = originOf(env.VITE_MONITORING_URL);
+  // The DSN's origin (its key is dropped) is where the Sentry SDK posts.
+  const sentry = originOf(env.VITE_SENTRY_DSN);
   const sources = (...extra: (string | null)[]) =>
     ["'self'", ...extra.filter((value): value is string => value !== null)].join(' ');
   return [
@@ -61,7 +63,7 @@ function contentSecurityPolicy(env: Record<string, string>): string {
     `style-src 'self'`,
     `img-src ${sources('data:', 'blob:', storage)}`,
     `font-src 'self'`,
-    `connect-src ${sources(api, ws, storage, monitoring)}`,
+    `connect-src ${sources(api, ws, storage, monitoring, sentry)}`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
@@ -76,11 +78,12 @@ function contentSecurityPolicy(env: Record<string, string>): string {
  * the values are fixed into the bundle at build time.
  */
 function releaseOriginProblems(env: Record<string, string>): string[] {
-  const monitoring = (env.VITE_MONITORING_URL ?? '').trim();
-  const monitoringProblems =
-    monitoring && !monitoring.startsWith('https://')
-      ? [`VITE_MONITORING_URL must start with https:// (it is ${monitoring}).`]
+  const monitoringProblems = ['VITE_MONITORING_URL', 'VITE_SENTRY_DSN'].flatMap((key) => {
+    const value = (env[key] ?? '').trim();
+    return value && !value.startsWith('https://')
+      ? [`${key} must start with https:// (it is ${value}).`]
       : [];
+  });
   return RELEASE_ORIGINS.flatMap(([key, scheme]) => {
     const value = (env[key] ?? '').trim();
     if (value === SAME_ORIGIN) return [];
@@ -178,8 +181,17 @@ export default defineConfig(({ mode }) => {
       // writes them without linking them from the bundles; upload them to the
       // monitor and leave them off the web server (docs/MONITORING.md).
       sourcemap: process.env.BUILD_SOURCEMAPS === 'hidden' ? 'hidden' : false,
+      // The Sentry SDK gets a chunk of its own (listed first, so it wins the
+      // match) to keep the vendor chunk under the 500 kB warning.
       rolldownOptions: {
-        output: { codeSplitting: { groups: [{ name: 'vendor', test: /node_modules/ }] } },
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'sentry', test: /node_modules[\\/]@sentry/ },
+              { name: 'vendor', test: /node_modules/ },
+            ],
+          },
+        },
       },
     },
     // Dev only: the page and the API share one origin, so the backend's

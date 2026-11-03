@@ -75,7 +75,7 @@ export function OpsSupportTicketScreen() {
         onRetry={notFound ? undefined : () => void ticket.refetch()}
       >
         <Button variant="secondary" onClick={() => navigate(opsPath('support'))}>
-          Back to Support Tickets
+          Back to Support Desk
         </Button>
       </ErrorState>
     );

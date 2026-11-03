@@ -5,7 +5,7 @@ import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 
-import type { SettingsSectionProps } from '@/features/ops-settings/presentation/components/opsSettingsForm';
+import type { SettingsSectionProps } from '@/features/ops-settings/presentation/components/opsSettingsFormModel';
 
 const UNAVAILABLE = 'Not available yet';
 const UNAVAILABLE_HINT = 'Not available yet — the platform API does not store this setting.';

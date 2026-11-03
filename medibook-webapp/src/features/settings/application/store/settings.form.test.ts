@@ -27,6 +27,7 @@ const profile: HospitalProfile = {
   legalName: null,
   email: 'desk@citycare.in',
   phoneE164: '+918045678900',
+  appVisibility: 'visible',
   website: null,
   addressLine1: '12 MG Road',
   addressLine2: null,

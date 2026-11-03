@@ -311,10 +311,13 @@ export function paiseToRupeeInput(paise: number): string {
 
 /**
  * Keep what a person types into a rupee field to digits, one dot and two
- * decimals; anything else (₹, letters, a third decimal) is dropped.
+ * decimals. Text that is not an amount at all (a minus sign, letters, ₹) is
+ * left as typed so `feeError` refuses it with a message — dropping those
+ * characters silently turned "-1" into a saved ₹1 fee (PR-010).
  */
 export function sanitizeRupeeInput(text: string): string {
-  const cleaned = text.replace(/[^0-9.]/g, '');
+  const cleaned = text.replace(/[₹,\s]/g, '');
+  if (/[^0-9.]/.test(cleaned)) return cleaned;
   const [whole = '', ...fraction] = cleaned.split('.');
   const next = fraction.length === 0 ? whole : `${whole}.${fraction.join('').slice(0, 2)}`;
   return RUPEE_TYPING_PATTERN.test(next) ? next : whole;

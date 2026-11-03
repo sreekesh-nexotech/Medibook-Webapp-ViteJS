@@ -4,7 +4,7 @@ import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { TextInput } from '@/shared/ui/TextInput';
 import { Toggle } from '@/shared/ui/Toggle';
 
-import type { SettingsSectionProps } from '@/features/ops-settings/presentation/components/opsSettingsForm';
+import type { SettingsSectionProps } from '@/features/ops-settings/presentation/components/opsSettingsFormModel';
 
 const INPUT_HEIGHT = 48;
 

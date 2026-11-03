@@ -29,7 +29,11 @@ describe('doctor fee input keeps paise (UAT-08)', () => {
   it('keeps typing to digits, one dot and two decimals', () => {
     expect(sanitizeRupeeInput('₹ 499.505')).toBe('499.50');
     expect(sanitizeRupeeInput('4.9.9')).toBe('4.99');
-    expect(sanitizeRupeeInput('abc')).toBe('');
+    // Not an amount: kept as typed so the validator can say so (PR-010).
+    expect(sanitizeRupeeInput('abc')).toBe('abc');
+    expect(sanitizeRupeeInput('-1')).toBe('-1');
+    expect(feeError('-1', 'Fee')).toMatch(/amount/);
+    expect(feeError('abc', 'Fee')).toMatch(/amount/);
   });
 
   it('accepts a free (₹0) consultation and rejects junk (06·Profile F4)', () => {

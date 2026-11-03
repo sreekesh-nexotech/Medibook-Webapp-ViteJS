@@ -179,12 +179,13 @@ export function formatSupportPhone(e164: string): string {
 export function supportContacts(
   phoneE164: string | null,
   email: string | null,
-  fallbackEmail: string,
 ): readonly SupportContact[] {
-  const address = email ?? fallbackEmail;
-  const contacts: SupportContact[] = [
-    { icon: 'mail', title: 'Email Support', detail: address, href: `mailto:${address}` },
-  ];
+  // Only what Platform Settings actually holds: an address the platform never
+  // configured must not be shown as if it were staffed (PR-018).
+  const contacts: SupportContact[] = [];
+  if (email) {
+    contacts.push({ icon: 'mail', title: 'Email Support', detail: email, href: `mailto:${email}` });
+  }
   if (phoneE164) {
     contacts.push({
       icon: 'phone',

@@ -244,7 +244,9 @@ export function PaymentsScreen() {
   const todayApptsQuery = useAppointmentsQuery(today);
   const totalsQuery = usePaymentTotalsQuery({
     ...today,
-    statuses: ['captured'],
+    // Gross collections: lines refunded in full stay in (the Dashboard subtracts
+    // processed refunds from the same gross, PR-008).
+    statuses: ['captured', 'refunded'],
     method: null,
     channel: null,
     doctorId: null,
@@ -314,8 +316,10 @@ export function PaymentsScreen() {
       icon: 'indian-rupee',
       label: 'Collected at Desk',
       value: totalsQuery.data ? money(totals.deskTotal) : '—',
-      // Lines refunded in full drop out of the captured total.
-      sub: `${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} still held today${
+      // Gross: refunded lines stay in; the caption says how much went back out.
+      // Gross: what was taken at the counter. The Dashboard's Revenue tile is
+      // the same day's collections net of refunds (PR-008) — say so here.
+      sub: `Gross, before refunds · ${totals.deskCount} desk payment${totals.deskCount === 1 ? '' : 's'} still held today${
         refundedToday > 0
           ? ` · ${money(refundedToday)} refunded today${hasRefundChannel ? '' : ' (desk and online)'}`
           : ''

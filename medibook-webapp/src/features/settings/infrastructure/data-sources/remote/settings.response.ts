@@ -40,6 +40,9 @@ export const hospitalProfileResponseSchema = z.object({
   cover_file_id: z.string().nullable(),
   stamp_file_id: z.string().nullable().optional(),
   online_booking_enabled: z.boolean(),
+  // Whether patients can find the hospital in the app; set by Medibook operations.
+  // Optional for older backends (PR-019).
+  app_visibility: z.enum(['visible', 'hidden']).optional(),
   // IANA zone the hospital's dates and times are kept in; optional for older backends.
   timezone: z.string().optional(),
   version: z.number().int(),
@@ -69,6 +72,7 @@ export function toHospitalProfile(dto: HospitalProfileResponse): HospitalProfile
     coverFileId: dto.cover_file_id,
     stampFileId: dto.stamp_file_id ?? null,
     onlineBookingEnabled: dto.online_booking_enabled,
+    appVisibility: dto.app_visibility ?? null,
     timezone: dto.timezone ?? null,
     version: dto.version,
   };

@@ -1,7 +1,7 @@
 {
   "name": "medibook-webapp-vitejs",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint && node scripts/check-case-collisions.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "format": "prettier --write .",
@@ -22,6 +22,7 @@
     "uat": "playwright test -c playwright.uat.config.ts"
   },
   "dependencies": {
+    "@sentry/react": "^11.8.0",
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.20.0",
     "clsx": "^2.1.1",

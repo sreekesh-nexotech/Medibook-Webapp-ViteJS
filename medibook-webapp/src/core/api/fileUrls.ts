@@ -18,6 +18,10 @@ export const FILE_STORE_NOT_READY_CODE = 'FILE_STORE_NOT_READY';
 export const FILE_STORE_NOT_READY_MESSAGE =
   'Downloading files is coming soon — this server is not set up to provide them yet.';
 
+/** The upload counterpart (PR-006): said at once instead of an endless “Uploading…”. */
+export const FILE_STORE_NOT_READY_UPLOAD_MESSAGE =
+  'The file could not be uploaded — this server is not set up to store files yet.';
+
 /**
  * Whether a signed file link points where the app's files live (SEC-15):
  * https, and on the configured file store when one is configured. The server

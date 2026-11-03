@@ -10,7 +10,7 @@ import {
   SHORT_OTP_MAX_ATTEMPTS,
   SHORT_OTP_MAX_TTL_SECONDS,
   type SettingsSectionProps,
-} from '@/features/ops-settings/presentation/components/opsSettingsForm';
+} from '@/features/ops-settings/presentation/components/opsSettingsFormModel';
 
 const UNAVAILABLE_HINT = 'Not available yet — the platform API does not store this setting.';
 const TWO_STEP_NOTE =

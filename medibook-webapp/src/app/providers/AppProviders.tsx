@@ -1,4 +1,4 @@
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 
 import { QUERY_MAX_RETRIES, QUERY_STALE_TIME_MS } from '@/core/config/api';
@@ -21,17 +21,25 @@ const RETRYABLE: ReadonlySet<FailureKind> = new Set(['network', 'server']);
  * Offline, a write fails at once with a connection message instead of pausing
  * and firing by itself when the network returns (RUN-03).
  */
+/**
+ * A 403 means the permissions this session was rendered with are stale — an
+ * administrator changed the role (PR-004 / DEF-040) or the tenant gate closed.
+ * Re-read `/me` on both surfaces so the sidebar and guards follow at once.
+ */
+function refreshSessionsOnForbidden(error: unknown): void {
+  if (!isFailure(error)) return;
+  if (error.kind === 'forbidden' || isHospitalWriteBlock(error)) {
+    void queryClient.invalidateQueries({ queryKey: authKeys.session('hospital') });
+    void queryClient.invalidateQueries({ queryKey: authKeys.session('platform') });
+  }
+}
+
 const queryClient: QueryClient = new QueryClient({
   // A write refused by the tenant gate means the hospital went read-only or
   // was suspended since `/hospital/me` was read: re-read it, so the shell's
   // banner appears and write controls switch off (UAT-38).
-  mutationCache: new MutationCache({
-    onError: (error) => {
-      if (isFailure(error) && isHospitalWriteBlock(error)) {
-        void queryClient.invalidateQueries({ queryKey: authKeys.session('hospital') });
-      }
-    },
-  }),
+  mutationCache: new MutationCache({ onError: refreshSessionsOnForbidden }),
+  queryCache: new QueryCache({ onError: refreshSessionsOnForbidden }),
   defaultOptions: {
     queries: {
       staleTime: QUERY_STALE_TIME_MS,

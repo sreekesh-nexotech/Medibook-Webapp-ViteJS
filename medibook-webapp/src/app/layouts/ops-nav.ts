@@ -48,7 +48,6 @@ export const OPS_NAV: readonly OpsNavSection[] = [
     items: [
       { id: 'users', label: 'Users & Roles', icon: 'shield-check' },
       { id: 'platform-users', label: 'Platform Users', icon: 'users' },
-      { id: 'support', label: 'Support Tickets', icon: 'life-buoy' },
       { id: 'notifications', label: 'Notifications', icon: 'megaphone' },
       { id: 'reviews', label: 'Review Moderation', icon: 'star' },
       { id: 'support', label: 'Support Desk', icon: 'headset' },

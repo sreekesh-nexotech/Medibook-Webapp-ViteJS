@@ -18,13 +18,15 @@ The settings are fixed into the bundle at build time, so each environment
 (staging, production) needs its own build. All of them are public; never put a
 secret in a `VITE_` variable.
 
-| Setting               | Value                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `VITE_API_BASE_URL`   | `same-origin` when the app's host proxies `/api` (recommended), else `https://<api host>` |
-| `VITE_WS_BASE_URL`    | `same-origin` when the app's host proxies `/ws` (recommended), else `wss://<ws host>`     |
-| `VITE_STORAGE_ORIGIN` | The file-storage origin signed links point at, e.g. `https://files.medibook.example`      |
-| `VITE_MONITORING_URL` | Where error reports are sent (`https://…`); optional, see `docs/MONITORING.md`            |
-| `VITE_GIT_COMMIT`     | The commit shown on My Account; set it when the build has no `.git` (e.g. a container)    |
+| Setting                   | Value                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`       | `same-origin` when the app's host proxies `/api` (recommended), else `https://<api host>` |
+| `VITE_WS_BASE_URL`        | `same-origin` when the app's host proxies `/ws` (recommended), else `wss://<ws host>`     |
+| `VITE_STORAGE_ORIGIN`     | The file-storage origin signed links point at, e.g. `https://files.medibook.example`      |
+| `VITE_MONITORING_URL`     | Where error reports are sent (`https://…`); optional, see `docs/MONITORING.md`            |
+| `VITE_SENTRY_DSN`         | Sentry project DSN (`https://…`); optional, see `docs/MONITORING.md`                      |
+| `VITE_SENTRY_ENVIRONMENT` | The environment Sentry files reports under (`staging`, `production`); optional            |
+| `VITE_GIT_COMMIT`         | The commit shown on My Account; set it when the build has no `.git` (e.g. a container)    |
 
 `npm run build` stops when the API or WebSocket setting is missing or not
 `https://`/`wss://` (DEP-10). The build writes a Content-Security-Policy that

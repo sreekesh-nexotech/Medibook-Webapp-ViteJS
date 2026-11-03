@@ -230,8 +230,8 @@ export function AdminDashboardScreen() {
       value: moneyShort(data?.netRupees ?? 0),
       sub:
         data && data.refundedRupees > 0
-          ? `Collected less ${money(data.refundedRupees)} refunded`
-          : 'Desk + online prepaid, collected',
+          ? `Collected less ${money(data.refundedRupees)} refunded (net)`
+          : 'Desk + online prepaid, net of refunds',
       iconClass: 'bg-y-100 text-y-800',
       valueClass: 'text-y-800',
     },

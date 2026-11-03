@@ -22,7 +22,7 @@ describe('loginErrorMessage (UAT-70)', () => {
   it('tells the user how many attempts are left', () => {
     expect(
       loginErrorMessage(failure('AUTH_INVALID_CREDENTIALS', { attempts_remaining: 3 }), false),
-    ).toBe('Incorrect email or password. 3 attempts left before sign-in is locked for 60 minutes.');
+    ).toBe('Incorrect email or password. 3 attempts left before sign-in is locked.');
     expect(
       loginErrorMessage(failure('AUTH_INVALID_CREDENTIALS', { attempts_remaining: 1 }), false),
     ).toContain('1 attempt left');

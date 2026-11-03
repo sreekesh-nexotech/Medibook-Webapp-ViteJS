@@ -35,6 +35,25 @@ Any HTTPS endpoint that stores JSON works, for example a log collector's HTTP in
 a vendor's own SDK instead, call it from `src/core/error/monitoring.ts`, the single place
 every report goes through.
 
+### Sentry
+
+Build with `VITE_SENTRY_DSN` set to the Sentry project's DSN (Settings → Client Keys).
+It works alongside `VITE_MONITORING_URL` or on its own. `VITE_SENTRY_ENVIRONMENT`
+names the environment (`staging`, `production`); it defaults to the Vite mode. The
+build adds the DSN's origin to the Content-Security-Policy; the nginx header needs it
+too (`deploy/nginx/medibook-security-headers.conf`).
+
+`src/core/error/sentry.ts` forwards each report after `monitoring.ts` has built it, so
+the limits and the no-patient-data rules below apply to Sentry as well. The SDK collects
+nothing on its own: its global error handlers, breadcrumbs, console capture and request
+context (the full URL, with search terms) are off, and `dataCollection` turns off user
+info, cookies, headers, bodies and query strings. Each
+event carries the report's fields as tags: `report_id` (search it for a crash card's
+support reference), `source`, `path`, `commit`, and for API failures `request_id`,
+`status` and `code`. The release is the package version.
+
+A browser DSN is public by design: it can submit events but not read them.
+
 ### Payload
 
 ```json
@@ -83,11 +102,11 @@ The reference nginx config also answers 404 for any `.map` file, and
 Every API request carries an `X-Request-Id`. The backend logs each line for that request
 with it (`request_id` in its JSON logs), stores it on audit rows, and echoes it back.
 
-| The user sees                                  | It is                                | Find it in                                       |
-| ---------------------------------------------- | ------------------------------------ | ------------------------------------------------ |
-| "Support reference 011c61b1" on an error state | First 8 characters of the request id | Backend logs: search `request_id` for `011c61b1` |
-| The same on an error toast (stays 10 seconds)  | The same                             | The same                                         |
-| "Support reference eaf3c55a" on a crash card   | First 8 characters of the report id  | Monitoring: search `id` for `eaf3c55a`           |
+| The user sees                                  | It is                                | Find it in                                                             |
+| ---------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| "Support reference 011c61b1" on an error state | First 8 characters of the request id | Backend logs: search `request_id` for `011c61b1`                       |
+| The same on an error toast (stays 10 seconds)  | The same                             | The same                                                               |
+| "Support reference eaf3c55a" on a crash card   | First 8 characters of the report id  | Monitoring: search `id` for `eaf3c55a`; in Sentry, the `report_id` tag |
 
 Eight characters with the time of the problem and the hospital narrow it to one request.
 A crash reference appears only when monitoring is on, since there is nowhere else to look

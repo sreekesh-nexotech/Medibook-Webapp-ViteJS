@@ -7,9 +7,6 @@ import type { Failure } from '@/core/error/failure';
  * and `locked_until` with a 423 `AUTH_LOCKED_OUT`. Both are shown.
  */
 
-/** Five failures lock sign-in for an hour (CLAUDE.md §6 Identity). */
-const LOCKOUT_MINUTES = 60;
-
 function readNumber(meta: Readonly<Record<string, unknown>>, key: string): number | null {
   const value = meta[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -32,10 +29,15 @@ export function formatUnlockTime(until: Date, now: Date): string {
   }).format(until);
 }
 
+/**
+ * How long a lock lasts is a platform setting (`login_lockout_seconds`), so
+ * the sentence names no duration; the 423 that follows carries `locked_until`
+ * and is shown with the exact time (PR-017 / Q-001).
+ */
 function attemptsSentence(remaining: number): string {
-  if (remaining <= 0) return `Sign-in is now locked for ${LOCKOUT_MINUTES} minutes.`;
+  if (remaining <= 0) return 'Sign-in is now locked.';
   const attempts = remaining === 1 ? '1 attempt' : `${remaining} attempts`;
-  return `${attempts} left before sign-in is locked for ${LOCKOUT_MINUTES} minutes.`;
+  return `${attempts} left before sign-in is locked.`;
 }
 
 /** Sign-in failures worded for the login screen; anything else shows the server's message. */

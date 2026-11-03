@@ -34,6 +34,8 @@ export interface HospitalProfile {
   readonly stampFileId: string | null;
   /** Platform-managed switch for booking from the patient app. */
   readonly onlineBookingEnabled: boolean;
+  /** `visible` | `hidden` in the patient app (ops-controlled); `null` when the server predates it. */
+  readonly appVisibility: 'visible' | 'hidden' | null;
   /** IANA time zone (e.g. `Asia/Kolkata`); `null` from an older backend. */
   readonly timezone: string | null;
   /** Row version, sent back as `If-Match`. */

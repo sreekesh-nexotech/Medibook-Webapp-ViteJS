@@ -7,8 +7,14 @@ import { authKeys } from '@/features/auth/application/queries/auth.keys';
 import { fetchSession } from '@/features/auth/application/usecases/fetchSession';
 import { hasStoredSession } from '@/features/auth/application/usecases/hasStoredSession';
 
-/** Who is signed in rarely changes mid-session; permissions are re-read every 5 minutes. */
-const SESSION_STALE_TIME_MS = 5 * 60_000;
+/**
+ * Permissions are re-read every minute in the background and whenever the tab
+ * regains focus after 15 s, so a role change made by an administrator reaches
+ * an open session within a minute and without a hard reload (PR-004 /
+ * DEF-040); any 403 invalidates them at once (AppProviders).
+ */
+const SESSION_STALE_TIME_MS = 15_000;
+const SESSION_REFETCH_INTERVAL_MS = 60_000;
 
 /**
  * The validated session for `surface` (`GET /<surface>/me`). Idle when the
@@ -21,5 +27,8 @@ export function useSessionQuery(surface: AuthSurface, enabled = true) {
     queryFn: async () => unwrap(await fetchSession(surface)),
     enabled: enabled && hasStoredSession(surface),
     staleTime: SESSION_STALE_TIME_MS,
+    refetchOnWindowFocus: true,
+    refetchInterval: SESSION_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
   });
 }

@@ -29,6 +29,8 @@ const envSchema = z.object({
     .default('')
     .transform((v) => v.replace(/\/+$/, '')),
   VITE_MONITORING_URL: z.string().trim().default(''),
+  VITE_SENTRY_DSN: z.string().trim().default(''),
+  VITE_SENTRY_ENVIRONMENT: z.string().trim().default(''),
 });
 
 // Name each key: Vite inlines exactly the `import.meta.env.X` expressions it
@@ -39,6 +41,8 @@ const env = envSchema.parse({
   VITE_WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL,
   VITE_STORAGE_ORIGIN: import.meta.env.VITE_STORAGE_ORIGIN,
   VITE_MONITORING_URL: import.meta.env.VITE_MONITORING_URL,
+  VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
+  VITE_SENTRY_ENVIRONMENT: import.meta.env.VITE_SENTRY_ENVIRONMENT,
 });
 
 /** Origin of the REST API; `''` means "same origin as the page" (dev proxy). */
@@ -68,3 +72,13 @@ export const STORAGE_ORIGIN = env.VITE_STORAGE_ORIGIN;
  * none (`core/error/monitoring.ts`).
  */
 export const MONITORING_URL = env.VITE_MONITORING_URL;
+
+/**
+ * Sentry project DSN (`https://<key>@…ingest…sentry.io/<project>`, OBS-01);
+ * `''` sends nothing to Sentry. A browser DSN is public by design: it can only
+ * submit events, never read them.
+ */
+export const SENTRY_DSN = env.VITE_SENTRY_DSN;
+
+/** The environment Sentry files reports under; defaults to the Vite mode. */
+export const SENTRY_ENVIRONMENT = env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { CanOps } from '@/shared/ui/CanOps';
 import { Card } from '@/shared/ui/Card';
@@ -94,8 +94,12 @@ export function OpsComplianceScreen() {
    * export. When the server cannot render the export (501), the request
    * stays filed and an error toast says no file was made (UB-54).
    */
+  // Set synchronously on the first click: `isPending` only flips on the next
+  // render, so a double-click used to file two requests (PR-009, DEF-046).
+  const exportInFlight = useRef(false);
   const handleExport = (value: ExportFormValue): void => {
-    if (createExport.isPending || processingId) return;
+    if (exportInFlight.current || createExport.isPending || processingId) return;
+    exportInFlight.current = true;
     createExport.mutate(
       {
         subjectUserId: value.subjectUserId,
@@ -103,6 +107,9 @@ export function OpsComplianceScreen() {
         idempotencyKey: crypto.randomUUID(),
       },
       {
+        onSettled: () => {
+          exportInFlight.current = false;
+        },
         onSuccess: (request) => prepare(request),
         onError: (error) =>
           toast(

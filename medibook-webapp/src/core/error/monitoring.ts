@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 import { newRequestId } from '@/core/api/requestId';
 import { APP_COMMIT, APP_VERSION } from '@/core/config/build';
-import { MONITORING_URL } from '@/core/config/env';
+import { MONITORING_URL, SENTRY_DSN } from '@/core/config/env';
 import type { Failure, FailureKind } from '@/core/error/failure';
 import { isFailure } from '@/core/error/failure';
+import { sendToSentry } from '@/core/error/sentry';
 
 /**
  * Runtime errors leave the browser here (OBS-01): crashes caught by an error
@@ -14,7 +15,8 @@ import { isFailure } from '@/core/error/failure';
  * (OBS-04).
  *
  * Reports are POSTed as JSON to `VITE_MONITORING_URL` (payload in
- * `docs/MONITORING.md`). Without one nothing is sent and no reference is
+ * `docs/MONITORING.md`) and/or sent to Sentry when `VITE_SENTRY_DSN` is set
+ * (`core/error/sentry.ts`). With neither, nothing is sent and no reference is
  * shown, since there would be nowhere to look it up.
  *
  * Patient data stays out: the path never includes its query string (search
@@ -61,6 +63,9 @@ const REPORT_WINDOW_MS = 60_000;
 const MAX_STACK_CHARS = 8_000;
 const MAX_ISSUES = 5;
 
+/** Whether reports have anywhere to go. */
+const MONITORING_ON = Boolean(MONITORING_URL || SENTRY_DSN);
+
 /** When this page sent its recent reports, for the per-minute cap. */
 const sentAt: number[] = [];
 /** The id each error object is (or will be) reported under. */
@@ -89,13 +94,22 @@ function issuesOf(error: unknown): ErrorReport['issues'] {
 
 /** Sends the report; a monitoring outage must never break the app, so failures are dropped. */
 function send(report: ErrorReport): void {
-  void fetch(MONITORING_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(report),
-    credentials: 'omit',
-    keepalive: true,
-  }).catch(() => undefined);
+  if (MONITORING_URL) {
+    void fetch(MONITORING_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report),
+      credentials: 'omit',
+      keepalive: true,
+    }).catch(() => undefined);
+  }
+  if (SENTRY_DSN) {
+    try {
+      sendToSentry(report);
+    } catch {
+      // Same rule as the POST above: the monitor failing is not the user's problem.
+    }
+  }
 }
 
 /** Whether the page may send another report now (at most 10 a minute). */
@@ -109,7 +123,7 @@ function underCap(now: number): boolean {
  * it while the report is sent from an effect; `null` with monitoring off.
  */
 export function reportIdFor(error: unknown): string | null {
-  if (!MONITORING_URL || typeof error !== 'object' || error === null) return null;
+  if (!MONITORING_ON || typeof error !== 'object' || error === null) return null;
   const known = ids.get(error);
   if (known) return known;
   const id = newRequestId();
@@ -122,7 +136,7 @@ function submit(
   context: ReportContext,
   extra: Partial<Pick<ErrorReport, 'requestId' | 'status' | 'code' | 'name' | 'message'>> = {},
 ): string | null {
-  if (!MONITORING_URL) return null;
+  if (!MONITORING_ON) return null;
   const isObject = typeof error === 'object' && error !== null;
   // The same error object is sent once, however many places catch it.
   if (isObject && sent.has(error)) return ids.get(error) ?? null;
