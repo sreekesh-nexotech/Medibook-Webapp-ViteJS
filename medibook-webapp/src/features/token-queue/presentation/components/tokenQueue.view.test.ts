@@ -11,6 +11,7 @@ import {
   canOfferNoShow,
   closeSessionCopy,
   isServing,
+  openTokensFromFailure,
   isStaleQueueRefusal,
   queueRefusalText,
   servingLabel,
@@ -214,10 +215,24 @@ describe('no-show and close rules', () => {
     expect(canOfferNoShow(session({ status: 'closed' }), TODAY, true)).toBe(false);
   });
 
-  it('says how many patients are still waiting when closing', () => {
-    expect(closeSessionCopy('Dr A', 'Morning', 0)).not.toMatch(/waiting/);
-    expect(closeSessionCopy('Dr A', 'Morning', 1)).toMatch(/1 patient is still waiting/);
-    expect(closeSessionCopy('Dr A', 'Morning', 3)).toMatch(/3 patients are still waiting/);
+  it('says every patient must be resolved before closing', () => {
+    expect(closeSessionCopy('Dr A', 'Morning')).toMatch(/served, cancelled or marked no-show/);
+  });
+
+  it('reads the open tokens from the 409 refusal', () => {
+    const blocked = openTokensFromFailure({
+      code: 'SESSION_HAS_OPEN_TOKENS',
+      meta: {
+        open_tokens: [
+          { token_no: 1, token_label: 'W001', status: 'checked_in' },
+          { token_no: 2, token_label: null, status: 'scheduled' },
+        ],
+        counts: { checked_in: 1, scheduled: 1 },
+      },
+    });
+    expect(blocked?.tokens.map((t) => t.tokenLabel)).toEqual(['W001', null]);
+    expect(blocked?.counts).toEqual({ checked_in: 1, scheduled: 1 });
+    expect(openTokensFromFailure({ code: 'OTHER', meta: {} })).toBeNull();
   });
 });
 

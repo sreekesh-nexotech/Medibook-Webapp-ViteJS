@@ -286,16 +286,54 @@ export function canOfferNoShow(session: QueueSession, today: string, wasCalled: 
   return session.date === today && isLiveSession(session) && wasCalled;
 }
 
+/** One token the backend says must be resolved before a session can close (UAT-3). */
+export interface OpenCloseToken {
+  readonly tokenNo: number;
+  readonly tokenLabel: string | null;
+  readonly status: string;
+}
+
+export interface OpenCloseTokens {
+  readonly tokens: readonly OpenCloseToken[];
+  readonly counts: Readonly<Record<string, number>>;
+}
+
+/** The `SESSION_HAS_OPEN_TOKENS` refusal's `meta`, or `null` for any other failure. */
+export function openTokensFromFailure(failure: {
+  readonly code: string | null;
+  readonly meta: Readonly<Record<string, unknown>>;
+}): OpenCloseTokens | null {
+  if (failure.code !== 'SESSION_HAS_OPEN_TOKENS') return null;
+  const raw = failure.meta.open_tokens;
+  if (!Array.isArray(raw)) return { tokens: [], counts: {} };
+  const tokens: OpenCloseToken[] = raw.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return [];
+    const value = row as Record<string, unknown>;
+    if (typeof value.token_no !== 'number') return [];
+    return [
+      {
+        tokenNo: value.token_no,
+        tokenLabel: typeof value.token_label === 'string' ? value.token_label : null,
+        status: typeof value.status === 'string' ? value.status : 'open',
+      },
+    ];
+  });
+  const rawCounts = failure.meta.counts;
+  const counts: Record<string, number> = {};
+  if (typeof rawCounts === 'object' && rawCounts !== null) {
+    for (const [key, value] of Object.entries(rawCounts)) {
+      if (typeof value === 'number') counts[key] = value;
+    }
+  }
+  return { tokens, counts };
+}
+
 /**
- * What the close confirmation says: closing while tokens still wait is
- * allowed (the backend has no such rule), but the desk is told what it
- * leaves behind (UAT-46, T15).
+ * What the close confirmation says. The backend refuses to close while tokens
+ * are still open (UAT-3); there is no "close anyway".
  */
-export function closeSessionCopy(doctorName: string, label: string, waiting: number): string {
-  const base = `Close ${doctorName}'s ${label} session for today? No more tokens can be called in it.`;
-  if (waiting <= 0) return base;
-  const who = waiting === 1 ? '1 patient is' : `${waiting} patients are`;
-  return `${base} ${who} still waiting — they stay booked; mark them as no-shows or cancel them from Appointments.`;
+export function closeSessionCopy(doctorName: string, label: string): string {
+  return `Close ${doctorName}'s ${label} session for today? Every patient still waiting must be served, cancelled or marked no-show first.`;
 }
 
 /* -------------------------------------------------------- queue refusals */
