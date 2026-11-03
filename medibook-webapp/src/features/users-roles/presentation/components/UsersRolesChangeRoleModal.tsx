@@ -8,6 +8,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure } from '@/core/error/failure';
 
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useStaffCountersQuery } from '@/features/users-roles/application/queries/useStaffCountersQuery';
 import { useUpdateStaffDetailsMutation } from '@/features/users-roles/application/queries/useUpdateStaffDetailsMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
@@ -22,6 +23,7 @@ const EMPLOYEE_CODE_MAX = 50;
 const DESIGNATION_MAX = 100;
 
 const NO_COUNTER = 'No default counter';
+const ALL_DEPARTMENTS = 'All departments';
 
 interface UsersRolesChangeRoleModalProps {
   user: UserRow;
@@ -35,13 +37,14 @@ interface UsersRolesChangeRoleModalProps {
 const CONFLICT_VERSION = 'CONFLICT_VERSION';
 
 /** Field-error keys the staff PATCH answers with, per form field (08 F6). */
-type EditField = 'role' | 'employeeCode' | 'designation' | 'counter';
+type EditField = 'role' | 'employeeCode' | 'designation' | 'counter' | 'department';
 
 const FIELD_KEYS: Readonly<Record<string, EditField>> = {
   role_code: 'role',
   employee_code: 'employeeCode',
   designation: 'designation',
   counter_id: 'counter',
+  department_id: 'department',
 };
 
 /** Blank → `null`, so clearing a field clears it on the server. */
@@ -66,10 +69,13 @@ export function UsersRolesChangeRoleModal({
   const save = useUpdateStaffDetailsMutation();
   const countersQuery = useStaffCountersQuery();
   const counters = countersQuery.data ?? [];
+  const departmentsQuery = useDepartmentsQuery();
+  const departments = departmentsQuery.data ?? [];
   const [roleId, setRoleId] = useState(user.roleId);
   const [employeeCode, setEmployeeCode] = useState(user.employeeCode ?? '');
   const [designation, setDesignation] = useState(user.designation ?? '');
   const [counterId, setCounterId] = useState<string | null>(user.counterId);
+  const [departmentId, setDepartmentId] = useState<string | null>(user.departmentId);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<EditField, string>>>({});
 
@@ -78,8 +84,10 @@ export function UsersRolesChangeRoleModal({
     roleId === user.roleId &&
     orNull(employeeCode) === user.employeeCode &&
     orNull(designation) === user.designation &&
-    counterId === user.counterId;
+    counterId === user.counterId &&
+    departmentId === user.departmentId;
   const counterName = counters.find((c) => c.id === counterId)?.name;
+  const departmentName = departments.find((d) => d.id === departmentId)?.name;
 
   const submit = (): void => {
     if (!picked || unchanged) {
@@ -94,6 +102,7 @@ export function UsersRolesChangeRoleModal({
           employeeCode: orNull(employeeCode),
           designation: orNull(designation),
           counterId,
+          departmentId,
         },
         version: user.version,
       },
@@ -212,6 +221,24 @@ export function UsersRolesChangeRoleModal({
             options={[NO_COUNTER, ...counters.filter((c) => c.isActive).map((c) => c.name)]}
             disabled={countersQuery.isError}
             onChange={(name) => setCounterId(counters.find((c) => c.name === name)?.id ?? null)}
+          />
+        </Field>
+        <Field
+          label="Department"
+          error={fieldErrors.department}
+          hint={
+            departmentsQuery.isError
+              ? 'Departments could not be loaded; the current scope is kept.'
+              : 'A Department Front Desk only sees and works this department. All departments = hospital-wide.'
+          }
+        >
+          <Select
+            value={departmentName ?? ALL_DEPARTMENTS}
+            options={[ALL_DEPARTMENTS, ...departments.map((d) => d.name)]}
+            disabled={departmentsQuery.isError}
+            onChange={(name) =>
+              setDepartmentId(departments.find((d) => d.name === name)?.id ?? null)
+            }
           />
         </Field>
         <div className="text-caption text-text-muted">

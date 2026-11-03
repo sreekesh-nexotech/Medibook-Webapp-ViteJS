@@ -221,6 +221,8 @@ export interface UserRow {
   readonly designation: string | null;
   /** Default counter id (staff only). */
   readonly counterId: string | null;
+  /** Department scope id (staff only); `null` = all departments. */
+  readonly departmentId: string | null;
   /** The role code — `RoleView.id`. */
   readonly roleId: string;
   readonly status: UserRowStatus;
@@ -266,6 +268,7 @@ export function staffToRow(s: StaffMember): UserRow {
     employeeCode: s.employeeCode,
     designation: s.designation,
     counterId: s.counterId,
+    departmentId: s.departmentId,
     roleId: s.roleCode,
     status: STAFF_STATUS[s.status],
     lastLoginAt: s.lastLoginAt,
@@ -299,6 +302,7 @@ export function invitationToRow(i: StaffInvitation, now: number): UserRow {
     employeeCode: null,
     designation: null,
     counterId: null,
+    departmentId: null,
     roleId: i.roleCode,
     status: expired ? 'Expired' : 'Pending',
     lastLoginAt: null,

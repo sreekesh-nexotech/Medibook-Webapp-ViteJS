@@ -19,6 +19,7 @@ export interface StaffRolePatchRequest {
   readonly employee_code: string | null;
   readonly designation: string | null;
   readonly counter_id: string | null;
+  readonly department_id: string | null;
 }
 
 export function toStaffPatchRequest(draft: StaffDetailsDraft): StaffRolePatchRequest {
@@ -27,6 +28,7 @@ export function toStaffPatchRequest(draft: StaffDetailsDraft): StaffRolePatchReq
     employee_code: draft.employeeCode,
     designation: draft.designation,
     counter_id: draft.counterId,
+    department_id: draft.departmentId,
   };
 }
 

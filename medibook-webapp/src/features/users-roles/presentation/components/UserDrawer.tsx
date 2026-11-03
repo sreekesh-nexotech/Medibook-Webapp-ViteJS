@@ -12,6 +12,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import { useReactivateStaffMutation } from '@/features/users-roles/application/queries/useReactivateStaffMutation';
 import { useResendInvitationMutation } from '@/features/users-roles/application/queries/useResendInvitationMutation';
 import { useRevokeInvitationMutation } from '@/features/users-roles/application/queries/useRevokeInvitationMutation';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
 import { useStaffCountersQuery } from '@/features/users-roles/application/queries/useStaffCountersQuery';
 import { useUnlockStaffMutation } from '@/features/users-roles/application/queries/useUnlockStaffMutation';
 import { AccessSummary } from '@/features/users-roles/presentation/components/AccessSummary';
@@ -73,6 +74,9 @@ export function UserDrawer({
   const isInvitation = user.kind === 'invitation';
   const countersQuery = useStaffCountersQuery();
   const counterName = countersQuery.data?.find((c) => c.id === user.counterId)?.name;
+  const departmentsQuery = useDepartmentsQuery();
+  const departmentName =
+    departmentsQuery.data?.find((d) => d.id === user.departmentId)?.name ?? 'All departments';
   const locked = isLockedOut(user, now);
 
   const when = (iso: string | null): string =>
@@ -246,6 +250,7 @@ export function UserDrawer({
             {row('Employee code', user.employeeCode ?? NO_VALUE)}
             {row('Designation', user.designation ?? NO_VALUE)}
             {row('Default counter', counterName ?? NO_VALUE)}
+            {row('Department', departmentName)}
             {row('Joined', when(user.joinedAt))}
             {user.deactivatedAt && row('Deactivated on', when(user.deactivatedAt))}
           </>
@@ -292,8 +297,8 @@ export function UserDrawer({
           : locked
             ? 'Locked out after too many failed sign-ins. Unlock lets them try again now.'
             : isSelf
-              ? 'This is your own account. Another administrator changes your role or deactivates you; you can still edit your employee code, designation and default counter.'
-              : 'Edit Details changes their role, employee code, designation and default counter. Name, email and phone belong to their own account.'}
+              ? 'This is your own account. Another administrator changes your role or deactivates you; you can still edit your employee code, designation, counter and department.'
+              : 'Edit Details changes their role, employee code, designation, counter and department. Name, email and phone belong to their own account.'}
       </div>
     </Drawer>
   );

@@ -26,6 +26,8 @@ export interface StaffMember {
   readonly designation: string | null;
   /** The counter they work at by default, or `null`. */
   readonly counterId: string | null;
+  /** The department they are scoped to, or `null` for all departments (B06). */
+  readonly departmentId: string | null;
   readonly status: StaffStatus;
   /** ISO date-time they joined (accepted the invitation). */
   readonly joinedAt: string | null;
@@ -103,6 +105,7 @@ export interface StaffDetailsDraft {
   readonly employeeCode: string | null;
   readonly designation: string | null;
   readonly counterId: string | null;
+  readonly departmentId: string | null;
 }
 
 /** What an administrator fills in to invite a new staff member. */
