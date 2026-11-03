@@ -59,7 +59,7 @@ export function unpreviewedBookings(
  * that never happens.
  */
 /** Q11 / UAT-5: a hospital-side cancellation refunds the full paid amount. */
-export const CANCEL_REFUND_NOTE = "a paid booking is refunded in full";
+export const CANCEL_REFUND_NOTE = 'a paid booking is refunded in full';
 
 /** "1 booking cancelled (the doctor's fee of a paid booking is refunded)" */
 export function cancelledBookingsCopy(n: number): string {

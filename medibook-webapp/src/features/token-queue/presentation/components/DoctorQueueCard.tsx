@@ -516,12 +516,16 @@ export function DoctorQueueCard({
                   <span className="text-body text-text-strong font-semibold">
                     {t.tokenLabel ?? `#${t.tokenNo}`}
                   </span>
-                  <span className="text-caption text-text-muted">{t.status.replaceAll('_', ' ')}</span>
+                  <span className="text-caption text-text-muted">
+                    {t.status.replaceAll('_', ' ')}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-body text-text-muted m-0">The server did not list the open tokens.</p>
+            <p className="text-body text-text-muted m-0">
+              The server did not list the open tokens.
+            </p>
           )}
         </div>
       </Modal>

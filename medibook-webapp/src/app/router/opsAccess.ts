@@ -55,4 +55,3 @@ export function opsHomePath(checks: OpsPermissionChecks): string {
 
 /** The console's root, which sends each role to its own first screen. */
 export const OPS_HOME_PATH = OPS_BASE_PATH;
-

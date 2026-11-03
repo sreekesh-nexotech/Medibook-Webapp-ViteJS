@@ -183,9 +183,7 @@ export function OpsReviewsScreen() {
                   </p>
                   <span className="text-caption text-text-muted">
                     {r.bookingRef ? `Booking ${r.bookingRef}` : 'Booking reference unavailable'}
-                    {r.moderatedAt
-                      ? ` · decided ${formatIst(r.moderatedAt, DATE_FORMAT)}`
-                      : ''}
+                    {r.moderatedAt ? ` · decided ${formatIst(r.moderatedAt, DATE_FORMAT)}` : ''}
                   </span>
                 </div>
                 <div className="flex gap-2">
