@@ -516,7 +516,7 @@ function DoctorEditor({ role, doctor, schedule, departments, initialTab }: Docto
           })
       : null;
   const deptError = form.errorFor('departmentId');
-  const weekSummary = summariseWeekHours(grid.week);
+  const weekSummary = summariseWeekHours(grid.week, schedule?.weeklySessions);
   const hospitalName = session?.surface === 'hospital' ? session.hospital.name : '';
   const isSaving = form.submitting || scheduleConfirm.modal.isApplying;
   const rating = doctor ? ratingView(doctor) : null;

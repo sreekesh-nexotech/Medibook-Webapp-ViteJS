@@ -6,7 +6,7 @@ import type {
   TicketPriority,
   TicketStatus,
 } from '@/features/ops-support/domain/entities/support.entities';
-import { formatInstant } from '@/shared/lib/format';
+import { formatIst } from '@/shared/lib/format';
 
 /** Shown wherever there is no value. */
 export const NO_VALUE = '—';
@@ -47,7 +47,7 @@ const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', time
 export function formatDateTime(iso: string | null): string {
   if (!iso) return NO_VALUE;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? NO_VALUE : formatInstant(date, DATE_TIME_FORMAT);
+  return Number.isNaN(date.getTime()) ? NO_VALUE : formatIst(date, DATE_TIME_FORMAT);
 }
 
 /** Who raised it, in a word: the hospital is resolved separately (`TicketRequester`). */

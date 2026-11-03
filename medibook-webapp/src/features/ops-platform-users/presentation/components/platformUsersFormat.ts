@@ -4,7 +4,7 @@ import type {
   PlatformUserStatus,
   PlatformUserSummary,
 } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
-import { formatInstant } from '@/shared/lib/format';
+import { formatIst } from '@/shared/lib/format';
 
 /** Shown wherever the backend has no value for a column. */
 export const NO_VALUE = '—';
@@ -58,7 +58,7 @@ const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', time
 function format(options: Intl.DateTimeFormatOptions, iso: string | null): string {
   if (!iso) return NO_VALUE;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? NO_VALUE : formatInstant(date, options);
+  return Number.isNaN(date.getTime()) ? NO_VALUE : formatIst(date, options);
 }
 
 /** "2026-01-12T05:30:00Z" → "12 Jan 2026" in India Standard Time. */

@@ -4,7 +4,7 @@
  * the day's totals.
  */
 import { isFailure } from '@/core/error/failure';
-import { fmtDate, formatInstant, parseHundredths, toLocalISO } from '@/shared/lib/format';
+import { formatInstant, parseHundredths } from '@/shared/lib/format';
 import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
@@ -224,12 +224,12 @@ export function cashWriteFailureCopy(error: unknown, fallback: string): string {
   return error.message;
 }
 
-/** `08 Oct 2026 · 10:42 am` in the device's clock, or `—`. */
+/** `08 Oct 2026 · 10:42 am` on the hospital's clock, or `—`. */
 export function dateTimeCopy(iso: string | null): string {
   if (!iso) return '—';
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return '—';
-  return `${fmtDate(toLocalISO(at))} · ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  return formatInstant(at, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** The day's figures for the KPI strip, from captured lines only. */

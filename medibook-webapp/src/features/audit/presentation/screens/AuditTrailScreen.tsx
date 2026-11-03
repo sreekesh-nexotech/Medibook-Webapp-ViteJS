@@ -370,7 +370,7 @@ export function AuditTrailScreen() {
                     icon="scroll-text"
                     tint={methodTint(e.method)}
                     title={actionLabel(e.action)}
-                    sub={e.resourceId ? shortId(e.resourceId) : e.action}
+                    sub={entityLabel(e.resourceType)}
                   />
                 </td>
                 <td className={tdClass}>
@@ -379,22 +379,12 @@ export function AuditTrailScreen() {
                     <span className="text-caption text-text-muted">{who.sub}</span>
                   </div>
                 </td>
-                <td className={cn(tdClass, 'break-all')}>
-                  {entityLabel(e.resourceType)}
-                  {e.resourceId && (
-                    <div className="text-caption text-text-muted">{shortId(e.resourceId)}</div>
-                  )}
-                </td>
+                <td className={tdClass}>{entityLabel(e.resourceType)}</td>
                 <td className={cn(tdClass, 'max-w-75')}>
                   <ChangesCell entry={e} />
                 </td>
                 <td className={cn(tdClass, 'max-w-75')}>
-                  <div className="flex flex-col">
-                    <span className="tabular-nums">{e.ip ?? '—'}</span>
-                    <span className="text-caption text-text-muted break-all">
-                      {e.method} {e.path}
-                    </span>
-                  </div>
+                  <span className="tabular-nums">{e.ip ?? '—'}</span>
                 </td>
                 <td className={cn(tdClass, 'whitespace-nowrap tabular-nums')}>
                   {stamp ? `${fmtDate(stamp.date)} · ${stamp.time}` : '—'}

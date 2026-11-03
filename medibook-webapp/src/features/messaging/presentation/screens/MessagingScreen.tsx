@@ -491,7 +491,7 @@ export function MessagingScreen() {
             <SearchField
               value={qDraft}
               onChange={handleSearchChange}
-              placeholder="Exact phone number, provider message ID or event code — press Enter"
+              placeholder="Exact phone number or event code — press Enter"
               aria-label="Search the outbox by exact value"
             />
           </form>

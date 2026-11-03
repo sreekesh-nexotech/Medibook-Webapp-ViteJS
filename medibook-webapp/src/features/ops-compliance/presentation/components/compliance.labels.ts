@@ -3,7 +3,7 @@
  * with the shared badge token that already carries their meaning, a short
  * device line from a user agent, and before / after values as text.
  */
-import { fmtDate, toLocalISO } from '@/shared/lib/format';
+import { formatIst } from '@/shared/lib/format';
 
 import type {
   DataRequest,
@@ -212,20 +212,21 @@ export function deviceLabel(userAgent: string | null): string {
     : userAgent;
 }
 
-/** Local 24-hour `HH:mm` of an ISO date-time. */
-function localHm(d: Date): string {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/** "20 Jun 2026 · 14:05" in the viewer's local time. */
+/** "20 Jun 2026 · 14:05" in India Standard Time. */
 export function fmtComplianceWhen(iso: string): string {
-  const d = new Date(iso);
-  return `${fmtDate(toLocalISO(d))} · ${localHm(d)}`;
+  return formatIst(iso, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
 }
 
-/** "20 Jun 2026" for an ISO date-time, in local time. */
+/** "20 Jun 2026" for an ISO date-time, in India Standard Time. */
 export function fmtComplianceDate(iso: string): string {
-  return fmtDate(toLocalISO(new Date(iso)));
+  return formatIst(iso, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 /** The one-line toast after a capped CSV export. */

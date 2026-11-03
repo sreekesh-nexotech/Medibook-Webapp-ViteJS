@@ -14,6 +14,8 @@ import { SegTabs } from '@/shared/ui/SegTabs';
 import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { toast } from '@/shared/ui/toast/toast.store';
 
+import { formatIst } from '@/shared/lib/format';
+
 import { useHospitalOptionsQuery } from '@/features/ops-hospitals/application/queries/useHospitalOptionsQuery';
 import { useModerateReviewMutation } from '@/features/ops-reviews/application/queries/useModerateReviewMutation';
 import { useReviewsQuery } from '@/features/ops-reviews/application/queries/useReviewsQuery';
@@ -34,7 +36,7 @@ const MAX_STARS = 5;
 const ALL_HOSPITALS = 'All hospitals';
 const ALL_RATINGS = 'Any rating';
 
-const DATE_FORMAT = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -170,7 +172,7 @@ export function OpsReviewsScreen() {
                     <Stars rating={r.rating} />
                     <Badge status={look.badge}>{look.label}</Badge>
                     <span className="text-caption text-text-muted">
-                      {DATE_FORMAT.format(new Date(r.createdAt))}
+                      {formatIst(r.createdAt, DATE_FORMAT)}
                     </span>
                   </div>
                   <span className="text-body text-text-strong font-medium">
@@ -182,7 +184,7 @@ export function OpsReviewsScreen() {
                   <span className="text-caption text-text-muted">
                     {r.bookingRef ? `Booking ${r.bookingRef}` : 'Booking reference unavailable'}
                     {r.moderatedAt
-                      ? ` · decided ${DATE_FORMAT.format(new Date(r.moderatedAt))}`
+                      ? ` · decided ${formatIst(r.moderatedAt, DATE_FORMAT)}`
                       : ''}
                   </span>
                 </div>

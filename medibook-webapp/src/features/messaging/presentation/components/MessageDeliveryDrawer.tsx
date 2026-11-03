@@ -13,6 +13,8 @@ import {
   deliveryStatusBadge,
   eventLabel,
   fmtLocalDateTime,
+  providerErrorText,
+  providerLabel,
   recipientSourceText,
 } from '@/features/messaging/presentation/components/messaging.labels';
 
@@ -79,12 +81,11 @@ export function MessageDeliveryDrawer({ deliveryId, onClose }: MessageDeliveryDr
         {d.deliveredAt && <Row label="Delivered" value={fmtLocalDateTime(d.deliveredAt)} />}
         {d.failedAt && <Row label="Failed" value={fmtLocalDateTime(d.failedAt)} />}
         {d.attempts !== null && <Row label="Attempts" value={d.attempts} />}
-        {d.provider && <Row label="Provider" value={d.provider} />}
-        {d.providerMessageId && <Row label="Provider reference" value={d.providerMessageId} />}
+        {providerLabel(d.provider) && <Row label="Provider" value={providerLabel(d.provider)} />}
         <Row label="Sent by" value={d.triggeredByKind === 'staff' ? 'The desk' : 'Automatic'} />
-        {(d.errorMessage || reason) && (
+        {(providerErrorText(d.errorMessage) || reason) && (
           <p className="text-caption text-d-700 m-0 mt-3">
-            {[reason, d.errorMessage].filter(Boolean).join(' ')}
+            {[reason, providerErrorText(d.errorMessage)].filter(Boolean).join(' ')}
           </p>
         )}
       </div>
