@@ -52,13 +52,14 @@ export function unpreviewedBookings(
 
 /**
  * What a schedule change does to the money on the bookings it cancels. The
- * backend refunds the doctor's booking fee (Q11), but its affected-booking items
- * (`materialise._booking_ref`: ref, token, status, time, patient) carry no
- * payment state, so an unpaid walk-in cannot be told from a prepaid booking.
- * The copy must not promise a refund that never happens.
+ * backend refunds the full paid amount, including the convenience fee (Q11,
+ * UAT-5), but its affected-booking items (`materialise._booking_ref`: ref,
+ * token, status, time, patient) carry no payment state, so an unpaid walk-in
+ * cannot be told from a prepaid booking. The copy must not promise a refund
+ * that never happens.
  */
-/** Q11: a hospital-side cancellation refunds the doctor's fee; the convenience fee is kept. */
-export const CANCEL_REFUND_NOTE = "the doctor's fee of a paid booking is refunded";
+/** Q11 / UAT-5: a hospital-side cancellation refunds the full paid amount. */
+export const CANCEL_REFUND_NOTE = "a paid booking is refunded in full";
 
 /** "1 booking cancelled (the doctor's fee of a paid booking is refunded)" */
 export function cancelledBookingsCopy(n: number): string {

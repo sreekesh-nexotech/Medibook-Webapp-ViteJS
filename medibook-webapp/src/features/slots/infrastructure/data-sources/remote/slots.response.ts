@@ -44,6 +44,8 @@ const doctorDayResponseSchema = z.object({
     name: z.string(),
     department_id: z.string(),
     slot_length_min: z.number().int(),
+    status: z.string().optional(),
+    unavailable_reason: z.string().nullable().optional(),
   }),
   sessions: z.array(
     z.object({
@@ -153,6 +155,8 @@ export function toDoctorSlotDay(dto: DoctorDayResponse): DoctorSlotDay {
     doctorId: dto.doctor.id,
     doctorName: dto.doctor.name,
     departmentId: dto.doctor.department_id,
+    doctorStatus: dto.doctor.status ?? 'active',
+    unavailableReason: dto.doctor.unavailable_reason ?? null,
     slotLengthMin: dto.doctor.slot_length_min,
     sessions: dto.sessions.map((s) => ({
       id: s.id,

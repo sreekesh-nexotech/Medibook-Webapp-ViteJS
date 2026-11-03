@@ -49,16 +49,16 @@ describe('confirm bound to its preview (L-17, BE-33)', () => {
     const extra = unpreviewedBookings([booking('a')], [booking('a'), booking('b')]);
     expect(extra.map((b) => b.appointmentId)).toEqual(['b']);
     expect(unpreviewedCopy(extra)).toBe(
-      "1 booking was made after the preview and was also cancelled (the doctor's fee of a paid booking is refunded): Patient b (BK-b).",
+      "1 booking was made after the preview and was also cancelled (a paid booking is refunded in full): Patient b (BK-b).",
     );
   });
 
   it('never claims a refund for a cancelled booking that may be unpaid', () => {
     expect(cancelledBookingsCopy(1)).toBe(
-      "1 booking cancelled (the doctor's fee of a paid booking is refunded)",
+      "1 booking cancelled (a paid booking is refunded in full)",
     );
     expect(cancelledBookingsCopy(3)).toBe(
-      "3 bookings cancelled (the doctor's fee of a paid booking is refunded)",
+      "3 bookings cancelled (a paid booking is refunded in full)",
     );
     expect(cancelledBookingsCopy(2)).not.toMatch(/and refunded|with a full refund/);
   });

@@ -41,6 +41,8 @@ export interface SlotRowView {
   readonly sessions: readonly SessionView[];
   /** Set when the doctor has no slots at all that day. */
   readonly closedReason: string | null;
+  /** Why the doctor is unavailable, when the backend says (UB-23). */
+  readonly unavailableReason: string | null;
 }
 
 /** A hospital holiday, as the grid needs it. */
@@ -73,6 +75,12 @@ const MINUTES_PER_HOUR = 60;
 const TIME_PART_WIDTH = 2;
 
 const NO_SESSIONS = 'No sessions on this date';
+
+/** A doctor-level reason that is more useful than "No sessions". */
+const UNAVAILABLE_REASON: Readonly<Record<string, string>> = {
+  doctor_on_leave: 'Doctor is on leave — booking is paused',
+  doctor_inactive: 'Doctor is inactive — hidden from the patient app',
+};
 
 const CELL_STATE: Readonly<Record<SlotLiveState, SlotCellState>> = {
   open: 'available',
@@ -184,7 +192,12 @@ export function toSlotGridView(
       room: rooms.get(day.doctorId) ?? '',
       slots,
       sessions,
-      closedReason: slots.length === 0 ? closedReasonFor(date, day.departmentId, holidays) : null,
+      closedReason:
+        slots.length === 0
+          ? (day.unavailableReason && UNAVAILABLE_REASON[day.unavailableReason]) ||
+            closedReasonFor(date, day.departmentId, holidays)
+          : null,
+      unavailableReason: day.unavailableReason ?? null,
     };
   });
   return { date, columns: [...columns].sort((a, b) => a - b), rows, counts };
