@@ -68,7 +68,7 @@ function toKpis(k: OpsDashboardKpis): readonly OpsKpi[] {
       icon: 'calendar-check',
       label: 'Bookings (30 days)',
       value: k.appointmentsLast30Days.toLocaleString('en-IN'),
-      sub: 'All hospitals · unpaid online checkouts excluded',
+      sub: 'All hospitals · up to yesterday (IST) · unpaid online checkouts excluded',
       iconClass: 'bg-badge-noshow-bg text-orange-strong',
       valueClass: 'text-orange-strong',
       subClass: 'text-text-muted',
