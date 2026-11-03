@@ -99,9 +99,7 @@ export function PaymentsDetailDrawer({ paymentId, onClose }: PaymentsDetailDrawe
             />
           )}
           {line.referenceNote && <Row label="Reference" value={line.referenceNote} />}
-          {line.gatewayPaymentId && <Row label="Gateway payment" value={line.gatewayPaymentId} />}
-          {line.orderId && <Row label="Payment order" value={line.orderId} />}
-          {line.cashSessionId && <Row label="Cash drawer" value={line.cashSessionId} />}
+          {line.cashSessionId && <Row label="Cash drawer" value="Open drawer session" />}
         </section>
         <section>
           <SectionTitle size={15} className="mb-1.5">

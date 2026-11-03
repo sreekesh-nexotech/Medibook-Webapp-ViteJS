@@ -104,7 +104,7 @@ export function refundCopy(refunds: readonly PaymentRefund[]): {
   const how =
     methods.length === 1 && methods[0] === 'cash'
       ? 'at desk'
-      : `to ${methods.map((m) => m.toUpperCase()).join(', ')}`;
+      : `to ${methods.map((m) => METHOD_LABEL[m as PaymentMethod] ?? m).join(', ')}`;
   return { amount, how };
 }
 

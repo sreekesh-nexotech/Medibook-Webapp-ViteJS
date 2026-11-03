@@ -10,9 +10,11 @@ export const NO_TAX_LABEL = 'No tax (exempt)';
 /** The department choice for a service that belongs to no single department (UAT-25). */
 export const HOSPITAL_WIDE_LABEL = 'Hospital-wide (all departments)';
 
-/** "GST 18%" / "GST 18% (incl.)". */
+/** "GST 18%" / "GST 18% (incl.)"; a name that already carries the rate is not doubled. */
 export function taxLabel(tax: Pick<ServiceTaxRate, 'name' | 'percent' | 'isInclusive'>): string {
-  return `${tax.name} ${tax.percent}%${tax.isInclusive ? ' (incl.)' : ''}`;
+  const name = tax.name.trim();
+  const rate = name.includes('%') ? '' : ` ${tax.percent}%`;
+  return `${name}${rate}${tax.isInclusive ? ' (incl.)' : ''}`;
 }
 
 /** What a hospital rate may be applied to (the convenience fee is the platform's, BE-18). */

@@ -129,7 +129,9 @@ export function HelpSupportScreen() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <SectionTitle size={16}>Frequently Asked Questions</SectionTitle>
             <span className="text-caption text-text-muted">
-              {filtered ? `${shown.length} of ${faqs.length} answers` : `${faqs.length} answers`}
+              {filtered
+                ? `${shown.length} of ${faqs.length} ${faqs.length === 1 ? 'answer' : 'answers'}`
+                : `${faqs.length} ${faqs.length === 1 ? 'answer' : 'answers'}`}
             </span>
           </div>
           {shown.length === 0 ? (

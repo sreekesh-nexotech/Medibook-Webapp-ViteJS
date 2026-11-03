@@ -111,10 +111,16 @@ export const STATIC_FAQS: readonly Faq[] = [
   },
 ];
 
-/** The platform's answers when it publishes any (BE-34), else the app's own. */
+const UAT_FAQ = /^(uat|qa|demo)[:\s-]/i;
+
+/**
+ * The platform's answers when it publishes any (BE-34), else the app's own.
+ * UAT/demo-only entries are filtered out so they cannot replace the built-ins.
+ */
 export function faqsToShow(feed: readonly HelpFaq[] | undefined): readonly Faq[] {
-  if (!feed || feed.length === 0) return STATIC_FAQS;
-  return feed.map((f) => ({ key: f.id, q: f.question, a: f.answer, topic: f.category }));
+  const real = (feed ?? []).filter((f) => !UAT_FAQ.test(f.question.trim()));
+  if (real.length === 0) return STATIC_FAQS;
+  return real.map((f) => ({ key: f.id, q: f.question, a: f.answer, topic: f.category }));
 }
 
 /** The topics the answers fall into, in first-seen order. */

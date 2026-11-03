@@ -64,7 +64,7 @@ export const NAV_MODEL: readonly HospitalNavSection[] = [
   {
     section: 'System',
     items: [
-      { id: 'profile', label: 'Hospital Profile', icon: 'building', roles: ['admin'] },
+      { id: 'profile', label: 'Hospital Details', icon: 'building', roles: ['admin'] },
       { id: 'settings', label: 'Hospital Settings', icon: 'settings', roles: ['admin'] },
       { id: 'messaging', label: 'Messaging', icon: 'megaphone', roles: ['admin'] },
       { id: 'audit', label: 'Audit Trail', icon: 'scroll-text', roles: ['admin'] },
@@ -149,7 +149,7 @@ const VIEW_TITLE: Readonly<Partial<Record<HospitalView, string>>> = {
   help: 'Help & Support',
   users: 'Users & Roles',
   slots: 'Slots & Availability',
-  profile: 'Hospital Profile',
+  profile: 'Hospital Details',
   services: 'Services & Pricing',
   messaging: 'Messaging',
   audit: 'Audit Trail',
@@ -168,7 +168,7 @@ export function subFor(role: HospitalRole, view: HospitalView, firstName: string
   if (view === 'dashboard')
     return role === 'receptionist' ? `Welcome back, ${firstName}` : 'Hospital-wide overview';
   if (view === 'account') return 'Your name, password and signed-in devices';
-  if (view === 'create') return 'Book a walk-in or register an online arrival';
+  if (view === 'create') return 'Register a walk-in and collect payment';
   return null;
 }
 
