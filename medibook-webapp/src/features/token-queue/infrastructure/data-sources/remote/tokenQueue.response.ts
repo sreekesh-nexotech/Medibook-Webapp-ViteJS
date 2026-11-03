@@ -52,6 +52,8 @@ export const sessionSnapshotSchema = z.object({
   session_code: z.string(),
   label: z.string(),
   status: z.enum(['scheduled', 'open', 'paused', 'closed', 'cancelled']),
+  /** UAT-3: the patient's session is closed; show an explicit closed state. */
+  session_closed: z.boolean().optional(),
   queue_state: z.enum(['available', 'waiting', 'consulting', 'on_break']),
   current_token_no: z.number().int().nullable(),
   current_appointment_id: z.string().nullable(),
@@ -138,6 +140,7 @@ export function toQueueSession(dto: SessionSnapshotResponse): QueueSession {
     sessionCode: dto.session_code,
     label: dto.label,
     status: dto.status,
+    sessionClosed: dto.session_closed ?? (dto.status === 'closed' || dto.status === 'cancelled'),
     queueState: dto.queue_state,
     currentTokenNo: dto.current_token_no,
     currentAppointmentId: dto.current_appointment_id,

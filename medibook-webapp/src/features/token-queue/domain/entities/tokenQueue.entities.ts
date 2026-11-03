@@ -46,6 +46,8 @@ export interface QueueSession {
   readonly sessionCode: string;
   readonly label: string;
   readonly status: SessionStatus;
+  /** UAT-3: true when the session is closed/cancelled (also derived when the field is absent). */
+  readonly sessionClosed?: boolean;
   readonly queueState: QueueState;
   /**
    * How far the queue has got — the backend's progress pointer, **never

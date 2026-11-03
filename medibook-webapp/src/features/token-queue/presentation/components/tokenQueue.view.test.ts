@@ -84,6 +84,8 @@ function appt(tokenNo: number, over: Partial<DeskAppointment> = {}): DeskAppoint
     patientNotes: '',
     remark: '',
     paymentStatus: 'paid',
+    refundPendingRupees: 0,
+    needsCloseOut: false,
     consultationRupees: 500,
     serviceRupees: 0,
     discountRupees: 0,
