@@ -146,8 +146,10 @@ export interface DataRequest {
   readonly coolingOffEndsAt: string | null;
   readonly dueAt: string;
   readonly completedAt: string | null;
-  /** The prepared export, once there is one. */
+  /** The prepared export, once there is one and this viewer may download it. */
   readonly exportFileId: string | null;
+  /** Whether the export is ready, even when the raw file id is withheld (B10). */
+  readonly exportReady: boolean;
   readonly notes: string | null;
   /** What an export deliberately left out (medical documents, insurance — Q123), free-form. */
   readonly retentionCarveOut: unknown;

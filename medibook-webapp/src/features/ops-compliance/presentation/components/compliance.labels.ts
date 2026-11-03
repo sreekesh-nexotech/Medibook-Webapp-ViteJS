@@ -91,7 +91,7 @@ export const DATA_SUBJECT_LABEL: Readonly<Record<DataSubjectKind, string>> = {
 
 /** The next step a request is waiting on, in one line under its status. */
 export function dataRequestNote(r: DataRequest): string {
-  if (r.status === 'completed') return r.exportFileId ? 'File ready to download' : 'Closed';
+  if (r.status === 'completed') return r.exportReady ? 'File ready' : 'Closed';
   if (r.status === 'no_data') return 'No records held — nothing was written';
   if (r.status === 'rejected') return r.notes ?? 'Rejected';
   if (r.status === 'withdrawn') return 'Withdrawn by the account holder';

@@ -165,7 +165,7 @@ export function DataRequestDrawer({
               label="Completed at"
               value={r.completedAt ? fmtComplianceWhen(r.completedAt) : NONE}
             />
-            <Fact label="Export file" value={r.exportFileId ? 'Prepared' : NONE} />
+            <Fact label="Export file" value={r.exportReady ? 'Prepared' : NONE} />
           </div>
           <div className="flex flex-col gap-2">
             <SectionTitle size={15}>Notes</SectionTitle>

@@ -125,6 +125,11 @@ export interface SettlementStatement extends StatementRef {
   readonly convenienceFeesPaise: number;
   readonly convenienceFeeGstPaise: number;
   readonly netPayablePaise: number;
+  /** The settlement side of the month, for reconciliation (B01). */
+  readonly settlementNetPaise: number | null;
+  readonly settlementAdjustmentsPaise: number | null;
+  /** Statement net minus settlement net; a non-zero value is never hidden. */
+  readonly settlementDifferencePaise: number | null;
   /** Stored PDF; `null` = the server renders it on the first download. */
   readonly pdfFileId: string | null;
 }

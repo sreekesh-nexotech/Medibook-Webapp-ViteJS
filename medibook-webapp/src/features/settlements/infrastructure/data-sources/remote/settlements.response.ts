@@ -109,6 +109,9 @@ export const statementResponseSchema = statementRefResponseSchema.extend({
   convenience_fees_paise: z.number().int(),
   convenience_fee_gst_paise: z.number().int(),
   net_payable_paise: z.number().int(),
+  settlement_net_paise: z.number().int().optional(),
+  settlement_adjustments_paise: z.number().int().optional(),
+  settlement_difference_paise: z.number().int().optional(),
   pdf_file_id: z.string().nullable(),
 });
 
@@ -230,6 +233,9 @@ export function toStatement(dto: StatementResponse): SettlementStatement {
     convenienceFeesPaise: dto.convenience_fees_paise,
     convenienceFeeGstPaise: dto.convenience_fee_gst_paise,
     netPayablePaise: dto.net_payable_paise,
+    settlementNetPaise: dto.settlement_net_paise ?? null,
+    settlementAdjustmentsPaise: dto.settlement_adjustments_paise ?? null,
+    settlementDifferencePaise: dto.settlement_difference_paise ?? null,
     pdfFileId: dto.pdf_file_id,
   };
 }
