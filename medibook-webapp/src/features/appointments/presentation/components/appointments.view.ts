@@ -67,9 +67,18 @@ export function statusBadge(status: ApptStatus): BadgeSpec {
 /** Widened view for labelling a status that arrives as a plain string (history events). */
 const STATUS_LOOKUP: Readonly<Record<string, string | undefined>> = STATUS_LABEL;
 
+/**
+ * History labels keep the two queue stages distinct: the list collapses both
+ * into "In Queue", but "In Queue → In Queue" is not a change (B13).
+ */
+const EVENT_STATUS_LABEL: Readonly<Record<string, string>> = {
+  checked_in: 'Checked in',
+  in_consultation: 'In consultation',
+};
+
 /** The label for any status code, e.g. from an event's from/to status. */
 export function statusLabelOf(code: string): string {
-  return STATUS_LOOKUP[code] ?? code.replace(/_/g, ' ');
+  return EVENT_STATUS_LABEL[code] ?? STATUS_LOOKUP[code] ?? code.replace(/_/g, ' ');
 }
 
 export const PAYMENT_LABEL: Readonly<Record<ApptPaymentStatus, string>> = {
@@ -253,9 +262,8 @@ export interface ReasonCopy {
 
 /**
  * What the reason prompt says. Cancel and reject promise a refund only when
- * something was paid (03 F16). A hospital cancel / reject refunds the doctor's
- * booking fee (Q11): `refund` is that amount, and the convenience fee is named
- * as not refunded when it was part of the total.
+ * something was paid (03 F16). A hospital cancel / reject now refunds the full
+ * paid amount, including the convenience fee and its GST (Q11, UAT-5).
  */
 export function reasonCopy(
   kind: ReasonKind,
@@ -275,7 +283,7 @@ export function reasonCopy(
   return {
     title: kind === 'cancel' ? 'Cancel Appointment' : 'Reject Booking',
     body: paid
-      ? `The booking is ${action} and the patient is refunded ${refundPhrase(a, total, refund)} to the original payment method. Cash is handed back from your open cash drawer. This cannot be undone.`
+      ? `The booking is ${action} and the patient is refunded ${refund} in full, including the convenience fee, to the original payment method. Cash is handed back from your open cash drawer. This cannot be undone.`
       : `The booking is ${action} and its slot is freed. Nothing was paid, so there is nothing to refund. This cannot be undone.`,
     confirm: paid
       ? kind === 'cancel'
@@ -285,13 +293,6 @@ export function reasonCopy(
         ? 'Cancel booking'
         : 'Reject booking',
   };
-}
-
-/** "₹400.00 — the doctor's booking fee (the ₹24.00 convenience fee is not refunded)" or "₹400.00 in full". */
-function refundPhrase(a: DeskAppointment, total: string, refund: string): string {
-  return a.hospitalCancelRefundRupees < a.totalRupees
-    ? `${refund} — the doctor's booking fee (the rest of the ${total} paid, the convenience fee and its tax, is not refunded)`
-    : `${refund} in full`;
 }
 
 /* ---------------------------------------------------------- desk refusals */
@@ -519,12 +520,17 @@ export function actorLabel(actorKind: string): string {
 }
 
 /**
- * The payment badge for a row. A booking cancelled before anyone paid keeps
- * an unsettled status on older backends; showing "Pending" there reads as
- * money still owed, so it says "Not paid" instead. A ₹0 walk-in says
- * "Nothing due".
+ * The payment badge for a row. A cancelled booking refunded through the
+ * gateway stays `paid` until the gateway confirms; `refund_pending_paise`
+ * lets the desk see that the money is on its way back (UAT-5). A booking
+ * cancelled before anyone paid keeps an unsettled status on older backends;
+ * showing "Pending" there reads as money still owed, so it says "Not paid"
+ * instead. A ₹0 walk-in says "Nothing due".
  */
 export function paymentBadge(a: DeskAppointment): BadgeSpec {
+  if (a.refundPendingRupees > 0) {
+    return { status: 'Refund pending', label: 'Refund pending' };
+  }
   if (isNothingDue(a)) return { status: 'Inactive', label: PAYMENT_LABEL.not_required };
   const unsettled = a.paymentStatus === 'unpaid' || a.paymentStatus === 'pending';
   if (a.paymentStatus === 'cancelled' || (unsettled && isClosed(a))) {

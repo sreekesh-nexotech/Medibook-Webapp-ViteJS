@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { useActionKeys } from '@/shared/hooks/useActionKeys';
 import { useHospitalToday } from '@/shared/hooks/useHospitalTime';
 import { useNow } from '@/shared/hooks/useNow';
-import { useCan } from '@/shared/hooks/usePermission';
+import { useCan, usePermission } from '@/shared/hooks/usePermission';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -201,6 +201,7 @@ function DrawerBody({
         <Badge status={status.status}>{status.label}</Badge>
         <Badge status={payBadge.status}>{payBadge.label}</Badge>
         {needsApproval(appt) && <Badge status="Pending verification">Needs approval</Badge>}
+        {appt.needsCloseOut && <Badge status="Needs action">Needs action</Badge>}
       </div>
       {needsApproval(appt) && (
         <Card pad={16} className="mb-4">
@@ -217,6 +218,24 @@ function DrawerBody({
           <div className="text-body text-text-body">
             This consultation is free (a follow-up or a doctor without a fee). No receipt is issued;
             the patient can be checked in on the day.
+          </div>
+        </Card>
+      )}
+      {appt.refundPendingRupees > 0 && (
+        <Card pad={16} className="mb-4">
+          <div className="text-caption text-text-muted mb-1">Refund pending</div>
+          <div className="text-body text-text-body">
+            {money(appt.refundPendingRupees)} is still being returned to the patient. The booking
+            stays paid until the payment gateway confirms the refund.
+          </div>
+        </Card>
+      )}
+      {appt.needsCloseOut && (
+        <Card pad={16} className="mb-4">
+          <div className="text-caption text-text-muted mb-1">Needs close-out</div>
+          <div className="text-body text-text-body">
+            This booking's day is over and it was never closed. Mark it as a no-show, or cancel and
+            refund it.
           </div>
         </Card>
       )}
@@ -355,6 +374,8 @@ function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
   const { today, timeZone } = useHospitalToday();
   const now = useNow(CLOCK_TICK_MS);
   const canCollect = useCan('Payments.add');
+  const { roleId } = usePermission();
+  const isAdmin = roleId === 'admin';
   const [pay, setPay] = useState(false);
   const [receipt, setReceipt] = useState(false);
   const [token, setToken] = useState(false);
@@ -513,12 +534,15 @@ function DrawerActions({ appt, refundBlocked }: DrawerActionsProps) {
             </Button>
           </Can>
         )}
-        {!awaiting && canCancel(appt) && (
+        {!awaiting && canCancel(appt) && isAdmin && (
           <Can perm="Appointments.del">
             <Button variant="ghost" className="text-d-600!" onClick={() => setReason('cancel')}>
               {moneyBack === 'cancel-refund' ? 'Cancel & refund' : 'Cancel'}
             </Button>
           </Can>
+        )}
+        {!awaiting && canCancel(appt) && !isAdmin && (
+          <span className="text-caption text-text-muted">Contact an admin to cancel</span>
         )}
       </div>
 

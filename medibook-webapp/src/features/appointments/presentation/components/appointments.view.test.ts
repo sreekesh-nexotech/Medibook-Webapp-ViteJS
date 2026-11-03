@@ -96,6 +96,11 @@ describe('₹0 walk-ins owe nothing (UAT-12)', () => {
     expect(isNothingDue(appt({ paymentStatus: 'unpaid', totalRupees: 500 }))).toBe(false);
   });
 
+  it('shows a refund in progress instead of Paid (UAT-5)', () => {
+    const refunding = appt({ paymentStatus: 'paid', refundPendingRupees: 424 });
+    expect(paymentBadge(refunding).label).toBe('Refund pending');
+  });
+
   it('never asks to collect for a ₹0 walk-in and lets it check in', () => {
     const free = appt({ paymentStatus: 'unpaid', totalRupees: 0 });
     expect(needsPayment(free)).toBe(false);
@@ -177,17 +182,15 @@ describe('money back (B3 REFUND_REQUIRES_CANCEL, 03 F16)', () => {
     expect(paid.confirm).toBe('Reject & refund');
   });
 
-  it("refunds only the doctor's booking fee when the hospital cancels an online booking (Q11)", () => {
+  it('promises the full paid amount, including the convenience fee, when the hospital cancels (UAT-5)', () => {
     const online = appt({
       paymentStatus: 'paid',
       totalRupees: 424,
       convenienceRupees: 20,
-      hospitalCancelRefundRupees: 400,
+      hospitalCancelRefundRupees: 424,
     });
-    const copy = reasonCopy('cancel', online, '₹424.00', '₹400.00');
-    expect(copy.body).toContain("refunded ₹400.00 — the doctor's booking fee");
-    expect(copy.body).toContain('convenience fee and its tax, is not refunded');
-    expect(copy.body).not.toContain('in full');
+    const copy = reasonCopy('cancel', online, '₹424.00', '₹424.00');
+    expect(copy.body).toContain('refunded ₹424.00 in full, including the convenience fee');
     expect(copy.confirm).toBe('Cancel & refund');
   });
 });

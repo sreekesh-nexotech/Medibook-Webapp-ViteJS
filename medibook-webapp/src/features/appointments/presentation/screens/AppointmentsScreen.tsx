@@ -496,7 +496,9 @@ export function AppointmentsScreen() {
                   <td className={tdClass}>
                     <div className="flex flex-col items-start gap-0.75">
                       <Badge status={status.status}>{status.label}</Badge>
-                      {needsApproval(a) ? (
+                      {a.needsCloseOut ? (
+                        <Badge status="Needs action">Needs action</Badge>
+                      ) : needsApproval(a) ? (
                         <span className="text-caption text-y-700 font-semibold">
                           Needs approval
                         </span>

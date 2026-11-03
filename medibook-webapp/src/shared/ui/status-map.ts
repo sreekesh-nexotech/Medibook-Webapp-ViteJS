@@ -20,6 +20,8 @@ export const STATUS = {
   Paid: { bg: 'bg-badge-completed-bg', fg: 'text-badge-completed-fg' },
   Pending: { bg: 'bg-badge-queue-bg', fg: 'text-badge-queue-fg' },
   Refunded: { bg: 'bg-badge-cancelled-bg', fg: 'text-badge-cancelled-fg' },
+  'Refund pending': { bg: 'bg-badge-queue-bg', fg: 'text-badge-queue-fg' },
+  'Needs action': { bg: 'bg-badge-noshow-bg', fg: 'text-badge-noshow-fg' },
   Waived: { bg: 'bg-grey-300', fg: 'text-grey-900' },
   Failed: { bg: 'bg-badge-cancelled-bg', fg: 'text-badge-cancelled-fg' },
   Settled: { bg: 'bg-badge-completed-bg', fg: 'text-badge-completed-fg' },
