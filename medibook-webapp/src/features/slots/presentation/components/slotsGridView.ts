@@ -78,8 +78,8 @@ const NO_SESSIONS = 'No sessions on this date';
 
 /** A doctor-level reason that is more useful than "No sessions". */
 const UNAVAILABLE_REASON: Readonly<Record<string, string>> = {
-  doctor_on_leave: 'Doctor is on leave — booking is paused',
-  doctor_inactive: 'Doctor is inactive — hidden from the patient app',
+  doctor_on_leave: 'Doctor is on leave â€” booking is paused',
+  doctor_inactive: 'Doctor is inactive â€” hidden from the patient app',
 };
 
 const CELL_STATE: Readonly<Record<SlotLiveState, SlotCellState>> = {
