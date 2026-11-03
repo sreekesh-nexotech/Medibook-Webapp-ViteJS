@@ -137,8 +137,7 @@ export function ReportView({ report }: ReportViewProps) {
             );
           }
         },
-        onError: (failure) =>
-          toast(reportFailureText(failure, EXPORT_FAILED), 'error', failure),
+        onError: (failure) => toast(reportFailureText(failure, EXPORT_FAILED), 'error', failure),
       },
     );
   };

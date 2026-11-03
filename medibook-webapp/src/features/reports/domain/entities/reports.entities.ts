@@ -136,3 +136,26 @@ export interface ReportExportFile {
   readonly expiresAt: string | null;
   readonly status: ReportExportStatus;
 }
+
+/** One hospital scheduled report (`GET /hospital/report-schedules`, BE-32). */
+export interface ReportSchedule {
+  readonly id: string;
+  readonly reportCode: string;
+  readonly reportTitle: string | null;
+  readonly cadence: 'daily' | 'weekly';
+  readonly format: 'csv' | 'xlsx' | 'pdf';
+  readonly recipients: readonly string[];
+  /** Empty recipients means the hospital's active admins at send time. */
+  readonly usesDefaultRecipients: boolean;
+  readonly isActive: boolean;
+  readonly lastSentAt: string | null;
+  readonly lastRunAt: string | null;
+  readonly lastStatus: string | null;
+  readonly lastError: string | null;
+  readonly version: number;
+}
+
+export interface ReportScheduleUpdate {
+  readonly isActive?: boolean;
+  readonly recipients?: readonly string[];
+}

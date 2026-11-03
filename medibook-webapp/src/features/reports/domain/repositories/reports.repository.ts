@@ -7,6 +7,8 @@ import type {
   ReportExportRequest,
   ReportQuery,
   ReportResult,
+  ReportSchedule,
+  ReportScheduleUpdate,
 } from '@/features/reports/domain/entities/reports.entities';
 
 /** Hospital reports (`/hospital/reports`, permission `reports.view`). */
@@ -23,4 +25,12 @@ export interface ReportsRepository {
    * file-ownership rules decide who may see it.
    */
   getExportFile(fileId: string): Promise<Result<ReportExportFile>>;
+  /** This hospital's scheduled report emails (BE-32). */
+  listSchedules(): Promise<Result<readonly ReportSchedule[]>>;
+  /** Pause/resume a schedule or change its recipients. */
+  updateSchedule(
+    id: string,
+    changes: ReportScheduleUpdate,
+    version: number,
+  ): Promise<Result<ReportSchedule>>;
 }
