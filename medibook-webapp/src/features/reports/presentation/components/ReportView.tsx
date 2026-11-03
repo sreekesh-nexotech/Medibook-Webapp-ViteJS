@@ -29,7 +29,7 @@ import type { ReportCatalogItem } from '../reports.design';
 import { ReportDataTable } from './ReportDataTable';
 import { ReportFilterControls } from './ReportFilterControls';
 import { ReportQueuedExport } from './ReportQueuedExport';
-import { kpiTile, reportFailureText } from './reportsFormat';
+import { kpiTile, plainReportNote, reportFailureText } from './reportsFormat';
 import { saveBlob } from './reportsDownload';
 
 const EXPORT_FAILED = 'Could not export the report. Please try again.';
@@ -177,7 +177,7 @@ export function ReportView({ report }: ReportViewProps) {
             }
           : undefined;
 
-  const notes = data?.notes ?? definition.notes;
+  const notes = (data?.notes ?? definition.notes).map(plainReportNote);
 
   return (
     <div className="flex flex-col gap-5">
