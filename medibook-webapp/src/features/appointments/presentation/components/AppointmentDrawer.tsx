@@ -220,7 +220,9 @@ function DrawerBody({
           <div className="text-caption text-text-muted mb-1">Desk confirmation</div>
           <div className="text-body text-text-body">
             This booking needs the hospital's approval. Approve it to confirm the slot, or reject it
-            {hasPaid(appt) ? " — the patient is refunded the doctor's booking fee." : '.'}
+            {hasPaid(appt)
+              ? ' — the patient is refunded everything they paid, including the convenience fee.'
+              : '.'}
           </div>
         </Card>
       )}

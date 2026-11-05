@@ -1,5 +1,6 @@
 import type { PermissionKey } from '@/shared/hooks/usePermission';
 import { money } from '@/shared/lib/format';
+import { HOSPITAL_CANCEL_REFUND_SENTENCE } from '@/shared/lib/refundCopy';
 import {
   addIsoDays,
   formatDateTimeIn,
@@ -314,8 +315,7 @@ export function isSlotRefusal(failure: Failure): boolean {
 const DESK_REFUSALS: Readonly<Record<string, string>> = {
   CASH_SESSION_REQUIRED:
     'Open your cash drawer on the Payments screen first — cash is taken into, or handed back from, your own drawer.',
-  REFUND_REQUIRES_CANCEL:
-    "This booking is still on. Cancel it to refund the patient — a hospital cancel refunds the doctor's booking fee.",
+  REFUND_REQUIRES_CANCEL: `This booking is still on. Cancel it to refund the patient. ${HOSPITAL_CANCEL_REFUND_SENTENCE}`,
   IDEMPOTENCY_CONFLICT:
     'This was already sent with different details. Refresh the list to see what was recorded.',
 };

@@ -235,7 +235,7 @@ export function SettingsBookingSection({
           )}
           <RuleRow
             label="Refund the convenience fee too"
-            hint="A cancellation by the hospital refunds the doctor's fee in full; the convenience fee is not refunded (Q11)."
+            hint="Applies when a patient cancels. A cancellation by the hospital always refunds everything the patient paid, including the convenience fee (Q11)."
           >
             <Toggle
               value={value.refundIncludesConvenienceFee}

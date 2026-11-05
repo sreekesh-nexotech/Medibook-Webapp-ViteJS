@@ -5,6 +5,7 @@
  */
 import { isFailure } from '@/core/error/failure';
 import { formatInstant, parseHundredths } from '@/shared/lib/format';
+import { HOSPITAL_CANCEL_REFUND_SENTENCE } from '@/shared/lib/refundCopy';
 import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
@@ -207,7 +208,7 @@ export function refundFailureCopy(error: unknown, canOpenDrawer: boolean): strin
       : 'Cash is handed back from an open cash drawer, and your role cannot open one. Ask a colleague who can.';
   }
   if (error.code === REFUND_REQUIRES_CANCEL) {
-    return "This booking is still live. Cancel it from Appointments — a hospital cancel refunds the doctor's booking fee.";
+    return `This booking is still live. Cancel it from Appointments. ${HOSPITAL_CANCEL_REFUND_SENTENCE}`;
   }
   return error.message;
 }
