@@ -135,6 +135,19 @@ export interface AffectedBooking {
   readonly scheduledStartAt: string;
 }
 
+/** A booking a doctor-department change moves to the new department (UAT T07). */
+export interface MovedBooking {
+  /** The appointment's id; falls back to the booking ref when the server sends none. Never shown. */
+  readonly appointmentId: string;
+  readonly bookingRef: string;
+  readonly tokenLabel: string | null;
+  /** `''` when the server omits it. */
+  readonly patientName: string;
+  readonly scheduledStartAt: string | null;
+  readonly fromDepartment: string | null;
+  readonly toDepartment: string | null;
+}
+
 /**
  * The answer to every write that can touch bookings. `dryRun: true` means
  * nothing was applied — `affectedBookings` lists what confirming would cancel.
@@ -147,6 +160,8 @@ export interface ScheduleChange<T = null> {
    * kept, never cancelled (L-21); empty from an older backend.
    */
   readonly notCancellableBookings: readonly AffectedBooking[];
+  /** Bookings moved to another department, not cancelled (UAT T07); empty until the backend sends it. */
+  readonly movedBookings: readonly MovedBooking[];
   /** The written record when the change was applied and the API returns one. */
   readonly result: T | null;
   /**

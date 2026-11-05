@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type {
   AffectedBooking,
+  MovedBooking,
   Department,
   DoctorDateException,
   DoctorLeaveEntry,
@@ -159,6 +160,9 @@ export const scheduleChangeResponseSchema = z.object({
   not_cancellable_bookings: z.array(affectedBookingSchema).optional(),
   // Confirm-bound-to-preview (L-17, BE-33).
   preview_token: z.string().nullable().optional(),
+  // UAT T07 — PROPOSED, not in the OpenAPI schema yet: bookings the change moves to another
+  // department instead of cancelling. Items are read leniently in `toMovedBookings`.
+  moved_bookings: z.unknown().optional(),
   rematerialisation_queued: z.boolean().optional(),
 });
 
@@ -301,6 +305,17 @@ export function toDoctorReview(dto: DoctorReviewResponse): DoctorReview {
   };
 }
 
+/** One item of the proposed `moved_bookings`; only the booking ref is required. */
+const movedBookingSchema = z.object({
+  appointment_id: z.string().optional(),
+  booking_ref: z.string(),
+  token_label: z.string().nullable().optional(),
+  patient_name: z.string().nullable().optional(),
+  scheduled_start_at: z.string().nullable().optional(),
+  from_department: z.string().nullable().optional(),
+  to_department: z.string().nullable().optional(),
+});
+
 type AffectedBookingResponse = z.infer<typeof affectedBookingSchema>;
 
 function toAffectedBooking(b: AffectedBookingResponse): AffectedBooking {
@@ -320,4 +335,32 @@ export function toAffectedBookings(dto: ScheduleChangeResponse): readonly Affect
 /** Bookings the change leaves alone because they are under way or done (L-21). */
 export function toNotCancellableBookings(dto: ScheduleChangeResponse): readonly AffectedBooking[] {
   return (dto.not_cancellable_bookings ?? []).map(toAffectedBooking);
+}
+
+/**
+ * Bookings the change moves to another department (UAT T07, proposed field).
+ * Tolerant: an absent or non-list field gives `[]`, a malformed item is skipped,
+ * and a booking the same change cancels is listed only as cancelled.
+ */
+export function toMovedBookings(dto: ScheduleChangeResponse): readonly MovedBooking[] {
+  if (!Array.isArray(dto.moved_bookings)) return [];
+  const cancelled = new Set(dto.affected_bookings.map((b) => b.appointment_id));
+  const moved: MovedBooking[] = [];
+  for (const item of dto.moved_bookings) {
+    const parsed = movedBookingSchema.safeParse(item);
+    if (!parsed.success) continue;
+    const b = parsed.data;
+    const appointmentId = b.appointment_id ?? b.booking_ref;
+    if (cancelled.has(appointmentId)) continue;
+    moved.push({
+      appointmentId,
+      bookingRef: b.booking_ref,
+      tokenLabel: b.token_label ?? null,
+      patientName: b.patient_name ?? '',
+      scheduledStartAt: b.scheduled_start_at ?? null,
+      fromDepartment: b.from_department ?? null,
+      toDepartment: b.to_department ?? null,
+    });
+  }
+  return moved;
 }

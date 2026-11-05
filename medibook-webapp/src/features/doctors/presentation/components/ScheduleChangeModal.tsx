@@ -2,8 +2,14 @@ import { Button } from '@/shared/ui/Button';
 import { Icon } from '@/shared/ui/Icon';
 import { Modal } from '@/shared/ui/Modal';
 
-import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors.types';
-import { CANCEL_REFUND_NOTE } from '@/features/doctors/presentation/components/scheduleConfirm';
+import type {
+  AffectedBooking,
+  MovedBooking,
+} from '@/features/doctors/domain/entities/doctors.types';
+import {
+  CANCEL_REFUND_NOTE,
+  movedDepartmentLabel,
+} from '@/features/doctors/presentation/components/scheduleConfirm';
 import { useHospitalProfileQuery } from '@/features/settings/application/queries/useHospitalProfileQuery';
 
 /** How many affected bookings to name before summarising the rest. */
@@ -20,11 +26,26 @@ function when(iso: string, timeZone: string | undefined): string {
   }).format(date);
 }
 
+/** "A-04 · BK-1 · Cardiology → Neurology · 6 Nov 2026, 10:00 am"; absent parts are left out. */
+function movedCaption(b: MovedBooking, timeZone: string | undefined): string {
+  const dept = movedDepartmentLabel(b);
+  return [
+    b.tokenLabel,
+    b.patientName ? b.bookingRef : null,
+    dept,
+    b.scheduledStartAt === null ? null : when(b.scheduledStartAt, timeZone),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ');
+}
+
 interface ScheduleChangeModalProps {
   /** `null` = closed. */
   affected: readonly AffectedBooking[] | null;
   /** Bookings in consultation or completed in that time — kept, never cancelled (L-21). */
   kept?: readonly AffectedBooking[];
+  /** Bookings that move to another department instead of being cancelled (UAT T07). */
+  moved?: readonly MovedBooking[];
   /** The list was refreshed because the bookings changed since the first preview. */
   changed?: boolean;
   isApplying: boolean;
@@ -36,6 +57,7 @@ interface ScheduleChangeModalProps {
 export function ScheduleChangeModal({
   affected,
   kept = [],
+  moved = [],
   changed = false,
   isApplying,
   onConfirm,
@@ -104,6 +126,29 @@ export function ScheduleChangeModal({
             </p>
           )}
         </>
+      )}
+      {moved.length > 0 && (
+        <div className="mt-4" data-testid="moved-bookings">
+          <p className="text-body text-text-body mb-2">
+            {moved.length} booking{moved.length === 1 ? ' moves' : 's move'} to another department.{' '}
+            {moved.length === 1 ? 'It is' : 'They are'} not cancelled and nothing is refunded.
+          </p>
+          <ul className="divide-border-soft border-border-soft divide-y rounded-md border">
+            {moved.slice(0, LISTED_BOOKINGS).map((b) => (
+              <li key={b.appointmentId} className="flex items-center gap-3 px-3.5 py-2.5">
+                <span className="text-body text-text-strong flex-1 font-medium">
+                  {b.patientName || b.bookingRef}
+                </span>
+                <span className="text-caption text-text-muted">{movedCaption(b, timeZone)}</span>
+              </li>
+            ))}
+          </ul>
+          {moved.length > LISTED_BOOKINGS && (
+            <p className="text-caption text-text-muted mt-2">
+              and {moved.length - LISTED_BOOKINGS} more.
+            </p>
+          )}
+        </div>
       )}
       {kept.length > 0 && (
         <div className="mt-4">

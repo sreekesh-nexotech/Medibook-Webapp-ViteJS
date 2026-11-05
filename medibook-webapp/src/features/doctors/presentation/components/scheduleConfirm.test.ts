@@ -7,6 +7,7 @@ import {
   cancelledBookingsCopy,
   isIdempotencyConflict,
   isPreviewStale,
+  movedDepartmentLabel,
   unpreviewedBookings,
   unpreviewedCopy,
 } from '@/features/doctors/presentation/components/scheduleConfirm';
@@ -61,5 +62,28 @@ describe('confirm bound to its preview (L-17, BE-33)', () => {
       '3 bookings cancelled (a paid booking is refunded in full)',
     );
     expect(cancelledBookingsCopy(2)).not.toMatch(/and refunded|with a full refund/);
+  });
+});
+
+describe('movedDepartmentLabel (UAT T07)', () => {
+  const base = {
+    appointmentId: 'a',
+    bookingRef: 'BK-1',
+    tokenLabel: null,
+    patientName: 'Asha Rao',
+    scheduledStartAt: null,
+  };
+  it('shows old and new department', () => {
+    expect(
+      movedDepartmentLabel({ ...base, fromDepartment: 'Cardiology', toDepartment: 'Neurology' }),
+    ).toBe('Cardiology → Neurology');
+  });
+  it('shows only the new one when the old is unknown, nothing when both are', () => {
+    expect(movedDepartmentLabel({ ...base, fromDepartment: null, toDepartment: 'Neurology' })).toBe(
+      'now Neurology',
+    );
+    expect(
+      movedDepartmentLabel({ ...base, fromDepartment: 'Cardiology', toDepartment: null }),
+    ).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 
 import type {
   AffectedBooking,
+  MovedBooking,
   ScheduleChange,
   ScheduleWriteMode,
 } from '@/features/doctors/domain/entities/doctors.types';
@@ -26,6 +27,8 @@ interface Pending {
   readonly affected: readonly AffectedBooking[];
   /** Under way or done — the change keeps them (L-21). */
   readonly kept: readonly AffectedBooking[];
+  /** Moved to another department, not cancelled (UAT T07). */
+  readonly moved: readonly MovedBooking[];
   /** The server refused the first confirm because the affected bookings changed. */
   readonly changed: boolean;
   readonly confirm: () => Promise<void>;
@@ -43,7 +46,7 @@ function newKey(): string {
  * The dry-run → confirm flow every booking-affecting write uses (Q32, Q73):
  * 1. dry run (its own fresh `Idempotency-Key`);
  * 2. applied already (an edit that touches no schedule) → done;
- * 3. nothing affected or kept → confirm straight away;
+ * 3. nothing affected, kept or moved → confirm straight away;
  * 4. otherwise hold it and let `ScheduleChangeModal` name the bookings that
  *    confirming cancels (refunding the doctor's fee, Q11) and those it keeps because the
  *    patient is already in consultation or done (L-21).
@@ -107,11 +110,17 @@ export function useScheduleConfirm() {
         }
       };
       const kept = dry.notCancellableBookings;
-      if (dry.affectedBookings.length === 0 && kept.length === 0 && !changed) {
+      const moved = dry.movedBookings;
+      if (
+        dry.affectedBookings.length === 0 &&
+        kept.length === 0 &&
+        moved.length === 0 &&
+        !changed
+      ) {
         await apply();
         return;
       }
-      setPending({ affected: dry.affectedBookings, kept, changed, confirm: apply });
+      setPending({ affected: dry.affectedBookings, kept, moved, changed, confirm: apply });
     };
     try {
       await preview(false);
@@ -125,6 +134,7 @@ export function useScheduleConfirm() {
     modal: {
       affected: pending?.affected ?? null,
       kept: pending?.kept ?? [],
+      moved: pending?.moved ?? [],
       changed: pending?.changed ?? false,
       isApplying,
       onConfirm: () => void pending?.confirm(),
