@@ -26,9 +26,11 @@ export const platformUserSummaryResponseSchema = z.object({
   created_at: z.string(),
   // B2 (BE-31): booking count on list rows; absent on older backends.
   booking_count: z.number().int().nullable().optional(),
-  // UAT T10 — PROPOSED: the block response's paid upcoming booking refs. The OpenAPI schema
-  // types that response as a free object, so it is read leniently by `toUpcomingPaidRefs`.
+  // UAT T10: the block / unblock / unlock response's paid upcoming booking refs
+  // (`UserActionResponse`); absent on list and detail rows, so read leniently.
   upcoming_paid_bookings: z.unknown().optional(),
+  // Exact total; the list above holds at most 50 refs.
+  upcoming_paid_bookings_count: z.number().int().nullable().optional(),
 });
 
 export const platformUsersPageResponseSchema = paginatedSchema(platformUserSummaryResponseSchema);
@@ -107,6 +109,7 @@ export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): Platfor
     createdAt: dto.created_at,
     bookingCount: dto.booking_count ?? null,
     upcomingPaidBookingRefs: toUpcomingPaidRefs(dto.upcoming_paid_bookings),
+    upcomingPaidBookingsCount: dto.upcoming_paid_bookings_count ?? null,
   };
 }
 

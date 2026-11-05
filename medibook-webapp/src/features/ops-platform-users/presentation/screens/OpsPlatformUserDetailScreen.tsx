@@ -20,6 +20,7 @@ import {
   humanize,
   isLockedAt,
   upcomingPaidCountLabel,
+  upcomingPaidMoreLabel,
   userName,
   verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
@@ -94,7 +95,10 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [reason, setReason] = useState('');
   // Paid upcoming bookings the block response reported (UAT T10); empty when none or not sent.
-  const [exposedRefs, setExposedRefs] = useState<readonly string[]>([]);
+  const [exposed, setExposed] = useState<{
+    readonly refs: readonly string[];
+    readonly total: number | null;
+  }>({ refs: [], total: null });
 
   const name = userName(u);
   const pill = ACCOUNT_STATUS_PILLS[u.status];
@@ -118,7 +122,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
     if (blocked) {
       unblock.mutate(u.id, {
         onSuccess: () => {
-          setExposedRefs([]);
+          setExposed({ refs: [], total: null });
           toast(`${name} unblocked.`);
           closeConfirm();
         },
@@ -131,7 +135,10 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
       { id: u.id, reason: trimmedReason },
       {
         onSuccess: (blockedUser) => {
-          setExposedRefs(blockedUser.upcomingPaidBookingRefs);
+          setExposed({
+            refs: blockedUser.upcomingPaidBookingRefs,
+            total: blockedUser.upcomingPaidBookingsCount,
+          });
           toast(`${name} blocked.`);
           closeConfirm();
         },
@@ -179,16 +186,20 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      {blocked && exposedRefs.length > 0 && (
+      {blocked && exposed.refs.length > 0 && (
         <Card pad={16} data-testid="blocked-upcoming-bookings">
           <div className="text-body text-text-strong mb-1 font-medium">
-            {upcomingPaidCountLabel(exposedRefs)}
+            {upcomingPaidCountLabel(exposed.refs, exposed.total)}
           </div>
           <div className="text-body text-text-body mb-2">
             {name} can no longer sign in to cancel these for a refund. The hospital can cancel them
             from its desk, which refunds the full amount including the convenience fee.
           </div>
-          <div className="text-caption text-text-muted">{exposedRefs.join(', ')}</div>
+          <div className="text-caption text-text-muted">
+            {[exposed.refs.join(', '), upcomingPaidMoreLabel(exposed.refs, exposed.total)]
+              .filter(Boolean)
+              .join(' ')}
+          </div>
         </Card>
       )}
       <Card>

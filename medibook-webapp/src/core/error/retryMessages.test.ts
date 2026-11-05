@@ -25,6 +25,30 @@ describe('lockedOutMessage (UAT T13)', () => {
     expect(text).toContain('6 Nov');
   });
 
+  it('adds the support contact when the backend sends one', () => {
+    const until = '2026-11-05T10:15:00Z';
+    const both = lockedOutMessage(
+      { locked_until: until, support: { phone_e164: '+911800000000', email: 'help@medibook.in' } },
+      NOW,
+      'UTC',
+    );
+    expect(both).toMatch(/Need help\? You can call \+911800000000 or email help@medibook\.in\.$/);
+    const phoneOnly = lockedOutMessage(
+      { locked_until: until, support: { phone_e164: '+911800000000', email: null } },
+      NOW,
+      'UTC',
+    );
+    expect(phoneOnly).toMatch(/You can call \+911800000000\.$/);
+  });
+
+  it('leaves the support line out when the contact is null, empty or malformed', () => {
+    for (const support of [{ phone_e164: null, email: null }, {}, null, 'x']) {
+      expect(lockedOutMessage({ locked_until: '2026-11-05T10:15:00Z', support }, NOW, 'UTC')).toBe(
+        'Too many failed attempts. Sign-in is locked until 10:15 am. Try again then.',
+      );
+    }
+  });
+
   it('is null when locked_until is absent, unparseable or already past', () => {
     expect(lockedOutMessage({}, NOW)).toBeNull();
     expect(lockedOutMessage({ locked_until: 'soon' }, NOW)).toBeNull();

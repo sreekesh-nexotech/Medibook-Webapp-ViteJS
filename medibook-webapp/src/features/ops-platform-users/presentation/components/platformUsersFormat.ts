@@ -114,12 +114,22 @@ export function verifiedLabel(at: string | null): string {
   return at ? `Verified ${formatDate(at)}` : 'Not verified';
 }
 
-/** The backend lists at most this many refs, so a full list means "at least". */
-const UPCOMING_REFS_CAP = 50;
+/** The exact total when the backend sends it, else the refs we were given. */
+function upcomingTotal(refs: readonly string[], total: number | null): number {
+  return Math.max(total ?? 0, refs.length);
+}
 
-/** "3 upcoming paid bookings" / "50 or more upcoming paid bookings". */
-export function upcomingPaidCountLabel(refs: readonly string[]): string {
-  const n = refs.length;
-  if (n >= UPCOMING_REFS_CAP) return `${UPCOMING_REFS_CAP} or more upcoming paid bookings`;
+/** "3 upcoming paid bookings". */
+export function upcomingPaidCountLabel(refs: readonly string[], total: number | null): string {
+  const n = upcomingTotal(refs, total);
   return `${n} upcoming paid booking${n === 1 ? '' : 's'}`;
+}
+
+/** "+12 more" when the capped list is shorter than the exact total, else `null`. */
+export function upcomingPaidMoreLabel(
+  refs: readonly string[],
+  total: number | null,
+): string | null {
+  const more = upcomingTotal(refs, total) - refs.length;
+  return more > 0 ? `+${more} more` : null;
 }

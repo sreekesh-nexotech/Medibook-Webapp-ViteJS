@@ -52,6 +52,8 @@ export interface PlatformUserSummary {
    * empty on every other response and until the backend sends it.
    */
   readonly upcomingPaidBookingRefs: readonly string[];
+  /** Exact total of those bookings (the refs are capped at 50); `null` when not sent. */
+  readonly upcomingPaidBookingsCount: number | null;
 }
 
 /** Demographics from the patient profile — never medical data (D-04). */

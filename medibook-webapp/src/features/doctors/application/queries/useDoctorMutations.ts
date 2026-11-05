@@ -51,8 +51,10 @@ export function useUpdateDoctorMutation() {
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.detail(id) });
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.schedule(id) });
       refreshAfterScheduleChange(queryClient, {
-        cancelledBookings: change.affectedBookings.length,
-        rematerialisationQueued: change.rematerialisationQueued,
+        // Moved bookings change what the desk lists and queue show, like cancelled ones (UAT T07).
+        cancelledBookings: change.affectedBookings.length + change.movedBookings.length,
+        // The backend rebuilds a doctor's slots in the same request (UAT T04).
+        rematerialisationQueued: false,
       });
     },
   });
@@ -75,7 +77,8 @@ export function useDeleteDoctorMutation() {
       queryClient.removeQueries({ queryKey: doctorsKeys.schedule(id) });
       refreshAfterScheduleChange(queryClient, {
         cancelledBookings: change.affectedBookings.length,
-        rematerialisationQueued: change.rematerialisationQueued,
+        // The backend rebuilds a doctor's slots in the same request (UAT T04).
+        rematerialisationQueued: false,
       });
     },
   });

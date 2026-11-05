@@ -11,6 +11,7 @@ import {
   deviceLine,
   searchHint,
   upcomingPaidCountLabel,
+  upcomingPaidMoreLabel,
   verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
 
@@ -97,11 +98,17 @@ describe('upcoming paid bookings after a block (UAT T10, proposed)', () => {
     expect(toUpcomingPaidRefs(undefined)).toEqual([]);
   });
 
-  it('labels the count in plain words', () => {
-    expect(upcomingPaidCountLabel(['BK-1'])).toBe('1 upcoming paid booking');
-    expect(upcomingPaidCountLabel(['BK-1', 'BK-2'])).toBe('2 upcoming paid bookings');
-    expect(upcomingPaidCountLabel(Array.from({ length: 50 }, (_, i) => `BK-${i}`))).toBe(
-      '50 or more upcoming paid bookings',
-    );
+  it('labels the exact total, not just the capped list', () => {
+    expect(upcomingPaidCountLabel(['BK-1'], null)).toBe('1 upcoming paid booking');
+    expect(upcomingPaidCountLabel(['BK-1', 'BK-2'], 2)).toBe('2 upcoming paid bookings');
+    const fifty = Array.from({ length: 50 }, (_, i) => `BK-${i}`);
+    expect(upcomingPaidCountLabel(fifty, 63)).toBe('63 upcoming paid bookings');
+  });
+
+  it('says how many refs are not listed', () => {
+    const fifty = Array.from({ length: 50 }, (_, i) => `BK-${i}`);
+    expect(upcomingPaidMoreLabel(fifty, 63)).toBe('+13 more');
+    expect(upcomingPaidMoreLabel(['BK-1'], 1)).toBeNull();
+    expect(upcomingPaidMoreLabel(['BK-1'], null)).toBeNull();
   });
 });

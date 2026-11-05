@@ -28,7 +28,19 @@ export function lockedOutMessage(
   const when = sameDay
     ? time
     : `${new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone }).format(until)}, ${time}`;
-  return `Too many failed attempts. Sign-in is locked until ${when}. Try again then.`;
+  return `Too many failed attempts. Sign-in is locked until ${when}. Try again then.${supportLine(meta)}`;
+}
+
+/** " Need help? Call +91… or email help@…" from `meta.support`; empty when neither is set. */
+export function supportLine(meta: Meta): string {
+  const support = meta['support'];
+  if (typeof support !== 'object' || support === null) return '';
+  const { phone_e164: phone, email } = support as Record<string, unknown>;
+  const parts = [
+    typeof phone === 'string' && phone !== '' ? `call ${phone}` : null,
+    typeof email === 'string' && email !== '' ? `email ${email}` : null,
+  ].filter((p): p is string => p !== null);
+  return parts.length === 0 ? '' : ` Need help? You can ${parts.join(' or ')}.`;
 }
 
 function positiveSeconds(value: unknown): number | null {
