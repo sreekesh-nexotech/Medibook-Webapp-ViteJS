@@ -294,6 +294,7 @@ export function DoctorQueueCard({
                 key={t.appointmentId}
                 label={t.label}
                 patientName={ticketTitle(t)}
+                accountFlag={t.patientAccountFlag}
                 onCall={canCallToken ? () => runToken('call', t.tokenNo) : undefined}
               />
             ))
@@ -326,6 +327,7 @@ export function DoctorQueueCard({
                 key={t.appointmentId}
                 label={t.label}
                 patientName={t.patientName}
+                accountFlag={t.patientAccountFlag}
                 actionVerb="Mark done"
                 onCall={
                   canRunQueue && isLive && !busy ? () => runToken('complete', t.tokenNo) : undefined
@@ -350,6 +352,7 @@ export function DoctorQueueCard({
                 <TokenChip
                   label={t.label}
                   patientName={ticketTitle(t)}
+                  accountFlag={t.patientAccountFlag}
                   muted
                   actionVerb="Call again"
                   onCall={canCallToken ? () => runToken('recall', t.tokenNo) : undefined}

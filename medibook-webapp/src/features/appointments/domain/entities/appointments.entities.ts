@@ -1,3 +1,5 @@
+import type { PatientAccountFlag } from '@/shared/lib/patientAccountFlag';
+
 /**
  * Desk appointments as the hospital API serves them. Plain readonly types.
  * Money is whole rupees here; the paise the API uses never leave the
@@ -74,6 +76,8 @@ export interface DeskAppointment {
   readonly refundPendingRupees: number;
   /** UAT-7: a past booking the desk still has to mark no-show or refund. */
   readonly needsCloseOut: boolean;
+  /** The patient's account state, for the desk's information only (UAT part 2). */
+  readonly patientAccountFlag: PatientAccountFlag | null;
   readonly consultationRupees: number;
   readonly serviceRupees: number;
   readonly discountRupees: number;

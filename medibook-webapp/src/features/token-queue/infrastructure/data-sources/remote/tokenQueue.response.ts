@@ -1,3 +1,4 @@
+import { parsePatientAccountFlag } from '@/shared/lib/patientAccountFlag';
 import { z } from 'zod';
 
 import { paginatedSchema } from '@/core/api/pagination';
@@ -41,6 +42,8 @@ export const queueRowSchema = z.object({
   offer_no_show: z.boolean().nullable().optional(),
   patient_name: z.string().nullable().optional(),
   mrn: z.string().nullable().optional(),
+  // UAT part 2 — proposed on queue rows (it is on appointment rows); read leniently.
+  patient_account_flag: z.string().nullable().optional(),
 });
 
 export const sessionSnapshotSchema = z.object({
@@ -122,6 +125,7 @@ function toQueueRow(dto: QueueRowResponse, kind: QueueRowKind): QueueRow {
     offerNoShow: dto.offer_no_show ?? false,
     patientName: dto.patient_name ?? null,
     mrn: dto.mrn ?? null,
+    patientAccountFlag: parsePatientAccountFlag(dto.patient_account_flag),
   };
 }
 

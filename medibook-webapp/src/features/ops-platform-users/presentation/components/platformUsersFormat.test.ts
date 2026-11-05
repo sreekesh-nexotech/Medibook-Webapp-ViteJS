@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { toCountQuery } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.request';
 import {
+  platformUserSummaryResponseSchema,
   toPlatformUserDetail,
   toPlatformUserSummary,
+  toUpcomingPaidRefs,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.response';
 import {
   deviceLine,
   searchHint,
+  upcomingPaidCountLabel,
   verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
 
@@ -77,5 +80,28 @@ describe('KPI counts (B2 BE-31)', () => {
       page_size: 1,
       last_login_from: '2026-09-07',
     });
+  });
+});
+
+describe('upcoming paid bookings after a block (UAT T10, proposed)', () => {
+  it('is empty when the block response does not carry the field', () => {
+    expect(
+      toPlatformUserSummary(platformUserSummaryResponseSchema.parse(SUMMARY))
+        .upcomingPaidBookingRefs,
+    ).toEqual([]);
+  });
+
+  it('reads booking refs and skips anything else', () => {
+    expect(toUpcomingPaidRefs(['BK-1', '', 7, null, 'BK-2'])).toEqual(['BK-1', 'BK-2']);
+    expect(toUpcomingPaidRefs('BK-1')).toEqual([]);
+    expect(toUpcomingPaidRefs(undefined)).toEqual([]);
+  });
+
+  it('labels the count in plain words', () => {
+    expect(upcomingPaidCountLabel(['BK-1'])).toBe('1 upcoming paid booking');
+    expect(upcomingPaidCountLabel(['BK-1', 'BK-2'])).toBe('2 upcoming paid bookings');
+    expect(upcomingPaidCountLabel(Array.from({ length: 50 }, (_, i) => `BK-${i}`))).toBe(
+      '50 or more upcoming paid bookings',
+    );
   });
 });

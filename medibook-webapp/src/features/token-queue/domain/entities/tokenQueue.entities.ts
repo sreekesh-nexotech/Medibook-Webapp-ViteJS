@@ -1,3 +1,5 @@
+import type { PatientAccountFlag } from '@/shared/lib/patientAccountFlag';
+
 /**
  * The live token queue. The backend's queue unit is a **doctor session** —
  * one doctor, one date, one named session (D-15) — so every command targets
@@ -33,6 +35,8 @@ export interface QueueRow {
   /** Hospital REST and the hospital socket only. */
   readonly patientName: string | null;
   readonly mrn: string | null;
+  /** Information only — the desk still serves a flagged patient (UAT part 2). */
+  readonly patientAccountFlag: PatientAccountFlag | null;
 }
 
 export interface QueueSession {

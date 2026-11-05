@@ -6,6 +6,8 @@ import { useNow } from '@/shared/hooks/useNow';
 import { useCan, usePermission } from '@/shared/hooks/usePermission';
 import { money } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/Badge';
+import { PatientFlagBadge } from '@/shared/ui/PatientFlagBadge';
+import { PATIENT_FLAG_HINT } from '@/shared/lib/patientAccountFlag';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
@@ -203,6 +205,16 @@ function DrawerBody({
         {needsApproval(appt) && <Badge status="Pending verification">Needs approval</Badge>}
         {appt.needsCloseOut && <Badge status="Needs action">Needs action</Badge>}
       </div>
+      {appt.patientAccountFlag !== null && (
+        <Card pad={16} className="mb-4" data-testid="patient-flag-notice">
+          <div className="mb-1">
+            <PatientFlagBadge flag={appt.patientAccountFlag} />
+          </div>
+          <div className="text-body text-text-body">
+            {PATIENT_FLAG_HINT[appt.patientAccountFlag]}
+          </div>
+        </Card>
+      )}
       {needsApproval(appt) && (
         <Card pad={16} className="mb-4">
           <div className="text-caption text-text-muted mb-1">Desk confirmation</div>

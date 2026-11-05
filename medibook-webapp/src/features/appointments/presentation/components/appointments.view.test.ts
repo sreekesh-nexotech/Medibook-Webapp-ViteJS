@@ -57,6 +57,7 @@ function appt(over: Partial<DeskAppointment> = {}): DeskAppointment {
     paymentStatus: 'unpaid',
     refundPendingRupees: 0,
     needsCloseOut: false,
+    patientAccountFlag: null,
     consultationRupees: 500,
     serviceRupees: 0,
     discountRupees: 0,

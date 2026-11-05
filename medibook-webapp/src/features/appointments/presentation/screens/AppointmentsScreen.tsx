@@ -12,6 +12,7 @@ import { money } from '@/shared/lib/format';
 import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
+import { PatientFlagBadge } from '@/shared/ui/PatientFlagBadge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
@@ -470,6 +471,7 @@ export function AppointmentsScreen() {
                       <span className="text-text-strong font-medium">
                         {a.patient?.fullName ?? 'Unknown patient'}
                       </span>
+                      <PatientFlagBadge flag={a.patientAccountFlag} />
                     </div>
                   </td>
                   <td className={tdClass}>

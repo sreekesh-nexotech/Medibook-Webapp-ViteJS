@@ -19,6 +19,7 @@ import {
   fullName,
   humanize,
   isLockedAt,
+  upcomingPaidCountLabel,
   userName,
   verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
@@ -92,6 +93,8 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   const mayEdit = useOpsPermission().can('platform_users.edit');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [reason, setReason] = useState('');
+  // Paid upcoming bookings the block response reported (UAT T10); empty when none or not sent.
+  const [exposedRefs, setExposedRefs] = useState<readonly string[]>([]);
 
   const name = userName(u);
   const pill = ACCOUNT_STATUS_PILLS[u.status];
@@ -115,6 +118,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
     if (blocked) {
       unblock.mutate(u.id, {
         onSuccess: () => {
+          setExposedRefs([]);
           toast(`${name} unblocked.`);
           closeConfirm();
         },
@@ -126,7 +130,8 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
     block.mutate(
       { id: u.id, reason: trimmedReason },
       {
-        onSuccess: () => {
+        onSuccess: (blockedUser) => {
+          setExposedRefs(blockedUser.upcomingPaidBookingRefs);
           toast(`${name} blocked.`);
           closeConfirm();
         },
@@ -174,6 +179,18 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {blocked && exposedRefs.length > 0 && (
+        <Card pad={16} data-testid="blocked-upcoming-bookings">
+          <div className="text-body text-text-strong mb-1 font-medium">
+            {upcomingPaidCountLabel(exposedRefs)}
+          </div>
+          <div className="text-body text-text-body mb-2">
+            {name} can no longer sign in to cancel these for a refund. The hospital can cancel them
+            from its desk, which refunds the full amount including the convenience fee.
+          </div>
+          <div className="text-caption text-text-muted">{exposedRefs.join(', ')}</div>
+        </Card>
+      )}
       <Card>
         <div className="flex flex-wrap items-center gap-4">
           <Avatar name={name} size={56} />

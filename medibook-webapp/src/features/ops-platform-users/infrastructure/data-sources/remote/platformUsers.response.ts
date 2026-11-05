@@ -26,6 +26,9 @@ export const platformUserSummaryResponseSchema = z.object({
   created_at: z.string(),
   // B2 (BE-31): booking count on list rows; absent on older backends.
   booking_count: z.number().int().nullable().optional(),
+  // UAT T10 — PROPOSED: the block response's paid upcoming booking refs. The OpenAPI schema
+  // types that response as a free object, so it is read leniently by `toUpcomingPaidRefs`.
+  upcoming_paid_bookings: z.unknown().optional(),
 });
 
 export const platformUsersPageResponseSchema = paginatedSchema(platformUserSummaryResponseSchema);
@@ -83,6 +86,12 @@ export type PlatformUserSummaryResponse = z.infer<typeof platformUserSummaryResp
 export type PlatformUsersPageResponse = z.infer<typeof platformUsersPageResponseSchema>;
 export type PlatformUserDetailResponse = z.infer<typeof platformUserDetailResponseSchema>;
 
+/** Booking refs only; anything that is not a list of non-empty strings is skipped. */
+export function toUpcomingPaidRefs(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string' && v !== '');
+}
+
 export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): PlatformUserSummary {
   return {
     id: dto.id,
@@ -97,6 +106,7 @@ export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): Platfor
     lastLoginAt: dto.last_login_at,
     createdAt: dto.created_at,
     bookingCount: dto.booking_count ?? null,
+    upcomingPaidBookingRefs: toUpcomingPaidRefs(dto.upcoming_paid_bookings),
   };
 }
 

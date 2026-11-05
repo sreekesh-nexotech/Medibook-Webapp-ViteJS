@@ -47,6 +47,11 @@ export interface PlatformUserSummary {
   readonly createdAt: string;
   /** Bookings the account has made (B2, BE-31); `null` until the backend sends it. */
   readonly bookingCount: number | null;
+  /**
+   * Refs of the paid bookings still to be attended, from the block response (UAT T10);
+   * empty on every other response and until the backend sends it.
+   */
+  readonly upcomingPaidBookingRefs: readonly string[];
 }
 
 /** Demographics from the patient profile — never medical data (D-04). */

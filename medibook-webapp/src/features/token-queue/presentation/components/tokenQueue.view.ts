@@ -1,3 +1,4 @@
+import type { PatientAccountFlag } from '@/shared/lib/patientAccountFlag';
 import type {
   QueueRow,
   QueueSession,
@@ -156,6 +157,8 @@ export interface QueueTicket {
   /** The skip limit is reached: the desk may mark a no-show (Q27, never automatic). */
   readonly offerNoShow: boolean;
   readonly estimatedWaitMinutes: number | null;
+  /** Information only — never a reason to hold the token (UAT part 2). */
+  readonly patientAccountFlag: PatientAccountFlag | null;
 }
 
 /** What one session card lists. */
@@ -182,6 +185,7 @@ function ticketFromAppointment(session: QueueSession, a: DeskAppointment): Queue
     skipCount: a.noShowAttempts,
     offerNoShow: limit !== null && a.calledAt !== null && a.noShowAttempts >= limit,
     estimatedWaitMinutes: null,
+    patientAccountFlag: a.patientAccountFlag,
   };
 }
 
@@ -194,6 +198,7 @@ function ticketFromRow(row: QueueRow, appointment: DeskAppointment | undefined):
     skipCount: row.skipCount,
     offerNoShow: row.offerNoShow,
     estimatedWaitMinutes: row.estimatedWaitMinutes,
+    patientAccountFlag: row.patientAccountFlag ?? appointment?.patientAccountFlag ?? null,
   };
 }
 

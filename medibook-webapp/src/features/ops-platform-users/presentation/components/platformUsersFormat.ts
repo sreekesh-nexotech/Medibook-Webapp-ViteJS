@@ -113,3 +113,13 @@ export function deviceLine(
 export function verifiedLabel(at: string | null): string {
   return at ? `Verified ${formatDate(at)}` : 'Not verified';
 }
+
+/** The backend lists at most this many refs, so a full list means "at least". */
+const UPCOMING_REFS_CAP = 50;
+
+/** "3 upcoming paid bookings" / "50 or more upcoming paid bookings". */
+export function upcomingPaidCountLabel(refs: readonly string[]): string {
+  const n = refs.length;
+  if (n >= UPCOMING_REFS_CAP) return `${UPCOMING_REFS_CAP} or more upcoming paid bookings`;
+  return `${n} upcoming paid booking${n === 1 ? '' : 's'}`;
+}
