@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { referenceOf } from '@/core/error/reference';
 import { clientFailure, isHospitalWriteBlock, toFailure } from '@/core/error/toFailure';
 
-
 function httpError(status: number, data: unknown): AxiosError {
   const config = { headers: new AxiosHeaders() };
   const response: AxiosResponse = { status, statusText: '', data, headers: {}, config };

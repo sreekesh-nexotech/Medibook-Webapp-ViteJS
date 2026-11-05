@@ -6,6 +6,7 @@ import { REQUEST_ID_HEADER } from '@/core/config/api';
 
 import type { Failure, FailureKind, FieldErrors } from '@/core/error/failure';
 import { isFailure } from '@/core/error/failure';
+import { lockedOutMessage, retryAfterSeconds, tryAgainMessage } from '@/core/error/retryMessages';
 
 /** Shown when nothing more specific is safe to say. */
 const FALLBACK_MESSAGES: Readonly<Record<FailureKind, string>> = {
@@ -151,6 +152,14 @@ function failure(kind: FailureKind, partial: Partial<Failure> = {}): Failure {
   };
 }
 
+/** 423 → when the lock ends; 429 → how long to wait. `undefined` keeps the server's sentence. */
+function waitMessage(status: number, meta: Record<string, unknown>, header: unknown) {
+  if (status === HTTP_LOCKED) return lockedOutMessage(meta) ?? undefined;
+  if (status !== HTTP_TOO_MANY_REQUESTS) return undefined;
+  const seconds = retryAfterSeconds(meta, header);
+  return seconds === null ? undefined : tryAgainMessage(seconds);
+}
+
 /**
  * Convert anything thrown below the application layer into a `Failure`.
  *
@@ -182,6 +191,7 @@ export function toFailure(error: unknown): Failure {
       code: body.code ?? null,
       message:
         codeMessage(body.code) ??
+        waitMessage(response.status, body.meta ?? {}, response.headers['retry-after']) ??
         (!isServerSide && body.message ? body.message : FALLBACK_MESSAGES[kind]),
       fieldErrors: toFieldErrors(body.errors),
       requestId: requestIdOf(error, body.request_id),
