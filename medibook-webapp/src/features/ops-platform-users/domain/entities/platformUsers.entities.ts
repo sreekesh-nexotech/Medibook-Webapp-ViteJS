@@ -111,3 +111,22 @@ export interface PlatformUserDetail extends PlatformUserSummary {
   /** When a pending deletion completes (B2), if the backend sends it. */
   readonly deletionDueAt: string | null;
 }
+
+/** One paid upcoming booking that "cancel and refund" would cancel (UAT T10). */
+export interface CancelBookingPreviewItem {
+  readonly bookingRef: string;
+  readonly hospitalName: string;
+  readonly scheduledStartAt: string;
+  /** What the full hospital-cancel refund returns, in whole paise. */
+  readonly refundPaise: number;
+}
+
+/** The dry run of cancelling a blocked patient's paid upcoming bookings. */
+export interface CancelBookingsPreview {
+  readonly bookings: readonly CancelBookingPreviewItem[];
+  readonly totalRefundPaise: number;
+}
+
+export interface CancelBookingsResult {
+  readonly cancelledBookingRefs: readonly string[];
+}

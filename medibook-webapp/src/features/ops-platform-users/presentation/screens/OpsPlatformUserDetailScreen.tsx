@@ -6,6 +6,7 @@ import { isFailure } from '@/core/error/failure';
 import { useBlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useBlockPlatformUserMutation';
 import { usePlatformUserQuery } from '@/features/ops-platform-users/application/queries/usePlatformUserQuery';
 import { useUnblockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnblockPlatformUserMutation';
+import { BlockedBookingsCard } from '@/features/ops-platform-users/presentation/components/BlockedBookingsCard';
 import { useUnlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnlockPlatformUserMutation';
 import type { PlatformUserDetail } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
 import {
@@ -19,8 +20,6 @@ import {
   fullName,
   humanize,
   isLockedAt,
-  upcomingPaidCountLabel,
-  upcomingPaidMoreLabel,
   userName,
   verifiedLabel,
 } from '@/features/ops-platform-users/presentation/components/platformUsersFormat';
@@ -186,21 +185,8 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      {blocked && exposed.refs.length > 0 && (
-        <Card pad={16} data-testid="blocked-upcoming-bookings">
-          <div className="text-body text-text-strong mb-1 font-medium">
-            {upcomingPaidCountLabel(exposed.refs, exposed.total)}
-          </div>
-          <div className="text-body text-text-body mb-2">
-            {name} can no longer sign in to cancel these for a refund. The hospital can cancel them
-            from its desk, which refunds the full amount including the convenience fee.
-          </div>
-          <div className="text-caption text-text-muted">
-            {[exposed.refs.join(', '), upcomingPaidMoreLabel(exposed.refs, exposed.total)]
-              .filter(Boolean)
-              .join(' ')}
-          </div>
-        </Card>
+      {blocked && (
+        <BlockedBookingsCard userId={u.id} name={name} mayEdit={mayEdit} reported={exposed} />
       )}
       <Card>
         <div className="flex flex-wrap items-center gap-4">

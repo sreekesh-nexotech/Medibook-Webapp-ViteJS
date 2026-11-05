@@ -384,6 +384,8 @@ const NOT_RECORDED: Readonly<Record<string, string>> = {
     'The 202 of GET /hospital/reports/{code}/export.{fmt}: only past the sync row limit (50,000; 2,000 for PDF), and it queues a worker export.',
   invitationPreviewResponseSchema:
     'GET /hospital/auth/invitations/{token} needs a live one-time invitation token from the invite email.',
+  cancelBookingsPreviewResponseSchema:
+    'GET /platform/users/{id}/cancel-bookings is read-only, but answers only for a blocked patient with paid upcoming bookings, which the seeded data lacks. Not recorded yet: record it once such an account is seeded.',
 };
 
 /** Item schemas that a paging helper wraps itself; the page fixture covers them. */

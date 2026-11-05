@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  CancelBookingsPreview,
+  CancelBookingsResult,
   PlatformUserBooking,
   PlatformUserDetail,
   PlatformUserDevice,
@@ -168,4 +170,45 @@ export function toPlatformUserDetail(dto: PlatformUserDetailResponse): PlatformU
       : null,
     deletionDueAt: dto.deletion_due_at ?? null,
   };
+}
+
+/** `UserCancelBookingsPreview` — `GET /platform/users/{id}/cancel-bookings`. */
+export const cancelBookingsPreviewResponseSchema = z.object({
+  bookings: z.array(
+    z.object({
+      booking_ref: z.string(),
+      hospital_name: z.string(),
+      scheduled_start_at: z.string(),
+      refund_paise: z.number().int(),
+    }),
+  ),
+});
+
+export type CancelBookingsPreviewResponse = z.infer<typeof cancelBookingsPreviewResponseSchema>;
+export type CancelBookingsResultResponse = z.infer<typeof cancelBookingsResultResponseSchema>;
+
+/** `UserCancelBookingsResult` — `POST /platform/users/{id}/cancel-bookings`. */
+export const cancelBookingsResultResponseSchema = z.object({
+  cancelled_booking_refs: z.array(z.string()),
+});
+
+export function toCancelBookingsPreview(
+  dto: z.infer<typeof cancelBookingsPreviewResponseSchema>,
+): CancelBookingsPreview {
+  const bookings = dto.bookings.map((b) => ({
+    bookingRef: b.booking_ref,
+    hospitalName: b.hospital_name,
+    scheduledStartAt: b.scheduled_start_at,
+    refundPaise: b.refund_paise,
+  }));
+  return {
+    bookings,
+    totalRefundPaise: bookings.reduce((sum, b) => sum + b.refundPaise, 0),
+  };
+}
+
+export function toCancelBookingsResult(
+  dto: z.infer<typeof cancelBookingsResultResponseSchema>,
+): CancelBookingsResult {
+  return { cancelledBookingRefs: dto.cancelled_booking_refs };
 }
