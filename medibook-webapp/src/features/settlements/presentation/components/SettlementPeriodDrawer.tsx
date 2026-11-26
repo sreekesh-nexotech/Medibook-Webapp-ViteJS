@@ -20,6 +20,7 @@ import {
   effectiveRate,
   fmtDateTime,
   PAYOUT_STATUS,
+  payoutAccountLabel,
   PERIOD_STATUS,
   periodCheck,
   periodLabel,
@@ -181,6 +182,12 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
           {b.convenienceFeeGstPaise !== 0 && (
             <Line label="GST on convenience fees" value={minus(b.convenienceFeeGstPaise)} />
           )}
+          {b.platformDiscountsPaise !== 0 && (
+            <Line
+              label="Medibook-funded coupon discounts"
+              value={signed(b.platformDiscountsPaise)}
+            />
+          )}
           {b.carriedAdjustmentsPaise !== 0 && (
             <Line
               label="Adjustments carried from a paid period"
@@ -247,10 +254,7 @@ export function SettlementPeriodDrawer({ period, onClose }: SettlementPeriodDraw
                 }
               />
               <Line label="Amount" value={rupees(payout.amountPaise)} strong />
-              <Line
-                label="To account"
-                value={payout.bankAccountLast4 ? `•••• ${payout.bankAccountLast4}` : '—'}
-              />
+              <Line label="To account" value={payoutAccountLabel(payout)} />
               <Line label="Transfer ref (UTR)" value={payout.utrRef ?? '—'} />
               <Line label="Released on" value={fmtDateTime(payout.releasedAt)} />
               {payout.failureReason && (

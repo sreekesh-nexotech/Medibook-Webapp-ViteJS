@@ -23,9 +23,28 @@ export function actionCodeFor(label: string): string | undefined {
   return AUDIT_ACTION_OPTIONS.find((o) => o.label === label)?.code;
 }
 
-/** `http.patch` → "Update"; a domain action stays as the backend wrote it. */
+/** `http.patch` → "Update"; `invoice.grace_changed` → "Invoice grace changed". */
 export function actionLabel(action: string): string {
-  return AUDIT_ACTION_OPTIONS.find((o) => o.code === action)?.label ?? action;
+  const generic = AUDIT_ACTION_OPTIONS.find((o) => o.code === action)?.label;
+  if (generic) return generic;
+  const words = action.replace(/[._]/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+const FIELD_LABELS: Readonly<Record<string, string>> = {
+  grace_ends_at: 'Grace period ends',
+  grace_days_override: 'Grace days override',
+  next_invoice_at: 'Next invoice',
+  payment_status: 'Payment status',
+  scheduled_start_at: 'Appointment time',
+  token_label: 'Token',
+  token_no: 'Token number',
+  appliance: 'Appliance',
+};
+
+/** A recorded field name as a person reads it. */
+export function fieldLabel(field: string): string {
+  return FIELD_LABELS[field] ?? field.replace(/[._]/g, ' ');
 }
 
 /** Glyph tint by HTTP method: removals stand out, edits warn, the rest is neutral. */

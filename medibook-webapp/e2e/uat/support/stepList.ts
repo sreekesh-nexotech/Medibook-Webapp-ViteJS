@@ -46,7 +46,7 @@ export const UAT_STEPS: readonly (readonly [string, string])[] = [
   ['A-11', 'Payments › refund a cash walk-in from your drawer; reconcile a closed drawer'],
   ['A-12', 'Patients › desk edits a phone (L-09); admin approves only the phone'],
   ['A-13', 'Appointments (Sahyadri) › approve one online request, reject another'],
-  ['A-14', 'Messaging › send a reminder; delivery listed with its status'],
+  ['A-14', 'Messaging is hidden from the hospital admin (client feedback point 13)'],
   ['A-15', 'Audit Trail › find the holiday and the refund; export'],
   ['A-16', 'Reports › every report from the server; one exported'],
   ['O-1', 'Sign in to the operations console'],

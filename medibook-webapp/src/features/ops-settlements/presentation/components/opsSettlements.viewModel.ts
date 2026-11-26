@@ -190,9 +190,11 @@ export function datePart(iso: string | null): string | null {
   return iso ? iso.slice(0, ISO_DATE_LENGTH) : null;
 }
 
-/** "•••• 1234", or `null` when no payout account was on file. */
+/** "A/c ····1234 · Online booking settlements", or `null` when no payout account was on file. */
 export function bankLabel(payout: Payout | null): string | null {
-  return payout?.bankAccountLast4 ? `A/c ····${payout.bankAccountLast4}` : null;
+  if (!payout?.bankAccountLast4) return null;
+  const note = payout.bankAccountPurposeNote ? ` · ${payout.bankAccountPurposeNote}` : '';
+  return `A/c ····${payout.bankAccountLast4}${note}`;
 }
 
 /** Run skip reasons (M-45), as ops read them. */
@@ -267,6 +269,9 @@ export function breakdownLines(
   ];
   if (b.commissionGstRupees !== 0) {
     lines.push({ label: 'GST on commission', rupees: -b.commissionGstRupees });
+  }
+  if (b.platformDiscountsRupees !== 0) {
+    lines.push({ label: 'Medibook-funded coupon discounts', rupees: b.platformDiscountsRupees });
   }
   if (b.carriedAdjustmentsRupees !== 0) {
     lines.push({ label: 'Adjustments carried in', rupees: b.carriedAdjustmentsRupees });

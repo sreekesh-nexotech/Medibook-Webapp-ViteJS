@@ -11,6 +11,7 @@ import { SkeletonCards, SkeletonKpiStrip, SkeletonTable } from '@/shared/ui/Skel
 import { useReportCatalogQuery } from '@/features/reports/application/queries/useReportCatalogQuery';
 
 import { ReportPickerCard } from '../components/ReportPickerCard';
+import { ReportSchedulesCard } from '../components/ReportSchedulesCard';
 import { ReportView } from '../components/ReportView';
 import { REPORT_CATS } from '../reports.data';
 import { toCatalogItem } from '../reports.design';
@@ -33,6 +34,7 @@ const ALL_CATEGORIES = 'All';
 export function ReportsScreen() {
   const { can } = usePermission();
   const canView = can('Reports.view');
+  const canEditSchedules = can('Reports.edit');
   const catalog = useReportCatalogQuery(canView);
 
   const [cat, setCat] = useState<string>(ALL_CATEGORIES);
@@ -91,6 +93,8 @@ export function ReportsScreen() {
   return (
     <div className="flex flex-col gap-5">
       <ReportView key={selected.code} report={selected} />
+
+      <ReportSchedulesCard canEdit={canEditSchedules} />
 
       {/* report picker */}
       <Card pad={16} className="flex flex-wrap items-center justify-between gap-3">

@@ -169,6 +169,16 @@ export function SettlementStatementsPanel() {
                   className={cn(tdClass, 'text-text-strong text-right font-semibold tabular-nums')}
                 >
                   {rupees(st.netPayablePaise)}
+                  {st.settlementNetPaise !== null && (
+                    <div className="text-caption text-text-muted font-normal">
+                      Settlement {rupees(st.settlementNetPaise)}
+                    </div>
+                  )}
+                  {st.settlementDifferencePaise !== null && st.settlementDifferencePaise !== 0 && (
+                    <div className="text-caption text-d-700 font-normal">
+                      Difference {rupees(Math.abs(st.settlementDifferencePaise))}
+                    </div>
+                  )}
                 </td>
                 <td className={tdClass}>
                   <StatementDownloadButton

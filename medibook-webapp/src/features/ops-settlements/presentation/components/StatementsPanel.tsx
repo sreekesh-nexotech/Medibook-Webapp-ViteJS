@@ -178,6 +178,15 @@ export function StatementsPanel({ hospitalId, hospitalName }: StatementsPanelPro
               { k: 'GST on commission', v: money(open.commissionGstRupees), num: true },
               { k: 'Convenience fees', v: money(open.convenienceFeesRupees), num: true },
               { k: 'GST on convenience fees', v: money(open.convenienceFeeGstRupees), num: true },
+              ...(open.platformDiscountsRupees !== 0
+                ? [
+                    {
+                      k: 'Medibook-funded coupon discounts',
+                      v: money(open.platformDiscountsRupees),
+                      num: true,
+                    },
+                  ]
+                : []),
               { k: 'Net payable', v: money(open.netPayableRupees), num: true },
             ]}
           />

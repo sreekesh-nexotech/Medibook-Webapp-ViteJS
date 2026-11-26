@@ -132,6 +132,35 @@ export function deliveryErrorText(code: string | null): string | null {
   return code ? (ERROR_CODE_TEXT[code] ?? null) : null;
 }
 
+const PROVIDER_LABELS: Readonly<Record<string, string>> = {
+  ses: 'Amazon SES',
+  msg91: 'MSG91',
+  fcm: 'Firebase Cloud Messaging',
+  razorpay: 'Razorpay',
+};
+
+/** A provider code as people read it. */
+export function providerLabel(provider: string | null): string | null {
+  if (!provider) return null;
+  return PROVIDER_LABELS[provider.toLowerCase()] ?? humanize(provider);
+}
+
+/** Provider errors as plain language rather than "ses HTTP 403". */
+export function providerErrorText(message: string | null): string | null {
+  if (!message) return null;
+  if (/ses.*40[13]/i.test(message)) return 'The email provider rejected the message.';
+  if (/msg91.*4\d\d/i.test(message)) return 'The SMS provider rejected the message.';
+  if (/http\s*5\d\d|timeout|unavailable/i.test(message)) {
+    return 'The provider was unavailable; it may be retried.';
+  }
+  return message;
+}
+
+function humanize(code: string): string {
+  const words = code.replace(/[._-]/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 const RECIPIENT_SOURCE_TEXT: Readonly<Record<RecipientSource, string>> = {
   account: 'The phone on the booking’s Medibook account',
   hospital_record: 'The phone on the hospital’s patient record',

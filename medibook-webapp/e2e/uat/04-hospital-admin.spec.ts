@@ -68,7 +68,6 @@ const DRAWER_FLOAT_RUPEES = 1_000;
 const PAYMENT_LOOKBACK_DAYS = 60;
 const SLOT_WAIT_MS = 120_000;
 const REFUND_WAIT_MS = 120_000;
-const DELIVERY_WAIT_MS = 60_000;
 const AFTERNOON = '13:00';
 const INVITEE_PASSWORD = 'Invitee#Secure-Pass-58';
 
@@ -952,68 +951,15 @@ test('4.4 Hospital admin — Lakeshore', async ({ browser }) => {
 
   /* A-14 ----------------------------------------------------------------- */
   await uatStep('A-14', { watch: watch(), pages }, async () => {
+    // Client feedback point 13 (Nov 2026): hospital admins cannot message patients directly, so
+    // Messaging is hidden — no sidebar item, no Settings › Management card, and an old link
+    // lands on the dashboard. Patients still get every system message.
     const { page } = needs(desk, 'A-1');
-    const doctors = (await hospitalDoctors(adminApi)).filter(
-      (d) => d.status === 'active' && d.is_bookable_online,
-    );
-    let booking: OnlineBooking | null = null;
-    for (let day = 1; day <= 7 && !booking; day += 1) {
-      for (const d of doctors) {
-        booking = await bookOnline({ doctorId: d.id, date: addDays(today, day) }).catch(() => null);
-        if (booking) break;
-      }
-    }
-    const appt = needs(booking, 'an upcoming booking');
-    const desk2 = await adminApi.get<{ patient: { mrn: string } | null }>(
-      `/appointments/${appt.appointment.id}`,
-    );
-    const mrn = needs(desk2.patient, 'the patient record').mrn;
-
-    await openNav(page, 'Messaging');
-    await page.getByRole('tab', { name: 'Send & Outbox' }).click();
-    await page.getByRole('button', { name: 'Send a Message' }).click();
-    const modal = dialog(page, 'Send a message');
-    await modal.getByLabel(/Find patient/).fill(mrn);
-    const patientSelect = modal.getByRole('combobox', { name: /^Patient/ });
-    await expect
-      .poll(async () =>
-        (await patientSelect.locator('option').allTextContents()).some((o) => o.includes(mrn)),
-      )
-      .toBe(true);
-    const patientOption = (await patientSelect.locator('option').allTextContents()).find((o) =>
-      o.includes(mrn),
-    );
-    await patientSelect.selectOption({ label: needs(patientOption, 'the patient') });
-    const apptSelect = modal.getByRole('combobox', { name: /^Appointment/ });
-    await expect
-      .poll(async () =>
-        (await apptSelect.locator('option').allTextContents()).some((o) =>
-          o.startsWith(appt.appointment.booking_ref),
-        ),
-      )
-      .toBe(true);
-    const apptOption = (await apptSelect.locator('option').allTextContents()).find((o) =>
-      o.startsWith(appt.appointment.booking_ref),
-    );
-    await apptSelect.selectOption({ label: needs(apptOption, 'the booking') });
-    await modal.getByRole('combobox', { name: /^Message/ }).selectOption('Reminder');
-    await modal.getByRole('button', { name: 'Review & queue' }).click();
-    await dialog(page, 'Queue this message?')
-      .getByRole('button', { name: 'Queue message' })
-      .click();
-    const queued = toast(page, /^Reminder queued for .+ by SMS to /);
-    await expect(queued).toBeVisible();
-    const address = ((await queued.innerText()).split(' to ').pop() ?? '').trim();
-
-    // The delivery is listed with its status.
-    const search = page.getByRole('textbox', { name: 'Search the outbox by exact value' });
-    await search.fill(address);
-    await search.press('Enter');
-    const delivery = row(page, address).filter({ hasText: 'Reminder' }).first();
-    await expect(delivery).toBeVisible({ timeout: DELIVERY_WAIT_MS });
     await expect(
-      delivery.getByText(/^(Queued|Sending|Sent|Delivered|Failed|Bounced|Suppressed)$/),
-    ).toBeVisible();
+      page.getByRole('navigation').getByRole('button', { name: 'Messaging', exact: true }),
+    ).toHaveCount(0);
+    await page.goto(`${ADMIN}/messaging`);
+    await expect(page).toHaveURL(new RegExp(`${ADMIN}/dashboard$`));
   });
 
   /* A-15 ----------------------------------------------------------------- */

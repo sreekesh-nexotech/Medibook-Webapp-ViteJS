@@ -49,6 +49,10 @@ export interface DoctorSlotDay {
   readonly doctorId: string;
   readonly doctorName: string;
   readonly departmentId: string;
+  /** The doctor's lifecycle status, when the backend sends it (UB-23). */
+  readonly doctorStatus?: string;
+  /** Why nothing is bookable, e.g. `doctor_on_leave` / `doctor_inactive` (UB-23). */
+  readonly unavailableReason?: string | null;
   readonly slotLengthMin: number;
   readonly sessions: readonly DoctorSessionSlots[];
 }

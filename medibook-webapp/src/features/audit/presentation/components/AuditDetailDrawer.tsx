@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 
 import { fmtDate } from '@/shared/lib/format';
+
+import { fieldLabel } from '@/features/audit/presentation/components/auditFormat';
 import { Drawer } from '@/shared/ui/Drawer';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 
@@ -72,13 +74,10 @@ export function AuditDetailDrawer({ entry, actor, onClose }: AuditDetailDrawerPr
           <section>
             <Row label="When" value={stamp ? `${fmtDate(stamp.date)} · ${stamp.time}` : '—'} />
             <Row label="Who" value={actor ? `${actor.name} · ${actor.sub}` : '—'} />
-            <Row label="Action" value={entry.action} />
+            <Row label="Action" value={actionLabel(entry.action)} />
             <Row label="Entity" value={entityLabel(entry.resourceType)} />
-            {entry.resourceId && <Row label="Record" value={entry.resourceId} />}
-            <Row label="Request" value={`${entry.method} ${entry.path}`} />
             <Row label="Result" value={entry.statusCode} />
             <Row label="IP" value={entry.ip ?? '—'} />
-            <Row label="Request ID" value={entry.requestId} />
           </section>
           {entry.changes.length > 0 && (
             <section>
@@ -88,7 +87,7 @@ export function AuditDetailDrawer({ entry, actor, onClose }: AuditDetailDrawerPr
               <div className="flex flex-col gap-2">
                 {entry.changes.map((c) => (
                   <div key={c.field} className="flex flex-col">
-                    <span className="text-caption text-text-muted">{c.field}</span>
+                    <span className="text-caption text-text-muted">{fieldLabel(c.field)}</span>
                     <span className="text-text-muted break-all line-through">
                       {c.before ?? 'not set'}
                     </span>

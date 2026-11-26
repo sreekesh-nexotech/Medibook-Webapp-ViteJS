@@ -309,8 +309,8 @@ export function toProfileForm(p: HospitalProfile): ProfileForm {
 
 /**
  * Only the fields that changed, in API units. Coordinates are sent only
- * when the user typed them — nothing on this screen invents a location
- * (07·F1, UAT-28).
+ * when the user set them — nothing on this screen invents a location
+ * (07·F1, UAT-28) — and then both together (point 3).
  */
 export function profileChanges(base: ProfileForm, draft: ProfileForm): HospitalProfileChanges {
   return {
@@ -325,8 +325,11 @@ export function profileChanges(base: ProfileForm, draft: ProfileForm): HospitalP
     ...(draft.city !== base.city && { city: draft.city.trim() }),
     ...(draft.state !== base.state && { state: draft.state.trim() }),
     ...(draft.pincode !== base.pincode && { pincode: draft.pincode.trim() }),
-    ...(draft.lat !== base.lat && { lat: coordValue(draft.lat) }),
-    ...(draft.lng !== base.lng && { lng: coordValue(draft.lng) }),
+    // Latitude and longitude always travel together (the server refuses half a location).
+    ...((draft.lat !== base.lat || draft.lng !== base.lng) && {
+      lat: coordValue(draft.lat),
+      lng: coordValue(draft.lng),
+    }),
     ...(draft.logoFileId !== base.logoFileId && { logoFileId: draft.logoFileId }),
     ...(draft.coverFileId !== base.coverFileId && { coverFileId: draft.coverFileId }),
     ...(draft.stampFileId !== base.stampFileId && { stampFileId: draft.stampFileId }),
@@ -630,7 +633,12 @@ export interface BankForm {
   readonly account: string;
   readonly ifsc: string;
   readonly upi: string;
+  /** What the account is for; optional, reference only. */
+  readonly purpose: string;
 }
+
+/** The backend's limit on a bank account's purpose / note. */
+export const BANK_PURPOSE_MAX_LENGTH = 200;
 
 export function toBankForm(account: BankAccount | null): BankForm {
   return {
@@ -639,6 +647,7 @@ export function toBankForm(account: BankAccount | null): BankForm {
     account: '',
     ifsc: account?.ifsc ?? '',
     upi: account?.upiId ?? '',
+    purpose: account?.purposeNote ?? '',
   };
 }
 
@@ -650,11 +659,13 @@ export function payoutAccountOf(accounts: readonly BankAccount[]): BankAccount |
 export function bankInput(form: BankForm): BankAccountInput {
   const number = form.account.replace(/\s/g, '');
   const upi = form.upi.trim();
+  const purpose = form.purpose.trim();
   return {
     accountHolder: form.accountName.trim(),
     ...(number !== '' && { accountNumber: number }),
     ifsc: form.ifsc.trim().toUpperCase(),
     bankName: form.bank.trim(),
     upiId: upi === '' ? null : upi,
+    purposeNote: purpose === '' ? null : purpose,
   };
 }

@@ -51,6 +51,8 @@ export interface ScheduleChange {
   readonly affectedBookings: readonly AffectedBooking[];
   /** Bookings already in consultation or completed — kept, never cancelled (L-21). */
   readonly notCancellableBookings: readonly AffectedBooking[];
+  /** A holiday never moves a booking to another department; kept so the shared confirm flow type-checks. */
+  readonly movedBookings: readonly never[];
   readonly result: null;
   /** The dry run's fingerprint, echoed on confirm (BE-33); `null` when not issued. */
   readonly previewToken: string | null;

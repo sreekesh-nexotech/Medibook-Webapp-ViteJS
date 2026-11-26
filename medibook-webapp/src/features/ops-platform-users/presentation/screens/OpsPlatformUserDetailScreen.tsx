@@ -6,6 +6,7 @@ import { isFailure } from '@/core/error/failure';
 import { useBlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useBlockPlatformUserMutation';
 import { usePlatformUserQuery } from '@/features/ops-platform-users/application/queries/usePlatformUserQuery';
 import { useUnblockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnblockPlatformUserMutation';
+import { BlockedBookingsCard } from '@/features/ops-platform-users/presentation/components/BlockedBookingsCard';
 import { useUnlockPlatformUserMutation } from '@/features/ops-platform-users/application/queries/useUnlockPlatformUserMutation';
 import type { PlatformUserDetail } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
 import {
@@ -92,6 +93,11 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
   const mayEdit = useOpsPermission().can('platform_users.edit');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [reason, setReason] = useState('');
+  // Paid upcoming bookings the block response reported (UAT T10); empty when none or not sent.
+  const [exposed, setExposed] = useState<{
+    readonly refs: readonly string[];
+    readonly total: number | null;
+  }>({ refs: [], total: null });
 
   const name = userName(u);
   const pill = ACCOUNT_STATUS_PILLS[u.status];
@@ -115,6 +121,7 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
     if (blocked) {
       unblock.mutate(u.id, {
         onSuccess: () => {
+          setExposed({ refs: [], total: null });
           toast(`${name} unblocked.`);
           closeConfirm();
         },
@@ -126,7 +133,11 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
     block.mutate(
       { id: u.id, reason: trimmedReason },
       {
-        onSuccess: () => {
+        onSuccess: (blockedUser) => {
+          setExposed({
+            refs: blockedUser.upcomingPaidBookingRefs,
+            total: blockedUser.upcomingPaidBookingsCount,
+          });
           toast(`${name} blocked.`);
           closeConfirm();
         },
@@ -174,6 +185,9 @@ function PlatformUserDetailBody({ u }: PlatformUserDetailBodyProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {blocked && (
+        <BlockedBookingsCard userId={u.id} name={name} mayEdit={mayEdit} reported={exposed} />
+      )}
       <Card>
         <div className="flex flex-wrap items-center gap-4">
           <Avatar name={name} size={56} />

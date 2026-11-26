@@ -201,6 +201,8 @@ export interface BankAccount {
   readonly ifsc: string;
   readonly bankName: string;
   readonly upiId: string | null;
+  /** The hospital's own label for the account (e.g. "Pharmacy collections"); reference only. */
+  readonly purposeNote: string | null;
   readonly isPrimary: boolean;
   readonly verifiedAt: string | null;
   readonly version: number;
@@ -213,6 +215,8 @@ export interface BankAccountInput {
   readonly ifsc: string;
   readonly bankName: string;
   readonly upiId: string | null;
+  /** `null` clears the note. */
+  readonly purposeNote: string | null;
 }
 
 /** The hospital images this screen manages (the stamp prints on receipts, Q98). */
@@ -312,6 +316,9 @@ export interface DisplayDevice {
   readonly id: string;
   readonly name: string;
   readonly isActive: boolean;
+  /** The ONE department the screen shows (client feedback point 8); `null` = every department. */
+  readonly selectedDepartmentId: string | null;
+  /** Narrows the screen to these doctors (inside the department when one is set). */
   readonly selectedDoctorIds: readonly string[];
   readonly selectedCounterIds: readonly string[];
   readonly lastSeenAt: string | null;
@@ -324,9 +331,23 @@ export interface DisplayDeviceWithKey {
   readonly deviceKey: string;
 }
 
+/** What a screen shows: one department (or all) and, optionally, some of its doctors. */
+export interface DisplaySelection {
+  readonly departmentId: string | null;
+  /** Empty = every doctor (of the department, when one is set). */
+  readonly doctorIds: readonly string[];
+}
+
+/** Register a screen. */
+export interface DisplayDeviceInput {
+  readonly name: string;
+  readonly selection: DisplaySelection;
+}
+
 export interface DisplayDeviceChanges {
   readonly name?: string;
   readonly isActive?: boolean;
+  readonly selectedDepartmentId?: string | null;
   readonly selectedDoctorIds?: readonly string[];
   readonly selectedCounterIds?: readonly string[];
 }

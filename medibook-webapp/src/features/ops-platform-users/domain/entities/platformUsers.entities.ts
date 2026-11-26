@@ -47,6 +47,13 @@ export interface PlatformUserSummary {
   readonly createdAt: string;
   /** Bookings the account has made (B2, BE-31); `null` until the backend sends it. */
   readonly bookingCount: number | null;
+  /**
+   * Refs of the paid bookings still to be attended, from the block response (UAT T10);
+   * empty on every other response and until the backend sends it.
+   */
+  readonly upcomingPaidBookingRefs: readonly string[];
+  /** Exact total of those bookings (the refs are capped at 50); `null` when not sent. */
+  readonly upcomingPaidBookingsCount: number | null;
 }
 
 /** Demographics from the patient profile — never medical data (D-04). */
@@ -103,4 +110,23 @@ export interface PlatformUserDetail extends PlatformUserSummary {
   readonly profile: PlatformUserProfile | null;
   /** When a pending deletion completes (B2), if the backend sends it. */
   readonly deletionDueAt: string | null;
+}
+
+/** One paid upcoming booking that "cancel and refund" would cancel (UAT T10). */
+export interface CancelBookingPreviewItem {
+  readonly bookingRef: string;
+  readonly hospitalName: string;
+  readonly scheduledStartAt: string;
+  /** What the full hospital-cancel refund returns, in whole paise. */
+  readonly refundPaise: number;
+}
+
+/** The dry run of cancelling a blocked patient's paid upcoming bookings. */
+export interface CancelBookingsPreview {
+  readonly bookings: readonly CancelBookingPreviewItem[];
+  readonly totalRefundPaise: number;
+}
+
+export interface CancelBookingsResult {
+  readonly cancelledBookingRefs: readonly string[];
 }

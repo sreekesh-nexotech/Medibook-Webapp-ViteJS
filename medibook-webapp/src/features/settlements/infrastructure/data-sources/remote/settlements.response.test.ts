@@ -119,6 +119,29 @@ describe('payout list', () => {
       bankAccountLast4: '0000',
     });
   });
+
+  it("reads the account's purpose note, and an older backend that sends none", () => {
+    const withNote = payoutPageResponseSchema.parse({
+      results: [{ ...PAYOUT, bank_account_purpose_note: 'Online booking settlements' }],
+      page: 1,
+      page_size: 12,
+      total: 1,
+      has_next: false,
+    }).results[0];
+    if (!withNote) throw new Error('expected a row');
+    expect(toPayout(withNote).bankAccountPurposeNote).toBe('Online booking settlements');
+    const older: Record<string, unknown> = { ...PAYOUT };
+    delete older.bank_account_purpose_note; // a backend from before the field
+    const legacy = payoutPageResponseSchema.parse({
+      results: [older],
+      page: 1,
+      page_size: 12,
+      total: 1,
+      has_next: false,
+    }).results[0];
+    if (!legacy) throw new Error('expected a row');
+    expect(toPayout(legacy).bankAccountPurposeNote).toBeNull();
+  });
 });
 
 describe('credit notes', () => {
@@ -157,5 +180,21 @@ describe('monthStartOf', () => {
   it('moves a date to the 1st of its month', () => {
     expect(monthStartOf('2026-09-16')).toBe('2026-09-01');
     expect(monthStartOf('2026-09-01')).toBe('2026-09-01');
+  });
+});
+
+describe('Medibook-funded coupon discounts (point 9)', () => {
+  it('reads the credit from the breakdown and the statement, and 0 from an older backend', () => {
+    const withCredit = toSettlementPeriodDetail(
+      settlementPeriodDetailResponseSchema.parse({
+        ...B4_DETAIL,
+        breakdown: { ...B4_DETAIL.breakdown, platform_discounts_paise: 10000 },
+      }),
+    );
+    expect(withCredit.breakdown.platformDiscountsPaise).toBe(10000);
+    expect(
+      toSettlementPeriodDetail(settlementPeriodDetailResponseSchema.parse(detailFixture)).breakdown
+        .platformDiscountsPaise,
+    ).toBe(0);
   });
 });

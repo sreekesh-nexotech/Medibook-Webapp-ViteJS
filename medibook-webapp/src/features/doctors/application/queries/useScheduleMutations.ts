@@ -44,7 +44,8 @@ function useScheduleWrite<V extends ScheduleWrite>(run: (variables: V) => Promis
       void queryClient.invalidateQueries({ queryKey: doctorsKeys.lists() });
       refreshAfterScheduleChange(queryClient, {
         cancelledBookings: change.affectedBookings.length,
-        rematerialisationQueued: change.rematerialisationQueued,
+        // Weekly sessions, leave and date exceptions rebuild slots in the same request (UAT T04).
+        rematerialisationQueued: false,
       });
     },
     // A conflict (stale version, replayed key, changed preview) means the

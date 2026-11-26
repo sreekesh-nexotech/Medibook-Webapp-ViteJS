@@ -9,6 +9,7 @@ import { toast } from '@/shared/ui/toast/toast.store';
 import type { BankAccount } from '@/features/settings/domain/entities/settings.entities';
 import { useSaveBankAccountMutation } from '@/features/settings/application/queries/useSaveBankAccountMutation';
 import {
+  BANK_PURPOSE_MAX_LENGTH,
   type BankForm,
   bankInput,
   toBankForm,
@@ -35,6 +36,10 @@ function validators(hasStoredNumber: boolean): FormValidators<BankForm> {
         : 'IFSC looks like HDFC0001234 — 4 letters, a zero, then 6 characters.',
     upi: (v) =>
       v.trim() === '' || UPI_PATTERN.test(v.trim()) ? undefined : 'UPI ID looks like name@bank.',
+    purpose: (v) =>
+      v.trim().length <= BANK_PURPOSE_MAX_LENGTH
+        ? undefined
+        : `Keep the purpose to ${BANK_PURPOSE_MAX_LENGTH} characters.`,
   };
 }
 
@@ -47,6 +52,7 @@ const SERVER_FIELDS = {
   account_number: 'account',
   ifsc: 'ifsc',
   upi_id: 'upi',
+  purpose_note: 'purpose',
 } as const;
 
 interface BankAccountModalProps {
@@ -125,6 +131,19 @@ export function BankAccountModal({ account, onClose }: BankAccountModalProps) {
           </Field>
           <Field label="Settlement UPI ID" error={form.errorFor('upi')} hint="Optional.">
             <TextInput value={v.upi} onChange={(x) => form.setField('upi', x)} />
+          </Field>
+          <Field
+            label="Purpose / Note"
+            className="md:col-span-2"
+            error={form.errorFor('purpose')}
+            hint={`Optional. What this account is for — for your reference only; payouts still go to the primary account. ${v.purpose.length}/${BANK_PURPOSE_MAX_LENGTH} characters.`}
+          >
+            <TextInput
+              value={v.purpose}
+              onChange={(x) => form.setField('purpose', x)}
+              placeholder="e.g. Online booking settlements"
+              maxLength={BANK_PURPOSE_MAX_LENGTH}
+            />
           </Field>
         </div>
       </div>

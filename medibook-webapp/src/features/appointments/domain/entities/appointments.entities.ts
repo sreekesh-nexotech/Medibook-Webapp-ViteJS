@@ -1,3 +1,5 @@
+import type { PatientAccountFlag } from '@/shared/lib/patientAccountFlag';
+
 /**
  * Desk appointments as the hospital API serves them. Plain readonly types.
  * Money is whole rupees here; the paise the API uses never leave the
@@ -67,6 +69,15 @@ export interface DeskAppointment {
   readonly patientNotes: string;
   readonly remark: string;
   readonly paymentStatus: ApptPaymentStatus;
+  /**
+   * UAT-5: money already taken but not yet returned. A cancelled booking stays
+   * `paid` while a refund is requested/processing; this amount fills that gap.
+   */
+  readonly refundPendingRupees: number;
+  /** UAT-7: a past booking the desk still has to mark no-show or refund. */
+  readonly needsCloseOut: boolean;
+  /** The patient's account state, for the desk's information only (UAT part 2). */
+  readonly patientAccountFlag: PatientAccountFlag | null;
   readonly consultationRupees: number;
   readonly serviceRupees: number;
   readonly discountRupees: number;
@@ -74,8 +85,8 @@ export interface DeskAppointment {
   readonly taxRupees: number;
   readonly totalRupees: number;
   /**
-   * What a hospital cancel / reject refunds now (Q11): the doctor's booking fee — the convenience
-   * fee and its GST stay with Medibook. 0 when nothing was paid.
+   * What a hospital cancel / reject refunds now (Q11, UAT-5): the full paid
+   * amount, including the convenience fee and its GST. 0 when nothing was paid.
    */
   readonly hospitalCancelRefundRupees: number;
   readonly approvedAt: string | null;

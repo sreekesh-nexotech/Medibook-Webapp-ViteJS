@@ -12,4 +12,5 @@ export const platformUsersKeys = {
   count: (filter: PlatformUserCountFilter) => [...platformUsersKeys.counts(), filter] as const,
   details: () => [...platformUsersKeys.all, 'detail'] as const,
   detail: (id: string) => [...platformUsersKeys.details(), id] as const,
+  cancelPreview: (id: string) => [...platformUsersKeys.all, 'cancel-preview', id] as const,
 };

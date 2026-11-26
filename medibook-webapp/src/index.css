@@ -257,6 +257,39 @@
   --text-button--line-height: 1;
   --text-button--font-weight: 500;
 
+  /* Hall display board (client feedback point 7). Sized in `cqw` — a share of the board's own
+   * width (`@container` on `DisplayBoardView`) — so one design reads from across the hall on any
+   * TV and the admin's 16:9 preview looks exactly like the screen. */
+  --text-board-title: 2.2cqw;
+  --text-board-title--line-height: 1.15;
+  --text-board-title--font-weight: 700;
+  --text-board-subtitle: 1.4cqw;
+  --text-board-subtitle--line-height: 1.3;
+  --text-board-subtitle--font-weight: 600;
+  --text-board-meta: 1cqw;
+  --text-board-meta--line-height: 1.4;
+  --text-board-column: 1.15cqw;
+  --text-board-column--line-height: 1.3;
+  --text-board-column--font-weight: 600;
+  --text-board-name: 1.6cqw;
+  --text-board-name--line-height: 1.15;
+  --text-board-name--font-weight: 600;
+  --text-board-patient: 1.9cqw;
+  --text-board-patient--line-height: 1.15;
+  --text-board-patient--font-weight: 700;
+  --text-board-state: 1.3cqw;
+  --text-board-state--line-height: 1.3;
+  --text-board-state--font-weight: 600;
+  --text-board-room: 2.8cqw;
+  --text-board-room--line-height: 1;
+  --text-board-room--font-weight: 700;
+  --text-board-room-long: 2cqw;
+  --text-board-room-long--line-height: 1;
+  --text-board-room-long--font-weight: 700;
+  --text-board-token: 3.2cqw;
+  --text-board-token--line-height: 1;
+  --text-board-token--font-weight: 700;
+
   /* ---- Radii ("Soft" corners) ---- */
   --radius-xs: 2px;
   --radius-sm: 5px;
@@ -266,6 +299,8 @@
   --radius-input: 10px;
   /* Shimmer-block corner used by every Skeleton primitive. */
   --radius-skeleton: 6px;
+  /* Hall display board rows and header (point 7; `cqw`, see the board type tokens). */
+  --radius-board: 0.6cqw;
 
   /* ---- Shadows ---- */
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
@@ -278,6 +313,11 @@
   /* Below `lg`, a multi-column table stops crushing and scrolls sideways
    * inside its own scroller instead (see shared/ui/TableShell). */
   --spacing-table-min: 860px;
+  /* Hall display board (point 7; `cqw`). `useBoardPaging` reads the row height and gap. */
+  --spacing-board-row: 6cqw;
+  --spacing-board-gap: 0.6cqw;
+  --spacing-board-pad: 1.2cqw;
+  --spacing-board-logo: 4.5cqw;
 
   /* ---- Motion ---- */
   --animate-fade-in: fade-in 0.15s ease-out;

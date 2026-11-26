@@ -12,6 +12,8 @@ export const displayDeviceResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   is_active: z.boolean(),
+  /** Point 8; older backends omit it (= every department). */
+  selected_department_id: z.string().nullable().optional(),
   selected_doctor_ids: z.array(z.string()).optional(),
   selected_counter_ids: z.array(z.string()).optional(),
   last_seen_at: z.string().nullable().optional(),
@@ -31,6 +33,7 @@ export function toDisplayDevice(dto: z.infer<typeof displayDeviceResponseSchema>
     id: dto.id,
     name: dto.name,
     isActive: dto.is_active,
+    selectedDepartmentId: dto.selected_department_id ?? null,
     selectedDoctorIds: dto.selected_doctor_ids ?? [],
     selectedCounterIds: dto.selected_counter_ids ?? [],
     lastSeenAt: dto.last_seen_at ?? null,

@@ -22,6 +22,7 @@ import type { PeriodRef } from '@/features/settlements/presentation/components/S
 import {
   fmtDateTime,
   PAYOUT_STATUS,
+  payoutAccountLabel,
   periodLabel,
   rupees,
 } from '@/features/settlements/presentation/components/settlementsFormat';
@@ -172,7 +173,7 @@ export function SettlementPayoutsPanel({ onOpenPeriod }: SettlementPayoutsPanelP
                 <div className="text-caption text-d-700 mt-1">{p.failureReason}</div>
               )}
             </td>
-            <td className={tdClass}>{p.bankAccountLast4 ? `•••• ${p.bankAccountLast4}` : '—'}</td>
+            <td className={tdClass}>{payoutAccountLabel(p)}</td>
             <td className={tdClass}>{p.utrRef ?? '—'}</td>
             <td className={tdClass}>{fmtDateTime(p.releasedAt)}</td>
             <td className={tdClass}>{fmtDateTime(p.createdAt)}</td>

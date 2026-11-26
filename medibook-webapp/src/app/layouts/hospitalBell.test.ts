@@ -106,6 +106,26 @@ describe('server bell (DASH-03)', () => {
     ],
   };
 
+  it('renders the unclosed past bookings item like the other bell items (UAT-7)', () => {
+    const [entry] = serverBellEntries({
+      unreadCount: 1,
+      items: [
+        {
+          key: 'unclosed_past_bookings',
+          label: 'Past bookings not closed out',
+          count: 2,
+          latestAt: '2026-10-06T10:00:00Z',
+          amountPaise: null,
+          read: false,
+          readAt: null,
+        },
+      ],
+    });
+    expect(entry?.title).toBe('Past bookings not closed out (2)');
+    expect(entry?.go).toBe('appointments');
+    expect(entry?.icon).toBe('calendar-x');
+  });
+
   it('maps each item to its screen, money and read state', () => {
     const [payout, approvals, unknown] = serverBellEntries(feed);
     expect(payout.title).toBe('Settlements awaiting payout (2)');

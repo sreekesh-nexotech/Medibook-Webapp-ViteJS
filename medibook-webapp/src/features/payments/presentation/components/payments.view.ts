@@ -4,7 +4,8 @@
  * the day's totals.
  */
 import { isFailure } from '@/core/error/failure';
-import { fmtDate, formatInstant, parseHundredths, toLocalISO } from '@/shared/lib/format';
+import { formatInstant, parseHundredths } from '@/shared/lib/format';
+import { HOSPITAL_CANCEL_REFUND_SENTENCE } from '@/shared/lib/refundCopy';
 import { addIsoDays } from '@/shared/lib/hospitalTime';
 
 import type {
@@ -104,7 +105,7 @@ export function refundCopy(refunds: readonly PaymentRefund[]): {
   const how =
     methods.length === 1 && methods[0] === 'cash'
       ? 'at desk'
-      : `to ${methods.map((m) => m.toUpperCase()).join(', ')}`;
+      : `to ${methods.map((m) => METHOD_LABEL[m as PaymentMethod] ?? m).join(', ')}`;
   return { amount, how };
 }
 
@@ -207,7 +208,7 @@ export function refundFailureCopy(error: unknown, canOpenDrawer: boolean): strin
       : 'Cash is handed back from an open cash drawer, and your role cannot open one. Ask a colleague who can.';
   }
   if (error.code === REFUND_REQUIRES_CANCEL) {
-    return "This booking is still live. Cancel it from Appointments — a hospital cancel refunds the doctor's booking fee.";
+    return `This booking is still live. Cancel it from Appointments. ${HOSPITAL_CANCEL_REFUND_SENTENCE}`;
   }
   return error.message;
 }
@@ -224,12 +225,12 @@ export function cashWriteFailureCopy(error: unknown, fallback: string): string {
   return error.message;
 }
 
-/** `08 Oct 2026 · 10:42 am` in the device's clock, or `—`. */
+/** `08 Oct 2026 · 10:42 am` on the hospital's clock, or `—`. */
 export function dateTimeCopy(iso: string | null): string {
   if (!iso) return '—';
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return '—';
-  return `${fmtDate(toLocalISO(at))} · ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  return formatInstant(at, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** The day's figures for the KPI strip, from captured lines only. */

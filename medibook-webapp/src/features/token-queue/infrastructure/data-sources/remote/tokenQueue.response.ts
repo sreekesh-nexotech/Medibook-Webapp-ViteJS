@@ -1,3 +1,4 @@
+import { parsePatientAccountFlag } from '@/shared/lib/patientAccountFlag';
 import { z } from 'zod';
 
 import { paginatedSchema } from '@/core/api/pagination';
@@ -41,6 +42,8 @@ export const queueRowSchema = z.object({
   offer_no_show: z.boolean().nullable().optional(),
   patient_name: z.string().nullable().optional(),
   mrn: z.string().nullable().optional(),
+  // UAT part 2 — proposed on queue rows (it is on appointment rows); read leniently.
+  patient_account_flag: z.string().nullable().optional(),
 });
 
 export const sessionSnapshotSchema = z.object({
@@ -52,6 +55,8 @@ export const sessionSnapshotSchema = z.object({
   session_code: z.string(),
   label: z.string(),
   status: z.enum(['scheduled', 'open', 'paused', 'closed', 'cancelled']),
+  /** UAT-3: the patient's session is closed; show an explicit closed state. */
+  session_closed: z.boolean().optional(),
   queue_state: z.enum(['available', 'waiting', 'consulting', 'on_break']),
   current_token_no: z.number().int().nullable(),
   current_appointment_id: z.string().nullable(),
@@ -120,6 +125,7 @@ function toQueueRow(dto: QueueRowResponse, kind: QueueRowKind): QueueRow {
     offerNoShow: dto.offer_no_show ?? false,
     patientName: dto.patient_name ?? null,
     mrn: dto.mrn ?? null,
+    patientAccountFlag: parsePatientAccountFlag(dto.patient_account_flag),
   };
 }
 
@@ -138,6 +144,7 @@ export function toQueueSession(dto: SessionSnapshotResponse): QueueSession {
     sessionCode: dto.session_code,
     label: dto.label,
     status: dto.status,
+    sessionClosed: dto.session_closed ?? (dto.status === 'closed' || dto.status === 'cancelled'),
     queueState: dto.queue_state,
     currentTokenNo: dto.current_token_no,
     currentAppointmentId: dto.current_appointment_id,

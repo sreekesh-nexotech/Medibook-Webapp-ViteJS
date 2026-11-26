@@ -6,6 +6,7 @@ import {
   scheduleResponseSchema,
   toAffectedBookings,
   toDoctorReview,
+  toMovedBookings,
   toNotCancellableBookings,
   toSchedule,
   toWallClockHhmm,
@@ -128,6 +129,74 @@ describe('schedule-change envelope (B5: L-17, L-21)', () => {
       affected_bookings: [],
     });
     expect(toNotCancellableBookings(dto)).toEqual([]);
+  });
+});
+
+describe('moved_bookings (UAT T07, proposed field)', () => {
+  const env = { dry_run: true, result: null, affected_bookings: [] };
+
+  it('is empty when the backend does not send the field', () => {
+    expect(toMovedBookings(scheduleChangeResponseSchema.parse(env))).toEqual([]);
+  });
+
+  it('reads the moved bookings with their departments', () => {
+    const dto = scheduleChangeResponseSchema.parse({
+      ...env,
+      moved_bookings: [
+        {
+          appointment_id: 'a1',
+          booking_ref: 'BK-1',
+          patient_name: 'Asha Rao',
+          token_label: 'A-04',
+          scheduled_start_at: '2026-11-06T04:30:00Z',
+          from_department: 'Cardiology',
+          to_department: 'Neurology',
+        },
+      ],
+    });
+    expect(toMovedBookings(dto)).toEqual([
+      {
+        appointmentId: 'a1',
+        bookingRef: 'BK-1',
+        patientName: 'Asha Rao',
+        tokenLabel: 'A-04',
+        scheduledStartAt: '2026-11-06T04:30:00Z',
+        fromDepartment: 'Cardiology',
+        toDepartment: 'Neurology',
+      },
+    ]);
+  });
+
+  it('keeps only the fields it can read and never throws on a malformed item', () => {
+    const dto = scheduleChangeResponseSchema.parse({
+      ...env,
+      moved_bookings: [
+        { booking_ref: 'BK-2' },
+        { booking_ref: 7 },
+        'junk',
+        null,
+        { appointment_id: 'a3', booking_ref: 'BK-3', to_department: null },
+      ],
+    });
+    expect(toMovedBookings(dto).map((b) => b.bookingRef)).toEqual(['BK-2', 'BK-3']);
+    expect(toMovedBookings(dto)[0]).toMatchObject({ patientName: '', toDepartment: null });
+  });
+
+  it('does not fail the whole envelope when the field is not a list', () => {
+    const dto = scheduleChangeResponseSchema.parse({ ...env, moved_bookings: 'oops' });
+    expect(toMovedBookings(dto)).toEqual([]);
+  });
+
+  it('drops a moved booking that the same change also cancels', () => {
+    const dto = scheduleChangeResponseSchema.parse({
+      ...env,
+      affected_bookings: [row('a', 'confirmed')],
+      moved_bookings: [
+        { appointment_id: 'a', booking_ref: 'BK-a' },
+        { appointment_id: 'b', booking_ref: 'BK-b' },
+      ],
+    });
+    expect(toMovedBookings(dto).map((b) => b.appointmentId)).toEqual(['b']);
   });
 });
 

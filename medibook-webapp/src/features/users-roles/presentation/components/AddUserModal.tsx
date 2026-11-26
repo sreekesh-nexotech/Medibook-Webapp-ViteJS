@@ -158,8 +158,7 @@ export function AddUserModal({ roles, onClose }: AddUserModalProps) {
         <Icon name="mail" size={14} className="mt-0.5 flex-none" />
         <span>
           They get an email invitation, valid for 7 days, and set their own password when they
-          accept. They sign in with this email address. Mobile OTP invites and setting a password
-          for them are coming later.
+          accept. They sign in with this email address.
         </span>
       </p>
     </FormModal>

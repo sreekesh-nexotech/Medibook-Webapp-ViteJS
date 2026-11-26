@@ -9,6 +9,7 @@ import type {
   UsageMetric,
 } from '@/features/settlements/domain/entities/billing.entities';
 import type {
+  Payout,
   PayoutStatus,
   SettlementPeriodDetail,
   SettlementPeriodStatus,
@@ -209,4 +210,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   downloadFromUrl(url, filename);
   setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS);
+}
+
+/** "•••• 1234 · Online booking settlements", or "—" when no payout account was on file. */
+export function payoutAccountLabel(
+  payout: Pick<Payout, 'bankAccountLast4' | 'bankAccountPurposeNote'>,
+): string {
+  if (!payout.bankAccountLast4) return '—';
+  const note = payout.bankAccountPurposeNote ? ` · ${payout.bankAccountPurposeNote}` : '';
+  return `•••• ${payout.bankAccountLast4}${note}`;
 }

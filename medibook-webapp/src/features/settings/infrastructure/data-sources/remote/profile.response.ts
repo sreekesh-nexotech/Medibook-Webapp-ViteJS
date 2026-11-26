@@ -79,6 +79,7 @@ export function toScheduleChange(dto: ScheduleChangeResponse): ScheduleChange {
     dryRun: dto.dry_run,
     affectedBookings: dto.affected_bookings.map(toAffectedBooking),
     notCancellableBookings: (dto.not_cancellable_bookings ?? []).map(toAffectedBooking),
+    movedBookings: [],
     result: null,
     previewToken: dto.preview_token ?? null,
     rematerialisationQueued: dto.rematerialisation_queued ?? false,

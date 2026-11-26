@@ -19,6 +19,8 @@ interface CanProps {
   disableInstead?: boolean;
   /** Tooltip for `disableInstead`. */
   disabledTitle?: string;
+  /** Visit-day fulfilment that still works while the hospital is read-only (UAT-4). */
+  readOnlyExempt?: boolean;
 }
 
 const DEFAULT_DISABLED_TITLE = 'Your role does not have permission for this action';
@@ -48,10 +50,13 @@ export function Can({
   fallback = null,
   disableInstead = false,
   disabledTitle = DEFAULT_DISABLED_TITLE,
+  readOnlyExempt = false,
 }: CanProps) {
-  const { canAll, canAny, writeBlock } = usePermission();
+  const { can, writeBlock } = usePermission();
   const keys: readonly PermissionKey[] = typeof perm === 'string' ? [perm] : perm;
-  const allowed = all ? canAll(...keys) : canAny(...keys);
+  const allowed = all
+    ? keys.every((key) => can(key, { readOnlyExempt }))
+    : keys.some((key) => can(key, { readOnlyExempt }));
 
   if (allowed) return <>{children}</>;
   if (!disableInstead) return <>{fallback}</>;

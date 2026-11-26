@@ -1,3 +1,4 @@
+import { HOSPITAL_CANCEL_REFUND_SENTENCE } from '@/shared/lib/refundCopy';
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 
@@ -173,7 +174,7 @@ function errorCopy(error: unknown): string | undefined {
  */
 export function PaymentsScreen() {
   const { role } = useParams();
-  const canRefund = useCan('Payments.del');
+  const canRefund = useCan('Payments.del', { readOnlyExempt: true });
   const cashAccess = useCashDeskAccess();
 
   const [tab, setTab] = useState<PayTab>('All');
@@ -771,7 +772,7 @@ export function PaymentsScreen() {
                         {canRefund && availability.kind === 'live' && (
                           <span
                             className="text-caption text-text-muted"
-                            title="A refund ends the booking. Cancel it from Appointments; a hospital cancel refunds the doctor's booking fee."
+                            title={`A refund ends the booking. Cancel it from Appointments. ${HOSPITAL_CANCEL_REFUND_SENTENCE}`}
                           >
                             Cancel booking to refund
                           </span>

@@ -33,6 +33,7 @@ const BASE: DataRequest = {
   dueAt: '2026-10-31T04:00:00Z',
   completedAt: null,
   exportFileId: null,
+  exportReady: false,
   notes: null,
   retentionCarveOut: null,
   subjectName: null,

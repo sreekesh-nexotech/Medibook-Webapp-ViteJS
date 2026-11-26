@@ -12,6 +12,7 @@ import { money } from '@/shared/lib/format';
 import { formatTimeIn } from '@/shared/lib/hospitalTime';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
+import { PatientFlagBadge } from '@/shared/ui/PatientFlagBadge';
 import { Button } from '@/shared/ui/Button';
 import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
@@ -470,6 +471,7 @@ export function AppointmentsScreen() {
                       <span className="text-text-strong font-medium">
                         {a.patient?.fullName ?? 'Unknown patient'}
                       </span>
+                      <PatientFlagBadge flag={a.patientAccountFlag} />
                     </div>
                   </td>
                   <td className={tdClass}>
@@ -496,7 +498,9 @@ export function AppointmentsScreen() {
                   <td className={tdClass}>
                     <div className="flex flex-col items-start gap-0.75">
                       <Badge status={status.status}>{status.label}</Badge>
-                      {needsApproval(a) ? (
+                      {a.needsCloseOut ? (
+                        <Badge status="Needs action">Needs action</Badge>
+                      ) : needsApproval(a) ? (
                         <span className="text-caption text-y-700 font-semibold">
                           Needs approval
                         </span>

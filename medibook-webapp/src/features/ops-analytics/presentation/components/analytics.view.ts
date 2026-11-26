@@ -207,7 +207,11 @@ export function providerRows(providers: readonly ProviderUsage[]): readonly Prov
       icon: 'sliders-horizontal',
       color: 'var(--color-grey-500)',
     };
-    const errorPct = pct(p.errors, p.requests);
+    // Messaging providers meter messages separately from requests; if a rollup
+    // records more failures than requests, use the larger real volume so the
+    // rate cannot read 0% beside a positive error count.
+    const volume = Math.max(p.requests, p.messages, p.errors);
+    const errorPct = Math.min(100, pct(p.errors, volume));
     return {
       id: p.provider,
       label: meta.label,
@@ -218,7 +222,7 @@ export function providerRows(providers: readonly ProviderUsage[]): readonly Prov
       errors: p.errors,
       errorPct,
       costRupees: p.costRupees,
-      health: healthOf(errorPct, null),
+      health: p.errors > 0 && errorPct < ERROR_PCT_WARNING ? 'warning' : healthOf(errorPct, null),
     };
   });
 }

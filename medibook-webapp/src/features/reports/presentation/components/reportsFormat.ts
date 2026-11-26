@@ -29,6 +29,7 @@ const ISO_TIME_END = 16;
 /** Readable labels for the raw status / method values reports carry. */
 const VALUE_LABELS: Readonly<Record<string, string>> = {
   // appointments
+  pending_payment: 'Awaiting payment',
   pending_approval: 'Pending',
   scheduled: 'Scheduled',
   checked_in: 'Checked-in',
@@ -141,4 +142,14 @@ export function reportFailureText(error: unknown, fallback: string): string {
   if (!isFailure(error)) return fallback;
   const details = [...new Set(Object.values(error.fieldErrors).flat())];
   return details.length > 0 ? details.join(' ') : error.message;
+}
+
+/** Backend report notes written for implementers, in plain hospital language. */
+export function plainReportNote(note: string): string {
+  return note
+    .replaceAll('pending_payment', 'awaiting payment')
+    .replaceAll('date_from / date_to', 'the selected date range')
+    .replaceAll('client to confirm', 'to be confirmed')
+    .replaceAll('sheet remark', 'report note')
+    .replaceAll('NOTE:', 'Note:');
 }

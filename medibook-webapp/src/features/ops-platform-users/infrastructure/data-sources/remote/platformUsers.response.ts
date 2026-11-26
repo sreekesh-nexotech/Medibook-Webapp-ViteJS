@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { paginatedSchema } from '@/core/api/pagination';
 
 import type {
+  CancelBookingsPreview,
+  CancelBookingsResult,
   PlatformUserBooking,
   PlatformUserDetail,
   PlatformUserDevice,
@@ -26,6 +28,11 @@ export const platformUserSummaryResponseSchema = z.object({
   created_at: z.string(),
   // B2 (BE-31): booking count on list rows; absent on older backends.
   booking_count: z.number().int().nullable().optional(),
+  // UAT T10: the block / unblock / unlock response's paid upcoming booking refs
+  // (`UserActionResponse`); absent on list and detail rows, so read leniently.
+  upcoming_paid_bookings: z.unknown().optional(),
+  // Exact total; the list above holds at most 50 refs.
+  upcoming_paid_bookings_count: z.number().int().nullable().optional(),
 });
 
 export const platformUsersPageResponseSchema = paginatedSchema(platformUserSummaryResponseSchema);
@@ -83,6 +90,12 @@ export type PlatformUserSummaryResponse = z.infer<typeof platformUserSummaryResp
 export type PlatformUsersPageResponse = z.infer<typeof platformUsersPageResponseSchema>;
 export type PlatformUserDetailResponse = z.infer<typeof platformUserDetailResponseSchema>;
 
+/** Booking refs only; anything that is not a list of non-empty strings is skipped. */
+export function toUpcomingPaidRefs(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string' && v !== '');
+}
+
 export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): PlatformUserSummary {
   return {
     id: dto.id,
@@ -97,6 +110,8 @@ export function toPlatformUserSummary(dto: PlatformUserSummaryResponse): Platfor
     lastLoginAt: dto.last_login_at,
     createdAt: dto.created_at,
     bookingCount: dto.booking_count ?? null,
+    upcomingPaidBookingRefs: toUpcomingPaidRefs(dto.upcoming_paid_bookings),
+    upcomingPaidBookingsCount: dto.upcoming_paid_bookings_count ?? null,
   };
 }
 
@@ -155,4 +170,45 @@ export function toPlatformUserDetail(dto: PlatformUserDetailResponse): PlatformU
       : null,
     deletionDueAt: dto.deletion_due_at ?? null,
   };
+}
+
+/** `UserCancelBookingsPreview` — `GET /platform/users/{id}/cancel-bookings`. */
+export const cancelBookingsPreviewResponseSchema = z.object({
+  bookings: z.array(
+    z.object({
+      booking_ref: z.string(),
+      hospital_name: z.string(),
+      scheduled_start_at: z.string(),
+      refund_paise: z.number().int(),
+    }),
+  ),
+});
+
+export type CancelBookingsPreviewResponse = z.infer<typeof cancelBookingsPreviewResponseSchema>;
+export type CancelBookingsResultResponse = z.infer<typeof cancelBookingsResultResponseSchema>;
+
+/** `UserCancelBookingsResult` — `POST /platform/users/{id}/cancel-bookings`. */
+export const cancelBookingsResultResponseSchema = z.object({
+  cancelled_booking_refs: z.array(z.string()),
+});
+
+export function toCancelBookingsPreview(
+  dto: z.infer<typeof cancelBookingsPreviewResponseSchema>,
+): CancelBookingsPreview {
+  const bookings = dto.bookings.map((b) => ({
+    bookingRef: b.booking_ref,
+    hospitalName: b.hospital_name,
+    scheduledStartAt: b.scheduled_start_at,
+    refundPaise: b.refund_paise,
+  }));
+  return {
+    bookings,
+    totalRefundPaise: bookings.reduce((sum, b) => sum + b.refundPaise, 0),
+  };
+}
+
+export function toCancelBookingsResult(
+  dto: z.infer<typeof cancelBookingsResultResponseSchema>,
+): CancelBookingsResult {
+  return { cancelledBookingRefs: dto.cancelled_booking_refs };
 }

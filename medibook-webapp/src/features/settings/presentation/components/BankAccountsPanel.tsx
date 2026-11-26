@@ -141,6 +141,11 @@ export function BankAccountsPanel({ bank, isAdmin }: BankAccountsPanelProps) {
                     {a.accountHolder} · IFSC {a.ifsc}
                     {a.upiId ? ` · UPI ${a.upiId}` : ''}
                   </div>
+                  {a.purposeNote && (
+                    <div className="text-caption text-text-body mt-0.5 break-words">
+                      Purpose: {a.purposeNote}
+                    </div>
+                  )}
                   {a.isPrimary && !a.verifiedAt && (
                     <div className="text-caption text-y-700 mt-0.5">
                       Payouts wait until Medibook finance verifies this account.

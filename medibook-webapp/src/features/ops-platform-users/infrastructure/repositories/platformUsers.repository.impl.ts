@@ -3,8 +3,10 @@ import { attempt } from '@/core/error/attempt';
 
 import type { PlatformUsersRepository } from '@/features/ops-platform-users/domain/repositories/platformUsers.repository';
 import {
+  getCancelBookingsPreview,
   getPlatformUser,
   getPlatformUsers,
+  postCancelBookings,
   postPlatformUserAction,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.api';
 import {
@@ -12,6 +14,8 @@ import {
   toListQuery,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.request';
 import {
+  toCancelBookingsPreview,
+  toCancelBookingsResult,
   toPlatformUserDetail,
   toPlatformUserSummary,
 } from '@/features/ops-platform-users/infrastructure/data-sources/remote/platformUsers.response';
@@ -34,6 +38,12 @@ export const platformUsersRepository: PlatformUsersRepository = {
     attempt(async () =>
       toPlatformUserSummary(await postPlatformUserAction(id, 'block', { reason })),
     ),
+
+  previewCancelBookings: (id) =>
+    attempt(async () => toCancelBookingsPreview(await getCancelBookingsPreview(id))),
+
+  cancelBookings: (id, replayKey) =>
+    attempt(async () => toCancelBookingsResult(await postCancelBookings(id, replayKey))),
 
   unblockUser: (id) =>
     attempt(async () =>

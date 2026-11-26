@@ -25,6 +25,8 @@ function hospital(overrides: Partial<PlatformHospital> = {}): PlatformHospital {
     city: 'Kochi',
     state: 'Kerala',
     pincode: '682001',
+    lat: null,
+    lng: null,
     status: 'active',
     appVisibility: 'visible',
     onlineBookingEnabled: true,

@@ -9,6 +9,7 @@ import type {
   SettlementPeriod,
 } from '@/features/ops-settlements/domain/entities/opsSettlements.entities';
 import {
+  bankLabel,
   breakdownLines,
   buildRows,
   canReleaseTo,
@@ -57,6 +58,7 @@ const payout = (over: Partial<Payout>): Payout => ({
   settlementPeriodId: 'p-1',
   hospitalId: 'h-1',
   bankAccountLast4: '1234',
+  bankAccountPurposeNote: null,
   hasBankAccount: true,
   amountRupees: 8_220,
   status: 'pending',
@@ -97,6 +99,7 @@ const breakdown: PeriodBreakdown = {
   convenienceFeesRupees: 300,
   convenienceFeeGstRupees: 54,
   carriedAdjustmentsRupees: 0,
+  platformDiscountsRupees: 0,
   ledgerNetRupees: 8_120,
   bookingsCount: 40,
   entries: 120,
@@ -185,6 +188,23 @@ describe('breakdown (BE-27)', () => {
     ]);
   });
 
+  it('shows the discounts Medibook bore on its coupons as a credit (point 9)', () => {
+    const lines = breakdownLines(
+      { ...breakdown, platformDiscountsRupees: 300, ledgerNetRupees: 8_420 },
+      0,
+      0,
+      8_420,
+    );
+    expect(lines.map((l) => [l.label, l.rupees])).toContainEqual([
+      'Medibook-funded coupon discounts',
+      300,
+    ]);
+    // none → no line
+    expect(breakdownLines(breakdown, 0, 0, 8_120).map((l) => l.label)).not.toContain(
+      'Medibook-funded coupon discounts',
+    );
+  });
+
   it('uses the server reconciliation, or checks ledger + adjustments − TDS', () => {
     expect(isReconciled(breakdown, 100, 0, 8_220)).toBe(true);
     expect(isReconciled(breakdown, 0, 0, 8_220)).toBe(false);
@@ -203,5 +223,16 @@ describe('form helpers', () => {
   it('picks the previous month to issue', () => {
     expect(previousMonth('2026-10-07')).toBe('2026-09');
     expect(previousMonth('2026-01-15')).toBe('2025-12');
+  });
+});
+
+describe('bankLabel', () => {
+  it("adds the hospital's purpose note to the payout account when there is one", () => {
+    expect(bankLabel(payout({}))).toBe('A/c ····1234');
+    expect(bankLabel(payout({ bankAccountPurposeNote: 'Online booking settlements' }))).toBe(
+      'A/c ····1234 · Online booking settlements',
+    );
+    expect(bankLabel(payout({ bankAccountLast4: null, hasBankAccount: false }))).toBeNull();
+    expect(bankLabel(null)).toBeNull();
   });
 });

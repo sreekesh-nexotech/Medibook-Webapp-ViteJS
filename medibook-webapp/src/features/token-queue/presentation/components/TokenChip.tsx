@@ -1,4 +1,6 @@
 import { cn } from '@/shared/lib/cn';
+import type { PatientAccountFlag } from '@/shared/lib/patientAccountFlag';
+import { PatientFlagBadge } from '@/shared/ui/PatientFlagBadge';
 
 interface TokenChipProps {
   label: string;
@@ -9,16 +11,18 @@ interface TokenChipProps {
   muted?: boolean;
   /** What a click does, for the tooltip and the accessible name. */
   actionVerb?: string;
+  /** Information only: shown beside the chip; it never disables the chip. */
+  accountFlag?: PatientAccountFlag | null;
 }
 
 /** One queued token: a plain chip, or a button that calls it when the desk is free. */
-export function TokenChip({
+function TokenChipBase({
   label,
   patientName,
   onCall,
   muted = false,
   actionVerb = 'Call',
-}: TokenChipProps) {
+}: Omit<TokenChipProps, 'accountFlag'>) {
   const chip = cn(
     'text-caption rounded-full px-2.25 py-0.5 font-semibold',
     muted ? 'bg-grey-200 text-text-muted' : 'text-blue bg-blue-soft-bg',
@@ -40,5 +44,15 @@ export function TokenChip({
     >
       {label}
     </button>
+  );
+}
+
+export function TokenChip({ accountFlag = null, ...chip }: TokenChipProps) {
+  if (accountFlag === null) return <TokenChipBase {...chip} />;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <TokenChipBase {...chip} />
+      <PatientFlagBadge flag={accountFlag} />
+    </span>
   );
 }

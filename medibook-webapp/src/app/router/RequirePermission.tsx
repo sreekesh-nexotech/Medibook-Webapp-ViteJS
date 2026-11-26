@@ -54,7 +54,11 @@ export function RequirePermission({
                 ? 'This hospital is suspended'
                 : 'This hospital is read-only right now'
             }
-            message="You can view records, but nothing can be created or changed until the hospital is active again."
+            message={
+              writeBlock === 'suspended'
+                ? 'You can view records, but nothing can be created or changed until the hospital is active again.'
+                : 'Visit-day work such as check-in, the queue and refunds still works. Settings and new bookings are blocked until the subscription is paid.'
+            }
           />
         );
       }

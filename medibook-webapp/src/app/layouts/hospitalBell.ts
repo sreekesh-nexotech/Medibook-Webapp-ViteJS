@@ -153,6 +153,12 @@ const ALERT_PRESENTATION: Readonly<
     sub: 'Expected from Medibook',
     go: 'settlements',
   },
+  unclosed_past_bookings: {
+    icon: 'calendar-x',
+    boxClass: 'bg-y-100 text-y-800',
+    sub: 'Past bookings waiting for no-show or refund',
+    go: 'appointments',
+  },
 };
 
 /** A bell item a newer backend added: shown by its own label, leading home. */

@@ -175,7 +175,7 @@ export function UsersRolesScreen() {
     {
       icon: 'users',
       label: 'Total Users',
-      value: users.filter((u) => u.kind === 'staff').length,
+      value: users.length,
       fg: 'text-blue',
       bg: 'bg-blue-soft-bg',
     },

@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios';
 
+import { ifMatch } from '@/core/api/headers';
 import { hospitalApi } from '@/core/api/http';
 
 import type {
@@ -12,12 +13,16 @@ import type {
   ReportCatalogResponse,
   ReportExportQueuedResponse,
   ReportResultResponse,
+  ReportScheduleResponse,
 } from '@/features/reports/infrastructure/data-sources/remote/reports.response';
 import {
   reportCatalogResponseSchema,
   reportExportQueuedResponseSchema,
   reportResultResponseSchema,
+  reportSchedulePageResponseSchema,
+  reportScheduleResponseSchema,
 } from '@/features/reports/infrastructure/data-sources/remote/reports.response';
+import type { ReportScheduleUpdate } from '@/features/reports/domain/entities/reports.entities';
 
 const HTTP_ACCEPTED = 202;
 
@@ -97,4 +102,22 @@ export async function getReportExport(request: ReportExportRequest): Promise<Rep
     return { kind: 'queued', body: reportExportQueuedResponseSchema.parse(body) };
   }
   return { kind: 'file', file: response.data };
+}
+
+/** `GET /hospital/report-schedules` — this hospital's scheduled report emails. */
+export async function getReportSchedules() {
+  const response = await hospitalApi.get('/report-schedules', { params: { page_size: 100 } });
+  return reportSchedulePageResponseSchema.parse(response.data);
+}
+
+/** `PATCH /hospital/report-schedules/{id}` — pause/resume or change recipients. */
+export async function patchReportSchedule(
+  id: string,
+  changes: ReportScheduleUpdate,
+  version: number,
+): Promise<ReportScheduleResponse> {
+  const response = await hospitalApi.patch(`/report-schedules/${encodeURIComponent(id)}`, changes, {
+    headers: ifMatch(version),
+  });
+  return reportScheduleResponseSchema.parse(response.data);
 }

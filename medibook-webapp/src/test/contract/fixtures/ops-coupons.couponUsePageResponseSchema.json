@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "id": "01a217b3-8c8a-7c11-87be-c168e6b46836",
+      "hospital_id": "01a14485-c452-7b00-80a9-fac1d3b6afcd",
+      "hospital_name": "Example Multispeciality Hospital",
+      "appointment_id": "01a217b3-8c79-7e51-b761-4bde1265d4cd",
+      "booking_ref": "EXMB-2611-00227",
+      "discount_paise": 10000,
+      "funded_by": "platform",
+      "redeemed_at": "2026-11-26T11:52:52.596786Z",
+      "reversed_at": null
+    }
+  ],
+  "page": 1,
+  "page_size": 5,
+  "total": 1,
+  "has_next": false
+}

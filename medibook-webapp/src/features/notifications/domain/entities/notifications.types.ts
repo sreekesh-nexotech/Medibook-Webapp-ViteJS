@@ -12,7 +12,8 @@ export type HospitalAlertKey =
   | 'unpaid_walk_ins_today'
   | 'cash_sessions_to_reconcile'
   | 'settlements_on_hold'
-  | 'settlements_awaiting_payout';
+  | 'settlements_awaiting_payout'
+  | 'unclosed_past_bookings';
 
 export interface HospitalAlertItem {
   /** A `HospitalAlertKey`, or a key a newer backend added (shown by its label). */

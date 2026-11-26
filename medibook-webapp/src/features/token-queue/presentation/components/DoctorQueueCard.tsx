@@ -7,6 +7,7 @@ import { Can } from '@/shared/ui/Can';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmModal } from '@/shared/ui/ConfirmModal';
 import { IconBtn } from '@/shared/ui/IconBtn';
+import { Modal } from '@/shared/ui/Modal';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import { isFailure, type FailureKind } from '@/core/error/failure';
@@ -32,6 +33,7 @@ import {
   isServing,
   isStaleQueueRefusal,
   minutesSince,
+  openTokensFromFailure,
   pillFor,
   queueRefusalText,
   servingLabel,
@@ -132,12 +134,13 @@ export function DoctorQueueCard({
   onShowCalls,
   onStale,
 }: DoctorQueueCardProps) {
-  const canRunQueue = useCan('Token Management.edit');
+  const canRunQueue = useCan('Token Management.edit', { readOnlyExempt: true });
   const sessionCommand = useSessionCommandMutation();
   const tokenCommand = useTokenCommandMutation();
   const skip = useSkipTokenMutation();
   const [offerNoShow, setOfferNoShow] = useState<NoShowOffer | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [closeBlocked, setCloseBlocked] = useState<ReturnType<typeof openTokensFromFailure>>(null);
 
   const pill = pillFor(session);
   const serving = isServing(session);
@@ -159,8 +162,13 @@ export function DoctorQueueCard({
   const canCallToken = canRunQueue && isOpen && !serving && !busy;
 
   const onError = (fallback: string) => (error: unknown) => {
-    if (isFailure(error) && (error.kind === NOT_FOUND || isStaleQueueRefusal(error.code))) {
-      onStale();
+    if (isFailure(error)) {
+      const blocked = openTokensFromFailure(error);
+      if (blocked) {
+        setCloseBlocked(blocked);
+        return;
+      }
+      if (error.kind === NOT_FOUND || isStaleQueueRefusal(error.code)) onStale();
     }
     toast(failureText(error, fallback), 'error', error);
   };
@@ -286,6 +294,7 @@ export function DoctorQueueCard({
                 key={t.appointmentId}
                 label={t.label}
                 patientName={ticketTitle(t)}
+                accountFlag={t.patientAccountFlag}
                 onCall={canCallToken ? () => runToken('call', t.tokenNo) : undefined}
               />
             ))
@@ -318,6 +327,7 @@ export function DoctorQueueCard({
                 key={t.appointmentId}
                 label={t.label}
                 patientName={t.patientName}
+                accountFlag={t.patientAccountFlag}
                 actionVerb="Mark done"
                 onCall={
                   canRunQueue && isLive && !busy ? () => runToken('complete', t.tokenNo) : undefined
@@ -342,6 +352,7 @@ export function DoctorQueueCard({
                 <TokenChip
                   label={t.label}
                   patientName={ticketTitle(t)}
+                  accountFlag={t.patientAccountFlag}
                   muted
                   actionVerb="Call again"
                   onCall={canCallToken ? () => runToken('recall', t.tokenNo) : undefined}
@@ -365,6 +376,7 @@ export function DoctorQueueCard({
 
       <Can
         perm="Token Management.edit"
+        readOnlyExempt
         disableInstead
         disabledTitle="Your role cannot run the queue"
       >
@@ -476,7 +488,7 @@ export function DoctorQueueCard({
       <ConfirmModal
         open={confirmClose}
         title="Close this session?"
-        body={closeSessionCopy(doctorName, session.label, session.waitingCount)}
+        body={closeSessionCopy(doctorName, session.label)}
         confirmLabel="Close session"
         danger={session.waitingCount > 0}
         onClose={() => setConfirmClose(false)}
@@ -485,6 +497,41 @@ export function DoctorQueueCard({
           runSession('close');
         }}
       />
+      <Modal
+        open={closeBlocked !== null}
+        onClose={() => setCloseBlocked(null)}
+        title="Session still has patients"
+        width={480}
+        footer={<Button onClick={() => setCloseBlocked(null)}>Close</Button>}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-body text-text-body m-0">
+            Serve, cancel or mark no-show every open token before closing this session. There is no
+            way to close it with patients still waiting.
+          </p>
+          {closeBlocked && closeBlocked.tokens.length > 0 ? (
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+              {closeBlocked.tokens.map((t) => (
+                <li
+                  key={t.tokenNo}
+                  className="border-border-soft flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <span className="text-body text-text-strong font-semibold">
+                    {t.tokenLabel ?? `#${t.tokenNo}`}
+                  </span>
+                  <span className="text-caption text-text-muted">
+                    {t.status.replaceAll('_', ' ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-body text-text-muted m-0">
+              The server did not list the open tokens.
+            </p>
+          )}
+        </div>
+      </Modal>
     </Card>
   );
 }

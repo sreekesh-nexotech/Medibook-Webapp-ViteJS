@@ -1,3 +1,4 @@
+import { parsePatientAccountFlag } from '@/shared/lib/patientAccountFlag';
 import { z } from 'zod';
 
 import type {
@@ -76,6 +77,12 @@ export const appointmentResponseSchema = z.object({
     'not_required',
     'cancelled',
   ]),
+  /** UAT-5: money taken but not yet returned; `payment_status` stays `paid` until the gateway confirms. */
+  refund_pending_paise: z.number().int().optional(),
+  /** UAT-7: a past booking still `scheduled`/`checked_in` that the desk must close out. */
+  needs_close_out: z.boolean().optional(),
+  /** UAT part 2 T10/T12/T16: `blocked` | `pending_deletion` | null. Read leniently. */
+  patient_account_flag: z.string().nullable().optional(),
   consultation_fee_paise: z.number().int(),
   service_fee_paise: z.number().int(),
   discount_paise: z.number().int(),
@@ -249,6 +256,9 @@ export function toAppointment(dto: AppointmentResponse): DeskAppointment {
     patientNotes: dto.patient_notes ?? '',
     remark: dto.remark ?? '',
     paymentStatus: dto.payment_status,
+    refundPendingRupees: rupees(dto.refund_pending_paise ?? 0),
+    needsCloseOut: dto.needs_close_out ?? false,
+    patientAccountFlag: parsePatientAccountFlag(dto.patient_account_flag),
     consultationRupees: rupees(dto.consultation_fee_paise),
     serviceRupees: rupees(dto.service_fee_paise),
     discountRupees: rupees(dto.discount_paise),

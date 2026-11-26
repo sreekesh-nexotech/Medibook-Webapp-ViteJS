@@ -775,6 +775,22 @@ const SPEC = [
     path: '/platform/banners',
     params: LIST,
   },
+  // point 9: Medibook Operations' coupons and their uses
+  {
+    key: 'ops-coupons.couponPageResponseSchema',
+    surface: 'platform',
+    path: '/platform/coupons',
+    params: LIST,
+  },
+  {
+    key: 'ops-coupons.couponUsePageResponseSchema',
+    surface: 'platform',
+    path: '/platform/coupons/{id}/redemptions',
+    params: LIST,
+    needs: (fx) => ({
+      id: first(fx, 'ops-coupons.couponPageResponseSchema', (c) => c.used_count > 0)?.id,
+    }),
+  },
   {
     key: 'ops-content.legalDocumentPageResponseSchema',
     surface: 'platform',

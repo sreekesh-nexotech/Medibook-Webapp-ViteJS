@@ -57,7 +57,15 @@ const NO_VALUE = '—';
  * columns are left out rather than shown as dashes; each hospital's page has
  * its plan.
  */
-const COLUMNS = ['Hospital', 'Location', 'Onboarded', 'Status', 'Action'] as const;
+const COLUMNS = [
+  'Hospital',
+  'Plan',
+  'Location',
+  'Bookings (30 days)',
+  'Onboarded',
+  'Status',
+  'Action',
+] as const;
 
 /** Sortable column keys → backend `sort` fields (`PlatformHospitalListView.spec.sorts`). */
 const SORT_FIELD: Readonly<Record<string, string>> = {

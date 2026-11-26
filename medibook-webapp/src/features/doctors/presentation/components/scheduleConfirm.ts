@@ -1,7 +1,10 @@
 import type { Failure } from '@/core/error/failure';
 import { isFailure } from '@/core/error/failure';
 
-import type { AffectedBooking } from '@/features/doctors/domain/entities/doctors.types';
+import type {
+  AffectedBooking,
+  MovedBooking,
+} from '@/features/doctors/domain/entities/doctors.types';
 
 /**
  * Pure rules of the dry-run → confirm flow (Q32, Q73), kept apart from the
@@ -52,13 +55,14 @@ export function unpreviewedBookings(
 
 /**
  * What a schedule change does to the money on the bookings it cancels. The
- * backend refunds the doctor's booking fee (Q11), but its affected-booking items
- * (`materialise._booking_ref`: ref, token, status, time, patient) carry no
- * payment state, so an unpaid walk-in cannot be told from a prepaid booking.
- * The copy must not promise a refund that never happens.
+ * backend refunds the full paid amount, including the convenience fee (Q11,
+ * UAT-5), but its affected-booking items (`materialise._booking_ref`: ref,
+ * token, status, time, patient) carry no payment state, so an unpaid walk-in
+ * cannot be told from a prepaid booking. The copy must not promise a refund
+ * that never happens.
  */
-/** Q11: a hospital-side cancellation refunds the doctor's fee; the convenience fee is kept. */
-export const CANCEL_REFUND_NOTE = "the doctor's fee of a paid booking is refunded";
+/** Q11 / UAT-5: a hospital-side cancellation refunds the full paid amount. */
+export const CANCEL_REFUND_NOTE = 'a paid booking is refunded in full';
 
 /** "1 booking cancelled (the doctor's fee of a paid booking is refunded)" */
 export function cancelledBookingsCopy(n: number): string {
@@ -72,4 +76,12 @@ export function unpreviewedCopy(bookings: readonly AffectedBooking[]): string {
   return `${n} booking${n === 1 ? ' was' : 's were'} made after the preview and ${
     n === 1 ? 'was' : 'were'
   } also cancelled (${CANCEL_REFUND_NOTE}): ${names}.`;
+}
+
+/** "Cardiology → Neurology", "now Neurology" when the old one is unknown, `null` when neither is. */
+export function movedDepartmentLabel(b: MovedBooking): string | null {
+  if (b.toDepartment === null) return null;
+  return b.fromDepartment === null
+    ? `now ${b.toDepartment}`
+    : `${b.fromDepartment} → ${b.toDepartment}`;
 }

@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
+import { paginatedSchema } from '@/core/api/pagination';
+
 import type {
   ReportColumnDef,
   ReportDefinition,
   ReportKpiValue,
   ReportResult,
   ReportRow,
+  ReportSchedule,
   ReportValue,
   ReportValueKind,
 } from '@/features/reports/domain/entities/reports.entities';
@@ -145,5 +148,44 @@ export function toReportResult(dto: ReportResultResponse): ReportResult {
     total: dto.page.total,
     hasNext: dto.page.has_next,
     notes: dto.meta.notes,
+  };
+}
+
+/** `schedules.serialize()` — one hospital scheduled report (BE-32). */
+export const reportScheduleResponseSchema = z.object({
+  id: z.string(),
+  report_code: z.string(),
+  report_title: z.string().nullable().optional(),
+  cadence: z.enum(['daily', 'weekly']),
+  format: z.enum(['csv', 'xlsx', 'pdf']),
+  recipients: z.array(z.string()),
+  uses_default_recipients: z.boolean(),
+  is_active: z.boolean(),
+  last_sent_at: z.string().nullable().optional(),
+  last_run_at: z.string().nullable().optional(),
+  last_status: z.string().nullable().optional(),
+  last_error: z.string().nullable().optional(),
+  version: z.number().int(),
+});
+
+export const reportSchedulePageResponseSchema = paginatedSchema(reportScheduleResponseSchema);
+
+export type ReportScheduleResponse = z.infer<typeof reportScheduleResponseSchema>;
+
+export function toReportSchedule(dto: ReportScheduleResponse): ReportSchedule {
+  return {
+    id: dto.id,
+    reportCode: dto.report_code,
+    reportTitle: dto.report_title ?? null,
+    cadence: dto.cadence,
+    format: dto.format,
+    recipients: dto.recipients,
+    usesDefaultRecipients: dto.uses_default_recipients,
+    isActive: dto.is_active,
+    lastSentAt: dto.last_sent_at ?? null,
+    lastRunAt: dto.last_run_at ?? null,
+    lastStatus: dto.last_status ?? null,
+    lastError: dto.last_error ?? null,
+    version: dto.version,
   };
 }

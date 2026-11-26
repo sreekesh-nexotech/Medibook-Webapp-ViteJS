@@ -14,7 +14,7 @@ interface HospitalStateBannerProps {
 const COPY: Readonly<Record<Exclude<HospitalWriteBlock, null>, { title: string; body: string }>> = {
   read_only: {
     title: 'This hospital is read-only',
-    body: "The Medibook subscription is overdue. You can view everything, but changes can't be saved and the hospital is hidden from the patient app until the invoice is paid.",
+    body: "The Medibook subscription is overdue. You can still check patients in, run the queue, and cancel or refund visits, but other changes can't be saved and the hospital is hidden from the patient app until the invoice is paid.",
   },
   suspended: {
     title: 'This hospital is suspended',

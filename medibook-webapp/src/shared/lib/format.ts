@@ -122,6 +122,19 @@ export function formatInstant(
   return zonedFormat(locale, options).format(new Date(instant));
 }
 
+const IST_TIME_ZONE = 'Asia/Kolkata';
+
+/** A moment formatted in India Standard Time, whatever the hospital/device zone is. */
+export function formatIst(
+  instant: Date | string | number,
+  options: Intl.DateTimeFormatOptions,
+  locale = 'en-IN',
+): string {
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: IST_TIME_ZONE }).format(
+    new Date(instant),
+  );
+}
+
 /** "10:42" — the "Updated …" caption beside a list's Refresh button. */
 export function formatUpdatedAt(updatedAt: number): string {
   return formatInstant(updatedAt, { hour: '2-digit', minute: '2-digit' });

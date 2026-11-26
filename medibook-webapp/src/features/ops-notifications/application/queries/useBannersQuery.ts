@@ -7,10 +7,11 @@ import { notificationsKeys } from '@/features/ops-notifications/application/quer
 import { fetchBanners } from '@/features/ops-notifications/application/usecases/fetchBanners';
 
 /** Every platform campaign banner, in rotation order. */
-export function useBannersQuery() {
+export function useBannersQuery(enabled = true) {
   return useQuery({
     queryKey: notificationsKeys.banners(),
     queryFn: async () => unwrap(await fetchBanners()),
     staleTime: QUERY_STALE_TIME_MS,
+    enabled,
   });
 }

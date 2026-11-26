@@ -18,6 +18,7 @@ import {
   toRulesForm,
   tokenChanges,
   tokenErrors,
+  toBankForm,
   toTokenForm,
 } from '@/features/settings/application/store/settings.form';
 
@@ -119,6 +120,16 @@ describe('profileChanges (UAT-28, 07·F1)', () => {
       website: null,
       addressLine2: 'Near Park',
     });
+  });
+
+  it('sends latitude and longitude together even when only one changed (point 3)', () => {
+    const base = toProfileForm({ ...profile, lat: 9.9312, lng: 76.2673 });
+    expect(profileChanges(base, { ...base, lat: '9.926492' })).toEqual({
+      lat: 9.926492,
+      lng: 76.2673,
+    });
+    // removing the location clears both
+    expect(profileChanges(base, { ...base, lat: '', lng: '' })).toEqual({ lat: null, lng: null });
   });
 
   it('turns a national phone number into E.164', () => {
@@ -293,14 +304,47 @@ describe('bankInput (decision 4)', () => {
       account: '',
       ifsc: 'sbin0001',
       upi: '',
+      purpose: '',
     };
     expect(bankInput(form)).toEqual({
       accountHolder: 'City Care',
       ifsc: 'SBIN0001',
       bankName: 'SBI',
       upiId: null,
+      purposeNote: null,
     });
     expect(bankInput({ ...form, account: '1234 5678 90' }).accountNumber).toBe('1234567890');
+  });
+
+  it('trims the purpose / note and sends null to clear it', () => {
+    const form = {
+      accountName: 'City Care',
+      bank: 'SBI',
+      account: '',
+      ifsc: 'SBIN0001234',
+      upi: '',
+      purpose: '  Online booking settlements  ',
+    };
+    expect(bankInput(form).purposeNote).toBe('Online booking settlements');
+    expect(bankInput({ ...form, purpose: '   ' }).purposeNote).toBeNull();
+  });
+
+  it('starts the form from the stored note', () => {
+    const stored = {
+      id: 'a-1',
+      accountHolder: 'City Care',
+      accountLast4: '4567',
+      ifsc: 'SBIN0001234',
+      bankName: 'SBI',
+      upiId: null,
+      purposeNote: 'Pharmacy collections',
+      isPrimary: false,
+      verifiedAt: null,
+      version: 1,
+    };
+    expect(toBankForm(stored).purpose).toBe('Pharmacy collections');
+    expect(toBankForm({ ...stored, purposeNote: null }).purpose).toBe('');
+    expect(toBankForm(null).purpose).toBe('');
   });
 });
 

@@ -1,10 +1,13 @@
 import type { Result } from '@/core/error/failure';
 
+import type { DisplayBoard } from '@/features/display/domain/entities/display.types';
 import type {
   Counter,
   CounterInput,
   DisplayDevice,
   DisplayDeviceChanges,
+  DisplayDeviceInput,
+  DisplaySelection,
   DisplayDeviceWithKey,
   NumberingChanges,
   NumberingSeries,
@@ -49,7 +52,7 @@ export interface ConfigRepository {
 
   listDisplayDevices(): Promise<Result<readonly DisplayDevice[]>>;
   /** Register a screen; the raw key in the answer is shown once. */
-  createDisplayDevice(name: string): Promise<Result<DisplayDeviceWithKey>>;
+  createDisplayDevice(input: DisplayDeviceInput): Promise<Result<DisplayDeviceWithKey>>;
   updateDisplayDevice(
     id: string,
     changes: DisplayDeviceChanges,
@@ -58,4 +61,8 @@ export interface ConfigRepository {
   deleteDisplayDevice(id: string, version: number): Promise<Result<null>>;
   /** The old key stops working; the new raw key in the answer is shown once. */
   rotateDisplayDeviceKey(id: string): Promise<Result<DisplayDeviceWithKey>>;
+  /** What a screen with this unsaved selection shows now (the form's Preview). */
+  previewDisplay(selection: DisplaySelection): Promise<Result<DisplayBoard>>;
+  /** What this saved screen shows now. */
+  previewDisplayDevice(id: string): Promise<Result<DisplayBoard>>;
 }

@@ -213,6 +213,12 @@ export function ServicesPricingScreen() {
   const [redemptionsOf, setRedemptionsOf] = useState<HospitalCoupon | null>(null);
   const [linksOf, setLinksOf] = useState<PricedService | null>(null);
   const [inUse, setInUse] = useState<InUseNotice | null>(null);
+  const [toggleTarget, setToggleTarget] = useState<
+    | { readonly kind: 'service'; readonly item: PricedService }
+    | { readonly kind: 'tax'; readonly item: ServiceTaxRate }
+    | { readonly kind: 'coupon'; readonly item: HospitalCoupon }
+    | null
+  >(null);
 
   const doctorName = useMemo(
     () => new Map((doctorsQuery.data ?? []).map((d) => [d.id, d.name])),
@@ -375,6 +381,10 @@ export function ServicesPricingScreen() {
 
   /** Only `is_active` is sent, so nothing else about the row can block the switch (07·S-F7). */
   const toggleService = (s: PricedService): void => {
+    setToggleTarget({ kind: 'service', item: s });
+  };
+
+  const confirmToggleService = (s: PricedService): void => {
     setServiceActive.mutate(
       { id: s.id, isActive: !s.isActive, version: s.version },
       {
@@ -385,6 +395,10 @@ export function ServicesPricingScreen() {
   };
 
   const toggleTax = (t: ServiceTaxRate): void => {
+    setToggleTarget({ kind: 'tax', item: t });
+  };
+
+  const confirmToggleTax = (t: ServiceTaxRate): void => {
     setTaxActive.mutate(
       { id: t.id, isActive: !t.isActive, version: t.version },
       {
@@ -398,6 +412,10 @@ export function ServicesPricingScreen() {
   };
 
   const toggleCoupon = (c: HospitalCoupon): void => {
+    setToggleTarget({ kind: 'coupon', item: c });
+  };
+
+  const confirmToggleCoupon = (c: HospitalCoupon): void => {
     setCouponActive.mutate(
       { id: c.id, isActive: !c.isActive, version: c.version },
       {
@@ -1239,6 +1257,33 @@ export function ServicesPricingScreen() {
       </Modal>
 
       <CouponRedemptionsModal coupon={redemptionsOf} onClose={() => setRedemptionsOf(null)} />
+
+      <ConfirmModal
+        open={toggleTarget != null}
+        title={
+          toggleTarget?.kind === 'coupon'
+            ? `${toggleTarget.item.isActive ? 'Pause' : 'Resume'} this coupon?`
+            : `${toggleTarget?.item.isActive ? 'Switch off' : 'Switch on'} this ${toggleTarget?.kind === 'tax' ? 'tax rate' : 'service'}?`
+        }
+        body={
+          toggleTarget?.kind === 'coupon'
+            ? toggleTarget.item.isActive
+              ? `“${toggleTarget.item.code}” stops being applied immediately. Its window and usage count are kept.`
+              : `“${toggleTarget.item.code}” can be applied again immediately.`
+            : toggleTarget?.item.isActive
+              ? 'It stops being offered immediately. Existing bookings and receipts keep their recorded amounts.'
+              : 'It becomes available for new bookings immediately.'
+        }
+        confirmLabel={toggleTarget?.item.isActive ? 'Switch off' : 'Switch on'}
+        danger={toggleTarget?.item.isActive}
+        onClose={() => setToggleTarget(null)}
+        onConfirm={() => {
+          if (toggleTarget?.kind === 'service') confirmToggleService(toggleTarget.item);
+          if (toggleTarget?.kind === 'tax') confirmToggleTax(toggleTarget.item);
+          if (toggleTarget?.kind === 'coupon') confirmToggleCoupon(toggleTarget.item);
+          setToggleTarget(null);
+        }}
+      />
 
       <ConfirmModal
         open={toDelete != null}

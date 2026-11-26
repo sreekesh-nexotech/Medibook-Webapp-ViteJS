@@ -9,11 +9,14 @@ import type { ReportsRepository } from '@/features/reports/domain/repositories/r
 import {
   getReport,
   getReportExport,
+  getReportSchedules,
   getReports,
+  patchReportSchedule,
 } from '@/features/reports/infrastructure/data-sources/remote/reports.api';
 import {
   toReportCatalog,
   toReportResult,
+  toReportSchedule,
 } from '@/features/reports/infrastructure/data-sources/remote/reports.response';
 
 /** A stored file's lifecycle as an export's state; `expiresAt` in the past reads expired. */
@@ -49,6 +52,12 @@ export const reportsRepository: ReportsRepository = {
       // because a blob download cannot read `Content-Disposition` cross-origin.
       return { kind: 'file', file: response.file, filename: `${request.code}.${request.format}` };
     }),
+
+  listSchedules: () =>
+    attempt(async () => (await getReportSchedules()).results.map(toReportSchedule)),
+
+  updateSchedule: (id, changes, version) =>
+    attempt(async () => toReportSchedule(await patchReportSchedule(id, changes, version))),
 
   getExportFile: async (fileId) => {
     const result = await getFile(fileId);

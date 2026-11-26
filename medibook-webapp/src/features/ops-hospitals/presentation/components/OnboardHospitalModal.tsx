@@ -8,6 +8,7 @@ import { FormErrorSummary } from '@/shared/ui/FormErrorSummary';
 import { FormModal } from '@/shared/ui/FormModal';
 import { Icon } from '@/shared/ui/Icon';
 import { OpsField } from '@/shared/ui/OpsField';
+import { MapLocationField } from '@/shared/ui/MapLocationField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
 import { TextInput } from '@/shared/ui/TextInput';
@@ -47,6 +48,9 @@ interface OnboardForm {
   city: string;
   state: string;
   pincode: string;
+  /** Map location (point 3): filled by the Google Maps location box, `''` when none. */
+  lat: string;
+  lng: string;
   timezone: string;
   planId: string;
   billingPeriod: string;
@@ -187,6 +191,8 @@ const SERVER_FIELDS: Readonly<Record<string, FormKey>> = {
   city: 'city',
   state: 'state',
   pincode: 'pincode',
+  lat: 'lat',
+  lng: 'lat',
   plan_id: 'planId',
   commission_bp: 'commissionPct',
   convenience_fee_value: 'feeValue',
@@ -224,6 +230,8 @@ function toInput(v: OnboardForm): HospitalCreateInput {
     city: v.city.trim(),
     state: v.state.trim(),
     pincode: v.pincode.trim(),
+    // Optional (client decision, point 3); when set, both together.
+    ...(v.lat.trim() !== '' && v.lng.trim() !== '' && { lat: Number(v.lat), lng: Number(v.lng) }),
     commissionBp: Math.round(Number(v.commissionPct) * BP_PER_PERCENT),
     convenienceFeeKind: feeKind,
     convenienceFeeValue: Math.round(
@@ -254,6 +262,8 @@ const INITIAL: OnboardForm = {
   city: '',
   state: '',
   pincode: '',
+  lat: '',
+  lng: '',
   timezone: DEFAULT_HOSPITAL_TIMEZONE,
   planId: '',
   billingPeriod: 'monthly',
@@ -409,6 +419,21 @@ export function OnboardHospitalModal({ open, onClose, onDone }: OnboardHospitalM
               {text('pincode', { inputMode: 'numeric' })}
             </OpsField>
           </div>
+          <OpsField
+            label="Google Maps location"
+            error={errorFor('lat')}
+            hint="Paste the hospital's Google Maps link (or a Share link from the phone), or type the coordinates. Optional."
+          >
+            <MapLocationField
+              lat={values.lat}
+              lng={values.lng}
+              onChange={(lat, lng) => {
+                set('lat', lat);
+                set('lng', lng);
+              }}
+              height={FIELD_HEIGHT}
+            />
+          </OpsField>
           <OpsField
             label="Time zone"
             error={errorFor('timezone')}

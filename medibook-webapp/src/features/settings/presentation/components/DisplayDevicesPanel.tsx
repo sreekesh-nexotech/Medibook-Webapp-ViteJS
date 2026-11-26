@@ -12,6 +12,9 @@ import { SkeletonCards } from '@/shared/ui/Skeleton';
 import { toast } from '@/shared/ui/toast/toast.store';
 
 import type { DisplayDevice } from '@/features/settings/domain/entities/settings.entities';
+import { selectionOf, selectionSummary } from '@/features/settings/domain/displaySelection';
+import { useDepartmentsQuery } from '@/features/doctors/application/queries/useDepartmentsQuery';
+import { useDoctorsQuery } from '@/features/doctors/application/queries/useDoctorsQuery';
 import type { DisplayDeviceAccess } from '@/features/settings/application/queries/useDisplayDeviceAccess';
 import {
   useDeleteDisplayDeviceMutation,
@@ -23,6 +26,7 @@ import { useDisplayDevicesQuery } from '@/features/settings/application/queries/
 import { displayAddress } from '@/features/settings/presentation/components/displayLinks';
 import { DeviceKeyModal } from './DeviceKeyModal';
 import { DisplayDeviceModal } from './DisplayDeviceModal';
+import { DisplayPreviewModal } from './DisplayPreviewModal';
 import { SettingsHead } from './SettingsHead';
 
 /** "7 Oct, 9:05 am", or "never" for a screen that has not signed in yet. */
@@ -36,7 +40,8 @@ function lastSeen(iso: string | null): string {
 
 type Pending =
   | { readonly kind: 'rotate'; readonly device: DisplayDevice }
-  | { readonly kind: 'delete'; readonly device: DisplayDevice };
+  | { readonly kind: 'delete'; readonly device: DisplayDevice }
+  | { readonly kind: 'toggle'; readonly device: DisplayDevice };
 
 interface DisplayDevicesPanelProps {
   access: DisplayDeviceAccess;
@@ -45,7 +50,8 @@ interface DisplayDevicesPanelProps {
 /**
  * Settings › Display Screens — token TVs (`/hospital/display-devices`,
  * O-10, permission module `display_devices`). Register a screen (its key is
- * shown once), rename it, rotate its key, deactivate or remove it.
+ * shown once), choose the department / doctors it shows and preview it (point 8),
+ * rename it, rotate its key, deactivate or remove it.
  */
 export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
   const devices = useDisplayDevicesQuery(access.canView);
@@ -55,8 +61,15 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
   const [editing, setEditing] = useState<{ device: DisplayDevice | null } | null>(null);
   const [issued, setIssued] = useState<{ name: string; key: string } | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [previewing, setPreviewing] = useState<DisplayDevice | null>(null);
+  const departments = useDepartmentsQuery();
+  const doctors = useDoctorsQuery();
 
   const toggleActive = (d: DisplayDevice): void => {
+    setPending({ kind: 'toggle', device: d });
+  };
+
+  const confirmToggleActive = (d: DisplayDevice): void => {
     update.mutate(
       { id: d.id, changes: { isActive: !d.isActive }, version: d.version },
       {
@@ -75,6 +88,10 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
     if (!pending) return;
     const { kind, device } = pending;
     setPending(null);
+    if (kind === 'toggle') {
+      confirmToggleActive(device);
+      return;
+    }
     if (kind === 'rotate') {
       rotate.mutate(device.id, {
         onSuccess: (out) => setIssued({ name: out.device.name, key: out.deviceKey }),
@@ -137,9 +154,21 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
             <li key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-50 flex-1">
                 <div className="text-body text-text-strong font-medium">{d.name}</div>
+                {departments.data && doctors.data ? (
+                  <div className="text-caption text-text-body">
+                    {selectionSummary(selectionOf(d), departments.data, doctors.data)}
+                  </div>
+                ) : null}
                 <div className="text-caption text-text-muted">{lastSeen(d.lastSeenAt)}</div>
               </div>
               <Badge status={d.isActive ? 'Active' : 'Inactive'} />
+              <IconBtn
+                name="eye"
+                label={`Preview ${d.name}`}
+                box={34}
+                size={15}
+                onClick={() => setPreviewing(d)}
+              />
               {access.canEdit && (
                 <>
                   <Button size="sm" variant="secondary" onClick={() => toggleActive(d)}>
@@ -154,7 +183,7 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
                   />
                   <IconBtn
                     name="pencil"
-                    label={`Rename ${d.name}`}
+                    label={`Edit ${d.name}`}
                     box={34}
                     size={15}
                     onClick={() => setEditing({ device: d })}
@@ -187,16 +216,39 @@ export function DisplayDevicesPanel({ access }: DisplayDevicesPanelProps) {
         />
       )}
       <DeviceKeyModal issued={issued} onClose={() => setIssued(null)} />
+      <DisplayPreviewModal
+        target={previewing ? { kind: 'device', id: previewing.id } : null}
+        screenName={previewing?.name ?? ''}
+        onClose={() => setPreviewing(null)}
+      />
       <ConfirmModal
         open={pending !== null}
         danger
-        title={pending?.kind === 'rotate' ? 'Rotate this screen’s key?' : 'Remove this screen?'}
-        confirmLabel={pending?.kind === 'rotate' ? 'Rotate key' : 'Remove'}
+        title={
+          pending?.kind === 'rotate'
+            ? 'Rotate this screen’s key?'
+            : pending?.kind === 'delete'
+              ? 'Remove this screen?'
+              : `${pending?.device.isActive ? 'Deactivate' : 'Reactivate'} this screen?`
+        }
+        confirmLabel={
+          pending?.kind === 'rotate'
+            ? 'Rotate key'
+            : pending?.kind === 'delete'
+              ? 'Remove'
+              : pending?.device.isActive
+                ? 'Deactivate'
+                : 'Reactivate'
+        }
         body={
           pending
             ? pending.kind === 'rotate'
               ? `${pending.device.name} is signed out at once and needs the new key to show the queue again.`
-              : `${pending.device.name} is signed out and removed. Register it again to use it.`
+              : pending.kind === 'delete'
+                ? `${pending.device.name} is signed out and removed. Register it again to use it.`
+                : pending.device.isActive
+                  ? `${pending.device.name} is signed out and stops showing the queue until it is reactivated.`
+                  : `${pending.device.name} can show the queue again once it signs in.`
             : ''
         }
         onClose={() => setPending(null)}

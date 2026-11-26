@@ -4,7 +4,7 @@ import type {
   PlatformUserStatus,
   PlatformUserSummary,
 } from '@/features/ops-platform-users/domain/entities/platformUsers.entities';
-import { formatInstant } from '@/shared/lib/format';
+import { formatIst } from '@/shared/lib/format';
 
 /** Shown wherever the backend has no value for a column. */
 export const NO_VALUE = '—';
@@ -58,7 +58,7 @@ const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: 'medium', time
 function format(options: Intl.DateTimeFormatOptions, iso: string | null): string {
   if (!iso) return NO_VALUE;
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? NO_VALUE : formatInstant(date, options);
+  return Number.isNaN(date.getTime()) ? NO_VALUE : formatIst(date, options);
 }
 
 /** "2026-01-12T05:30:00Z" → "12 Jan 2026" in India Standard Time. */
@@ -112,4 +112,24 @@ export function deviceLine(
 /** "Verified 12 Jan 2026" / "Not verified" for a phone or email verification timestamp. */
 export function verifiedLabel(at: string | null): string {
   return at ? `Verified ${formatDate(at)}` : 'Not verified';
+}
+
+/** The exact total when the backend sends it, else the refs we were given. */
+function upcomingTotal(refs: readonly string[], total: number | null): number {
+  return Math.max(total ?? 0, refs.length);
+}
+
+/** "3 upcoming paid bookings". */
+export function upcomingPaidCountLabel(refs: readonly string[], total: number | null): string {
+  const n = upcomingTotal(refs, total);
+  return `${n} upcoming paid booking${n === 1 ? '' : 's'}`;
+}
+
+/** "+12 more" when the capped list is shorter than the exact total, else `null`. */
+export function upcomingPaidMoreLabel(
+  refs: readonly string[],
+  total: number | null,
+): string | null {
+  const more = upcomingTotal(refs, total) - refs.length;
+  return more > 0 ? `+${more} more` : null;
 }
