@@ -96,6 +96,10 @@ import {
   logsPageResponseSchema,
   retentionResponseSchema,
 } from '@/features/ops-logs/infrastructure/data-sources/remote/logs.response';
+import {
+  couponPageResponseSchema,
+  couponUsePageResponseSchema,
+} from '@/features/ops-coupons/infrastructure/data-sources/remote/coupons.response';
 import { bannersPageResponseSchema } from '@/features/ops-notifications/infrastructure/data-sources/remote/notifications.response';
 import {
   planPageResponseSchema,
@@ -285,6 +289,8 @@ const CONTRACTS: Readonly<Record<string, ZodType>> = {
   'ops-logs.logsPageResponseSchema': logsPageResponseSchema,
   'ops-logs.retentionResponseSchema': retentionResponseSchema,
   'ops-notifications.bannersPageResponseSchema': bannersPageResponseSchema,
+  'ops-coupons.couponPageResponseSchema': couponPageResponseSchema,
+  'ops-coupons.couponUsePageResponseSchema': couponUsePageResponseSchema,
   'ops-plans.planPageResponseSchema': planPageResponseSchema,
   'ops-plans.subscriberPageResponseSchema': subscriberPageResponseSchema,
   'ops-plans.subscriberRowsPageSchema': subscriberRowsPageSchema,

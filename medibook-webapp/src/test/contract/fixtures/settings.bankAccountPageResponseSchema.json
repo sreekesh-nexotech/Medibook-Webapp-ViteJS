@@ -1,17 +1,20 @@
 {
   "results": [
     {
-      "id": "01a0ee28-a627-7220-83dd-6069f3596b39",
+      "id": "01a14485-ce32-7af1-bd05-f40ff7d564a0",
       "account_holder": "Example Healthcare Pvt Ltd",
       "account_last4": "0000",
+      "account_number_masked": "AAAAAAAA0000",
       "ifsc": "AAAA0000000",
       "bank_name": "HDFC Bank",
       "upi_id": "aaaaaaaaa-aa@aaaaaaaa",
+      "purpose_note": null,
       "is_primary": true,
-      "verified_at": null,
-      "created_at": "2026-08-09T09:30:00.197559Z",
-      "updated_at": "2026-08-09T09:30:00.197585Z",
-      "version": 1
+      "verified": true,
+      "verified_at": "2026-08-26T09:30:00.022301Z",
+      "created_at": "2026-08-26T09:30:00.020288Z",
+      "updated_at": "2026-11-25T16:53:08.436960Z",
+      "version": 4
     }
   ],
   "page": 1,

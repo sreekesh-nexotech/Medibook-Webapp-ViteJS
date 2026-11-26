@@ -45,6 +45,9 @@ export interface PlatformHospital {
   readonly city: string;
   readonly state: string;
   readonly pincode: string;
+  /** Map location (point 3): both set or both `null`; `null` too from an older backend. */
+  readonly lat: number | null;
+  readonly lng: number | null;
   readonly status: HospitalLifecycle;
   /** Listed in the patient app. A hospital is bookable online only when it is active, visible and has online booking on. */
   readonly appVisibility: HospitalAppVisibility;
@@ -146,6 +149,8 @@ export interface HospitalBankAccount {
   readonly ifsc: string;
   readonly accountNumberMasked: string;
   readonly upiIdMasked: string | null;
+  /** The hospital's own label for the account; reference only. */
+  readonly purposeNote: string | null;
   readonly isPrimary: boolean;
   /** Set once platform finance verified it (M-45); unverified primaries are skipped by payouts. */
   readonly verifiedAt: string | null;
@@ -214,6 +219,9 @@ export interface HospitalCreateInput {
   readonly city: string;
   readonly state: string;
   readonly pincode: string;
+  /** Map location read from a Google Maps link (point 3); optional, both or neither. */
+  readonly lat?: number;
+  readonly lng?: number;
   /** Platform commission on online bookings, in basis points. */
   readonly commissionBp: number;
   readonly convenienceFeeKind: ConvenienceFeeKind;
@@ -250,6 +258,9 @@ export interface HospitalProfileChanges {
   readonly city?: string;
   readonly state?: string;
   readonly pincode?: string;
+  /** Sent together (point 3): both values, or both `null` to remove the location. */
+  readonly lat?: number | null;
+  readonly lng?: number | null;
   /** Fixed once the hospital is live (L-20). */
   readonly timezone?: string;
   readonly onlineBookingEnabled?: boolean;
@@ -298,6 +309,8 @@ export interface PayoutBankAccount {
   readonly ifsc: string;
   readonly accountNumberMasked: string;
   readonly upiId: string | null;
+  /** The hospital's own label for the account; reference only. */
+  readonly purposeNote: string | null;
   readonly isPrimary: boolean;
   readonly verifiedAt: string | null;
   readonly version: number;

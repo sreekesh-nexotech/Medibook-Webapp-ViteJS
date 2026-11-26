@@ -373,6 +373,8 @@ export type OpsView =
   | 'platform-users'
   | 'platform-user-detail'
   | 'notifications'
+  /** Coupons / Offers — Medibook-funded coupon codes (client feedback point 9). */
+  | 'coupons'
   | 'settings'
   // ---- added this round (screens owned by the feature agents) ----
   /** Hospital onboarding pipeline (applications, KYC, go-live). */
@@ -423,6 +425,7 @@ export const OPS_VIEW_SEGMENT: Readonly<Record<OpsView, string>> = {
   'platform-users': 'platform-users',
   'platform-user-detail': 'platform-users/:id',
   notifications: 'notifications',
+  coupons: 'coupons',
   settings: 'settings',
   onboarding: 'onboarding',
   compliance: 'compliance',
@@ -527,6 +530,7 @@ const OPS_SEGMENT_VIEWS: readonly OpsView[] = [
   'users',
   'platform-users',
   'notifications',
+  'coupons',
   'settings',
   'onboarding',
   'compliance',

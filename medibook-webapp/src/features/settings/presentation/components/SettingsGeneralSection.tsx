@@ -6,6 +6,7 @@ import { cn } from '@/shared/lib/cn';
 import { Card } from '@/shared/ui/Card';
 import { Field } from '@/shared/ui/Field';
 import { Icon } from '@/shared/ui/Icon';
+import { MapLocationField } from '@/shared/ui/MapLocationField';
 import { TextInput } from '@/shared/ui/TextInput';
 
 import type {
@@ -21,9 +22,6 @@ import type { SectionDraft } from './settingsEditor.types';
 /** Fallback artwork while the hospital has no logo of its own. */
 const DEFAULT_LOGO_SRC = '/assets/medibook-mark.svg';
 const PLATFORM_MANAGED_HINT = 'Managed by Medibook — contact support to change it.';
-/** A map search for typed coordinates, so the admin can check the pin themselves. */
-const MAP_SEARCH_URL = 'https://www.openstreetmap.org/';
-const MAP_ZOOM = 17;
 
 type PickImage = (
   purpose: HospitalImagePurpose,
@@ -101,9 +99,10 @@ function ImagePicker({
 /**
  * Settings › General — the hospital's profile as patients and receipts see
  * it: identity, contact, the full structured address (lines 1–3, city,
- * state, PIN — CLAUDE.md §7), typed coordinates and the images. There is no
+ * state, PIN — CLAUDE.md §7), the map location and the images. There is no
  * clickable map: it used to write Bengaluru coordinates for any hospital
- * (UAT-28), so a location is only what the admin types, checked on a real map.
+ * (UAT-28). The location comes from a pasted Google Maps link or typed
+ * coordinates (client feedback point 3), checked on Google Maps before saving.
  */
 export function SettingsGeneralSection({
   draft,
@@ -114,10 +113,6 @@ export function SettingsGeneralSection({
   pickImage,
 }: SettingsGeneralSectionProps) {
   const { value, set, errors } = draft;
-  const hasCoords = value.lat.trim() !== '' && value.lng.trim() !== '';
-  const mapHref = hasCoords
-    ? `${MAP_SEARCH_URL}?mlat=${encodeURIComponent(value.lat.trim())}&mlon=${encodeURIComponent(value.lng.trim())}#map=${MAP_ZOOM}/${encodeURIComponent(value.lat.trim())}/${encodeURIComponent(value.lng.trim())}`
-    : null;
   const text = (
     key: keyof ProfileForm,
     label: string,
@@ -195,28 +190,21 @@ export function SettingsGeneralSection({
               autoComplete: 'postal-code',
             })}
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {text('lat', 'Latitude', { inputMode: 'decimal', hint: 'e.g. 9.9312' })}
-            {text('lng', 'Longitude', { inputMode: 'decimal', hint: 'e.g. 76.2673' })}
-          </div>
-          <div className="text-caption text-text-muted flex flex-wrap items-center gap-1.5">
-            <Icon name="map-pin" size={14} /> Copy the coordinates from your map app (long-press the
-            hospital&apos;s entrance).
-            {mapHref ? (
-              <a
-                href={mapHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue underline"
-              >
-                Check this pin on a map
-              </a>
-            ) : (
-              <span>
-                Leave both empty if you are not sure — patients then get the address only.
-              </span>
-            )}
-          </div>
+          <Field
+            label="Google Maps location"
+            error={errors.lat ?? errors.lng}
+            hint="In Google Maps, find the hospital's entrance, then copy the link (or use Share on the phone) and paste it here. You can also type the coordinates."
+          >
+            <MapLocationField
+              lat={value.lat}
+              lng={value.lng}
+              onChange={(lat, lng) => {
+                set('lat', lat);
+                set('lng', lng);
+              }}
+              disabled={!mayEdit}
+            />
+          </Field>
         </div>
       </Card>
 

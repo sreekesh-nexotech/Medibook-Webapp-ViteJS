@@ -8,11 +8,14 @@ import {
   postCounter,
 } from '@/features/settings/infrastructure/data-sources/remote/counters.api';
 import { toCounter } from '@/features/settings/infrastructure/data-sources/remote/counters.response';
+import { toDisplayBoard } from '@/features/display/infrastructure/data-sources/remote/display.response';
 import {
   deleteDisplayDevice,
+  getDisplayDevicePreview,
   listDisplayDevices,
   patchDisplayDevice,
   postDisplayDevice,
+  postDisplayPreview,
   postRotateDisplayDeviceKey,
 } from '@/features/settings/infrastructure/data-sources/remote/displayDevices.api';
 import {
@@ -68,8 +71,8 @@ export const configRepository: ConfigRepository = {
     attempt(async () => toPrintPreview(await postPrintTemplatePreview(id))),
 
   listDisplayDevices: () => attempt(async () => (await listDisplayDevices()).map(toDisplayDevice)),
-  createDisplayDevice: (name) =>
-    attempt(async () => toDisplayDeviceWithKey(await postDisplayDevice(name))),
+  createDisplayDevice: (input) =>
+    attempt(async () => toDisplayDeviceWithKey(await postDisplayDevice(input))),
   updateDisplayDevice: (id, changes, version) =>
     attempt(async () => toDisplayDevice(await patchDisplayDevice(id, changes, version))),
   deleteDisplayDevice: (id, version) =>
@@ -79,4 +82,8 @@ export const configRepository: ConfigRepository = {
     }),
   rotateDisplayDeviceKey: (id) =>
     attempt(async () => toDisplayDeviceWithKey(await postRotateDisplayDeviceKey(id))),
+  previewDisplay: (selection) =>
+    attempt(async () => toDisplayBoard(await postDisplayPreview(selection))),
+  previewDisplayDevice: (id) =>
+    attempt(async () => toDisplayBoard(await getDisplayDevicePreview(id))),
 };

@@ -99,7 +99,8 @@ function payoutAccountCopy(h: PlatformHospitalDetail): string {
   if (h.bankAccounts === null) return 'See Billing & Settlements';
   const primary = h.bankAccounts.find((a) => a.isPrimary);
   if (!primary) return 'No payout account yet';
-  return `${primary.bankName} ${primary.accountNumberMasked}${primary.verifiedAt ? ' · verified' : ' · not verified'}`;
+  const purpose = primary.purposeNote ? ` · ${primary.purposeNote}` : '';
+  return `${primary.bankName} ${primary.accountNumberMasked}${primary.verifiedAt ? ' · verified' : ' · not verified'}${purpose}`;
 }
 
 /**

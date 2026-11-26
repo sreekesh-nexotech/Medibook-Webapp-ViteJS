@@ -181,6 +181,7 @@ export interface BankAccountWriteRequest {
   readonly ifsc: string;
   readonly bank_name: string;
   readonly upi_id: string | null;
+  readonly purpose_note: string | null;
 }
 
 export function toBankAccountWriteRequest(input: BankAccountInput): BankAccountWriteRequest {
@@ -190,5 +191,6 @@ export function toBankAccountWriteRequest(input: BankAccountInput): BankAccountW
     ifsc: input.ifsc,
     bank_name: input.bankName,
     upi_id: input.upiId,
+    purpose_note: input.purposeNote,
   };
 }

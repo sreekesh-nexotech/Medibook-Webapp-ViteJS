@@ -17,12 +17,8 @@ import {
 } from '@/features/display/application/usecases/displayKey';
 import { DisplayKeyForm } from '@/features/display/presentation/components/DisplayKeyForm';
 import { NowCallingBanner } from '@/features/display/presentation/components/NowCallingBanner';
-import { DisplaySessionTile } from '@/features/display/presentation/components/DisplaySessionTile';
-import {
-  boardDateLabel,
-  latestCall,
-  orderSessions,
-} from '@/features/display/presentation/components/display.view';
+import { DisplayBoardView } from '@/features/display/presentation/components/DisplayBoardView';
+import { latestCall } from '@/features/display/presentation/components/display.view';
 
 const HTTP_UNAUTHORIZED = 401;
 
@@ -33,7 +29,8 @@ const NOW_CALLING_MS = 12_000;
  * The waiting-room display (UAT PRV-010 / DEF-006): a public page for the TV
  * in the OPD hall. It signs in with a device key (from `?key=` or typed once,
  * then kept in this browser) and shows today's token for every doctor
- * session, refreshed every 15 seconds. No staff session is involved.
+ * session, refreshed every 15 seconds. No staff session is involved. The board is laid out after
+ * the client's reference screen (point 7) and fills the TV without scrolling, paging its rows.
  */
 export function DisplayScreen() {
   const [params, setParams] = useSearchParams();
@@ -112,28 +109,16 @@ export function DisplayScreen() {
     );
   }
 
-  const sessions = orderSessions(board.data.sessions);
   return (
-    <main className="bg-bg-app flex h-full flex-col gap-6 overflow-y-auto p-8">
-      <header className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="text-display text-text-strong">{board.data.hospitalName}</h1>
-        <p className="text-h3 text-text-muted">{boardDateLabel(board.data.date)}</p>
-      </header>
-      {calling ? <NowCallingBanner session={calling} /> : null}
-      {board.isError ? (
-        <p role="status" className="text-body text-warning">
-          Reconnecting… the tokens below may be a little out of date.
-        </p>
-      ) : null}
-      {sessions.length === 0 ? (
-        <p className="text-h2 text-text-muted">No consultations are running today.</p>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sessions.map((session) => (
-            <DisplaySessionTile key={session.id} session={session} />
-          ))}
-        </div>
-      )}
+    <main className="bg-bg-app h-full overflow-hidden">
+      <DisplayBoardView board={board.data}>
+        {calling ? <NowCallingBanner session={calling} /> : null}
+        {board.isError ? (
+          <p role="status" className="text-board-meta text-warning">
+            Reconnecting… the tokens below may be a little out of date.
+          </p>
+        ) : null}
+      </DisplayBoardView>
     </main>
   );
 }

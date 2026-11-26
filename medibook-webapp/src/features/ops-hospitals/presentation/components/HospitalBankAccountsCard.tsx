@@ -83,6 +83,11 @@ export function HospitalBankAccountsCard({ hospitalId }: HospitalBankAccountsCar
                   {a.accountHolder} · IFSC {a.ifsc}
                   {a.verifiedAt ? ` · verified ${longDateFromTimestamp(a.verifiedAt)}` : ''}
                 </div>
+                {a.purposeNote && (
+                  <div className="text-caption text-text-body mt-0.5 break-words">
+                    Purpose: {a.purposeNote}
+                  </div>
+                )}
               </div>
               {a.isPrimary && <Badge status="Info">Primary</Badge>}
               <Badge status={a.verifiedAt ? 'Verified' : 'Pending'}>

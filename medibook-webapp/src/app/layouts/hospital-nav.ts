@@ -66,7 +66,8 @@ export const NAV_MODEL: readonly HospitalNavSection[] = [
     items: [
       { id: 'profile', label: 'Hospital Details', icon: 'building', roles: ['admin'] },
       { id: 'settings', label: 'Hospital Settings', icon: 'settings', roles: ['admin'] },
-      { id: 'messaging', label: 'Messaging', icon: 'megaphone', roles: ['admin'] },
+      // Messaging is hidden from hospital admins (client feedback point 13, Nov 2026): a hospital
+      // cannot message patients directly; every patient message is sent by the system.
       { id: 'audit', label: 'Audit Trail', icon: 'scroll-text', roles: ['admin'] },
       {
         id: 'help',

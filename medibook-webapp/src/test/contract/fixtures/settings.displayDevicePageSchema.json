@@ -1,23 +1,24 @@
 {
   "results": [
     {
-      "id": "01a118b6-937a-7d30-854b-a32962e58318",
+      "id": "01a14485-c5d8-79c2-9b2f-11b70210065a",
       "name": "OPD waiting hall screen",
       "is_active": true,
+      "selected_department_id": null,
       "selected_doctor_ids": [
-        "01a118b6-917e-7ed2-a65a-e04b3fe0c31c",
-        "01a118b6-91f0-7fe2-96f7-0413134bbd47",
-        "01a118b6-9221-7443-839b-5bbdb59d3034",
-        "01a118b6-924b-7861-ad56-5f0931bddfa6",
-        "01a118b6-9276-7b63-8645-29bd06fe41c3"
+        "01a14485-c566-7983-9191-b048616850e0",
+        "01a14485-c57e-7a61-8cd2-17911098c538",
+        "01a14485-c58b-7e91-ba2a-112427d78d1a",
+        "01a14485-c59a-7583-bfa0-4723b48b29fb",
+        "01a14485-c5a7-77e1-9948-cae01e3ac985"
       ],
       "selected_counter_ids": [
-        "01a118b6-9040-7851-b186-e1423a263fea",
-        "01a118b6-9043-74a3-b66c-c97fffeba13c"
+        "01a14485-c54d-7ba1-a438-7e167bbdf120",
+        "01a14485-c54e-7622-abf4-f6346dccb5d2"
       ],
-      "last_seen_at": null,
-      "created_at": "2026-08-15T04:30:00.946699Z",
-      "updated_at": "2026-08-15T04:30:00.946716Z",
+      "last_seen_at": "2026-10-16T12:23:50.532389Z",
+      "created_at": "2026-08-23T04:30:00.310809Z",
+      "updated_at": "2026-10-16T12:23:50.532389Z",
       "version": 1
     }
   ],

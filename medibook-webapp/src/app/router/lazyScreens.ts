@@ -35,11 +35,6 @@ export const HelpSupportScreen = lazy(() =>
     default: m.HelpSupportScreen,
   })),
 );
-export const MessagingScreen = lazy(() =>
-  import('@/features/messaging/presentation/screens/MessagingScreen').then((m) => ({
-    default: m.MessagingScreen,
-  })),
-);
 export const OpsAnalyticsScreen = lazy(() =>
   import('@/features/ops-analytics/presentation/screens/OpsAnalyticsScreen').then((m) => ({
     default: m.OpsAnalyticsScreen,
@@ -88,6 +83,11 @@ export const OpsOnboardingScreen = lazy(() =>
 export const OpsLogsScreen = lazy(() =>
   import('@/features/ops-logs/presentation/screens/OpsLogsScreen').then((m) => ({
     default: m.OpsLogsScreen,
+  })),
+);
+export const OpsCouponsScreen = lazy(() =>
+  import('@/features/ops-coupons/presentation/screens/OpsCouponsScreen').then((m) => ({
+    default: m.OpsCouponsScreen,
   })),
 );
 export const OpsNotificationsScreen = lazy(() =>

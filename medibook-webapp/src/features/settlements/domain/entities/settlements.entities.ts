@@ -42,6 +42,8 @@ export interface Payout {
   readonly amountPaise: number;
   readonly status: PayoutStatus;
   readonly bankAccountLast4: string | null;
+  /** The hospital's own label for the payout account; reference only. */
+  readonly bankAccountPurposeNote: string | null;
   /** Bank reference for the transfer, once released. */
   readonly utrRef: string | null;
   readonly releasedAt: string | null;
@@ -77,6 +79,8 @@ export interface SettlementBreakdown {
   readonly bookingsCount: number;
   /** Adjustments posted after an earlier period was paid, settled in this one. */
   readonly carriedAdjustmentsPaise: number;
+  /** Discounts Medibook bore on its coupons, credited to the hospital net of reversals (point 9). */
+  readonly platformDiscountsPaise: number;
   /** Ledger rows journalled after an earlier close that rolled into this window. */
   readonly lateEntries: number;
   /**
@@ -124,6 +128,8 @@ export interface SettlementStatement extends StatementRef {
   readonly commissionGstPaise: number;
   readonly convenienceFeesPaise: number;
   readonly convenienceFeeGstPaise: number;
+  /** Discounts Medibook bore on its coupons, credited to the hospital net of reversals (point 9). */
+  readonly platformDiscountsPaise: number;
   readonly netPayablePaise: number;
   /** The settlement side of the month, for reconciliation (B01). */
   readonly settlementNetPaise: number | null;

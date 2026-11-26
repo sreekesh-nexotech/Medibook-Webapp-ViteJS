@@ -14,6 +14,8 @@ export interface HospitalCreateRequest {
   readonly city: string;
   readonly state: string;
   readonly pincode: string;
+  readonly lat?: number;
+  readonly lng?: number;
   readonly commission_bp: number;
   readonly convenience_fee_kind: string;
   readonly convenience_fee_value: number;
@@ -44,6 +46,7 @@ export function toHospitalCreateRequest(input: HospitalCreateInput): HospitalCre
     city: input.city,
     state: input.state,
     pincode: input.pincode,
+    ...(input.lat !== undefined && input.lng !== undefined && { lat: input.lat, lng: input.lng }),
     commission_bp: input.commissionBp,
     convenience_fee_kind: input.convenienceFeeKind,
     convenience_fee_value: input.convenienceFeeValue,
@@ -77,6 +80,8 @@ export interface HospitalPatchRequest {
   readonly city?: string;
   readonly state?: string;
   readonly pincode?: string;
+  readonly lat?: number | null;
+  readonly lng?: number | null;
   readonly timezone?: string;
   readonly online_booking_enabled?: boolean;
 }
@@ -95,6 +100,8 @@ export function toHospitalPatchRequest(c: HospitalProfileChanges): HospitalPatch
     ...(c.city !== undefined && { city: c.city }),
     ...(c.state !== undefined && { state: c.state }),
     ...(c.pincode !== undefined && { pincode: c.pincode }),
+    // Both or neither: the server refuses half a location (point 3).
+    ...(c.lat !== undefined && c.lng !== undefined && { lat: c.lat, lng: c.lng }),
     ...(c.timezone !== undefined && { timezone: c.timezone }),
     ...(c.onlineBookingEnabled !== undefined && {
       online_booking_enabled: c.onlineBookingEnabled,

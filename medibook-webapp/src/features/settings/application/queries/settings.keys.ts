@@ -15,6 +15,9 @@ export const settingsKeys = {
   printPreview: (id: string, version: number) =>
     [...settingsKeys.printTemplates(), 'preview', id, version] as const,
   displayDevices: () => [...settingsKeys.all, 'display-devices'] as const,
+  /** A saved screen (`device:<id>`) or the form's unsaved selection (`draft:<dept>:<doctors>`). */
+  displayPreview: (target: string) =>
+    [...settingsKeys.displayDevices(), 'preview', target] as const,
 };
 
 /** Settings change rarely and only from this screen; a minute keeps tabs in step. */

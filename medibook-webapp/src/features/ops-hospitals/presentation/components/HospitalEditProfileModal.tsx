@@ -4,6 +4,7 @@ import { isFailure } from '@/core/error/failure';
 import { useForm, type FormValidators } from '@/shared/hooks/useForm';
 import { email, pincode, required } from '@/shared/lib/validate';
 import { FormModal } from '@/shared/ui/FormModal';
+import { MapLocationField } from '@/shared/ui/MapLocationField';
 import { OpsField } from '@/shared/ui/OpsField';
 import { SectionTitle } from '@/shared/ui/SectionTitle';
 import { Select } from '@/shared/ui/Select';
@@ -41,6 +42,9 @@ interface ProfileForm {
   city: string;
   state: string;
   pincode: string;
+  /** Map location (point 3): filled by the Google Maps location box, `''` when none. */
+  lat: string;
+  lng: string;
   timezone: string;
 }
 
@@ -90,6 +94,8 @@ const SERVER_FIELDS: Readonly<Record<string, FormKey>> = {
   city: 'city',
   state: 'state',
   pincode: 'pincode',
+  lat: 'lat',
+  lng: 'lat',
   timezone: 'timezone',
 };
 
@@ -107,8 +113,15 @@ function toForm(h: PlatformHospitalDetail): ProfileForm {
     city: h.city,
     state: h.state,
     pincode: h.pincode,
+    lat: h.lat === null ? '' : String(h.lat),
+    lng: h.lng === null ? '' : String(h.lng),
     timezone: h.timezone ?? DEFAULT_HOSPITAL_TIMEZONE,
   };
+}
+
+/** A coordinate from the form, or `null` when the location was removed. */
+function coordinate(value: string): number | null {
+  return value.trim() === '' ? null : Number(value);
 }
 
 /** Empty optional text is stored as `null`. */
@@ -137,6 +150,11 @@ function toChanges(v: ProfileForm, h: PlatformHospitalDetail): HospitalProfileCh
     ...(v.city.trim() !== h.city && { city: v.city.trim() }),
     ...(v.state.trim() !== h.state && { state: v.state.trim() }),
     ...(v.pincode.trim() !== h.pincode && { pincode: v.pincode.trim() }),
+    // Both together, or the server refuses half a location (point 3).
+    ...((coordinate(v.lat) !== h.lat || coordinate(v.lng) !== h.lng) && {
+      lat: coordinate(v.lat),
+      lng: coordinate(v.lng),
+    }),
     // Fixed once the hospital is live (L-20); only sent before go-live.
     ...(h.goLiveAt === null &&
       v.timezone !== (h.timezone ?? DEFAULT_HOSPITAL_TIMEZONE) && { timezone: v.timezone }),
@@ -312,6 +330,22 @@ export function HospitalEditProfileModal({ h, onClose }: HospitalEditProfileModa
               />
             </OpsField>
           </div>
+          <OpsField
+            label="Google Maps location"
+            error={errorFor('lat')}
+            hint="Paste the hospital's Google Maps link (or a Share link from the phone), or type the coordinates. Optional."
+          >
+            <MapLocationField
+              lat={values.lat}
+              lng={values.lng}
+              onChange={(lat, lng) => {
+                form.setField('lat', lat);
+                form.setField('lng', lng);
+                if (serverErrors.lat) setServerErrors((e) => ({ ...e, lat: undefined }));
+              }}
+              height={FIELD_HEIGHT}
+            />
+          </OpsField>
         </section>
       </div>
     </FormModal>

@@ -6,6 +6,7 @@ import type {
 } from '@/features/settlements/domain/entities/settlements.entities';
 import {
   monthLabel,
+  payoutAccountLabel,
   PERIOD_STATUS,
   periodCheck,
   statementSpan,
@@ -22,6 +23,7 @@ const BREAKDOWN: SettlementBreakdown = {
   ledgerNetPaise: 92_100,
   bookingsCount: 4,
   carriedAdjustmentsPaise: 0,
+  platformDiscountsPaise: 0,
   lateEntries: 0,
   expectedNetPaise: null,
   differencePaise: null,
@@ -98,6 +100,20 @@ describe('period status labels', () => {
   it('never call a period "accruing" (decision 11, UAT-63)', () => {
     expect(Object.values(PERIOD_STATUS).map((s) => s.label.toLowerCase())).not.toContain(
       'accruing',
+    );
+  });
+});
+
+describe('payoutAccountLabel', () => {
+  it('shows the last 4 digits and the purpose note when the hospital gave one', () => {
+    expect(payoutAccountLabel({ bankAccountLast4: '4567', bankAccountPurposeNote: null })).toBe(
+      '•••• 4567',
+    );
+    expect(
+      payoutAccountLabel({ bankAccountLast4: '4567', bankAccountPurposeNote: 'Pharmacy' }),
+    ).toBe('•••• 4567 · Pharmacy');
+    expect(payoutAccountLabel({ bankAccountLast4: null, bankAccountPurposeNote: 'Pharmacy' })).toBe(
+      '—',
     );
   });
 });

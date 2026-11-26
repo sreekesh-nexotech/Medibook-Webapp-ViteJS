@@ -56,6 +56,9 @@ export const hospitalResponseSchema = z.object({
   city: z.string(),
   state: z.string(),
   pincode: z.string(),
+  // Decimal on the server: a number or a string depending on the serializer; older backends omit.
+  lat: z.union([z.number(), z.string()]).nullish(),
+  lng: z.union([z.number(), z.string()]).nullish(),
   status: lifecycleSchema,
   app_visibility: z.enum(['visible', 'hidden']),
   online_booking_enabled: z.boolean(),
@@ -122,6 +125,7 @@ const bankAccountSchema = z.object({
   ifsc: z.string(),
   account_number_masked: z.string(),
   upi_id_masked: z.string().nullable(),
+  purpose_note: z.string().nullable().optional(),
   is_primary: z.boolean(),
   verified_at: z.string().nullable(),
   created_at: z.string(),
@@ -135,6 +139,7 @@ function toBankAccount(dto: z.infer<typeof bankAccountSchema>): HospitalBankAcco
     ifsc: dto.ifsc,
     accountNumberMasked: dto.account_number_masked,
     upiIdMasked: dto.upi_id_masked,
+    purposeNote: dto.purpose_note ?? null,
     isPrimary: dto.is_primary,
     verifiedAt: dto.verified_at,
     createdAt: dto.created_at,
@@ -195,6 +200,13 @@ export const hospitalDetailResponseSchema = hospitalResponseSchema.extend({
 export type HospitalResponse = z.infer<typeof hospitalResponseSchema>;
 export type HospitalDetailResponse = z.infer<typeof hospitalDetailResponseSchema>;
 
+/** A decimal coordinate as a number, or `null` when absent or unreadable. */
+function coordinate(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function toPlatformHospital(dto: HospitalResponse): PlatformHospital {
   return {
     id: dto.id,
@@ -212,6 +224,8 @@ export function toPlatformHospital(dto: HospitalResponse): PlatformHospital {
     city: dto.city,
     state: dto.state,
     pincode: dto.pincode,
+    lat: coordinate(dto.lat),
+    lng: coordinate(dto.lng),
     status: dto.status,
     appVisibility: dto.app_visibility,
     onlineBookingEnabled: dto.online_booking_enabled,
@@ -326,6 +340,7 @@ export const payoutBankAccountResponseSchema = z.object({
   ifsc: z.string(),
   account_number_masked: z.string(),
   upi_id: z.string().nullable().optional(),
+  purpose_note: z.string().nullable().optional(),
   is_primary: z.boolean(),
   verified_at: z.string().nullable(),
   version: z.number().int(),
@@ -343,6 +358,7 @@ export function toPayoutBankAccount(dto: PayoutBankAccountResponse): PayoutBankA
     ifsc: dto.ifsc,
     accountNumberMasked: dto.account_number_masked,
     upiId: dto.upi_id ?? null,
+    purposeNote: dto.purpose_note ?? null,
     isPrimary: dto.is_primary,
     verifiedAt: dto.verified_at,
     version: dto.version,

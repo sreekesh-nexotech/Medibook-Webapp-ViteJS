@@ -82,6 +82,8 @@ export interface Payout {
   readonly hospitalId: string;
   /** Last four digits of the hospital's primary payout account; `null` when none was on file. */
   readonly bankAccountLast4: string | null;
+  /** The hospital's own label for that account; reference only. */
+  readonly bankAccountPurposeNote: string | null;
   readonly hasBankAccount: boolean;
   readonly amountRupees: number;
   readonly status: PayoutStatus;
@@ -146,6 +148,8 @@ export interface PeriodBreakdown {
   readonly convenienceFeeGstRupees: number;
   /** Adjustments posted after an earlier period was paid, settling here. */
   readonly carriedAdjustmentsRupees: number;
+  /** Discounts Medibook bore on its coupons, credited to the hospital net of reversals (point 9). */
+  readonly platformDiscountsRupees: number;
   readonly ledgerNetRupees: number;
   readonly bookingsCount: number;
   readonly entries: number;
@@ -253,6 +257,8 @@ export interface PlatformStatement {
   readonly commissionGstRupees: number;
   readonly gatewayFeesRupees: number;
   readonly refundsRupees: number;
+  /** Discounts Medibook bore on its coupons, credited to the hospital net of reversals (point 9). */
+  readonly platformDiscountsRupees: number;
   readonly netPayableRupees: number;
 }
 

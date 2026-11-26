@@ -2,7 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { unwrap } from '@/core/error/failure';
 
-import type { DisplayDeviceChanges } from '@/features/settings/domain/entities/settings.entities';
+import type {
+  DisplayDeviceChanges,
+  DisplayDeviceInput,
+} from '@/features/settings/domain/entities/settings.entities';
 import { settingsKeys } from '@/features/settings/application/queries/settings.keys';
 import { createDisplayDevice } from '@/features/settings/application/usecases/createDisplayDevice';
 import { deleteDisplayDevice } from '@/features/settings/application/usecases/deleteDisplayDevice';
@@ -13,7 +16,7 @@ import { updateDisplayDevice } from '@/features/settings/application/usecases/up
 export function useRegisterDisplayDeviceMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string) => unwrap(await createDisplayDevice(name)),
+    mutationFn: async (input: DisplayDeviceInput) => unwrap(await createDisplayDevice(input)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: settingsKeys.displayDevices() }),
   });
 }
@@ -24,7 +27,7 @@ interface UpdateDisplayDeviceInput {
   readonly version: number;
 }
 
-/** Rename, deactivate or reactivate a screen. */
+/** Rename a screen, change what it shows, deactivate or reactivate it. */
 export function useUpdateDisplayDeviceMutation() {
   const queryClient = useQueryClient();
   return useMutation({

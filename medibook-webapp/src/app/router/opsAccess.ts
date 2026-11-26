@@ -28,6 +28,8 @@ export const OPS_VIEW_PERMISSION: Readonly<Record<OpsView, OpsPermissionKey | nu
   // Banners themselves still need settings.view; notifications.edit lets Support
   // open the screen and be pointed at Review Moderation instead of a 403.
   notifications: 'notifications.edit',
+  // point 9: coupons are platform config like the banners that advertise them
+  coupons: 'settings.view',
   settings: 'settings.view',
   content: 'settings.view',
   reviews: 'notifications.edit',

@@ -10,7 +10,8 @@ import type { IconName } from '@/shared/ui/icon-registry';
 /**
  * Where the rest of the hospital's setup lives. Captions describe only what
  * exists in v2 — no branches (D-02), shift patterns, announcements or
- * hospital message templates (CLAUDE.md §12, UAT-52).
+ * hospital message templates (CLAUDE.md §12, UAT-52). Messaging itself is hidden from
+ * hospital admins (client feedback point 13, Nov 2026).
  */
 const MANAGE_LINKS: readonly [string, string, HospitalStaticView, IconName][] = [
   ['Hospital Profile', 'Holiday calendar and patient-app banners', 'profile', 'building'],
@@ -32,7 +33,6 @@ const MANAGE_LINKS: readonly [string, string, HospitalStaticView, IconName][] = 
     'slots',
     'calendar-clock',
   ],
-  ['Messaging', 'Send booking messages and check deliveries', 'messaging', 'megaphone'],
   ['Audit Trail', 'Who changed what, when and from where', 'audit', 'scroll-text'],
   ['Users & Roles', 'Staff accounts and what each role may do', 'users', 'users'],
   ['Billing & Settlements', 'Subscription, invoices and payouts', 'settlements', 'credit-card'],

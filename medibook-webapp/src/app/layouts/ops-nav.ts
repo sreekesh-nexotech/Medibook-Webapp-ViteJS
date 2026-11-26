@@ -49,6 +49,7 @@ export const OPS_NAV: readonly OpsNavSection[] = [
       { id: 'users', label: 'Users & Roles', icon: 'shield-check' },
       { id: 'platform-users', label: 'Platform Users', icon: 'users' },
       { id: 'notifications', label: 'Notifications', icon: 'megaphone' },
+      { id: 'coupons', label: 'Coupons / Offers', icon: 'ticket' },
       { id: 'reviews', label: 'Review Moderation', icon: 'star' },
       { id: 'support', label: 'Support Desk', icon: 'headset' },
     ],
@@ -95,6 +96,10 @@ export const OPS_META: Readonly<Record<OpsView, readonly [string, string]>> = {
   users: ['Users & Roles', 'Internal Medibook users and their access roles'],
   'platform-users': ['Platform Users', 'Patient accounts from the Medibook mobile app'],
   'platform-user-detail': ['Patient Account', 'Read-only account view — access is logged'],
+  coupons: [
+    'Coupons / Offers',
+    'Coupon codes Medibook pays for, used on online bookings in the patient app',
+  ],
   notifications: [
     'Notifications',
     'Home-screen banners and push notifications in the Medibook patient app',

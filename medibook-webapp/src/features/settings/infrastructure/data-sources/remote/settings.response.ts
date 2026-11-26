@@ -266,6 +266,8 @@ export const bankAccountResponseSchema = z.object({
   ifsc: z.string(),
   bank_name: z.string(),
   upi_id: z.string().nullable(),
+  /** Optional while a backend without the field may still answer (client feedback, point 2). */
+  purpose_note: z.string().nullable().optional(),
   is_primary: z.boolean(),
   verified_at: z.string().nullable(),
   version: z.number().int(),
@@ -284,6 +286,7 @@ export function toBankAccount(dto: BankAccountResponse): BankAccount {
     ifsc: dto.ifsc,
     bankName: dto.bank_name,
     upiId: dto.upi_id,
+    purposeNote: dto.purpose_note ?? null,
     isPrimary: dto.is_primary,
     verifiedAt: dto.verified_at,
     version: dto.version,

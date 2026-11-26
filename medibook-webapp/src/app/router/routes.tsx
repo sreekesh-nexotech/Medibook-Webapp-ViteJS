@@ -35,7 +35,6 @@ import {
   HelpSupportScreen,
   HospitalProfileScreen,
   HospitalSettingsScreen,
-  MessagingScreen,
   MyAccountScreen,
   OpsAnalyticsScreen,
   OpsOnboardingDocumentsScreen,
@@ -49,6 +48,7 @@ import {
   OpsHospitalsScreen,
   OpsInvoiceDetailScreen,
   OpsLogsScreen,
+  OpsCouponsScreen,
   OpsNotificationsScreen,
   OpsOnboardingScreen,
   OpsPaymentDetailScreen,
@@ -169,7 +169,12 @@ export const router = createBrowserRouter([
               { path: HOSPITAL_VIEW_SEGMENT.slots, element: <SlotsScreen /> },
               { path: HOSPITAL_VIEW_SEGMENT.profile, element: <HospitalProfileScreen /> },
               { path: HOSPITAL_VIEW_SEGMENT.services, element: <ServicesPricingScreen /> },
-              { path: HOSPITAL_VIEW_SEGMENT.messaging, element: <MessagingScreen /> },
+              // Client feedback point 13 (Nov 2026): Messaging is hidden from hospital admins.
+              // An old link or bookmark lands on the dashboard instead of the removed screen.
+              {
+                path: HOSPITAL_VIEW_SEGMENT.messaging,
+                element: <Navigate to={`../${HOSPITAL_VIEW_SEGMENT.dashboard}`} replace />,
+              },
               { path: HOSPITAL_VIEW_SEGMENT.audit, element: <AuditTrailScreen /> },
             ],
           },
@@ -210,6 +215,7 @@ export const router = createBrowserRouter([
                 element: <OpsPlatformUserDetailScreen />,
               },
               { path: OPS_VIEW_SEGMENT.notifications, element: <OpsNotificationsScreen /> },
+              { path: OPS_VIEW_SEGMENT.coupons, element: <OpsCouponsScreen /> },
               { path: OPS_VIEW_SEGMENT.settings, element: <OpsSettingsScreen /> },
               { path: OPS_VIEW_SEGMENT['content'], element: <OpsContentScreen /> },
               { path: OPS_VIEW_SEGMENT['reviews'], element: <OpsReviewsScreen /> },

@@ -1,7 +1,10 @@
 {
   "hospital": {
     "id": "01a1263f-8a37-78f1-9c45-56169f660dd9",
-    "name": "Lakeshore Multispeciality Hospital"
+    "name": "Lakeshore Multispeciality Hospital",
+    "logo_file_id": null,
+    "logo_url": null,
+    "logo_url_expires_at": null
   },
   "date": "2026-10-16",
   "selection": {
@@ -80,6 +83,7 @@
       "queue_state": "available"
     }
   ],
+  "doctors_off_today": [],
   "options": {
     "doctors": [
       {
